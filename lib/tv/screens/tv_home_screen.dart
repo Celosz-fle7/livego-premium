@@ -4,6 +4,7 @@ import '../../models/content_item.dart';
 import '../../shared/widgets/category_chips.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/poster_card.dart';
+import 'tv_player_screen.dart';
 
 class TvHomeScreen extends StatefulWidget {
   const TvHomeScreen({super.key});
@@ -109,7 +110,15 @@ class _Rail extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 20),
-            itemBuilder: (_, i) => PosterCard(item: items[i], tv: true),
+            itemBuilder: (_, i) => PosterCard(
+              item: items[i],
+              tv: true,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => TvPlayerScreen(item: items[i])),
+                );
+              },
+            ),
           ),
         ),
       ],

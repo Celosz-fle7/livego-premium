@@ -72,7 +72,13 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
               children: [
                 _TopBar(item: item),
                 const SizedBox(height: 14),
-                _PlayerSurface(item: item, loading: loading, streamUrl: streamUrl, episode: episode),
+                _PlayerSurface(
+                  key: ValueKey('mobile-player-$streamUrl-$episode'),
+                  item: item,
+                  loading: loading,
+                  streamUrl: streamUrl,
+                  episode: episode,
+                ),
                 const SizedBox(height: 18),
                 _ActionRow(item: item),
                 const SizedBox(height: 18),
@@ -112,7 +118,11 @@ class _TopBar extends StatelessWidget {
             item.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
@@ -125,7 +135,14 @@ class _PlayerSurface extends StatefulWidget {
   final bool loading;
   final String streamUrl;
   final int episode;
-  const _PlayerSurface({required this.item, required this.loading, required this.streamUrl, required this.episode});
+
+  const _PlayerSurface({
+    super.key,
+    required this.item,
+    required this.loading,
+    required this.streamUrl,
+    required this.episode,
+  });
 
   @override
   State<_PlayerSurface> createState() => _PlayerSurfaceState();
@@ -133,32 +150,85 @@ class _PlayerSurface extends StatefulWidget {
 
 class _PlayerSurfaceState extends State<_PlayerSurface> {
   VideoPlayerController? _controller;
-  String _activeUrl = '';
-
-  @override
-  void didUpdateWidget(covariant _PlayerSurface oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _setup();
-  }
+  String _error = '';
+  bool _buffering = true;
 
   @override
   void initState() {
     super.initState();
-    _setup();
+    _openStream();
   }
 
-  Future<void> _setup() async {
-    if (widget.streamUrl.isEmpty || widget.streamUrl == _activeUrl) return;
-    _activeUrl = widget.streamUrl;
+  @override
+  void didUpdateWidget(covariant _PlayerSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamUrl != widget.streamUrl) {
+      _openStream();
+    }
+  }
+
+  Future<void> _openStream() async {
     await _controller?.dispose();
-    final c = VideoPlayerController.networkUrl(
-      Uri.parse(widget.streamUrl),
-      httpHeaders: const {'User-Agent': 'okhttp/4.12.0'},
-    );
-    _controller = c;
-    await c.initialize();
-    await c.play();
+    _controller = null;
+    _error = '';
+    _buffering = true;
+
     if (mounted) setState(() {});
+
+    if (widget.streamUrl.isEmpty) {
+      _error = 'Stream belum tersedia dari API.';
+      _buffering = false;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    try {
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.streamUrl),
+        httpHeaders: const {
+          'User-Agent': 'okhttp/4.12.0',
+          'Accept': '*/*',
+          'Connection': 'keep-alive',
+        },
+      );
+
+      _controller = controller;
+      controller.addListener(() {
+        if (!mounted) return;
+        final value = controller.value;
+        if (_buffering != value.isBuffering) {
+          setState(() => _buffering = value.isBuffering);
+        }
+      });
+
+      await controller.initialize();
+      await controller.play();
+      if (mounted) {
+        setState(() => _buffering = false);
+      }
+    } catch (e) {
+      _error = '$e';
+      _buffering = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _togglePlay() {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
+    setState(() {});
+  }
+
+  Future<void> _seek(int seconds) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final target = c.value.position + Duration(seconds: seconds);
+    await c.seekTo(target < Duration.zero ? Duration.zero : target);
   }
 
   @override
@@ -169,11 +239,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   @override
   Widget build(BuildContext context) {
-    final item = widget.item;
-    final loading = widget.loading;
-    final streamUrl = widget.streamUrl;
-    final episode = widget.episode;
-    final image = item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl;
+    final image = widget.item.backdropUrl.isNotEmpty ? widget.item.backdropUrl : widget.item.posterUrl;
+    final controller = _controller;
+    final ready = controller != null && controller.value.isInitialized;
+
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Container(
@@ -181,48 +250,99 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
           color: const Color(0xFF090E18),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(color: const Color(0xFF27405A)),
-          image: image.isEmpty ? null : DecorationImage(image: NetworkImage(image), fit: BoxFit.cover),
+          image: (!ready && image.isNotEmpty)
+              ? DecorationImage(image: NetworkImage(image), fit: BoxFit.cover)
+              : null,
           boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.09), blurRadius: 30)],
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x66000000), Color(0xEE050913)],
-            ),
-          ),
-          child: (_controller != null && _controller!.value.isInitialized)
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(26),
-                  child: VideoPlayer(_controller!),
-                )
-              : Center(
-            child: loading
-                ? const CircularProgressIndicator()
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (ready)
+              FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
+              )
+            else
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x66000000), Color(0xEE050913)],
+                  ),
+                ),
+              ),
+            if (_buffering || widget.loading)
+              const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+            if (_error.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    _error,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            if (ready)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _togglePlay,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      opacity: controller.value.isPlaying ? 0 : 1,
+                      duration: const Duration(milliseconds: 180),
+                      child: Container(
+                        width: 76,
+                        height: 76,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
-                          boxShadow: [BoxShadow(color: AppTheme.purple.withOpacity(0.42), blurRadius: 26)],
+                          color: Colors.black.withOpacity(0.45),
+                          border: Border.all(color: Colors.white24),
                         ),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 52),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 48),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        streamUrl.isEmpty ? 'Stream belum tersedia' : 'Episode $episode siap diputar',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                      ),
-                    ],
+                    ),
                   ),
-          ),
-        ),
+                ),
+              ),
+            if (ready)
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => _seek(-10),
+                      icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                    ),
+                    Expanded(
+                      child: VideoProgressIndicator(
+                        controller,
+                        allowScrubbing: true,
+                        colors: const VideoProgressColors(
+                          playedColor: AppTheme.cyan,
+                          bufferedColor: Colors.white30,
+                          backgroundColor: Colors.white12,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _seek(10),
+                      icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -245,7 +365,7 @@ class _ActionRow extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () {},
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Tonton'),
+                label: const Text('Sedang Diputar'),
               ),
             ),
             const SizedBox(width: 10),
@@ -290,11 +410,24 @@ class _DetailCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 8),
-                Text('${item.source} • ${item.episodes} Episode • ${item.category}', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w700)),
+                Text(
+                  '${item.source} • ${item.episodes} Episode • ${item.category}',
+                  style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 10),
-                Text(item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description, maxLines: 5, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.42)),
+                Text(
+                  item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppTheme.textSoft, height: 1.42),
+                ),
               ],
             ),
           ),

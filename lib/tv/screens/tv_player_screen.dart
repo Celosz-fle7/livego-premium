@@ -1,0 +1,278 @@
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
+
+import '../../core/app_theme.dart';
+import '../../data/livego_catalog.dart';
+import '../../models/content_item.dart';
+
+class TvPlayerScreen extends StatefulWidget {
+  final ContentItem item;
+  const TvPlayerScreen({super.key, required this.item});
+
+  @override
+  State<TvPlayerScreen> createState() => _TvPlayerScreenState();
+}
+
+class _TvPlayerScreenState extends State<TvPlayerScreen> {
+  VideoPlayerController? _controller;
+  ContentItem? _detail;
+  String _url = '';
+  String _error = '';
+  bool _loading = true;
+  int _episode = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+
+    try {
+      final detail = await LiveGoCatalog.detail(widget.item);
+      final selected = ContentItem(
+        id: detail.id,
+        title: detail.title,
+        source: detail.source,
+        category: detail.category,
+        description: detail.description,
+        posterUrl: detail.posterUrl,
+        backdropUrl: detail.backdropUrl,
+        rating: detail.rating,
+        episodes: detail.episodes,
+        updated: detail.updated,
+        platformSlug: detail.platformSlug,
+        chapterId: '$_episode',
+        lang: detail.lang,
+      );
+      final url = await LiveGoCatalog.videoUrl(selected);
+      await _controller?.dispose();
+      _controller = null;
+      _detail = selected;
+      _url = url;
+
+      if (url.isNotEmpty) {
+        final controller = VideoPlayerController.networkUrl(
+          Uri.parse(url),
+          httpHeaders: const {
+            'User-Agent': 'okhttp/4.12.0',
+            'Accept': '*/*',
+            'Connection': 'keep-alive',
+          },
+        );
+        _controller = controller;
+        await controller.initialize();
+        await controller.play();
+      }
+    } catch (e) {
+      _error = '$e';
+    }
+
+    _loading = false;
+    if (mounted) setState(() {});
+  }
+
+  void _toggle() {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
+    setState(() {});
+  }
+
+  void _selectEpisode(int episode) {
+    _episode = episode;
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = _detail ?? widget.item;
+    final controller = _controller;
+    final ready = controller != null && controller.value.isInitialized;
+
+    return Scaffold(
+      backgroundColor: AppTheme.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(112, 30, 40, 30),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: AppTheme.cyan.withOpacity(0.28)),
+                          boxShadow: [BoxShadow(color: AppTheme.purple.withOpacity(0.18), blurRadius: 40)],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (ready)
+                              FittedBox(
+                                fit: BoxFit.contain,
+                                child: SizedBox(
+                                  width: controller.value.size.width,
+                                  height: controller.value.size.height,
+                                  child: VideoPlayer(controller),
+                                ),
+                              )
+                            else if (item.backdropUrl.isNotEmpty || item.posterUrl.isNotEmpty)
+                              Image.network(
+                                item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
+                                fit: BoxFit.cover,
+                              ),
+                            Container(color: Colors.black.withOpacity(ready ? 0 : 0.38)),
+                            if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+                            if (!_loading && !ready)
+                              Center(
+                                child: Text(
+                                  _error.isNotEmpty ? _error : (_url.isEmpty ? 'Stream belum tersedia' : 'Menyiapkan player...'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            if (ready)
+                              Center(
+                                child: IconButton(
+                                  onPressed: _toggle,
+                                  iconSize: 86,
+                                  icon: Icon(
+                                    controller.value.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                                    color: Colors.white.withOpacity(controller.value.isPlaying ? 0.18 : 0.88),
+                                  ),
+                                ),
+                              ),
+                            if (ready)
+                              Positioned(
+                                left: 22,
+                                right: 22,
+                                bottom: 18,
+                                child: VideoProgressIndicator(
+                                  controller,
+                                  allowScrubbing: true,
+                                  colors: const VideoProgressColors(
+                                    playedColor: AppTheme.cyan,
+                                    bufferedColor: Colors.white30,
+                                    backgroundColor: Colors.white12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(item.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.45)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 28),
+              SizedBox(
+                width: 310,
+                child: _EpisodePanel(
+                  total: item.episodes.clamp(1, 120).toInt(),
+                  selected: _episode,
+                  onSelect: _selectEpisode,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EpisodePanel extends StatelessWidget {
+  final int total;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  const _EpisodePanel({required this.total, required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = total > 80 ? 80 : total;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFF24344A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.builder(
+              itemCount: count,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.35,
+              ),
+              itemBuilder: (_, i) {
+                final ep = i + 1;
+                final active = ep == selected;
+                return ElevatedButton(
+                  onPressed: () => onSelect(ep),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: active ? const Color(0xFF183455) : AppTheme.surface2,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('$ep', style: const TextStyle(fontWeight: FontWeight.w900)),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
