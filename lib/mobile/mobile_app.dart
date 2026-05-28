@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../shared/widgets/premium_shell.dart';
+import 'screens/mobile_account_screen.dart';
 import 'screens/mobile_home_screen.dart';
 import 'screens/mobile_search_screen.dart';
 import 'screens/simple_page.dart';
@@ -22,7 +23,7 @@ class _MobileAppState extends State<MobileApp> {
       const SimplePage(title: 'Histori', icon: Icons.history_rounded),
       const MobileSearchScreen(),
       const SimplePage(title: 'Favorit', icon: Icons.favorite_rounded),
-      const SimplePage(title: 'Akun', icon: Icons.person_rounded),
+      const MobileAccountScreen(),
     ];
 
     return Scaffold(

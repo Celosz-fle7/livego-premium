@@ -10,11 +10,11 @@ class TvSideNav extends StatelessWidget {
 
   static const items = [
     (Icons.home_rounded, 'Home'),
-    (Icons.download_rounded, 'Download'),
     (Icons.history_rounded, 'Histori'),
+    (Icons.search_rounded, 'Search'),
     (Icons.favorite_border_rounded, 'Favorit'),
     (Icons.person_rounded, 'Akun'),
-    (Icons.search_rounded, 'Search'),
+    (Icons.settings_rounded, 'Setting'),
   ];
 
   @override
