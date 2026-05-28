@@ -142,9 +142,9 @@ class MobileAccountScreen extends StatelessWidget {
               _menu(context, Icons.send_rounded, 'Kirim Feedback', 'Laporkan bug, source, atau usulan fitur.', () {}),
               _menu(context, Icons.help_outline_rounded, 'Bantuan', 'Panduan singkat fitur utama LiveGo.', () {}),
             ]),
-            _section('Perawatan'),
+            _section('Info LiveGo'),
             _menuGroup(context, [
-              _menu(context, Icons.delete_outline_rounded, 'Hapus Semua Cache', 'Bersihkan riwayat dan favorit lokal sementara.', LiveGoLocalStore.clearAll),
+              _menu(context, Icons.info_outline_rounded, 'Tentang LiveGo', 'Streaming premium HP dan Android TV dengan source manager dinamis.', () {}),
             ]),
           ],
         );

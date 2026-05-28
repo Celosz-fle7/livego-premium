@@ -69,6 +69,17 @@ class LiveGoCatalog {
     return result;
   }
 
+  static Future<List<ContentItem>> banners({String platform = 'freereels'}) async {
+    try {
+      final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language);
+      if (banners.isNotEmpty) return banners;
+      final items = await home(platform: platform);
+      return items.take(5).toList();
+    } catch (_) {
+      return [MockCatalog.hero];
+    }
+  }
+
   static Future<ContentItem> hero({String platform = 'freereels'}) async {
     try {
       final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language);

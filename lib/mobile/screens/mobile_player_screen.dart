@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
@@ -67,7 +70,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
 
   void _selectEpisode(int value) {
     setState(() {
-      episode = value;
+      episode = value.clamp(1, 9999);
       _future = _load();
     });
   }
@@ -81,44 +84,34 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
         final state = snap.data;
         final item = state?.item ?? widget.item;
         final stream = state?.stream ?? StreamInfo.empty;
-        final streamUrl = stream.url;
 
         return Scaffold(
-          backgroundColor: AppTheme.bg,
+          backgroundColor: Colors.black,
           body: SafeArea(
             bottom: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+            child: Column(
               children: [
-                _TopBar(item: item),
-                const SizedBox(height: 14),
-                _PlayerSurface(
-                  key: ValueKey('mobile-player-$streamUrl-$episode'),
-                  item: item,
-                  loading: loading,
-                  stream: stream,
-                  streamUrl: streamUrl,
-                  episode: episode,
-                  onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.60,
+                  child: _PlayerSurface(
+                    key: ValueKey('mobile-player-${stream.url}-$episode'),
+                    item: item,
+                    loading: loading,
+                    stream: stream,
+                    episode: episode,
+                    onBack: () => Navigator.pop(context),
+                    onEpisode: _selectEpisode,
+                    onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
+                  ),
                 ),
-                const SizedBox(height: 18),
-                _ActionRow(
-                  item: item,
-                  episode: episode,
-                  totalEpisodes: item.episodes,
-                  onPrev: episode > 1 ? () => _selectEpisode(episode - 1) : null,
-                  onNext: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
+                Expanded(
+                  child: _BottomInfoPanel(
+                    item: item,
+                    stream: stream,
+                    episode: episode,
+                    onEpisode: _selectEpisode,
+                  ),
                 ),
-                const SizedBox(height: 18),
-                _DetailCard(item: item),
-                const SizedBox(height: 18),
-                _EpisodeGrid(
-                  count: item.episodes.clamp(1, 120).toInt(),
-                  selected: episode,
-                  onSelected: _selectEpisode,
-                ),
-                const SizedBox(height: 18),
-                _StreamBox(url: streamUrl),
               ],
             ),
           ),
@@ -128,42 +121,13 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  final ContentItem item;
-  const _TopBar({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _PlayerSurface extends StatefulWidget {
   final ContentItem item;
   final bool loading;
   final StreamInfo stream;
-  final String streamUrl;
   final int episode;
+  final VoidCallback onBack;
+  final ValueChanged<int> onEpisode;
   final VoidCallback? onAutoNext;
 
   const _PlayerSurface({
@@ -171,8 +135,9 @@ class _PlayerSurface extends StatefulWidget {
     required this.item,
     required this.loading,
     required this.stream,
-    required this.streamUrl,
     required this.episode,
+    required this.onBack,
+    required this.onEpisode,
     required this.onAutoNext,
   });
 
@@ -182,22 +147,30 @@ class _PlayerSurface extends StatefulWidget {
 
 class _PlayerSurfaceState extends State<_PlayerSurface> {
   VideoPlayerController? _controller;
+  Timer? _timer;
   String _error = '';
+  bool _controls = true;
   bool _buffering = true;
+  bool _muted = false;
+  bool _fitCover = false;
+  bool _landscape = false;
   bool _autoNextDone = false;
+  String _quality = 'Auto';
+  double _speed = 1.0;
+  DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastTapRight = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     _openStream();
+    _startTimer();
   }
 
   @override
   void didUpdateWidget(covariant _PlayerSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.streamUrl != widget.streamUrl) {
-      _openStream();
-    }
+    if (oldWidget.stream.url != widget.stream.url) _openStream();
   }
 
   Future<void> _openStream() async {
@@ -206,10 +179,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     _error = '';
     _buffering = true;
     _autoNextDone = false;
-
     if (mounted) setState(() {});
 
-    if (widget.streamUrl.isEmpty) {
+    if (widget.stream.url.isEmpty) {
       _error = 'Stream belum tersedia dari API.';
       _buffering = false;
       if (mounted) setState(() {});
@@ -218,42 +190,18 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
     try {
       final controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.streamUrl),
-        httpHeaders: widget.stream.headers.isEmpty
-            ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
-            : widget.stream.headers,
+        Uri.parse(widget.stream.url),
+        httpHeaders: widget.stream.headers.isEmpty ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'} : widget.stream.headers,
       );
-
       _controller = controller;
-      controller.addListener(() {
-        if (!mounted) return;
-        final value = controller.value;
-        if (_buffering != value.isBuffering) {
-          setState(() => _buffering = value.isBuffering);
-        }
-        if (value.isInitialized && value.position.inSeconds % 5 == 0) {
-          LiveGoLocalStore.saveProgress(widget.item, widget.episode, value.position, value.duration);
-        }
-        final duration = value.duration;
-        if (!_autoNextDone && widget.onAutoNext != null && duration.inSeconds > 15) {
-          final remaining = duration - value.position;
-          if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
-            _autoNextDone = true;
-            LiveGoLocalStore.markEpisodeComplete(widget.item, widget.episode);
-            widget.onAutoNext?.call();
-          }
-        }
-      });
-
+      controller.addListener(_listen);
       await controller.initialize();
       final saved = LiveGoLocalStore.progressFor(widget.item);
       if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
         await controller.seekTo(saved.position);
       }
       await controller.play();
-      if (mounted) {
-        setState(() => _buffering = false);
-      }
+      if (mounted) setState(() => _buffering = false);
     } catch (e) {
       _error = '$e';
       _buffering = false;
@@ -261,14 +209,47 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     }
   }
 
+  void _listen() {
+    final c = _controller;
+    if (!mounted || c == null) return;
+    final value = c.value;
+    if (_buffering != value.isBuffering) setState(() => _buffering = value.isBuffering);
+    if (value.isInitialized && value.position.inSeconds % 5 == 0) {
+      LiveGoLocalStore.saveProgress(widget.item, widget.episode, value.position, value.duration);
+    }
+    final duration = value.duration;
+    if (!_autoNextDone && widget.onAutoNext != null && duration.inSeconds > 15) {
+      final remaining = duration - value.position;
+      if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
+        _autoNextDone = true;
+        LiveGoLocalStore.markEpisodeComplete(widget.item, widget.episode);
+        widget.onAutoNext?.call();
+      }
+    }
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 4), () {
+      if (mounted && _controls) setState(() => _controls = false);
+    });
+  }
+
+  void _showControls() {
+    setState(() => _controls = true);
+    _startTimer();
+  }
+
+  void _toggleControls() {
+    setState(() => _controls = !_controls);
+    if (_controls) _startTimer();
+  }
+
   void _togglePlay() {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      c.play();
-    }
+    c.value.isPlaying ? c.pause() : c.play();
+    _showControls();
     setState(() {});
   }
 
@@ -277,311 +258,308 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (c == null || !c.value.isInitialized) return;
     final target = c.value.position + Duration(seconds: seconds);
     await c.seekTo(target < Duration.zero ? Duration.zero : target);
+    _showControls();
+  }
+
+  void _doubleTapSeek(bool right) {
+    final now = DateTime.now();
+    final last = right ? _lastTapRight : _lastTapLeft;
+    if (now.difference(last).inMilliseconds < 320) _seek(right ? 10 : -10);
+    if (right) {
+      _lastTapRight = now;
+    } else {
+      _lastTapLeft = now;
+    }
+  }
+
+  Future<void> _holdSpeed(bool fast) async {
+    final c = _controller;
+    if (c == null) return;
+    _speed = fast ? 2.0 : 1.0;
+    await c.setPlaybackSpeed(_speed);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleMute() async {
+    final c = _controller;
+    if (c == null) return;
+    _muted = !_muted;
+    await c.setVolume(_muted ? 0 : 1);
+    _showControls();
+  }
+
+  Future<void> _toggleLandscape() async {
+    _landscape = !_landscape;
+    if (_landscape) {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    } else {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
+    _showControls();
+  }
+
+  void _openPlayerSettings() {
+    _showControls();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) {
+        final subtitles = widget.stream.subtitles;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Pengaturan Player', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 14),
+                _SheetRow(title: 'Kualitas', value: _quality, onTap: _qualityMenu),
+                _SheetRow(title: 'Subtitle', value: subtitles.isEmpty ? 'Tidak tersedia' : subtitles.first.language, onTap: () {}),
+                _SheetRow(title: 'Kecepatan', value: '${_speed.toStringAsFixed(1)}x', onTap: _speedMenu),
+                _SheetRow(title: 'Suara', value: _muted ? 'Mute' : 'Aktif', onTap: _toggleMute),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _qualityMenu() {
+    final values = ['Auto', '360p', '480p', '560p', '720p', '1080p'];
+    setState(() => _quality = values[(values.indexOf(_quality) + 1) % values.length]);
+    _showControls();
+  }
+
+  void _speedMenu() async {
+    final values = [1.0, 1.25, 1.5, 2.0];
+    final next = values[(values.indexOf(_speed) + 1) % values.length];
+    _speed = next;
+    await _controller?.setPlaybackSpeed(next);
+    _showControls();
+  }
+
+  void _showEpisodes() {
+    _showControls();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(child: Text('Pilih Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white54)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: GridView.builder(
+                  itemCount: widget.item.episodes.clamp(1, 240).toInt(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.35),
+                  itemBuilder: (_, i) {
+                    final ep = i + 1;
+                    final active = ep == widget.episode;
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onEpisode(ep);
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: active ? AppTheme.cyan : Colors.white10,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: active ? Colors.transparent : Colors.white12),
+                        ),
+                        child: Text('$ep', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
+    _controller?.removeListener(_listen);
     _controller?.dispose();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized;
     final image = widget.item.backdropUrl.isNotEmpty ? widget.item.backdropUrl : widget.item.posterUrl;
-    final controller = _controller;
-    final ready = controller != null && controller.value.isInitialized;
 
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF090E18),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFF27405A)),
-          image: (!ready && image.isNotEmpty)
-              ? DecorationImage(image: NetworkImage(image), fit: BoxFit.cover)
-              : null,
-          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.09), blurRadius: 30)],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (ready)
-              FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: controller.value.size.width,
-                  height: controller.value.size.height,
-                  child: VideoPlayer(controller),
-                ),
-              )
-            else
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x66000000), Color(0xEE050913)],
-                  ),
-                ),
-              ),
-            if (_buffering || widget.loading)
-              const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
-            if (_error.isNotEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    _error,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-            if (ready)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: _togglePlay,
-                  child: Center(
-                    child: AnimatedOpacity(
-                      opacity: controller.value.isPlaying ? 0 : 1,
-                      duration: const Duration(milliseconds: 180),
-                      child: Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.black.withOpacity(0.45),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 48),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (ready)
-              Positioned(
-                left: 10,
-                right: 10,
-                bottom: 10,
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => _seek(-10),
-                      icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
-                    ),
-                    Expanded(
-                      child: VideoProgressIndicator(
-                        controller,
-                        allowScrubbing: true,
-                        colors: const VideoProgressColors(
-                          playedColor: AppTheme.cyan,
-                          bufferedColor: Colors.white30,
-                          backgroundColor: Colors.white12,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => _seek(10),
-                      icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  final ContentItem item;
-  final int episode;
-  final int totalEpisodes;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-  const _ActionRow({
-    required this.item,
-    required this.episode,
-    required this.totalEpisodes,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: LiveGoLocalStore.version,
-      builder: (context, _, __) {
-        final fav = LiveGoLocalStore.isFavorite(item);
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text('Episode $episode / $totalEpisodes'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => LiveGoLocalStore.toggleFavorite(item),
-                    icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded),
-                    label: Text(fav ? 'Disimpan' : 'Favorit'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => LiveGoLocalStore.toggleDownload(item),
-                    icon: Icon(LiveGoLocalStore.isDownloaded(item) ? Icons.download_done_rounded : Icons.download_rounded),
-                    label: Text(LiveGoLocalStore.isDownloaded(item) ? 'Offline Siap' : 'Simpan Offline'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.closed_caption_rounded),
-                    label: Text(LiveGoSettings.subtitlesEnabled ? 'Subtitle ON' : 'Subtitle OFF'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onPrev,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                    label: const Text('Sebelumnya'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onNext,
-                    icon: const Icon(Icons.skip_next_rounded),
-                    label: const Text('Berikutnya'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+    return PopScope(
+      canPop: !_controls,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_controls) {
+          setState(() => _controls = false);
+          _timer?.cancel();
+        }
       },
+      child: GestureDetector(
+        onTap: _toggleControls,
+        child: Container(
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (ready)
+                Center(
+                  child: FittedBox(
+                    fit: _fitCover && !_landscape ? BoxFit.cover : BoxFit.contain,
+                    child: SizedBox(
+                      width: c.value.size.width,
+                      height: c.value.size.height,
+                      child: VideoPlayer(c),
+                    ),
+                  ),
+                )
+              else if (image.isNotEmpty)
+                Image.network(image, fit: BoxFit.cover)
+              else
+                const ColoredBox(color: Color(0xFF101010)),
+              if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
+              Row(
+                children: [
+                  Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                  Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
+                  Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(true), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                ],
+              ),
+              if (widget.loading || _buffering) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+              if (_error.isNotEmpty) Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)))),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                top: _controls ? 0 : -95,
+                left: 0,
+                right: 0,
+                child: _TopOverlay(title: '${widget.item.title} - Eps ${widget.episode}', onBack: widget.onBack),
+              ),
+              if (_controls)
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _CenterButton(icon: Icons.skip_previous_rounded, enabled: widget.episode > 1, onTap: () => widget.onEpisode(widget.episode - 1)),
+                      const SizedBox(width: 30),
+                      _MainPlayButton(playing: ready && c.value.isPlaying, onTap: _togglePlay),
+                      const SizedBox(width: 30),
+                      _CenterButton(icon: Icons.skip_next_rounded, enabled: widget.episode < widget.item.episodes, onTap: () => widget.onEpisode(widget.episode + 1)),
+                    ],
+                  ),
+                ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                bottom: _controls ? 0 : -160,
+                left: 0,
+                right: 0,
+                child: _BottomOverlay(
+                  controller: c,
+                  episode: widget.episode,
+                  total: widget.item.episodes,
+                  quality: _quality,
+                  muted: _muted,
+                  fitCover: _fitCover,
+                  landscape: _landscape,
+                  onEpisodes: _showEpisodes,
+                  onDownload: () => LiveGoLocalStore.toggleDownload(widget.item),
+                  onSettings: _openPlayerSettings,
+                  onQuality: _qualityMenu,
+                  onRotate: _toggleLandscape,
+                  onFit: () => setState(() => _fitCover = !_fitCover),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _DetailCard extends StatelessWidget {
+class _BottomInfoPanel extends StatelessWidget {
   final ContentItem item;
-  const _DetailCard({required this.item});
+  final StreamInfo stream;
+  final int episode;
+  final ValueChanged<int> onEpisode;
+  const _BottomInfoPanel({required this.item, required this.stream, required this.episode, required this.onEpisode});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF24344A)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: item.posterUrl.isEmpty
-                ? Container(width: 88, height: 124, color: AppTheme.surface2)
-                : Image.network(item.posterUrl, width: 88, height: 124, fit: BoxFit.cover),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${item.source} • ${item.episodes} Episode • ${item.category}',
-                  style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description,
-                  maxLines: 5,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.textSoft, height: 1.42),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EpisodeGrid extends StatelessWidget {
-  final int count;
-  final int selected;
-  final ValueChanged<int> onSelected;
-  const _EpisodeGrid({required this.count, required this.selected, required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    final shown = count > 80 ? 80 : count;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.86),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF24344A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      color: AppTheme.bg,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 26),
         children: [
           Row(
             children: [
-              const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-              const Spacer(),
-              Text('$count total', style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              ),
+              ValueListenableBuilder<int>(
+                valueListenable: LiveGoLocalStore.version,
+                builder: (_, __, ___) {
+                  final fav = LiveGoLocalStore.isFavorite(item);
+                  return IconButton(onPressed: () => LiveGoLocalStore.toggleFavorite(item), icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: fav ? AppTheme.cyan : Colors.white));
+                },
+              ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(shown, (i) {
-              final ep = i + 1;
-              final active = ep == selected;
-              return ChoiceChip(
-                selected: active,
-                label: Text('$ep'),
-                onSelected: (_) => onSelected(ep),
-                selectedColor: const Color(0xFF183455),
-                backgroundColor: AppTheme.surface2,
-                side: BorderSide(color: active ? AppTheme.cyan : Colors.white10),
-                labelStyle: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900),
-              );
-            }),
+          const SizedBox(height: 6),
+          Text('${item.source} • Episode $episode / ${item.episodes} • ${item.category}', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Text(item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.42)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 46,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: item.episodes.clamp(1, 120).toInt(),
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final ep = i + 1;
+                final active = ep == episode;
+                return GestureDetector(
+                  onTap: () => onEpisode(ep),
+                  child: Container(
+                    width: 58,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
+                      color: active ? null : AppTheme.surface2,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: active ? Colors.transparent : const Color(0xFF2D405C)),
+                    ),
+                    child: Text('$ep', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -589,33 +567,174 @@ class _EpisodeGrid extends StatelessWidget {
   }
 }
 
-class _StreamBox extends StatelessWidget {
-  final String url;
-  const _StreamBox({required this.url});
+class _TopOverlay extends StatelessWidget {
+  final String title;
+  final VoidCallback onBack;
+  const _TopOverlay({required this.title, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF08111E),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.22)),
-      ),
+      height: 88,
+      padding: const EdgeInsets.only(top: 28, left: 8, right: 12),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.86), Colors.transparent])),
       child: Row(
         children: [
-          Icon(url.isEmpty ? Icons.link_off_rounded : Icons.link_rounded, color: url.isEmpty ? Colors.redAccent : AppTheme.cyan),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              url.isEmpty ? 'URL stream belum ditemukan dari API.' : url,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppTheme.textSoft, fontSize: 12),
+          IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20)),
+          Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomOverlay extends StatelessWidget {
+  final VideoPlayerController? controller;
+  final int episode;
+  final int total;
+  final String quality;
+  final bool muted;
+  final bool fitCover;
+  final bool landscape;
+  final VoidCallback onEpisodes;
+  final VoidCallback onDownload;
+  final VoidCallback onSettings;
+  final VoidCallback onQuality;
+  final VoidCallback onRotate;
+  final VoidCallback onFit;
+  const _BottomOverlay({required this.controller, required this.episode, required this.total, required this.quality, required this.muted, required this.fitCover, required this.landscape, required this.onEpisodes, required this.onDownload, required this.onSettings, required this.onQuality, required this.onRotate, required this.onFit});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = controller;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 26),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withOpacity(0.94), Colors.transparent])),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (c != null && c.value.isInitialized)
+            Row(
+              children: [
+                Text(_fmt(c.value.position), style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                Expanded(
+                  child: VideoProgressIndicator(
+                    c,
+                    allowScrubbing: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    colors: const VideoProgressColors(playedColor: AppTheme.cyan, bufferedColor: Colors.white30, backgroundColor: Colors.white12),
+                  ),
+                ),
+                Text(_fmt(c.value.duration), style: const TextStyle(color: Colors.white60, fontSize: 11)),
+              ],
             ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _Shortcut(icon: Icons.menu_rounded, label: 'Eps', onTap: onEpisodes),
+              const SizedBox(width: 8),
+              _Shortcut(icon: Icons.download_rounded, label: 'Unduh', onTap: onDownload),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 18)),
+                      GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11))),
+                      GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 18)),
+                      GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 20)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+}
+
+class _Shortcut extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _Shortcut({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
+        child: Row(children: [Icon(icon, color: Colors.white, size: 15), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700))]),
+      ),
+    );
+  }
+}
+
+class _CenterButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _CenterButton({required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: enabled ? Colors.black45 : Colors.transparent, shape: BoxShape.circle),
+        child: Icon(icon, color: enabled ? Colors.white70 : Colors.white12, size: 30),
+      ),
+    );
+  }
+}
+
+class _MainPlayButton extends StatelessWidget {
+  final bool playing;
+  final VoidCallback onTap;
+  const _MainPlayButton({required this.playing, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 68,
+        height: 68,
+        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle, border: Border.all(color: Colors.white30, width: 1.4)),
+        child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 38),
+      ),
+    );
+  }
+}
+
+class _SheetRow extends StatelessWidget {
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+  const _SheetRow({required this.title, required this.value, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+      trailing: Text(value, style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)),
     );
   }
 }

@@ -166,22 +166,33 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
             ],
           ),
         ),
-        _section('Kualitas & Subtitle'),
+        _section('Tampilan Home'),
         GlowContainer(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+              const SizedBox(height: 8),
+              const Text('HP default 3 grid, batas 2–6. TV default 6 grid, batas 4–10.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+              const SizedBox(height: 14),
               Wrap(
                 spacing: 9,
                 runSpacing: 9,
                 children: [
-                  for (final q in ['Auto', '360p', '480p', '560p', '720p', '1080p'])
-                    _ChoiceButton(text: q, active: LiveGoSettings.quality == q, onTap: () => setState(() => LiveGoSettings.quality = q)),
+                  for (final v in [2, 3, 4, 5, 6])
+                    _ChoiceButton(text: '$v Grid HP', active: LiveGoSettings.mobileHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setMobileHomeGrid(v))),
                 ],
               ),
-              const SizedBox(height: 14),
-              _tile(Icons.subtitles_rounded, 'Subtitle Otomatis', 'Aktifkan subtitle jika source menyediakannya.', trailing: Switch(value: LiveGoSettings.subtitlesEnabled, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.subtitlesEnabled = v))),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 9,
+                runSpacing: 9,
+                children: [
+                  for (final v in [4, 5, 6, 7, 8, 9, 10])
+                    _ChoiceButton(text: '$v Grid TV', active: LiveGoSettings.tvHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setTvHomeGrid(v))),
+                ],
+              ),
             ],
           ),
         ),

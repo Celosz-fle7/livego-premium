@@ -13,6 +13,8 @@ class LiveGoSettings {
   static bool backgroundPoster = true;
   static bool cachePlayback = true;
   static bool manualRotateButton = true;
+  static int mobileHomeGrid = 3;
+  static int tvHomeGrid = 6;
 
   static final List<String> defaultPlatforms = [
     'freereels',
@@ -115,6 +117,15 @@ class LiveGoSettings {
 
   static String statusFor(String slug) => platformStatus[slug] ?? 'unknown';
 
+
+  static void setMobileHomeGrid(int value) {
+    mobileHomeGrid = value.clamp(2, 6);
+  }
+
+  static void setTvHomeGrid(int value) {
+    tvHomeGrid = value.clamp(4, 10);
+  }
+
   static void reset() {
     language = 'id';
     defaultPlatform = 'freereels';
@@ -128,6 +139,8 @@ class LiveGoSettings {
     backgroundPoster = true;
     cachePlayback = true;
     manualRotateButton = true;
+    mobileHomeGrid = 3;
+    tvHomeGrid = 6;
     activePlatforms
       ..clear()
       ..addAll(defaultPlatforms);
