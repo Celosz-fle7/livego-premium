@@ -8,3 +8,4 @@ Premium cinematic streaming UI for Mobile and Android TV.
 
 ## Build
 GitHub Actions recreates the Android project automatically.
+# rebuild
