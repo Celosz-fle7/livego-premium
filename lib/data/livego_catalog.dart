@@ -6,14 +6,51 @@ import 'mock_catalog.dart';
 
 class LiveGoCatalog {
   static List<String> get platforms {
-    final active = LiveGoSettings.activePlatforms.toList();
+    final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).take(6).toList();
+    if (chosen.isNotEmpty) return chosen;
+    final active = LiveGoSettings.activePlatforms.take(6).toList();
     return active.isEmpty ? ApiDramaClient.defaultPlatforms : active;
   }
 
   static List<String> get allPlatforms => ApiDramaClient.supportedPlatforms;
-  static List<String> get platformLabels => platforms.map(_label).toList();
-  static List<String> labelsFor(List<String> values) => values.map(_label).toList();
-  static List<String> get categories => MockCatalog.categories.take(6).toList();
+  static List<String> get platformLabels => platforms.map(label).toList();
+  static List<String> labelsFor(List<String> values) => values.map(label).toList();
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'freereels' : platforms.first);
+
+  static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
+
+  static Future<List<String>> fetchCategoriesFor(String platform) async {
+    try {
+      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language);
+      final seen = <String>{};
+      final values = <String>[];
+      for (final item in rows) {
+        final c = item.category.trim();
+        if (c.isNotEmpty && c.toLowerCase() != 'drama' && seen.add(c.toLowerCase())) values.add(c);
+        if (values.length >= 12) break;
+      }
+      if (values.isNotEmpty) return values;
+    } catch (_) {}
+    return const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
+  }
+
+  static Future<String> pingPlatform(String platform) async {
+    final start = DateTime.now();
+    try {
+      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language);
+      if (rows.isEmpty) {
+        LiveGoSettings.setPlatformStatus(platform, 'offline');
+        return 'offline';
+      }
+      final ms = DateTime.now().difference(start).inMilliseconds;
+      final status = ms > 2500 ? 'slow' : 'online';
+      LiveGoSettings.setPlatformStatus(platform, status);
+      return status;
+    } catch (_) {
+      LiveGoSettings.setPlatformStatus(platform, 'offline');
+      return 'offline';
+    }
+  }
 
   static Future<List<ContentItem>> home({String platform = 'freereels'}) async {
     try {
@@ -27,7 +64,7 @@ class LiveGoCatalog {
     final result = <String, List<ContentItem>>{};
     for (final platform in platforms.take(6)) {
       final rows = await home(platform: platform);
-      if (rows.isNotEmpty) result[_label(platform)] = rows;
+      if (rows.isNotEmpty) result[label(platform)] = rows;
     }
     return result;
   }
@@ -87,7 +124,7 @@ class LiveGoCatalog {
     return info.url;
   }
 
-  static String _label(String slug) {
+  static String label(String slug) {
     return slug
         .split(RegExp(r'[_-]'))
         .map((e) => e.isEmpty ? e : '${e[0].toUpperCase()}${e.substring(1)}')
