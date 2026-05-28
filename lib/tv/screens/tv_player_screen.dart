@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
@@ -25,6 +26,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _episode = LiveGoLocalStore.continueEpisode(widget.item);
+    LiveGoLocalStore.addHistory(widget.item);
     _load();
   }
 
@@ -81,7 +84,27 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               : stream.headers,
         );
         _controller = controller;
+        controller.addListener(() {
+          if (!mounted || !controller.value.isInitialized) return;
+          final value = controller.value;
+          if (value.position.inSeconds % 5 == 0) {
+            LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
+          }
+          final duration = value.duration;
+          if (duration.inSeconds > 15 && _episode < (_detail?.episodes ?? widget.item.episodes)) {
+            final remaining = duration - value.position;
+            if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
+              LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
+              _episode += 1;
+              _load();
+            }
+          }
+        });
         await controller.initialize();
+        final saved = LiveGoLocalStore.progressFor(playable);
+        if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
+          await controller.seekTo(saved.position);
+        }
         await controller.play();
       }
     } catch (e) {

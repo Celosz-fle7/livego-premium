@@ -22,6 +22,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   @override
   void initState() {
     super.initState();
+    episode = LiveGoLocalStore.continueEpisode(widget.item);
     LiveGoLocalStore.addHistory(widget.item);
     _future = _load();
   }
@@ -97,6 +98,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
                   stream: stream,
                   streamUrl: streamUrl,
                   episode: episode,
+                  onAutoNext: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
                 ),
                 const SizedBox(height: 18),
                 _ActionRow(
@@ -161,6 +163,7 @@ class _PlayerSurface extends StatefulWidget {
   final StreamInfo stream;
   final String streamUrl;
   final int episode;
+  final VoidCallback? onAutoNext;
 
   const _PlayerSurface({
     super.key,
@@ -169,6 +172,7 @@ class _PlayerSurface extends StatefulWidget {
     required this.stream,
     required this.streamUrl,
     required this.episode,
+    required this.onAutoNext,
   });
 
   @override
@@ -179,6 +183,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   VideoPlayerController? _controller;
   String _error = '';
   bool _buffering = true;
+  bool _autoNextDone = false;
 
   @override
   void initState() {
@@ -199,6 +204,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     _controller = null;
     _error = '';
     _buffering = true;
+    _autoNextDone = false;
 
     if (mounted) setState(() {});
 
@@ -224,9 +230,25 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         if (_buffering != value.isBuffering) {
           setState(() => _buffering = value.isBuffering);
         }
+        if (value.isInitialized && value.position.inSeconds % 5 == 0) {
+          LiveGoLocalStore.saveProgress(widget.item, widget.episode, value.position, value.duration);
+        }
+        final duration = value.duration;
+        if (!_autoNextDone && widget.onAutoNext != null && duration.inSeconds > 15) {
+          final remaining = duration - value.position;
+          if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
+            _autoNextDone = true;
+            LiveGoLocalStore.markEpisodeComplete(widget.item, widget.episode);
+            widget.onAutoNext?.call();
+          }
+        }
       });
 
       await controller.initialize();
+      final saved = LiveGoLocalStore.progressFor(widget.item);
+      if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
+        await controller.seekTo(saved.position);
+      }
       await controller.play();
       if (mounted) {
         setState(() => _buffering = false);
