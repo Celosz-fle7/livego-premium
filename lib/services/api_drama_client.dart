@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 
 import '../models/content_item.dart';
-import '../models/stream_info.dart';
 
 class ApiDramaClient {
   static const String baseUrl = String.fromEnvironment(
@@ -12,10 +11,9 @@ class ApiDramaClient {
     defaultValue: 'https://api-drama.dobda.id',
   );
 
-  // Development fallback. Nanti kalau sudah final, pindahkan lagi ke GitHub Secrets.
   static const String apiSecret = String.fromEnvironment(
     'API_SECRET',
-    defaultValue: '22dfb2b849814054af0491ff2ee3ffe33989313d7d38e97aae659757a4cf8960',
+    defaultValue: '',
   );
 
   static const String defaultLang = String.fromEnvironment(
@@ -71,10 +69,14 @@ class ApiDramaClient {
     String platform = 'freereels',
     String lang = defaultLang,
   }) async {
-    final json = await _getJson('/api/v2/home', {
-      'category_p': platform,
-      'lang': lang,
-    });
+    final json = await _getJson(
+      '/api/v2/home',
+      {
+        'category_p': platform,
+        'lang': lang,
+      },
+    );
+
     return _parseItems(json, platform: platform, lang: lang);
   }
 
@@ -83,11 +85,15 @@ class ApiDramaClient {
     String lang = defaultLang,
     int page = 1,
   }) async {
-    final json = await _getJson('/api/v2/discover', {
-      'category_p': platform,
-      'lang': lang,
-      'page': '$page',
-    });
+    final json = await _getJson(
+      '/api/v2/discover',
+      {
+        'category_p': platform,
+        'lang': lang,
+        'page': '$page',
+      },
+    );
+
     return _parseItems(json, platform: platform, lang: lang);
   }
 
@@ -95,10 +101,14 @@ class ApiDramaClient {
     String platform = 'freereels',
     String lang = defaultLang,
   }) async {
-    final json = await _getJson('/api/v2/banner', {
-      'category_p': platform,
-      'lang': lang,
-    });
+    final json = await _getJson(
+      '/api/v2/banner',
+      {
+        'category_p': platform,
+        'lang': lang,
+      },
+    );
+
     return _parseItems(json, platform: platform, lang: lang);
   }
 
@@ -109,21 +119,29 @@ class ApiDramaClient {
     int page = 1,
   }) async {
     if (query.trim().isEmpty) return [];
-    final json = await _getJson('/api/v2/search', {
-      'category_p': platform,
-      'q': query.trim(),
-      'lang': lang,
-      'page': '$page',
-    });
+
+    final json = await _getJson(
+      '/api/v2/search',
+      {
+        'category_p': platform,
+        'q': query.trim(),
+        'lang': lang,
+        'page': '$page',
+      },
+    );
+
     return _parseItems(json, platform: platform, lang: lang);
   }
 
   static Future<ContentItem?> detail(ContentItem item) async {
-    final json = await _getJson('/api/v2/detail', {
-      'category_p': item.platformSlug,
-      'id': item.id,
-      'lang': item.lang,
-    });
+    final json = await _getJson(
+      '/api/v2/detail',
+      {
+        'category_p': item.platformSlug,
+        'id': item.id,
+        'lang': item.lang,
+      },
+    );
 
     final data = json['data'];
     if (data is Map<String, dynamic>) {
@@ -135,32 +153,36 @@ class ApiDramaClient {
     return null;
   }
 
-  static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
-    final json = await _getJson('/api/v2/video', {
-      'category_p': item.platformSlug,
-      'id': item.id,
-      'chapterId': chapterId ?? item.chapterId,
-      'lang': item.lang,
-    });
-    return StreamInfo.fromApi(json);
-  }
-
   static Future<String> videoUrl(ContentItem item, {String chapterId = '1'}) async {
-    final info = await videoInfo(item, chapterId: chapterId);
-    return info.url;
+    final json = await _getJson(
+      '/api/v2/video',
+      {
+        'category_p': item.platformSlug,
+        'id': item.id,
+        'chapterId': chapterId,
+        'lang': item.lang,
+      },
+    );
+
+    final data = json['data'];
+    if (data is Map) {
+      final streams = data['streams'];
+      if (streams is List && streams.isNotEmpty) {
+        final first = streams.first;
+        if (first is Map && first['url'] != null) return '${first['url']}';
+      }
+    }
+    return '';
   }
 
   static Future<List<String>> categories() async {
     final json = await _getJson('/api/v2/categories', {});
     final data = json['data'];
     if (data is List) {
-      return data
-          .map((e) {
-            if (e is Map) return '${e['name'] ?? e['display_name'] ?? ''}';
-            return '$e';
-          })
-          .where((e) => e.isNotEmpty)
-          .toList();
+      return data.map((e) {
+        if (e is Map) return '${e['name'] ?? e['display_name'] ?? ''}';
+        return '$e';
+      }).where((e) => e.isNotEmpty).toList();
     }
     return defaultPlatforms;
   }
@@ -180,7 +202,10 @@ class ApiDramaClient {
         .toList();
   }
 
-  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
+  static Future<Map<String, dynamic>> _getJson(
+    String path,
+    Map<String, String> query,
+  ) async {
     final uri = Uri.parse(baseUrl).replace(path: path, queryParameters: query.isEmpty ? null : query);
     final request = await HttpClient().getUrl(uri).timeout(const Duration(seconds: 18));
 
@@ -204,11 +229,15 @@ class ApiDramaClient {
   static Map<String, String> _signedHeaders(String method, Uri uri) {
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     final pathWithQuery = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
-    final headers = <String, String>{'Accept': 'application/json'};
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
 
     if (apiSecret.isNotEmpty) {
       final payload = '$method:$pathWithQuery:$timestamp';
-      final signature = Hmac(sha256, utf8.encode(apiSecret)).convert(utf8.encode(payload)).toString();
+      final key = utf8.encode(apiSecret);
+      final bytes = utf8.encode(payload);
+      final signature = Hmac(sha256, key).convert(bytes).toString();
       headers['X-Timestamp'] = timestamp;
       headers['X-Signature'] = signature;
     }

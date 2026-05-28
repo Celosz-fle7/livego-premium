@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
-import '../../data/livego_catalog.dart';
 import '../../shared/widgets/glow_container.dart';
 
 class MobileSettingsScreen extends StatefulWidget {
@@ -13,88 +11,36 @@ class MobileSettingsScreen extends StatefulWidget {
 }
 
 class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
-  Widget _section(String text) {
+  Widget _title(String text) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 24, 2, 12),
-      child: Text(text.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 12)),
-    );
-  }
-
-  Widget _mode(String title, bool active, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        child: Row(
-          children: [
-            Icon(active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: AppTheme.cyan, size: 24),
-            const SizedBox(width: 18),
-            Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15))),
-          ],
+      padding: const EdgeInsets.fromLTRB(4, 24, 4, 12),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: AppTheme.textSoft,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.1,
         ),
       ),
     );
   }
 
-  Widget _tile(IconData icon, String title, String subtitle, {Widget? trailing, VoidCallback? onTap, Color? iconColor}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFF142338),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF2B4058)),
-              ),
-              child: Icon(icon, color: iconColor ?? Colors.white, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.25)),
-                ],
-              ),
-            ),
-            trailing ?? const Icon(Icons.arrow_forward_rounded, color: AppTheme.textSoft),
-          ],
+  Widget _chip(String text, bool active, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10, bottom: 10),
+      child: ChoiceChip(
+        selected: active,
+        label: Text(text),
+        onSelected: (_) => onTap(),
+        selectedColor: const Color(0xFF183455),
+        backgroundColor: AppTheme.surface2,
+        labelStyle: TextStyle(
+          color: active ? Colors.white : AppTheme.textSoft,
+          fontWeight: FontWeight.w800,
         ),
+        side: BorderSide(color: active ? AppTheme.cyan : Colors.white10),
       ),
     );
-  }
-
-  Future<void> _showDrmDialog() async {
-    final value = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Mode Widevine DRM'),
-        children: [
-          for (final item in ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'])
-            RadioListTile<String>(
-              value: item,
-              groupValue: LiveGoSettings.drmMode,
-              activeColor: Colors.teal,
-              title: Text(item),
-              onChanged: (v) => Navigator.pop(context, v),
-            ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(onPressed: () => Navigator.pop(context), child: const Text('BATAL')),
-          ),
-        ],
-      ),
-    );
-    if (value != null) setState(() => LiveGoSettings.drmMode = value);
   }
 
   @override
@@ -102,405 +48,69 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 120),
       children: [
-        GlowContainer(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(color: const Color(0xFF0D1828), borderRadius: BorderRadius.circular(999)),
-                    child: const Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 10)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              const Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, height: 1.4)),
-              const SizedBox(height: 14),
-              Row(
-                children: const [
-                  _SmallPill('Display'),
-                  SizedBox(width: 8),
-                  _SmallPill('Player'),
-                  SizedBox(width: 8),
-                  _SmallPill('Source'),
-                ],
-              )
-            ],
-          ),
+        const Text(
+          'Pengaturan',
+          style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
         ),
-        _section('Tampilan & Navigasi'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 8, bottom: 8),
-                child: Text('Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-              ),
-              _mode('Otomatis (Ikuti Hardware)', LiveGoSettings.layoutMode == 'Auto', () => setState(() => LiveGoSettings.layoutMode = 'Auto')),
-              _mode('Smartphone / Tablet (Android)', LiveGoSettings.layoutMode == 'Mobile', () => setState(() => LiveGoSettings.layoutMode = 'Mobile')),
-              _mode('Android TV (Leanback Style)', LiveGoSettings.layoutMode == 'TV', () => setState(() => LiveGoSettings.layoutMode = 'TV')),
-            ],
-          ),
+        const SizedBox(height: 8),
+        const Text(
+          'Atur bahasa, platform default, kualitas, dan mode tampilan LiveGo.',
+          style: TextStyle(color: AppTheme.textSoft, height: 1.5),
         ),
-        _section('Player'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              _tile(Icons.image_rounded, 'Tampilkan Background Poster', 'Poster menjadi ambience di halaman detail dan player.', trailing: Switch(value: LiveGoSettings.backgroundPoster, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.backgroundPoster = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.sync_rounded, 'Gunakan Cache Playback', 'Simpan potongan stream sementara agar perpindahan lebih stabil.', trailing: Switch(value: LiveGoSettings.cachePlayback, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.cachePlayback = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.screen_rotation_rounded, 'Tampilkan Tombol Rotasi Manual', 'Tampilkan kontrol rotasi manual saat menonton.', trailing: Switch(value: LiveGoSettings.manualRotateButton, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.manualRotateButton = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.lock_rounded, 'Kompatibilitas Widevine DRM', 'Mode saat ini: ${LiveGoSettings.drmMode}', trailing: const Text('ATUR', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)), onTap: _showDrmDialog),
-            ],
-          ),
+        _title('Bahasa'),
+        Wrap(
+          children: [
+            for (final lang in ['id', 'en', 'th', 'ar'])
+              _chip(lang.toUpperCase(), LiveGoSettings.language == lang, () {
+                setState(() => LiveGoSettings.language = lang);
+              }),
+          ],
         ),
-        _section('Tampilan Home'),
+        _title('Default 6 Platform'),
         GlowContainer(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Wrap(
             children: [
-              const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              const SizedBox(height: 8),
-              const Text('HP default 3 grid, batas 2–6. TV default 6 grid, batas 4–10.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                children: [
-                  for (final v in [2, 3, 4, 5, 6])
-                    _ChoiceButton(text: '$v Grid HP', active: LiveGoSettings.mobileHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setMobileHomeGrid(v))),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                children: [
-                  for (final v in [4, 5, 6, 7, 8, 9, 10])
-                    _ChoiceButton(text: '$v Grid TV', active: LiveGoSettings.tvHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setTvHomeGrid(v))),
-                ],
-              ),
+              for (final platform in LiveGoSettings.defaultPlatforms)
+                _chip(platform, LiveGoSettings.defaultPlatform == platform, () {
+                  setState(() => LiveGoSettings.defaultPlatform = platform);
+                }),
             ],
           ),
         ),
-        _section('Sumber & Izin'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              _tile(Icons.layers_rounded, 'Kelola Sumber Data', 'Pilih 6 platform Home, kategori, dan cek status server.', onTap: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagerScreen()));
-                setState(() {});
+        _title('Kualitas Video'),
+        Wrap(
+          children: [
+            for (final q in ['Auto', '720p', '480p'])
+              _chip(q, LiveGoSettings.quality == q, () {
+                setState(() => LiveGoSettings.quality = q);
               }),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.info_rounded, 'Kelola Notifikasi Unduhan', 'Belum aktif. Aktifkan lagi agar progress unduhan mudah dipantau.', trailing: const Text('AKTIFKAN', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900))),
-            ],
+          ],
+        ),
+        _title('Mode Tampilan'),
+        Wrap(
+          children: [
+            for (final mode in ['Auto', 'Mobile', 'TV'])
+              _chip(mode, LiveGoSettings.layoutMode == mode, () {
+                setState(() => LiveGoSettings.layoutMode = mode);
+              }),
+          ],
+        ),
+        _title('Platform Didukung'),
+        GlowContainer(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            '${LiveGoSettings.supportedPlatforms.length} platform siap dikoneksikan. Default aktif sementara: ${LiveGoSettings.defaultPlatforms.length}.',
+            style: const TextStyle(color: Colors.white70, height: 1.5),
           ),
         ),
-        _section('Perawatan'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: _tile(Icons.delete_rounded, 'Hapus Semua Cache', 'Bersihkan cache streaming dan gambar agar ruang penyimpanan lega.', iconColor: Colors.redAccent, trailing: const Icon(Icons.arrow_forward_rounded, color: Colors.redAccent), onTap: () => setState(LiveGoSettings.reset)),
+        const SizedBox(height: 18),
+        ElevatedButton.icon(
+          onPressed: () => setState(LiveGoSettings.reset),
+          icon: const Icon(Icons.restart_alt_rounded),
+          label: const Text('Reset Pengaturan'),
         ),
       ],
-    );
-  }
-}
-
-class SourceManagerScreen extends StatefulWidget {
-  const SourceManagerScreen({super.key});
-
-  @override
-  State<SourceManagerScreen> createState() => _SourceManagerScreenState();
-}
-
-class _SourceManagerScreenState extends State<SourceManagerScreen> {
-  late Set<String> _active;
-  late List<String> _home;
-  String _selectedPlatform = LiveGoSettings.defaultPlatform;
-  List<String> _availableCategories = const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
-  List<String> _selectedCategories = const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
-  bool _loadingCategories = false;
-  bool _pinging = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _active = Set<String>.from(LiveGoSettings.activePlatforms);
-    _home = List<String>.from(LiveGoSettings.homePlatforms);
-    _selectedPlatform = _home.isNotEmpty ? _home.first : LiveGoSettings.defaultPlatform;
-    _loadCategories(_selectedPlatform);
-    _pingVisibleOnce();
-  }
-
-  Future<void> _loadCategories(String platform) async {
-    setState(() {
-      _selectedPlatform = platform;
-      _loadingCategories = true;
-      _selectedCategories = LiveGoSettings.categoriesFor(platform);
-    });
-    final rows = await LiveGoCatalog.fetchCategoriesFor(platform);
-    if (!mounted) return;
-    setState(() {
-      _availableCategories = rows;
-      _loadingCategories = false;
-    });
-  }
-
-  Future<void> _pingVisibleOnce() async {
-    setState(() => _pinging = true);
-    for (final p in LiveGoCatalog.allPlatforms) {
-      await LiveGoCatalog.pingPlatform(p);
-      if (mounted) setState(() {});
-    }
-    if (mounted) setState(() => _pinging = false);
-  }
-
-  void _toggleActive(String slug) {
-    setState(() {
-      if (_active.contains(slug)) {
-        if (_active.length > 1) _active.remove(slug);
-        _home.remove(slug);
-      } else {
-        _active.add(slug);
-        if (_home.length < 6) _home.add(slug);
-      }
-      if (_home.isEmpty) _home.add(_active.first);
-    });
-  }
-
-  void _toggleHome(String slug) {
-    setState(() {
-      if (_home.contains(slug)) {
-        if (_home.length > 1) _home.remove(slug);
-      } else if (_home.length < 6) {
-        _home.add(slug);
-        _active.add(slug);
-      }
-    });
-  }
-
-  void _toggleCategory(String name) {
-    setState(() {
-      if (_selectedCategories.contains(name)) {
-        if (_selectedCategories.length > 1) _selectedCategories = _selectedCategories.where((e) => e != name).toList();
-      } else if (_selectedCategories.length < 6) {
-        _selectedCategories = [..._selectedCategories, name];
-      }
-    });
-  }
-
-  void _save() {
-    LiveGoSettings.activePlatforms
-      ..clear()
-      ..addAll(_active);
-    LiveGoSettings.homePlatforms
-      ..clear()
-      ..addAll(_home.take(6));
-    LiveGoSettings.defaultPlatform = LiveGoSettings.homePlatforms.first;
-    LiveGoSettings.setCategoriesFor(_selectedPlatform, _selectedCategories);
-    Navigator.pop(context);
-  }
-
-  Color _statusColor(String slug) {
-    switch (LiveGoSettings.statusFor(slug)) {
-      case 'online':
-        return Colors.greenAccent;
-      case 'slow':
-        return Colors.orangeAccent;
-      case 'offline':
-        return Colors.redAccent;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final platforms = LiveGoCatalog.allPlatforms;
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-              child: Row(
-                children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
-                  const Expanded(child: Text('Kelola Sumber Data', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900))),
-                  TextButton.icon(onPressed: _pinging ? null : _pingVisibleOnce, icon: const Icon(Icons.network_ping_rounded), label: Text(_pinging ? 'PING...' : 'PING')),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                children: [
-                  const Text('Pilih platform aktif. Maksimal 6 platform tampil di Home. Lampu status memakai hasil ping terakhir.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
-                  const SizedBox(height: 14),
-                  for (final slug in platforms) _SourceCard(
-                    title: LiveGoCatalog.label(slug),
-                    subtitle: _sourceDescription(slug),
-                    active: _active.contains(slug),
-                    home: _home.contains(slug),
-                    selected: _selectedPlatform == slug,
-                    statusColor: _statusColor(slug),
-                    onTap: () => _loadCategories(slug),
-                    onToggleActive: () => _toggleActive(slug),
-                    onToggleHome: () => _toggleHome(slug),
-                  ),
-                  const SizedBox(height: 18),
-                  Text('Kategori ${LiveGoCatalog.label(_selectedPlatform)}'.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-                  const SizedBox(height: 10),
-                  GlowContainer(
-                    padding: const EdgeInsets.all(14),
-                    child: _loadingCategories
-                        ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                        : Wrap(
-                            spacing: 9,
-                            runSpacing: 9,
-                            children: [
-                              for (final c in _availableCategories)
-                                _ChoiceButton(text: c, active: _selectedCategories.contains(c), onTap: () => _toggleCategory(c)),
-                            ],
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-        decoration: const BoxDecoration(color: Color(0xF0050913), border: Border(top: BorderSide(color: Color(0xFF24344A)))),
-        child: Row(
-          children: [
-            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Batal'))),
-            const SizedBox(width: 12),
-            Expanded(child: ElevatedButton(onPressed: _save, child: const Text('Simpan'))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _sourceDescription(String slug) {
-    final map = <String, String>{
-      'freereels': 'Video pendek drama populer dan gratis.',
-      'dramawave': 'Drama viral dengan koleksi lengkap.',
-      'goodshort': 'Drama pendek cepat untuk HP.',
-      'netshort': 'Serial pendek populer dan ringan.',
-      'reelshort': 'Koleksi reels drama pendek.',
-      'melolo': 'Drama pendek kualitas tinggi.',
-      'youku': 'Drama China dan konten Asia.',
-      'wetv': 'Drama dan serial Asia pilihan.',
-    };
-    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
-  }
-}
-
-class _SourceCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool active;
-  final bool home;
-  final bool selected;
-  final Color statusColor;
-  final VoidCallback onTap;
-  final VoidCallback onToggleActive;
-  final VoidCallback onToggleHome;
-
-  const _SourceCard({required this.title, required this.subtitle, required this.active, required this.home, required this.selected, required this.statusColor, required this.onTap, required this.onToggleActive, required this.onToggleHome});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF06272C) : const Color(0xFF071B1F),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: selected ? AppTheme.cyan.withOpacity(.7) : AppTheme.cyan.withOpacity(.28)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(width: 11, height: 11, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle, boxShadow: [BoxShadow(color: statusColor.withOpacity(.45), blurRadius: 12)])),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12)),
-                  const SizedBox(height: 9),
-                  GestureDetector(
-                    onTap: onToggleHome,
-                    child: Text(home ? 'Tampil di Home' : 'Tambahkan ke Home', style: TextStyle(color: home ? AppTheme.cyan : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11)),
-                  ),
-                ]),
-              ),
-              Switch(value: active, onChanged: (_) => onToggleActive(), activeColor: AppTheme.cyan),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChoiceButton extends StatelessWidget {
-  final String text;
-  final bool active;
-  final VoidCallback onTap;
-  const _ChoiceButton({required this.text, required this.active, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
-          color: active ? null : const Color(0xFF172131),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: active ? Colors.transparent : const Color(0xFF31445F)),
-        ),
-        child: Text(text, style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 12)),
-      ),
-    );
-  }
-}
-
-class _SmallPill extends StatelessWidget {
-  final String text;
-  const _SmallPill(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0xFF111B2A), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white10)),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
     );
   }
 }
