@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../models/stream_info.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -50,20 +51,34 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         chapterId: '$_episode',
         lang: detail.lang,
       );
-      final url = await LiveGoCatalog.videoUrl(selected);
+      final stream = await LiveGoCatalog.streamInfo(selected, chapterId: '$_episode');
+      final total = stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes;
+      final playable = ContentItem(
+        id: selected.id,
+        title: selected.title,
+        source: selected.source,
+        category: selected.category,
+        description: selected.description,
+        posterUrl: selected.posterUrl,
+        backdropUrl: selected.backdropUrl,
+        rating: selected.rating,
+        episodes: total <= 0 ? 1 : total,
+        updated: selected.updated,
+        platformSlug: selected.platformSlug,
+        chapterId: '$_episode',
+        lang: selected.lang,
+      );
       await _controller?.dispose();
       _controller = null;
-      _detail = selected;
-      _url = url;
+      _detail = playable;
+      _url = stream.url;
 
-      if (url.isNotEmpty) {
+      if (stream.url.isNotEmpty) {
         final controller = VideoPlayerController.networkUrl(
-          Uri.parse(url),
-          httpHeaders: const {
-            'User-Agent': 'okhttp/4.12.0',
-            'Accept': '*/*',
-            'Connection': 'keep-alive',
-          },
+          Uri.parse(stream.url),
+          httpHeaders: stream.headers.isEmpty
+              ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+              : stream.headers,
         );
         _controller = controller;
         await controller.initialize();

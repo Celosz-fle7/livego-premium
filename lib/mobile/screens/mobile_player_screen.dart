@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../models/stream_info.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -42,8 +43,24 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       chapterId: '$episode',
       lang: detail.lang,
     );
-    final url = await LiveGoCatalog.videoUrl(selected);
-    return _PlayerState(item: selected, streamUrl: url);
+    final stream = await LiveGoCatalog.streamInfo(selected, chapterId: '$episode');
+    final total = stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes;
+    final playable = ContentItem(
+      id: selected.id,
+      title: selected.title,
+      source: selected.source,
+      category: selected.category,
+      description: selected.description,
+      posterUrl: selected.posterUrl,
+      backdropUrl: selected.backdropUrl,
+      rating: selected.rating,
+      episodes: total <= 0 ? 1 : total,
+      updated: selected.updated,
+      platformSlug: selected.platformSlug,
+      chapterId: '$episode',
+      lang: selected.lang,
+    );
+    return _PlayerState(item: playable, stream: stream);
   }
 
   void _selectEpisode(int value) {
@@ -61,7 +78,8 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
         final item = state?.item ?? widget.item;
-        final streamUrl = state?.streamUrl ?? '';
+        final stream = state?.stream ?? StreamInfo.empty;
+        final streamUrl = stream.url;
 
         return Scaffold(
           backgroundColor: AppTheme.bg,
@@ -76,11 +94,18 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
                   key: ValueKey('mobile-player-$streamUrl-$episode'),
                   item: item,
                   loading: loading,
+                  stream: stream,
                   streamUrl: streamUrl,
                   episode: episode,
                 ),
                 const SizedBox(height: 18),
-                _ActionRow(item: item),
+                _ActionRow(
+                  item: item,
+                  episode: episode,
+                  totalEpisodes: item.episodes,
+                  onPrev: episode > 1 ? () => _selectEpisode(episode - 1) : null,
+                  onNext: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
+                ),
                 const SizedBox(height: 18),
                 _DetailCard(item: item),
                 const SizedBox(height: 18),
@@ -133,6 +158,7 @@ class _TopBar extends StatelessWidget {
 class _PlayerSurface extends StatefulWidget {
   final ContentItem item;
   final bool loading;
+  final StreamInfo stream;
   final String streamUrl;
   final int episode;
 
@@ -140,6 +166,7 @@ class _PlayerSurface extends StatefulWidget {
     super.key,
     required this.item,
     required this.loading,
+    required this.stream,
     required this.streamUrl,
     required this.episode,
   });
@@ -185,11 +212,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     try {
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(widget.streamUrl),
-        httpHeaders: const {
-          'User-Agent': 'okhttp/4.12.0',
-          'Accept': '*/*',
-          'Connection': 'keep-alive',
-        },
+        httpHeaders: widget.stream.headers.isEmpty
+            ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+            : widget.stream.headers,
       );
 
       _controller = controller;
@@ -351,7 +376,17 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
 class _ActionRow extends StatelessWidget {
   final ContentItem item;
-  const _ActionRow({required this.item});
+  final int episode;
+  final int totalEpisodes;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  const _ActionRow({
+    required this.item,
+    required this.episode,
+    required this.totalEpisodes,
+    required this.onPrev,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -359,22 +394,46 @@ class _ActionRow extends StatelessWidget {
       valueListenable: LiveGoLocalStore.version,
       builder: (context, _, __) {
         final fav = LiveGoLocalStore.isFavorite(item);
-        return Row(
+        return Column(
           children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Sedang Diputar'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text('Episode $episode / $totalEpisodes'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => LiveGoLocalStore.toggleFavorite(item),
+                    icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded),
+                    label: Text(fav ? 'Disimpan' : 'Favorit'),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => LiveGoLocalStore.toggleFavorite(item),
-                icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded),
-                label: Text(fav ? 'Disimpan' : 'Favorit'),
-              ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPrev,
+                    icon: const Icon(Icons.skip_previous_rounded),
+                    label: const Text('Sebelumnya'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: onNext,
+                    icon: const Icon(Icons.skip_next_rounded),
+                    label: const Text('Berikutnya'),
+                  ),
+                ),
+              ],
             ),
           ],
         );
@@ -520,6 +579,6 @@ class _StreamBox extends StatelessWidget {
 
 class _PlayerState {
   final ContentItem item;
-  final String streamUrl;
-  const _PlayerState({required this.item, required this.streamUrl});
+  final StreamInfo stream;
+  const _PlayerState({required this.item, required this.stream});
 }

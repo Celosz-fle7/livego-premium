@@ -1,4 +1,5 @@
 import '../models/content_item.dart';
+import '../models/stream_info.dart';
 import '../services/api_drama_client.dart';
 import 'mock_catalog.dart';
 
@@ -9,8 +10,7 @@ class LiveGoCatalog {
 
   static Future<List<ContentItem>> home({String platform = 'freereels'}) async {
     try {
-      final items = await ApiDramaClient.home(platform: platform);
-      return items;
+      return await ApiDramaClient.home(platform: platform);
     } catch (_) {
       return [];
     }
@@ -28,8 +28,7 @@ class LiveGoCatalog {
 
   static Future<List<ContentItem>> search(String query, {String platform = 'freereels'}) async {
     try {
-      final items = await ApiDramaClient.search(query: query, platform: platform);
-      return items.isNotEmpty ? items : MockCatalog.search(query);
+      return await ApiDramaClient.search(query: query, platform: platform);
     } catch (_) {
       return [];
     }
@@ -44,12 +43,17 @@ class LiveGoCatalog {
     }
   }
 
-  static Future<String> videoUrl(ContentItem item) async {
+  static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
-      return await ApiDramaClient.videoUrl(item, chapterId: item.chapterId);
+      return await ApiDramaClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
     } catch (_) {
-      return '';
+      return StreamInfo.empty;
     }
+  }
+
+  static Future<String> videoUrl(ContentItem item) async {
+    final info = await streamInfo(item, chapterId: item.chapterId);
+    return info.url;
   }
 
   static String _label(String slug) {
