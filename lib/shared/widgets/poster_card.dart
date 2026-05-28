@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
 
 class PosterCard extends StatelessWidget {
