@@ -22,7 +22,7 @@ class HeroBanner extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(item.backdropUrl, fit: BoxFit.cover),
+            _SafeNetworkImage(url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl),
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -66,11 +66,10 @@ class HeroBanner extends StatelessWidget {
               bottom: tv ? 32 : 40,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                child: Image.network(
-                  item.posterUrl,
+                child: SizedBox(
                   width: tv ? 125 : 92,
                   height: tv ? 170 : 132,
-                  fit: BoxFit.cover,
+                  child: _SafeNetworkImage(url: item.posterUrl),
                 ),
               ),
             ),
@@ -112,6 +111,45 @@ class _AccentLine extends StatelessWidget {
         gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
         borderRadius: BorderRadius.circular(99),
       ),
+    );
+  }
+}
+
+
+class _SafeNetworkImage extends StatelessWidget {
+  final String url;
+  const _SafeNetworkImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) {
+      return Container(
+        color: const Color(0xFF101826),
+        alignment: Alignment.center,
+        child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 46),
+      );
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      cacheWidth: 720,
+      errorBuilder: (_, __, ___) => Container(
+        color: const Color(0xFF101826),
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image_rounded, color: Colors.white38, size: 42),
+      ),
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: const Color(0xFF101826),
+          alignment: Alignment.center,
+          child: const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyan),
+          ),
+        );
+      },
     );
   }
 }

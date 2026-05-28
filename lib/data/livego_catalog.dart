@@ -17,11 +17,14 @@ class LiveGoCatalog {
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'freereels' : platforms.first);
 
-  static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
+  static List<String> categoriesFor(String platform) {
+    final values = LiveGoSettings.categoriesFor(platform).where((e) => e.trim().isNotEmpty).take(6).toList();
+    return values.isEmpty ? const ['Trending', 'New', 'Drama', 'Romance', 'CEO', 'Completed'] : values;
+  }
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
     try {
-      final rows = await home(platform: platform).timeout(const Duration(seconds: 12));
+      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language);
       final seen = <String>{};
       final values = <String>[];
       for (final item in rows) {
@@ -54,18 +57,10 @@ class LiveGoCatalog {
 
   static Future<List<ContentItem>> home({String platform = 'freereels'}) async {
     try {
-      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language)
-          .timeout(const Duration(seconds: 12));
-      if (rows.isNotEmpty) return rows;
-    } catch (_) {}
-
-    try {
-      final rows = await ApiDramaClient.discover(platform: platform, lang: LiveGoSettings.language)
-          .timeout(const Duration(seconds: 12));
-      if (rows.isNotEmpty) return rows;
-    } catch (_) {}
-
-    return [];
+      return await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language);
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<Map<String, List<ContentItem>>> homeSections() async {
@@ -79,13 +74,13 @@ class LiveGoCatalog {
 
   static Future<List<ContentItem>> banners({String platform = 'freereels'}) async {
     try {
-      final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language)
-          .timeout(const Duration(seconds: 10));
-      if (banners.isNotEmpty) return banners.take(8).toList();
-    } catch (_) {}
-
-    final items = await home(platform: platform);
-    return items.take(5).toList();
+      final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language);
+      if (banners.isNotEmpty) return banners;
+      final items = await home(platform: platform);
+      return items.take(5).toList();
+    } catch (_) {
+      return [MockCatalog.hero];
+    }
   }
 
   static Future<ContentItem> hero({String platform = 'freereels'}) async {

@@ -414,7 +414,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
     return PopScope(
       canPop: !_controls,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_controls) {
           setState(() => _controls = false);

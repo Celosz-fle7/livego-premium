@@ -38,49 +38,10 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
   Future<_HomeState> _load() async {
     final platform = _platform;
-    try {
-      final result = await Future.wait<List<ContentItem>>([
-        LiveGoCatalog.banners(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
-        LiveGoCatalog.home(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
-      ]).timeout(const Duration(seconds: 16));
-
-      final banners = result[0].isNotEmpty ? result[0] : result[1].take(5).toList();
-      final items = result[1];
-      final categories = _categoriesFromItems(platform, items);
-      return _HomeState(banners: banners, items: items, categories: categories);
-    } catch (_) {
-      return _HomeState(
-        banners: const <ContentItem>[],
-        items: const <ContentItem>[],
-        categories: LiveGoCatalog.categoriesFor(platform).take(6).toList(),
-      );
-    }
-  }
-
-  List<String> _categoriesFromItems(String platform, List<ContentItem> items) {
-    final stored = LiveGoCatalog.categoriesFor(platform).take(6).toList();
-    if (items.isEmpty) return stored;
-
-    final seen = <String>{};
-    final values = <String>['Trending'];
-    seen.add('trending');
-
-    for (final item in items) {
-      final categoryName = item.category.trim();
-      if (categoryName.isEmpty) continue;
-      final key = categoryName.toLowerCase();
-      if (key == 'drama') continue;
-      if (seen.add(key)) values.add(categoryName);
-      if (values.length >= 6) break;
-    }
-
-    const fallback = ['New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
-    for (final item in fallback) {
-      if (values.length >= 6) break;
-      if (seen.add(item.toLowerCase())) values.add(item);
-    }
-
-    return values.take(6).toList();
+    final banners = await LiveGoCatalog.banners(platform: platform);
+    final items = await LiveGoCatalog.home(platform: platform);
+    final categories = LiveGoCatalog.categoriesFor(platform).take(6).toList();
+    return _HomeState(banners: banners, items: items, categories: categories);
   }
 
   void _reload() => setState(() => _future = _load());
@@ -208,7 +169,9 @@ class _HeroCarouselState extends State<_HeroCarousel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.items.length != widget.items.length) {
       index = 0;
-      _controller.jumpToPage(0);
+      if (_controller.hasClients) {
+        _controller.jumpToPage(0);
+      }
       _start();
     }
   }
@@ -218,6 +181,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || widget.items.length < 2) return;
       final next = (index + 1) % widget.items.length;
+      if (!_controller.hasClients) return;
       _controller.animateToPage(next, duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
     });
   }
@@ -233,7 +197,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
   Widget build(BuildContext context) {
     if (widget.loading && widget.items.isEmpty) return const _Skeleton(height: 320, radius: 34);
     final items = widget.items;
-    if (items.isEmpty) return const _EmptyHero();
+    if (items.isEmpty) return const _Skeleton(height: 320, radius: 34);
     return SizedBox(
       height: 320,
       child: Stack(
@@ -289,7 +253,7 @@ class _OneLineSelector extends StatelessWidget {
     final shown = items.take(6).toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+      padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
       decoration: BoxDecoration(
         color: const Color(0xFF101826).withOpacity(0.82),
         borderRadius: BorderRadius.circular(20),
@@ -298,8 +262,8 @@ class _OneLineSelector extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-          const SizedBox(height: 8),
+          Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+          const SizedBox(height: 6),
           Row(
             children: List.generate(shown.length, (i) {
               final active = i == selected;
@@ -310,12 +274,12 @@ class _OneLineSelector extends StatelessWidget {
                     onTap: () => onSelected(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      height: 34,
+                      height: 30,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
                         color: active ? null : const Color(0xFF172131),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: active ? Colors.transparent : const Color(0xFF2C405A)),
                       ),
                       child: Text(
@@ -323,7 +287,7 @@ class _OneLineSelector extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 9.5),
+                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 8.6),
                       ),
                     ),
                   ),
@@ -332,28 +296,6 @@ class _OneLineSelector extends StatelessWidget {
             }),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyHero extends StatelessWidget {
-  const _EmptyHero();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 320,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: const Color(0xFF243A54)),
-      ),
-      child: const Text(
-        'Memuat banner gagal. Tarik layar untuk refresh.',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w800),
       ),
     );
   }
