@@ -35,7 +35,7 @@ jobs:
         run: flutter analyze || true
 
       - name: Build universal release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=API_SECRET=${{ secrets.API_SECRET }} --dart-define=API_BASE_URL=https://api-drama.dobda.id --dart-define=API_LANG=id
 
       - name: Prepare files
         run: |
