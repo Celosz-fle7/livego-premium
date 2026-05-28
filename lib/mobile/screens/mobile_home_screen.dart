@@ -38,10 +38,49 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
   Future<_HomeState> _load() async {
     final platform = _platform;
-    final banners = await LiveGoCatalog.banners(platform: platform);
-    final items = await LiveGoCatalog.home(platform: platform);
-    final categories = LiveGoCatalog.categoriesFor(platform).take(6).toList();
-    return _HomeState(banners: banners, items: items, categories: categories);
+    try {
+      final result = await Future.wait<List<ContentItem>>([
+        LiveGoCatalog.banners(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
+        LiveGoCatalog.home(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
+      ]).timeout(const Duration(seconds: 16));
+
+      final banners = result[0].isNotEmpty ? result[0] : result[1].take(5).toList();
+      final items = result[1];
+      final categories = _categoriesFromItems(platform, items);
+      return _HomeState(banners: banners, items: items, categories: categories);
+    } catch (_) {
+      return _HomeState(
+        banners: const <ContentItem>[],
+        items: const <ContentItem>[],
+        categories: LiveGoCatalog.categoriesFor(platform).take(6).toList(),
+      );
+    }
+  }
+
+  List<String> _categoriesFromItems(String platform, List<ContentItem> items) {
+    final stored = LiveGoCatalog.categoriesFor(platform).take(6).toList();
+    if (items.isEmpty) return stored;
+
+    final seen = <String>{};
+    final values = <String>['Trending'];
+    seen.add('trending');
+
+    for (final item in items) {
+      final categoryName = item.category.trim();
+      if (categoryName.isEmpty) continue;
+      final key = categoryName.toLowerCase();
+      if (key == 'drama') continue;
+      if (seen.add(key)) values.add(categoryName);
+      if (values.length >= 6) break;
+    }
+
+    const fallback = ['New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
+    for (final item in fallback) {
+      if (values.length >= 6) break;
+      if (seen.add(item.toLowerCase())) values.add(item);
+    }
+
+    return values.take(6).toList();
   }
 
   void _reload() => setState(() => _future = _load());
@@ -194,7 +233,7 @@ class _HeroCarouselState extends State<_HeroCarousel> {
   Widget build(BuildContext context) {
     if (widget.loading && widget.items.isEmpty) return const _Skeleton(height: 320, radius: 34);
     final items = widget.items;
-    if (items.isEmpty) return const _Skeleton(height: 320, radius: 34);
+    if (items.isEmpty) return const _EmptyHero();
     return SizedBox(
       height: 320,
       child: Stack(
@@ -293,6 +332,28 @@ class _OneLineSelector extends StatelessWidget {
             }),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmptyHero extends StatelessWidget {
+  const _EmptyHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 320,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF101826),
+        borderRadius: BorderRadius.circular(34),
+        border: Border.all(color: const Color(0xFF243A54)),
+      ),
+      child: const Text(
+        'Memuat banner gagal. Tarik layar untuk refresh.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w800),
       ),
     );
   }
