@@ -10,9 +10,9 @@ class LiveGoCatalog {
   static Future<List<ContentItem>> home({String platform = 'freereels'}) async {
     try {
       final items = await ApiDramaClient.home(platform: platform);
-      return items.isNotEmpty ? items : MockCatalog.items;
+      return items;
     } catch (_) {
-      return MockCatalog.items;
+      return [];
     }
   }
 
@@ -31,7 +31,7 @@ class LiveGoCatalog {
       final items = await ApiDramaClient.search(query: query, platform: platform);
       return items.isNotEmpty ? items : MockCatalog.search(query);
     } catch (_) {
-      return MockCatalog.search(query);
+      return [];
     }
   }
 
