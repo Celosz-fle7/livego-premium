@@ -3,7 +3,7 @@ import '../shared/widgets/premium_shell.dart';
 import 'screens/mobile_account_screen.dart';
 import 'screens/mobile_home_screen.dart';
 import 'screens/mobile_search_screen.dart';
-import 'screens/simple_page.dart';
+import 'screens/mobile_library_screen.dart';
 import 'widgets/mobile_bottom_nav.dart';
 
 class MobileApp extends StatefulWidget {
@@ -20,9 +20,9 @@ class _MobileAppState extends State<MobileApp> {
   Widget build(BuildContext context) {
     final pages = [
       MobileHomeScreen(onTab: (i) => setState(() => index = i)),
-      const SimplePage(title: 'Histori', icon: Icons.history_rounded),
+      const MobileLibraryScreen(title: 'Histori', icon: Icons.history_rounded, favorites: false),
       const MobileSearchScreen(),
-      const SimplePage(title: 'Favorit', icon: Icons.favorite_rounded),
+      const MobileLibraryScreen(title: 'Favorit', icon: Icons.favorite_rounded, favorites: true),
       const MobileAccountScreen(),
     ];
 
