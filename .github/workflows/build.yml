@@ -26,6 +26,7 @@ jobs:
 
       - name: Recreate Android project
         run: flutter create --platforms=android --project-name livego_premium .
+          rm -rf test
 
       - name: Pub get
         run: flutter pub get
