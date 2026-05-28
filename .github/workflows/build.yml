@@ -11,14 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.22.0
           channel: stable
@@ -50,9 +53,11 @@ jobs:
           path: build/app/outputs/flutter-apk/livego-premium-arm64.zip
 
       - name: Send ZIP to Telegram
-        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          curl -F chat_id="$CHAT_ID" \
                -F document="@build/app/outputs/flutter-apk/livego-premium-arm64.zip" \
                -F caption="LiveGO Premium ARM64 Release APK" \
-               "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
+               "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
