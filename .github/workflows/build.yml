@@ -37,27 +37,35 @@ jobs:
       - name: Analyze
         run: flutter analyze || true
 
-      - name: Build release split APK
-        run: flutter build apk --release --split-per-abi
+      - name: Build universal release APK
+        run: flutter build apk --release
 
-      - name: Compress arm64 APK
+      - name: Compress APK
         run: |
           cd build/app/outputs/flutter-apk
-          zip livego-premium-arm64.zip app-arm64-v8a-release.apk
-          ls -lh livego-premium-arm64.zip
+          zip -9 livego-premium-universal.zip app-release.apk
+          ls -lh app-release.apk livego-premium-universal.zip
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: livego-premium-arm64
-          path: build/app/outputs/flutter-apk/livego-premium-arm64.zip
+          name: livego-premium-universal
+          path: build/app/outputs/flutter-apk/livego-premium-universal.zip
 
       - name: Send ZIP to Telegram
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -F chat_id="$CHAT_ID" \
-               -F document="@build/app/outputs/flutter-apk/livego-premium-arm64.zip" \
-               -F caption="LiveGO Premium ARM64 Release APK" \
-               "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
+          FILE="build/app/outputs/flutter-apk/livego-premium-universal.zip"
+          SIZE=$(stat -c%s "$FILE")
+          LIMIT=50000000
+
+          if [ "$SIZE" -le "$LIMIT" ]; then
+            curl -F chat_id="$CHAT_ID" \
+                 -F document=@"$FILE" \
+                 -F caption="LiveGO Premium Universal APK" \
+                 "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
+          else
+            echo "ZIP lebih dari 50MB, hanya upload ke GitHub artifact."
+          fi
