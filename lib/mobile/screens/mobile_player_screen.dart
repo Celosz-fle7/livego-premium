@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
+import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
@@ -98,7 +99,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
                   stream: stream,
                   streamUrl: streamUrl,
                   episode: episode,
-                  onAutoNext: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
+                  onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
                 ),
                 const SizedBox(height: 18),
                 _ActionRow(
@@ -433,6 +434,26 @@ class _ActionRow extends StatelessWidget {
                     onPressed: () => LiveGoLocalStore.toggleFavorite(item),
                     icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded),
                     label: Text(fav ? 'Disimpan' : 'Favorit'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => LiveGoLocalStore.toggleDownload(item),
+                    icon: Icon(LiveGoLocalStore.isDownloaded(item) ? Icons.download_done_rounded : Icons.download_rounded),
+                    label: Text(LiveGoLocalStore.isDownloaded(item) ? 'Offline Siap' : 'Simpan Offline'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.closed_caption_rounded),
+                    label: Text(LiveGoSettings.subtitlesEnabled ? 'Subtitle ON' : 'Subtitle OFF'),
                   ),
                 ),
               ],

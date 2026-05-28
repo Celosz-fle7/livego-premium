@@ -1,136 +1,94 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
 
-class PosterCard extends StatefulWidget {
+class PosterCard extends StatelessWidget {
   final ContentItem item;
   final VoidCallback? onTap;
   final bool tv;
 
-  const PosterCard({
-    super.key,
-    required this.item,
-    this.onTap,
-    this.tv = false,
-  });
-
-  @override
-  State<PosterCard> createState() => _PosterCardState();
-}
-
-class _PosterCardState extends State<PosterCard> {
-  bool _focused = false;
+  const PosterCard({super.key, required this.item, this.onTap, this.tv = false});
 
   @override
   Widget build(BuildContext context) {
-    final width = widget.tv ? 166.0 : 150.0;
-    final card = AnimatedScale(
-      scale: widget.tv && _focused ? 1.08 : 1.0,
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        width: width,
-        padding: EdgeInsets.all(widget.tv && _focused ? 3 : 0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: widget.tv && _focused ? AppTheme.cyan : Colors.transparent,
-            width: 2.5,
-          ),
-          boxShadow: widget.tv && _focused
-              ? [
-                  BoxShadow(
-                    color: AppTheme.cyan.withOpacity(0.32),
-                    blurRadius: 24,
-                    spreadRadius: 1,
-                  ),
-                  BoxShadow(
-                    color: AppTheme.purple.withOpacity(0.22),
-                    blurRadius: 36,
-                  ),
-                ]
-              : const [],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    widget.item.posterUrl.isEmpty
-                        ? Container(
-                            color: const Color(0xFF111827),
-                            child: const Icon(Icons.movie_creation_rounded, color: Colors.white38),
-                          )
-                        : Image.network(
-                            widget.item.posterUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFF111827),
-                              child: const Icon(Icons.broken_image_rounded, color: Colors.white38),
-                            ),
-                          ),
-                    Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
-                    if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
-                    Positioned(right: 8, bottom: 8, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
-                    if (widget.tv && _focused)
-                      Positioned.fill(
-                        child: DecoratedBox(
+    final width = tv ? 158.0 : 150.0;
+    return ValueListenableBuilder<int>(
+      valueListenable: LiveGoLocalStore.version,
+      builder: (context, _, __) {
+        final progress = LiveGoLocalStore.progressFor(item)?.ratio ?? 0;
+        final fav = LiveGoLocalStore.isFavorite(item);
+        return InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            width: width,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        item.posterUrl.isEmpty
+                            ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 46))
+                            : Image.network(
+                                item.posterUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: AppTheme.surface2,
+                                  child: const Icon(Icons.broken_image_rounded, color: Colors.white38),
+                                ),
+                              ),
+                        const DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.white.withOpacity(0.08),
-                                AppTheme.cyan.withOpacity(0.08),
-                              ],
+                              colors: [Colors.transparent, Color(0xAA020617)],
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                        Positioned(top: 8, left: 8, child: _Badge(text: '${item.episodes} Ep')),
+                        if (item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
+                        if (fav) const Positioned(right: 8, top: 38, child: _RoundIcon(icon: Icons.favorite_rounded)),
+                        Positioned(right: 8, bottom: 12, child: _Badge(text: item.rating.toStringAsFixed(1))),
+                        if (progress > 0)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 4,
+                              backgroundColor: Colors.white12,
+                              valueColor: const AlwaysStoppedAnimation(AppTheme.cyan),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: tv ? 14 : 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              widget.item.title,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: widget.tv ? 14 : 13,
-                fontWeight: FontWeight.w800,
-                height: 1.1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (!widget.tv) {
-      return InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(width: width, child: card),
-      );
-    }
-
-    return Focus(
-      onFocusChange: (value) => setState(() => _focused = value),
-      child: InkWell(
-        onTap: widget.onTap,
-        onLongPress: widget.onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: SizedBox(width: width, child: card),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -148,10 +106,22 @@ class _Badge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white24),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
-      ),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
+class _RoundIcon extends StatelessWidget {
+  final IconData icon;
+  const _RoundIcon({required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
+      child: Icon(icon, color: AppTheme.cyan, size: 15),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
+import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
@@ -91,7 +92,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
           }
           final duration = value.duration;
-          if (duration.inSeconds > 15 && _episode < (_detail?.episodes ?? widget.item.episodes)) {
+          if (LiveGoSettings.autoNextEnabled && duration.inSeconds > 15 && _episode < (_detail?.episodes ?? widget.item.episodes)) {
             final remaining = duration - value.position;
             if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
               LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);

@@ -29,9 +29,11 @@ class LiveGoLocalStore {
   static final List<ContentItem> _history = <ContentItem>[];
   static final List<ContentItem> _favorites = <ContentItem>[];
   static final Map<String, WatchProgress> _progress = <String, WatchProgress>{};
+  static final List<ContentItem> _downloads = <ContentItem>[];
 
   static List<ContentItem> get history => List.unmodifiable(_history);
   static List<ContentItem> get favorites => List.unmodifiable(_favorites);
+  static List<ContentItem> get downloads => List.unmodifiable(_downloads);
   static List<WatchProgress> get continueWatching {
     final rows = _progress.values.toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -93,6 +95,26 @@ class LiveGoLocalStore {
     _bump();
   }
 
+
+  static bool isDownloaded(ContentItem item) {
+    return _downloads.any((e) => e.id == item.id && e.platformSlug == item.platformSlug);
+  }
+
+  static void toggleDownload(ContentItem item) {
+    final index = _downloads.indexWhere((e) => e.id == item.id && e.platformSlug == item.platformSlug);
+    if (index >= 0) {
+      _downloads.removeAt(index);
+    } else {
+      _downloads.insert(0, item);
+    }
+    _bump();
+  }
+
+  static void clearDownloads() {
+    _downloads.clear();
+    _bump();
+  }
+
   static void clearHistory() {
     _history.clear();
     _progress.clear();
@@ -107,6 +129,7 @@ class LiveGoLocalStore {
   static void clearAll() {
     _history.clear();
     _favorites.clear();
+    _downloads.clear();
     _progress.clear();
     _bump();
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../shared/widgets/category_chips.dart';
@@ -113,6 +114,33 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              ValueListenableBuilder<int>(
+                valueListenable: LiveGoLocalStore.version,
+                builder: (context, _, __) {
+                  final continueRows = LiveGoLocalStore.continueWatching;
+                  if (continueRows.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('LANJUT NONTON', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 246,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: continueRows.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 14),
+                          itemBuilder: (_, i) {
+                            final row = continueRows[i];
+                            return PosterCard(item: row.item, onTap: () => _open(row.item));
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                },
+              ),
               if (loading)
                 GridView.builder(
                   shrinkWrap: true,
