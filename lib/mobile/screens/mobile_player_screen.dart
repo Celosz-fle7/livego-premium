@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
@@ -119,7 +120,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _PlayerSurface extends StatelessWidget {
+class _PlayerSurface extends StatefulWidget {
   final ContentItem item;
   final bool loading;
   final String streamUrl;
@@ -127,7 +128,51 @@ class _PlayerSurface extends StatelessWidget {
   const _PlayerSurface({required this.item, required this.loading, required this.streamUrl, required this.episode});
 
   @override
+  State<_PlayerSurface> createState() => _PlayerSurfaceState();
+}
+
+class _PlayerSurfaceState extends State<_PlayerSurface> {
+  VideoPlayerController? _controller;
+  String _activeUrl = '';
+
+  @override
+  void didUpdateWidget(covariant _PlayerSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _setup();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _setup();
+  }
+
+  Future<void> _setup() async {
+    if (widget.streamUrl.isEmpty || widget.streamUrl == _activeUrl) return;
+    _activeUrl = widget.streamUrl;
+    await _controller?.dispose();
+    final c = VideoPlayerController.networkUrl(
+      Uri.parse(widget.streamUrl),
+      httpHeaders: const {'User-Agent': 'okhttp/4.12.0'},
+    );
+    _controller = c;
+    await c.initialize();
+    await c.play();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final loading = widget.loading;
+    final streamUrl = widget.streamUrl;
+    final episode = widget.episode;
     final image = item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl;
     return AspectRatio(
       aspectRatio: 16 / 9,
@@ -148,7 +193,12 @@ class _PlayerSurface extends StatelessWidget {
               colors: [Color(0x66000000), Color(0xEE050913)],
             ),
           ),
-          child: Center(
+          child: (_controller != null && _controller!.value.isInitialized)
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: VideoPlayer(_controller!),
+                )
+              : Center(
             child: loading
                 ? const CircularProgressIndicator()
                 : Column(
@@ -172,6 +222,7 @@ class _PlayerSurface extends StatelessWidget {
                     ],
                   ),
           ),
+        ),
         ),
       ),
     );
