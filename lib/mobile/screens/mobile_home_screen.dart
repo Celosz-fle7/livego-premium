@@ -110,53 +110,28 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
-        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform).take(6).toList();
-        if (category >= categories.length) category = 0;
-        final items = _filtered(state?.items ?? const [], categories);
-        final platforms = LiveGoCatalog.platforms.take(6).toList();
-        final labels = LiveGoCatalog.labelsFor(platforms);
-        final grid = LiveGoSettings.mobileHomeGrid.clamp(2, 6);
-        final posterHeight = grid <= 3 ? 250.0 : (grid == 4 ? 212.0 : 184.0);
+        final items = state?.items ?? const <ContentItem>[];
+        final grid = 3;
 
         return RefreshIndicator(
           onRefresh: () async => _reload(),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
             children: [
-              _HeroCarousel(
-                items: state?.banners ?? const <ContentItem>[],
-                loading: loading,
-                onTap: _open,
+              const SizedBox(height: 8),
+              Text(
+                'LiveGO',
+                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 12),
-              _OneLineSelector(
-                title: 'Platform',
-                items: labels,
-                selected: source,
-                onSelected: (v) {
-                  setState(() {
-                    source = v;
-                    category = 0;
-                  });
-                  _reload();
-                },
-              ),
-              const SizedBox(height: 9),
-              _OneLineSelector(
-                title: 'Kategori',
-                items: categories,
-                selected: category,
-                onSelected: (v) => setState(() => category = v),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               if (loading)
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: grid * 2,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: grid,
-                    mainAxisExtent: posterHeight,
+                  itemCount: 9,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisExtent: 250,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 14,
                   ),
@@ -169,9 +144,9 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: items.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: grid,
-                    mainAxisExtent: posterHeight,
+                    mainAxisExtent: 250,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 14,
                   ),
