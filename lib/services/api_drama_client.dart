@@ -12,11 +12,11 @@ class ApiDramaClient {
     defaultValue: 'https://api-drama.dobda.id',
   );
 
-  // Development fallback. Nanti kalau sudah final, pindahkan lagi ke GitHub Secrets.
-  static const String apiSecret = String.fromEnvironment(
-    'API_SECRET',
-    defaultValue: '22dfb2b849814054af0491ff2ee3ffe33989313d7d38e97aae659757a4cf8960',
-  );
+  // Development hardcoded secret.
+  // Jangan pakai String.fromEnvironment untuk sementara, karena workflow lama bisa mengirim
+  // API_SECRET kosong dan menimpa fallback sehingga request tidak signed.
+  static const String apiSecret =
+      '22dfb2b849814054af0491ff2ee3ffe33989313d7d38e97aae659757a4cf8960';
 
   static const String defaultLang = String.fromEnvironment(
     'API_LANG',
