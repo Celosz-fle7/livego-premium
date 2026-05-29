@@ -23,7 +23,9 @@ class ApiDramaClient {
       'category_p': platform,
       'lang': lang,
     });
-    return _parseItems(json, platform: platform, lang: lang);
+    final items = _parseItems(json, platform: platform, lang: lang);
+    print('HOME API PLATFORM=$platform TOTAL=${json['total']} DATA=${json['data'].runtimeType} ITEMS=${items.length}');
+    return items;
   }
 
   static Future<List<ContentItem>> discover({

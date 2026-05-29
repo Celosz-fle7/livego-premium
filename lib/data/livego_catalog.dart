@@ -57,6 +57,7 @@ class LiveGoCatalog {
     try {
       final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
+      print('CATALOG HOME $platform -> ${rows.length}');
       if (rows.isNotEmpty) return rows;
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
