@@ -1,10 +1,37 @@
-class ApiDramaClient {
-  static const String baseUrl = ApiConfig.baseUrl;
-  static const String apiSecret = ApiConfig.apiSecret;
-  static const String defaultLang = ApiConfig.defaultLang;
+import 'dart:convert';
+import 'dart:io';
 
-  static const List<String> defaultPlatforms = PlatformRegistry.defaultPlatforms;
-  static const List<String> supportedPlatforms = PlatformRegistry.supportedPlatforms;
+import 'package:crypto/crypto.dart';
+
+import '../models/content_item.dart';
+import '../models/stream_info.dart';
+
+class ApiDramaClient {
+  static const String baseUrl = 'https://api-drama.dobda.id';
+
+  static const String apiSecret =
+      '22dfb2b849814054af0491ff2ee3ffe33989313d7d38e97aae659757a4cf8960';
+
+  static const String defaultLang = 'id';
+
+  static const List<String> defaultPlatforms = [
+    'freereels',
+    'goodshort',
+    'dramawave',
+    'netshort',
+    'reelshort',
+    'melolo',
+  ];
+
+  static const List<String> supportedPlatforms = [
+    'freereels',
+    'goodshort',
+    'dramawave',
+    'netshort',
+    'reelshort',
+    'melolo',
+    'rapidtv',
+  ];
 
   static Future<List<ContentItem>> home({
     String platform = 'freereels',
@@ -93,13 +120,10 @@ class ApiDramaClient {
     final json = await _getJson('/api/v2/categories', {});
     final data = json['data'];
     if (data is List) {
-      return data
-          .map((e) {
-            if (e is Map) return '${e['name'] ?? e['display_name'] ?? ''}';
-            return '$e';
-          })
-          .where((e) => e.isNotEmpty)
-          .toList();
+      return data.map((e) {
+        if (e is Map) return '${e['name'] ?? e['display_name'] ?? ''}';
+        return '$e';
+      }).where((e) => e.isNotEmpty).toList();
     }
     return defaultPlatforms;
   }
@@ -119,24 +143,27 @@ class ApiDramaClient {
         .toList();
   }
 
-  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
-    final uri = Uri.parse(baseUrl).replace(path: path, queryParameters: query.isEmpty ? null : query);
-    print('LIVEGO API => GET $uri');
+  static Future<Map<String, dynamic>> _getJson(
+    String path,
+    Map<String, String> query,
+  ) async {
+    final uri = Uri.parse(baseUrl).replace(
+      path: path,
+      queryParameters: query.isEmpty ? null : query,
+    );
 
-    final request = await HttpClient().getUrl(uri).timeout(ApiConfig.timeout);
-    final headers = <String, String>{
-      ...ApiConfig.defaultHeaders,
-      ...const HmacSigner(apiSecret).sign('GET', uri),
-    };
+    final request = await HttpClient().getUrl(uri).timeout(const Duration(seconds: 18));
 
-    for (final entry in headers.entries) {
+    request.headers.set('Accept', 'application/json');
+    request.headers.set('User-Agent', 'okhttp/4.12.0');
+
+    final signed = _signedHeaders('GET', uri);
+    for (final entry in signed.entries) {
       request.headers.set(entry.key, entry.value);
     }
 
-    final response = await request.close().timeout(ApiConfig.timeout);
+    final response = await request.close().timeout(const Duration(seconds: 18));
     final body = await response.transform(utf8.decoder).join();
-    final preview = body.length > 240 ? body.substring(0, 240) : body;
-    print('LIVEGO API <= ${response.statusCode} $preview');
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('API ${response.statusCode}: $body');
@@ -146,5 +173,21 @@ class ApiDramaClient {
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return Map<String, dynamic>.from(decoded);
     return {};
+  }
+
+  static Map<String, String> _signedHeaders(String method, Uri uri) {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final pathWithQuery = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
+    final payload = '$method:$pathWithQuery:$timestamp';
+
+    final signature = Hmac(
+      sha256,
+      utf8.encode(apiSecret),
+    ).convert(utf8.encode(payload)).toString();
+
+    return {
+      'X-Timestamp': timestamp,
+      'X-Signature': signature,
+    };
   }
 }
