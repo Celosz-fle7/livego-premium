@@ -140,7 +140,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _fitCover = false;
   bool _landscape = false;
   bool _autoNextDone = false;
-  String _quality = 'Auto';
+  String _quality = LiveGoSettings.quality.isEmpty ? 'Auto Adaptive' : LiveGoSettings.quality;
   double _speed = 1.0;
   DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastTapRight = DateTime.fromMillisecondsSinceEpoch(0);
@@ -313,7 +313,6 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   Future<void> _qualityMenu() async {
-    final values = ['Auto', '360p', '480p', '560p', '720p', '1080p'];
     final picked = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF0D1117),
@@ -322,25 +321,43 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Wrap(
-            runSpacing: 10,
+            runSpacing: 12,
             spacing: 10,
             children: [
-              const SizedBox(width: double.infinity, child: Text('Pilih Kualitas', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
-              for (final v in values)
-                ChoiceChip(
-                  label: Text(v),
-                  selected: v == _quality,
-                  onSelected: (_) => Navigator.pop(context, v),
-                  selectedColor: AppTheme.cyan,
-                  labelStyle: TextStyle(color: v == _quality ? Colors.black : Colors.white, fontWeight: FontWeight.w900),
-                  backgroundColor: const Color(0xFF172131),
+              const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Kualitas Video',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
                 ),
+              ),
+              const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Stream API saat ini HLS adaptive. Player akan mengikuti kualitas terbaik sesuai koneksi. Pilihan manual 360p/480p/720p baru bisa dibuat setelah playlist m3u8 diparse.',
+                  style: TextStyle(color: Colors.white60, height: 1.35),
+                ),
+              ),
+              ChoiceChip(
+                label: const Text('Auto Adaptive'),
+                selected: _quality == 'Auto Adaptive' || _quality == 'Auto',
+                onSelected: (_) => Navigator.pop(context, 'Auto Adaptive'),
+                selectedColor: AppTheme.cyan,
+                labelStyle: TextStyle(
+                  color: (_quality == 'Auto Adaptive' || _quality == 'Auto') ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+                backgroundColor: const Color(0xFF172131),
+              ),
             ],
           ),
         ),
       ),
     );
-    if (picked != null) setState(() => _quality = picked);
+    if (picked != null) {
+      setState(() => _quality = picked);
+      LiveGoSettings.quality = picked;
+    }
     _showControls();
   }
 
@@ -439,10 +456,22 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
             final screenW = box.maxWidth;
             final screenH = box.maxHeight;
             final fullMode = _fitCover || _landscape;
-            final targetH = fullMode ? screenH : screenH * 0.80;
-            final targetW = fullMode ? screenW : targetH * 9 / 14;
-            final playerW = targetW > screenW ? screenW : targetW;
-            final playerH = fullMode ? screenH : targetH;
+
+            // LiveGO content mayoritas drama vertikal. Mode normal sekarang 9:16.
+            // Full portrait/landscape memakai seluruh container layar.
+            double playerW;
+            double playerH;
+            if (fullMode) {
+              playerW = screenW;
+              playerH = screenH;
+            } else {
+              playerH = screenH * 0.84;
+              playerW = playerH * 9 / 16;
+              if (playerW > screenW * 0.96) {
+                playerW = screenW * 0.96;
+                playerH = playerW * 16 / 9;
+              }
+            }
 
             return Center(
               child: SizedBox(
@@ -507,7 +536,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   controller: c,
                   episode: widget.episode,
                   total: widget.item.episodes,
-                  quality: _quality,
+                  quality: _quality == 'Auto' ? 'Auto Adaptive' : _quality,
                   muted: _muted,
                   fitCover: _fitCover,
                   landscape: _landscape,

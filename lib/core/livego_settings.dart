@@ -3,7 +3,7 @@ class LiveGoSettings {
 
   static String language = 'id';
   static String defaultPlatform = 'freereels';
-  static String quality = 'Auto';
+  static String quality = 'Auto Adaptive';
   static String layoutMode = 'Auto';
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
@@ -129,7 +129,7 @@ class LiveGoSettings {
   static void reset() {
     language = 'id';
     defaultPlatform = 'freereels';
-    quality = 'Auto';
+    quality = 'Auto Adaptive';
     layoutMode = 'Auto';
     drmMode = 'Auto';
     subtitlesEnabled = true;
