@@ -26,12 +26,8 @@ class AdaptiveRoot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = MediaQuery.sizeOf(context);
-        final isTv = size.width >= 900 && size.width > size.height;
-        return isTv ? const TvApp() : const MobileApp();
-      },
-    );
+    // Stabilkan dulu: HP portrait/landscape tetap MobileApp.
+    // TV mode nanti dibuat manual dari setting/device detection yang lebih aman.
+    return const MobileApp();
   }
 }
