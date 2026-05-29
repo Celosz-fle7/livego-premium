@@ -142,6 +142,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _autoNextDone = false;
   String _quality = LiveGoSettings.quality.isEmpty ? 'Auto Adaptive' : LiveGoSettings.quality;
   double _speed = 1.0;
+  Duration _lastProgressSaved = Duration.zero;
   DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastTapRight = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -199,7 +200,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (!mounted || c == null) return;
     final value = c.value;
     if (_buffering != value.isBuffering) setState(() => _buffering = value.isBuffering);
-    if (value.isInitialized && value.position.inSeconds % 5 == 0) {
+    if (value.isInitialized && (value.position - _lastProgressSaved).inSeconds.abs() >= 5) {
+      _lastProgressSaved = value.position;
       LiveGoLocalStore.saveProgress(widget.item, widget.episode, value.position, value.duration);
     }
     final duration = value.duration;
@@ -334,21 +336,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               const SizedBox(
                 width: double.infinity,
                 child: Text(
-                  'Stream API saat ini HLS adaptive. Player akan mengikuti kualitas terbaik sesuai koneksi. Pilihan manual 360p/480p/720p baru bisa dibuat setelah playlist m3u8 diparse.',
+                  'API memberi stream HLS adaptive. Pilihan di bawah adalah mode preferensi user. Kualitas manual real akan aktif kalau playlist m3u8 sudah diparse.',
                   style: TextStyle(color: Colors.white60, height: 1.35),
                 ),
               ),
-              ChoiceChip(
-                label: const Text('Auto Adaptive'),
-                selected: _quality == 'Auto Adaptive' || _quality == 'Auto',
-                onSelected: (_) => Navigator.pop(context, 'Auto Adaptive'),
-                selectedColor: AppTheme.cyan,
-                labelStyle: TextStyle(
-                  color: (_quality == 'Auto Adaptive' || _quality == 'Auto') ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-                backgroundColor: const Color(0xFF172131),
-              ),
+              _QualityChip(label: 'Auto Adaptive', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: 'Hemat Data', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: 'Normal', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: 'Kualitas Tinggi', current: _quality, onPick: (v) => Navigator.pop(context, v)),
             ],
           ),
         ),
@@ -455,23 +450,39 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
           builder: (context, box) {
             final screenW = box.maxWidth;
             final screenH = box.maxHeight;
-            final fullMode = _fitCover || _landscape;
+            final videoRatio = ready && c.value.aspectRatio > 0 ? c.value.aspectRatio : 9 / 16;
+            final isPortraitVideo = videoRatio < 1.0;
 
-            // LiveGO content mayoritas drama vertikal. Mode normal sekarang 9:16.
-            // Full portrait/landscape memakai seluruh container layar.
+            // Mode container LiveGO:
+            // - Normal portrait video: 75-80% tinggi layar, rasio asli tetap aman.
+            // - Normal landscape video: lebar dominan, tidak dipaksa gepeng.
+            // - Full portrait / landscape: seluruh layar, controls ikut lebar layar.
             double playerW;
             double playerH;
-            if (fullMode) {
+            if (_fitCover || _landscape) {
               playerW = screenW;
               playerH = screenH;
+            } else if (isPortraitVideo) {
+              playerH = screenH * 0.78;
+              playerW = playerH * videoRatio;
+              final maxW = screenW * 0.96;
+              if (playerW > maxW) {
+                playerW = maxW;
+                playerH = playerW / videoRatio;
+              }
             } else {
-              playerH = screenH * 0.84;
-              playerW = playerH * 9 / 16;
-              if (playerW > screenW * 0.96) {
-                playerW = screenW * 0.96;
-                playerH = playerW * 16 / 9;
+              playerW = screenW * 0.94;
+              playerH = playerW / videoRatio;
+              final maxH = screenH * 0.58;
+              if (playerH > maxH) {
+                playerH = maxH;
+                playerW = playerH * videoRatio;
               }
             }
+
+            final BoxFit videoFit = _fitCover
+                ? BoxFit.cover
+                : (_landscape && isPortraitVideo ? BoxFit.fitHeight : BoxFit.contain);
 
             return Center(
               child: SizedBox(
@@ -485,7 +496,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                       if (ready)
                         Center(
                           child: FittedBox(
-                            fit: _fitCover ? BoxFit.cover : BoxFit.contain,
+                            fit: videoFit,
                             child: SizedBox(
                               width: c.value.size.width,
                               height: c.value.size.height,
@@ -775,6 +786,30 @@ class _MainPlayButton extends StatelessWidget {
         height: 68,
         decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle, border: Border.all(color: Colors.white30, width: 1.4)),
         child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 38),
+      ),
+    );
+  }
+}
+
+
+class _QualityChip extends StatelessWidget {
+  final String label;
+  final String current;
+  final ValueChanged<String> onPick;
+  const _QualityChip({required this.label, required this.current, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = current == label || (label == 'Auto Adaptive' && current == 'Auto');
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onPick(label),
+      selectedColor: AppTheme.cyan,
+      backgroundColor: const Color(0xFF172131),
+      labelStyle: TextStyle(
+        color: selected ? Colors.black : Colors.white,
+        fontWeight: FontWeight.w900,
       ),
     );
   }
