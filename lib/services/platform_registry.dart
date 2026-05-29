@@ -1,4 +1,5 @@
 class PlatformRegistry {
+  // Default Home hanya platform yang sudah dites 200 OK.
   static const List<String> defaultPlatforms = [
     'freereels',
     'goodshort',
@@ -8,21 +9,22 @@ class PlatformRegistry {
     'melolo',
   ];
 
+  // Supported tetap bisa diperluas di Source Manager, tapi platform error jangan jadi default.
   static const List<String> supportedPlatforms = [
     'freereels',
     'goodshort',
     'dramawave',
     'netshort',
     'reelshort',
-    'reelife',
+    'melolo',
     'rapidtv',
+    'reelife',
     'flickreels',
     'dramapops',
     'dramapoops',
     'shortmax',
     'dramanova',
     'dramarush',
-    'melolo',
     'starshort',
     'meloshort',
     'dramabite',

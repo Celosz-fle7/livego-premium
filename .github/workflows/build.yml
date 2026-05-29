@@ -11,14 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.22.0
           channel: stable
@@ -32,7 +35,10 @@ jobs:
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
           if "android.permission.INTERNET" not in s:
-              s = s.replace("<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">", "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n    <uses-permission android:name=\"android.permission.INTERNET\" />")
+              s = s.replace(
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />'
+              )
           p.write_text(s)
           FIX
 
@@ -67,11 +73,8 @@ jobs:
           SIZE=$(stat -c%s "$FILE")
           LIMIT=50000000
 
-          if [ "$SIZE" -le "$LIMIT" ]; then
-            curl -F chat_id="$CHAT_ID" \
-                 -F document=@"$FILE" \
-                 -F caption="LiveGO Premium APK" \
-                 "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
+          if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && [ "$SIZE" -le "$LIMIT" ]; then
+            curl -F chat_id="$CHAT_ID"                  -F document=@"$FILE"                  -F caption="LiveGO Premium APK"                  "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
           else
-            echo "APK lebih dari 50MB, tidak dikirim Telegram."
+            echo "Skip Telegram: missing token/chat id or APK > 50MB."
           fi

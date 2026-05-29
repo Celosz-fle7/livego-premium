@@ -1,37 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
-
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
+import 'api_config.dart';
+import 'hmac_signer.dart';
+import 'platform_registry.dart';
 
 class ApiDramaClient {
-  static const String baseUrl = 'https://api-drama.dobda.id';
+  static const String baseUrl = ApiConfig.baseUrl;
+  static const String apiSecret = ApiConfig.apiSecret;
+  static const String defaultLang = ApiConfig.defaultLang;
 
-  static const String apiSecret =
-      '22dfb2b849814054af0491ff2ee3ffe33989313d7d38e97aae659757a4cf8960';
-
-  static const String defaultLang = 'id';
-
-  static const List<String> defaultPlatforms = [
-    'freereels',
-    'goodshort',
-    'dramawave',
-    'netshort',
-    'reelshort',
-    'melolo',
-  ];
-
-  static const List<String> supportedPlatforms = [
-    'freereels',
-    'goodshort',
-    'dramawave',
-    'netshort',
-    'reelshort',
-    'melolo',
-    'rapidtv',
-  ];
+  static const List<String> defaultPlatforms = PlatformRegistry.defaultPlatforms;
+  static const List<String> supportedPlatforms = PlatformRegistry.supportedPlatforms;
 
   static Future<List<ContentItem>> home({
     String platform = 'freereels',
@@ -128,6 +110,11 @@ class ApiDramaClient {
     return defaultPlatforms;
   }
 
+  static Future<bool> ping(String platform, {String lang = defaultLang}) async {
+    final rows = await home(platform: platform, lang: lang);
+    return rows.isNotEmpty;
+  }
+
   static List<ContentItem> _parseItems(
     Map<String, dynamic> json, {
     required String platform,
@@ -152,42 +139,35 @@ class ApiDramaClient {
       queryParameters: query.isEmpty ? null : query,
     );
 
-    final request = await HttpClient().getUrl(uri).timeout(const Duration(seconds: 18));
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri).timeout(ApiConfig.timeout);
 
-    request.headers.set('Accept', 'application/json');
-    request.headers.set('User-Agent', 'okhttp/4.12.0');
+      for (final entry in ApiConfig.defaultHeaders.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
 
-    final signed = _signedHeaders('GET', uri);
-    for (final entry in signed.entries) {
-      request.headers.set(entry.key, entry.value);
+      final signed = const HmacSigner(apiSecret).sign('GET', uri);
+      for (final entry in signed.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+
+      final response = await request.close().timeout(ApiConfig.timeout);
+      final body = await response.transform(utf8.decoder).join();
+
+      // Jangan silent. Kalau API gagal, error ini akan kelihatan di log.
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('API ${response.statusCode} ${uri.path}: $body');
+      }
+
+      if (body.trim().isEmpty) return <String, dynamic>{};
+
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return <String, dynamic>{'success': true, 'data': decoded};
+    } finally {
+      client.close(force: true);
     }
-
-    final response = await request.close().timeout(const Duration(seconds: 18));
-    final body = await response.transform(utf8.decoder).join();
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('API ${response.statusCode}: $body');
-    }
-
-    final decoded = jsonDecode(body);
-    if (decoded is Map<String, dynamic>) return decoded;
-    if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    return {};
-  }
-
-  static Map<String, String> _signedHeaders(String method, Uri uri) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-    final pathWithQuery = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
-    final payload = '$method:$pathWithQuery:$timestamp';
-
-    final signature = Hmac(
-      sha256,
-      utf8.encode(apiSecret),
-    ).convert(utf8.encode(payload)).toString();
-
-    return {
-      'X-Timestamp': timestamp,
-      'X-Signature': signature,
-    };
   }
 }
