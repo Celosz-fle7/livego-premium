@@ -6,7 +6,7 @@ class PlatformRegistry {
     'dramawave',
     'netshort',
     'reelshort',
-    'melolo',
+    'shortmax',
   ];
 
   // Supported tetap bisa diperluas di Source Manager, tapi platform error jangan jadi default.

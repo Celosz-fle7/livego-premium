@@ -22,7 +22,7 @@ class LiveGoSettings {
     'dramawave',
     'netshort',
     'reelshort',
-    'melolo',
+    'shortmax',
   ];
 
   static final List<String> supportedPlatforms = [

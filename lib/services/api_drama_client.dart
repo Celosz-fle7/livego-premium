@@ -4,6 +4,7 @@ import 'dart:io';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import 'api_config.dart';
+import 'anichin_api_client.dart';
 import 'hmac_signer.dart';
 import 'platform_registry.dart';
 
@@ -19,6 +20,9 @@ class ApiDramaClient {
     String platform = 'freereels',
     String lang = defaultLang,
   }) async {
+    if (AnichinApiClient.supports(platform)) {
+      return AnichinApiClient.home(platform: platform, lang: lang);
+    }
     final json = await _getJson('/api/v2/home', {
       'category_p': platform,
       'lang': lang,
@@ -33,6 +37,9 @@ class ApiDramaClient {
     String lang = defaultLang,
     int page = 1,
   }) async {
+    if (AnichinApiClient.supports(platform)) {
+      return AnichinApiClient.discover(platform: platform, lang: lang, page: page);
+    }
     final json = await _getJson('/api/v2/discover', {
       'category_p': platform,
       'lang': lang,
@@ -45,6 +52,9 @@ class ApiDramaClient {
     String platform = 'freereels',
     String lang = defaultLang,
   }) async {
+    if (AnichinApiClient.supports(platform)) {
+      return AnichinApiClient.banner(platform: platform, lang: lang);
+    }
     final json = await _getJson('/api/v2/banner', {
       'category_p': platform,
       'lang': lang,
@@ -59,6 +69,9 @@ class ApiDramaClient {
     int page = 1,
   }) async {
     if (query.trim().isEmpty) return [];
+    if (AnichinApiClient.supports(platform)) {
+      return AnichinApiClient.search(query: query, platform: platform, lang: lang);
+    }
     final json = await _getJson('/api/v2/search', {
       'category_p': platform,
       'q': query.trim(),
@@ -69,6 +82,9 @@ class ApiDramaClient {
   }
 
   static Future<ContentItem?> detail(ContentItem item) async {
+    if (AnichinApiClient.supports(item.platformSlug)) {
+      return AnichinApiClient.detail(item);
+    }
     final json = await _getJson('/api/v2/detail', {
       'category_p': item.platformSlug,
       'id': item.id,
@@ -86,6 +102,9 @@ class ApiDramaClient {
   }
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
+    if (AnichinApiClient.supports(item.platformSlug)) {
+      return AnichinApiClient.videoInfo(item, chapterId: chapterId);
+    }
     final json = await _getJson('/api/v2/video', {
       'category_p': item.platformSlug,
       'id': item.id,
