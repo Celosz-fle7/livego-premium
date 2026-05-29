@@ -48,7 +48,8 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       final items = result[1];
       final categories = _categoriesFromItems(platform, items);
       return _HomeState(banners: banners, items: items, categories: categories);
-    } catch (_) {
+    } catch (e) {
+      print('LIVEGO HOME ERROR: $e');
       return _HomeState(
         banners: const <ContentItem>[],
         items: const <ContentItem>[],

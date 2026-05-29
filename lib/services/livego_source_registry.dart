@@ -17,7 +17,7 @@ class LiveGoSourceRegistry {
     LiveGoSource(slug: 'dramawave', name: 'DramaWave', enabledByDefault: true),
     LiveGoSource(slug: 'netshort', name: 'NetShort', enabledByDefault: true),
     LiveGoSource(slug: 'reelshort', name: 'ReelShort', enabledByDefault: true),
-    LiveGoSource(slug: 'shortmax', name: 'ShortMax', enabledByDefault: true),
+    LiveGoSource(slug: 'shortmax', name: 'ShortMax'),
 
     LiveGoSource(slug: 'reelife', name: 'Reelife'),
     LiveGoSource(slug: 'rapidtv', name: 'RapidTV'),
@@ -25,7 +25,7 @@ class LiveGoSourceRegistry {
     LiveGoSource(slug: 'dramapoops', name: 'DramaPoops'),
     LiveGoSource(slug: 'dramanova', name: 'DramaNova'),
     LiveGoSource(slug: 'dramarush', name: 'DramaRush'),
-    LiveGoSource(slug: 'melolo', name: 'Melolo'),
+    LiveGoSource(slug: 'melolo', name: 'Melolo', enabledByDefault: true),
     LiveGoSource(slug: 'starshort', name: 'StarShort'),
     LiveGoSource(slug: 'meloshort', name: 'MeloShort'),
     LiveGoSource(slug: 'dramabite', name: 'DramaBite'),

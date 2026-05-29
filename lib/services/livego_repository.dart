@@ -115,7 +115,7 @@ class LiveGoRepository {
         'lang': lang,
         ...extra,
       },
-      signed: path.contains('/video') || path.contains('/detail'),
+      signed: true,
     );
 
     final raw = json['data'];

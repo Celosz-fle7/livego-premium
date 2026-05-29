@@ -18,7 +18,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int category = 0;
   late Future<_TvHomeState> _future;
 
-  String get _platform => LiveGoCatalog.platforms[source];
+  String get _platform {
+    final platforms = LiveGoCatalog.platforms;
+    if (platforms.isEmpty) return 'freereels';
+    if (source < 0 || source >= platforms.length) source = 0;
+    return platforms[source];
+  }
 
   @override
   void initState() {
@@ -40,7 +45,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   List<ContentItem> _filtered(List<ContentItem> items) {
     if (category == 0) return items;
-    final categoryName = LiveGoCatalog.categories[category];
+    final categories = LiveGoCatalog.categories;
+    if (category < 0 || category >= categories.length) return items;
+    final categoryName = categories[category];
     final filtered = items.where((e) => e.category.toLowerCase().contains(categoryName.toLowerCase())).toList();
     return filtered.isEmpty ? items : filtered;
   }
