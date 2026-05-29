@@ -169,29 +169,36 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
         _section('Tampilan Home'),
         GlowContainer(
           padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              const Text('Geser titik untuk mengatur jumlah poster di Home. HP default 3, TV default 6.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-              const SizedBox(height: 18),
-              _GridSlider(
-                label: 'HP',
-                value: LiveGoSettings.mobileHomeGrid,
-                min: 2,
-                max: 6,
-                onChanged: (v) => setState(() => LiveGoSettings.setMobileHomeGrid(v)),
-              ),
-              const SizedBox(height: 16),
-              _GridSlider(
-                label: 'TV',
-                value: LiveGoSettings.tvHomeGrid,
-                min: 4,
-                max: 10,
-                onChanged: (v) => setState(() => LiveGoSettings.setTvHomeGrid(v)),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final isTvLike = MediaQuery.sizeOf(context).shortestSide >= 540 && MediaQuery.sizeOf(context).width >= 960;
+              final value = isTvLike ? LiveGoSettings.tvHomeGrid : LiveGoSettings.mobileHomeGrid;
+              final max = isTvLike ? 10 : 6;
+              final min = isTvLike ? 4 : 2;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text('Geser titik untuk mengatur jumlah poster. Perangkat ini dibatasi sampai $max grid.', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+                  const SizedBox(height: 18),
+                  _GridSlider(
+                    label: 'Grid',
+                    value: value,
+                    min: min,
+                    max: max,
+                    onChanged: (v) => setState(() {
+                      if (isTvLike) {
+                        LiveGoSettings.setTvHomeGrid(v);
+                      } else {
+                        LiveGoSettings.setMobileHomeGrid(v);
+                      }
+                    }),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         _section('Sumber & Izin'),
@@ -503,7 +510,7 @@ class _GridSlider extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('$label Grid', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
             const Spacer(),
             Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
           ],

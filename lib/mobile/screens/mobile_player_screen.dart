@@ -89,35 +89,15 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
           backgroundColor: Colors.black,
           body: SafeArea(
             bottom: false,
-            child: LayoutBuilder(
-              builder: (context, box) {
-                final screenW = box.maxWidth;
-                final screenH = box.maxHeight;
-                final playerH = screenH * 0.80;
-                final playerW = playerH * 9 / 14;
-                return Column(
-                  children: [
-                    SizedBox(height: screenH * 0.10),
-                    Center(
-                      child: SizedBox(
-                        width: playerW > screenW ? screenW : playerW,
-                        height: playerH,
-                        child: _PlayerSurface(
-                          key: ValueKey('mobile-player-${stream.url}-$episode'),
-                          item: item,
-                          loading: loading,
-                          stream: stream,
-                          episode: episode,
-                          onBack: () => Navigator.pop(context),
-                          onEpisode: _selectEpisode,
-                          onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: screenH * 0.10),
-                  ],
-                );
-              },
+            child: _PlayerSurface(
+              key: ValueKey('mobile-player-${stream.url}-$episode'),
+              item: item,
+              loading: loading,
+              stream: stream,
+              episode: episode,
+              onBack: () => Navigator.pop(context),
+              onEpisode: _selectEpisode,
+              onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
             ),
           ),
         );
@@ -454,28 +434,42 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       },
       child: GestureDetector(
         onTap: _toggleControls,
-        child: Container(
-          color: Colors.black,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (ready)
-                Center(
-                  child: FittedBox(
-                    fit: _fitCover && !_landscape ? BoxFit.cover : BoxFit.contain,
-                    child: SizedBox(
-                      width: c.value.size.width,
-                      height: c.value.size.height,
-                      child: VideoPlayer(c),
-                    ),
-                  ),
-                )
-              else if (image.isNotEmpty)
-                Image.network(image, fit: BoxFit.cover)
-              else
-                const ColoredBox(color: Color(0xFF101010)),
-              if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
-              Row(
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final screenW = box.maxWidth;
+            final screenH = box.maxHeight;
+            final fullMode = _fitCover || _landscape;
+            final targetH = fullMode ? screenH : screenH * 0.80;
+            final targetW = fullMode ? screenW : targetH * 9 / 14;
+            final playerW = targetW > screenW ? screenW : targetW;
+            final playerH = fullMode ? screenH : targetH;
+
+            return Center(
+              child: SizedBox(
+                width: playerW,
+                height: playerH,
+                child: Container(
+                  color: Colors.black,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (ready)
+                        Center(
+                          child: FittedBox(
+                            fit: _fitCover ? BoxFit.cover : BoxFit.contain,
+                            child: SizedBox(
+                              width: c.value.size.width,
+                              height: c.value.size.height,
+                              child: VideoPlayer(c),
+                            ),
+                          ),
+                        )
+                      else if (image.isNotEmpty)
+                        Image.network(image, fit: BoxFit.cover)
+                      else
+                        const ColoredBox(color: Color(0xFF101010)),
+                      if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
+                      Row(
                 children: [
                   Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
                   Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
@@ -524,9 +518,13 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   onRotate: _toggleLandscape,
                   onFit: () => setState(() => _fitCover = !_fitCover),
                 ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
