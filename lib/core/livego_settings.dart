@@ -1,6 +1,5 @@
 class LiveGoSettings {
   static const appName = 'LiveGo';
-  static const patchVersion = 'home-api-source-manager-recovery-v2';
 
   static String language = 'id';
   static String defaultPlatform = 'freereels';

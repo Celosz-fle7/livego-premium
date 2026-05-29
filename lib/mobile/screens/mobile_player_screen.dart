@@ -89,30 +89,35 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
           backgroundColor: Colors.black,
           body: SafeArea(
             bottom: false,
-            child: Column(
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.60,
-                  child: _PlayerSurface(
-                    key: ValueKey('mobile-player-${stream.url}-$episode'),
-                    item: item,
-                    loading: loading,
-                    stream: stream,
-                    episode: episode,
-                    onBack: () => Navigator.pop(context),
-                    onEpisode: _selectEpisode,
-                    onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
-                  ),
-                ),
-                Expanded(
-                  child: _BottomInfoPanel(
-                    item: item,
-                    stream: stream,
-                    episode: episode,
-                    onEpisode: _selectEpisode,
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final screenW = box.maxWidth;
+                final screenH = box.maxHeight;
+                final playerH = screenH * 0.80;
+                final playerW = playerH * 9 / 14;
+                return Column(
+                  children: [
+                    SizedBox(height: screenH * 0.10),
+                    Center(
+                      child: SizedBox(
+                        width: playerW > screenW ? screenW : playerW,
+                        height: playerH,
+                        child: _PlayerSurface(
+                          key: ValueKey('mobile-player-${stream.url}-$episode'),
+                          item: item,
+                          loading: loading,
+                          stream: stream,
+                          episode: episode,
+                          onBack: () => Navigator.pop(context),
+                          onEpisode: _selectEpisode,
+                          onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: screenH * 0.10),
+                  ],
+                );
+              },
             ),
           ),
         );
@@ -230,7 +235,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 4), () {
+    _timer = Timer(const Duration(seconds: 5), () {
       if (mounted && _controls) setState(() => _controls = false);
     });
   }
@@ -327,9 +332,35 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     );
   }
 
-  void _qualityMenu() {
+  Future<void> _qualityMenu() async {
     final values = ['Auto', '360p', '480p', '560p', '720p', '1080p'];
-    setState(() => _quality = values[(values.indexOf(_quality) + 1) % values.length]);
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Wrap(
+            runSpacing: 10,
+            spacing: 10,
+            children: [
+              const SizedBox(width: double.infinity, child: Text('Pilih Kualitas', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900))),
+              for (final v in values)
+                ChoiceChip(
+                  label: Text(v),
+                  selected: v == _quality,
+                  onSelected: (_) => Navigator.pop(context, v),
+                  selectedColor: AppTheme.cyan,
+                  labelStyle: TextStyle(color: v == _quality ? Colors.black : Colors.white, fontWeight: FontWeight.w900),
+                  backgroundColor: const Color(0xFF172131),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) setState(() => _quality = picked);
     _showControls();
   }
 

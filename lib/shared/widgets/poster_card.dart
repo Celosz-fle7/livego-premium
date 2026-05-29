@@ -37,7 +37,6 @@ class PosterCard extends StatelessWidget {
                             : Image.network(
                                 item.posterUrl,
                                 fit: BoxFit.cover,
-                                cacheWidth: tv ? 420 : 320,
                                 errorBuilder: (_, __, ___) => Container(
                                   color: AppTheme.surface2,
                                   child: const Icon(Icons.broken_image_rounded, color: Colors.white38),

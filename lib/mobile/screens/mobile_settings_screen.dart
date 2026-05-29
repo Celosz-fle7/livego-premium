@@ -168,30 +168,28 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
         ),
         _section('Tampilan Home'),
         GlowContainer(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-              const SizedBox(height: 8),
-              const Text('HP default 3 grid, batas 2–6. TV default 6 grid, batas 4–10.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                children: [
-                  for (final v in [2, 3, 4, 5, 6])
-                    _ChoiceButton(text: '$v Grid HP', active: LiveGoSettings.mobileHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setMobileHomeGrid(v))),
-                ],
+              const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              const Text('Geser titik untuk mengatur jumlah poster di Home. HP default 3, TV default 6.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+              const SizedBox(height: 18),
+              _GridSlider(
+                label: 'HP',
+                value: LiveGoSettings.mobileHomeGrid,
+                min: 2,
+                max: 6,
+                onChanged: (v) => setState(() => LiveGoSettings.setMobileHomeGrid(v)),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                children: [
-                  for (final v in [4, 5, 6, 7, 8, 9, 10])
-                    _ChoiceButton(text: '$v Grid TV', active: LiveGoSettings.tvHomeGrid == v, onTap: () => setState(() => LiveGoSettings.setTvHomeGrid(v))),
-                ],
+              const SizedBox(height: 16),
+              _GridSlider(
+                label: 'TV',
+                value: LiveGoSettings.tvHomeGrid,
+                min: 4,
+                max: 10,
+                onChanged: (v) => setState(() => LiveGoSettings.setTvHomeGrid(v)),
               ),
             ],
           ),
@@ -311,7 +309,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       ..clear()
       ..addAll(_home.take(6));
     LiveGoSettings.defaultPlatform = LiveGoSettings.homePlatforms.first;
-    LiveGoSettings.setCategoriesFor(_selectedPlatform, _selectedCategories);
+    if (_selectedPlatform.isNotEmpty) LiveGoSettings.setCategoriesFor(_selectedPlatform, _selectedCategories);
     Navigator.pop(context);
   }
 
@@ -352,33 +350,49 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
                 children: [
                   const Text('Pilih platform aktif. Maksimal 6 platform tampil di Home. Lampu status memakai hasil ping terakhir.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
                   const SizedBox(height: 14),
-                  for (final slug in platforms) _SourceCard(
-                    title: LiveGoCatalog.label(slug),
-                    subtitle: _sourceDescription(slug),
-                    active: _active.contains(slug),
-                    home: _home.contains(slug),
-                    selected: _selectedPlatform == slug,
-                    statusColor: _statusColor(slug),
-                    onTap: () => _loadCategories(slug),
-                    onToggleActive: () => _toggleActive(slug),
-                    onToggleHome: () => _toggleHome(slug),
-                  ),
-                  const SizedBox(height: 18),
-                  Text('Kategori ${LiveGoCatalog.label(_selectedPlatform)}'.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-                  const SizedBox(height: 10),
-                  GlowContainer(
-                    padding: const EdgeInsets.all(14),
-                    child: _loadingCategories
-                        ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                        : Wrap(
-                            spacing: 9,
-                            runSpacing: 9,
-                            children: [
-                              for (final c in _availableCategories)
-                                _ChoiceButton(text: c, active: _selectedCategories.contains(c), onTap: () => _toggleCategory(c)),
-                            ],
-                          ),
-                  ),
+                  for (final slug in platforms) ...[
+                    _SourceCard(
+                      title: LiveGoCatalog.label(slug),
+                      subtitle: _sourceDescription(slug),
+                      active: _active.contains(slug),
+                      home: _home.contains(slug),
+                      selected: _selectedPlatform == slug,
+                      statusColor: _statusColor(slug),
+                      onTap: () {
+                        if (_selectedPlatform == slug) {
+                          setState(() => _selectedPlatform = '');
+                        } else {
+                          _loadCategories(slug);
+                        }
+                      },
+                      onToggleActive: () => _toggleActive(slug),
+                      onToggleHome: () => _toggleHome(slug),
+                    ),
+                    if (_selectedPlatform == slug)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: GlowContainer(
+                          padding: const EdgeInsets.all(14),
+                          child: _loadingCategories
+                              ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Kategori ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 9,
+                                      runSpacing: 9,
+                                      children: [
+                                        for (final c in _availableCategories)
+                                          _ChoiceButton(text: c, active: _selectedCategories.contains(c), onTap: () => _toggleCategory(c)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -462,6 +476,56 @@ class _SourceCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+class _GridSlider extends StatelessWidget {
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  const _GridSlider({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('$label Grid', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            const Spacer(),
+            Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 3,
+            activeTrackColor: AppTheme.cyan,
+            inactiveTrackColor: const Color(0xFF24344A),
+            thumbColor: Colors.white,
+            overlayColor: AppTheme.cyan.withOpacity(.15),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+          ),
+          child: Slider(
+            value: value.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
+            onChanged: (v) => onChanged(v.round()),
+          ),
+        ),
+      ],
     );
   }
 }

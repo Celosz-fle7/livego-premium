@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_home_screen.dart';
@@ -30,26 +31,45 @@ class _TvAppState extends State<TvApp> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: PremiumShell(
-        child: MouseRegion(
-          onEnter: (_) => setState(() => navOpen = true),
-          onExit: (_) => setState(() => navOpen = false),
-          child: Stack(
-            children: [
-              _page(),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Focus(
-                  onFocusChange: (v) => setState(() => navOpen = v),
-                  child: TvSideNav(
-                    index: index,
-                    expanded: navOpen,
-                    onChanged: (v) => setState(() => index = v),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final exit = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: const Color(0xFF0D1117),
+            title: const Text('Keluar dari LiveGO?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+            content: const Text('Tutup aplikasi di Android TV?', style: TextStyle(color: Colors.white70)),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
+            ],
+          ),
+        );
+        if (exit == true) SystemNavigator.pop();
+      },
+      child: Scaffold(
+        body: PremiumShell(
+          child: MouseRegion(
+            onEnter: (_) => setState(() => navOpen = true),
+            onExit: (_) => setState(() => navOpen = false),
+            child: Stack(
+              children: [
+                _page(),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Focus(
+                    onFocusChange: (v) => setState(() => navOpen = v),
+                    child: TvSideNav(
+                      index: index,
+                      expanded: navOpen,
+                      onChanged: (v) => setState(() => index = v),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
