@@ -41,13 +41,10 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
     try {
       // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
-      final baseCategories = LiveGoCatalog.categoriesFor(platform).take(6).toList();
-      if (category >= baseCategories.length) category = 0;
-      final selectedCategory = baseCategories.isEmpty ? 'Trending' : baseCategories[category];
-      final items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
+      final items = await LiveGoCatalog.home(platform: platform)
           .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
 
-      final categories = baseCategories;
+      final categories = _categoriesFromItems(platform, items);
       final fallbackBanners = items.take(5).toList();
 
       if (items.isEmpty) {
@@ -74,6 +71,32 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     }
   }
 
+  List<String> _categoriesFromItems(String platform, List<ContentItem> items) {
+    final stored = LiveGoCatalog.categoriesFor(platform).take(6).toList();
+    if (items.isEmpty) return stored;
+
+    final seen = <String>{};
+    final values = <String>['Trending'];
+    seen.add('trending');
+
+    for (final item in items) {
+      final categoryName = item.category.trim();
+      if (categoryName.isEmpty) continue;
+      final key = categoryName.toLowerCase();
+      if (key == 'drama') continue;
+      if (seen.add(key)) values.add(categoryName);
+      if (values.length >= 6) break;
+    }
+
+    const fallback = ['New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
+    for (final item in fallback) {
+      if (values.length >= 6) break;
+      if (seen.add(item.toLowerCase())) values.add(item);
+    }
+
+    return values.take(6).toList();
+  }
+
   void _reload() => setState(() => _future = _load());
 
   void _open(ContentItem item) {
@@ -81,7 +104,14 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   }
 
   List<ContentItem> _filtered(List<ContentItem> items, List<String> categories) {
-    return items;
+    if (categories.isEmpty || category == 0) return items;
+    final categoryName = categories[category].toLowerCase();
+    final filtered = items.where((e) {
+      return e.category.toLowerCase().contains(categoryName) ||
+          e.title.toLowerCase().contains(categoryName) ||
+          e.description.toLowerCase().contains(categoryName);
+    }).toList();
+    return filtered.isEmpty ? items : filtered;
   }
 
   @override
@@ -127,12 +157,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                 title: 'Kategori',
                 items: categories,
                 selected: category,
-                onSelected: (v) {
-                  setState(() {
-                    category = v;
-                    _future = _load();
-                  });
-                },
+                onSelected: (v) => setState(() => category = v),
               ),
               const SizedBox(height: 16),
               if (loading)

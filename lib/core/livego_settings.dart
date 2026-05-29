@@ -37,12 +37,7 @@ class LiveGoSettings {
   static final List<String> homePlatforms = List<String>.from(defaultPlatforms);
 
   static final Map<String, List<String>> homeCategories = {
-    'shortmax': ['Trending', 'For You'],
-    'netshort': ['Trending', 'For You'],
-    'pinedrama': ['Trending', 'For You'],
-    'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
-    'flickreels': ['Trending', 'For You'],
-    'melolo': ['Trending', 'For You'],
+    for (final platform in defaultPlatforms) platform: ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'],
   };
 
   // unknown, online, slow, offline. Disimpan selama sesi aplikasi berjalan.
@@ -81,7 +76,7 @@ class LiveGoSettings {
   }
 
   static List<String> categoriesFor(String platform) {
-    return List<String>.from(homeCategories[platform] ?? const ['Trending', 'For You']);
+    return List<String>.from(homeCategories[platform] ?? const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing']);
   }
 
   static void setCategoriesFor(String platform, List<String> values) {
@@ -127,13 +122,6 @@ class LiveGoSettings {
       ..addAll(defaultPlatforms);
     homeCategories
       ..clear()
-      ..addAll({
-        'shortmax': ['Trending', 'For You'],
-        'netshort': ['Trending', 'For You'],
-        'pinedrama': ['Trending', 'For You'],
-        'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
-        'flickreels': ['Trending', 'For You'],
-        'melolo': ['Trending', 'For You'],
-      });
+      ..addEntries(defaultPlatforms.map((p) => MapEntry(p, ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'])));
   }
 }
