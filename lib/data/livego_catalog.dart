@@ -102,7 +102,8 @@ class LiveGoCatalog {
   static Future<List<ContentItem>> search(String query, {String platform = 'freereels'}) async {
     try {
       return await ApiDramaClient.search(query: query, platform: platform, lang: LiveGoSettings.language);
-    } catch (_) {
+    } catch (e) {
+      print('LIVEGO SEARCH ERROR: $e');
       return [];
     }
   }
@@ -126,7 +127,8 @@ class LiveGoCatalog {
     try {
       final detail = await ApiDramaClient.detail(item);
       return detail ?? item;
-    } catch (_) {
+    } catch (e) {
+      print('LIVEGO DETAIL ERROR: $e');
       return item;
     }
   }
@@ -134,7 +136,8 @@ class LiveGoCatalog {
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
       return await ApiDramaClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
-    } catch (_) {
+    } catch (e) {
+      print('LIVEGO STREAM ERROR: $e');
       return StreamInfo.empty;
     }
   }

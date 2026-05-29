@@ -1,8 +1,5 @@
 class PlatformRegistry {
-  PlatformRegistry._();
-
-  /// Default Home platforms: only platforms verified stable with HMAC.
-  static const List<String> defaultHomePlatforms = [
+  static const List<String> defaultPlatforms = [
     'freereels',
     'goodshort',
     'dramawave',
@@ -11,32 +8,21 @@ class PlatformRegistry {
     'melolo',
   ];
 
-  static const List<String> verifiedPlatforms = [
-    'freereels',
-    'goodshort',
-    'dramawave',
-    'netshort',
-    'reelshort',
-    'melolo',
-    'rapidtv',
-  ];
-
-  /// Full list exposed to Source Manager. Some can be offline/403 depending on API provider.
   static const List<String> supportedPlatforms = [
     'freereels',
     'goodshort',
     'dramawave',
     'netshort',
     'reelshort',
-    'melolo',
-    'rapidtv',
     'reelife',
+    'rapidtv',
     'flickreels',
     'dramapops',
     'dramapoops',
     'shortmax',
     'dramanova',
     'dramarush',
+    'melolo',
     'starshort',
     'meloshort',
     'dramabite',
@@ -56,11 +42,4 @@ class PlatformRegistry {
     'flexreels',
     'livego',
   ];
-
-  static String label(String slug) {
-    return slug
-        .split(RegExp(r'[_-]'))
-        .map((e) => e.isEmpty ? e : '${e[0].toUpperCase()}${e.substring(1)}')
-        .join(' ');
-  }
 }
