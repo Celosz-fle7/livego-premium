@@ -36,7 +36,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         _section('Default 6 Platform'),
         Wrap(children: [for (final p in LiveGoSettings.defaultPlatforms) _chip(p, LiveGoSettings.defaultPlatform == p, () => setState(() => LiveGoSettings.defaultPlatform = p))]),
         _section('Kualitas'),
-        Wrap(children: [for (final q in ['Auto', '720p', '480p']) _chip(q, LiveGoSettings.quality == q, () => setState(() => LiveGoSettings.quality = q))]),
+        Wrap(children: [for (final q in ['480p', '720p', '1080p']) _chip(q, LiveGoSettings.quality == q, () => setState(() => LiveGoSettings.quality = q))]),
         _section('Mode'),
         Wrap(children: [for (final m in ['Auto', 'Mobile', 'TV']) _chip(m, LiveGoSettings.layoutMode == m, () => setState(() => LiveGoSettings.layoutMode = m))]),
         const SizedBox(height: 24),

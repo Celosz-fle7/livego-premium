@@ -25,7 +25,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms.take(6).toList();
-    if (platforms.isEmpty) return 'freereels';
+    if (platforms.isEmpty) return 'shortmax';
     if (source >= platforms.length) source = 0;
     return platforms[source];
   }

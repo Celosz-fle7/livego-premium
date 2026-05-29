@@ -24,7 +24,7 @@ class ContentItem {
     required this.rating,
     required this.episodes,
     this.updated = false,
-    this.platformSlug = 'freereels',
+    this.platformSlug = 'shortmax',
     this.chapterId = '1',
     this.lang = 'id',
   });

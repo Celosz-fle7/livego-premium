@@ -40,6 +40,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     try {
       final detail = await LiveGoCatalog.detail(widget.item);
+      final realEpisodes = await LiveGoCatalog.episodes(detail);
+      final safeIndex = _episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
+      final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
       final selected = ContentItem(
         id: detail.id,
         title: detail.title,
@@ -49,14 +52,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         posterUrl: detail.posterUrl,
         backdropUrl: detail.backdropUrl,
         rating: detail.rating,
-        episodes: detail.episodes,
+        episodes: realEpisodes.isEmpty ? detail.episodes : realEpisodes.length,
         updated: detail.updated,
         platformSlug: detail.platformSlug,
-        chapterId: '$_episode',
+        chapterId: episodeId,
         lang: detail.lang,
       );
-      final stream = await LiveGoCatalog.streamInfo(selected, chapterId: '$_episode');
-      final total = stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes;
+      final stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId);
+      final total = realEpisodes.isNotEmpty ? realEpisodes.length : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
       final playable = ContentItem(
         id: selected.id,
         title: selected.title,
@@ -69,7 +72,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         episodes: total <= 0 ? 1 : total,
         updated: selected.updated,
         platformSlug: selected.platformSlug,
-        chapterId: '$_episode',
+        chapterId: episodeId,
         lang: selected.lang,
       );
       await _controller?.dispose();

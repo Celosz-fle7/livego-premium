@@ -1,7 +1,8 @@
 import '../core/livego_settings.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
-import '../services/api_drama_client.dart';
+import '../services/anichin_api_client.dart';
+import '../models/livego_episode.dart';
 import 'mock_catalog.dart';
 
 class LiveGoCatalog {
@@ -9,13 +10,13 @@ class LiveGoCatalog {
     final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).take(6).toList();
     if (chosen.isNotEmpty) return chosen;
     final active = LiveGoSettings.activePlatforms.take(6).toList();
-    return active.isEmpty ? ApiDramaClient.defaultPlatforms : active;
+    return active.isEmpty ? AnichinApiClient.defaultPlatforms : active;
   }
 
-  static List<String> get allPlatforms => ApiDramaClient.supportedPlatforms;
+  static List<String> get allPlatforms => AnichinApiClient.supportedPlatforms;
   static List<String> get platformLabels => platforms.map(label).toList();
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'freereels' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'shortmax' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
 
@@ -37,7 +38,7 @@ class LiveGoCatalog {
   static Future<String> pingPlatform(String platform) async {
     final start = DateTime.now();
     try {
-      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language);
+      final rows = await AnichinApiClient.home(platform: platform, lang: LiveGoSettings.language);
       if (rows.isEmpty) {
         LiveGoSettings.setPlatformStatus(platform, 'offline');
         return 'offline';
@@ -53,16 +54,16 @@ class LiveGoCatalog {
     }
   }
 
-  static Future<List<ContentItem>> home({String platform = 'freereels'}) async {
+  static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
     try {
-      final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language)
+      final rows = await AnichinApiClient.home(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
       print('CATALOG HOME $platform -> ${rows.length}');
       if (rows.isNotEmpty) return rows;
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
-      final rows = await ApiDramaClient.discover(platform: platform, lang: LiveGoSettings.language)
+      final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
       if (rows.isNotEmpty) return rows;
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
@@ -79,9 +80,9 @@ class LiveGoCatalog {
     return result;
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'freereels'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'shortmax'}) async {
     try {
-      final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language)
+      final banners = await AnichinApiClient.banner(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 10));
       if (banners.isNotEmpty) return banners.take(8).toList();
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
@@ -90,9 +91,9 @@ class LiveGoCatalog {
     return items.take(5).toList();
   }
 
-  static Future<ContentItem> hero({String platform = 'freereels'}) async {
+  static Future<ContentItem> hero({String platform = 'shortmax'}) async {
     try {
-      final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language);
+      final banners = await AnichinApiClient.banner(platform: platform, lang: LiveGoSettings.language);
       if (banners.isNotEmpty) return banners.first;
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
@@ -100,9 +101,9 @@ class LiveGoCatalog {
     return MockCatalog.hero;
   }
 
-  static Future<List<ContentItem>> search(String query, {String platform = 'freereels'}) async {
+  static Future<List<ContentItem>> search(String query, {String platform = 'shortmax'}) async {
     try {
-      return await ApiDramaClient.search(query: query, platform: platform, lang: LiveGoSettings.language);
+      return await AnichinApiClient.search(query: query, platform: platform, lang: LiveGoSettings.language);
     } catch (e) {
       print('LIVEGO SEARCH ERROR: $e');
       return [];
@@ -126,7 +127,7 @@ class LiveGoCatalog {
 
   static Future<ContentItem> detail(ContentItem item) async {
     try {
-      final detail = await ApiDramaClient.detail(item);
+      final detail = await AnichinApiClient.detail(item);
       return detail ?? item;
     } catch (e) {
       print('LIVEGO DETAIL ERROR: $e');
@@ -134,9 +135,25 @@ class LiveGoCatalog {
     }
   }
 
+
+  static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
+    try {
+      return await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 12));
+    } catch (e) {
+      print('LIVEGO EPISODES ERROR: $e');
+      final total = item.episodes <= 0 ? 1 : item.episodes;
+      return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
+    }
+  }
+
+  static Future<int> episodeCount(ContentItem item) async {
+    final rows = await episodes(item);
+    return rows.isEmpty ? (item.episodes <= 0 ? 1 : item.episodes) : rows.length;
+  }
+
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
-      return await ApiDramaClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
+      return await AnichinApiClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
     } catch (e) {
       print('LIVEGO STREAM ERROR: $e');
       return StreamInfo.empty;

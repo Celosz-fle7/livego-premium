@@ -2,8 +2,8 @@ class LiveGoSettings {
   static const appName = 'LiveGo';
 
   static String language = 'id';
-  static String defaultPlatform = 'freereels';
-  static String quality = 'Auto Adaptive';
+  static String defaultPlatform = 'shortmax';
+  static String quality = '720p';
   static String layoutMode = 'Auto';
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
@@ -17,47 +17,20 @@ class LiveGoSettings {
   static int tvHomeGrid = 6;
 
   static final List<String> defaultPlatforms = [
-    'freereels',
-    'goodshort',
-    'dramawave',
-    'netshort',
-    'reelshort',
     'shortmax',
+    'netshort',
+    'pinedrama',
+    'dramabox',
+    'flickreels',
   ];
 
   static final List<String> supportedPlatforms = [
-    'freereels',
-    'goodshort',
-    'dramawave',
-    'netshort',
-    'reelshort',
-    'reelife',
-    'rapidtv',
-    'flickreels',
-    'dramapops',
-    'dramapoops',
     'shortmax',
-    'dramanova',
-    'dramarush',
-    'melolo',
-    'starshort',
-    'meloshort',
-    'dramabite',
-    'stardusttv',
+    'netshort',
+    'pinedrama',
     'dramabox',
-    'drachin',
-    'youku',
-    'tencent',
-    'iqiyi',
-    'mango',
-    'wetv',
-    'viki',
-    'shorttv',
-    'minidrama',
-    'topreels',
-    'moboreels',
-    'flexreels',
-    'livego',
+    'flickreels',
+    'melolo',
   ];
 
   static final Set<String> activePlatforms = defaultPlatforms.toSet();
@@ -128,8 +101,8 @@ class LiveGoSettings {
 
   static void reset() {
     language = 'id';
-    defaultPlatform = 'freereels';
-    quality = 'Auto Adaptive';
+    defaultPlatform = 'shortmax';
+    quality = '720p';
     layoutMode = 'Auto';
     drmMode = 'Auto';
     subtitlesEnabled = true;

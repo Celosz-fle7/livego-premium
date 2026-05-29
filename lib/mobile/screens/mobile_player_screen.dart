@@ -33,6 +33,9 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
 
   Future<_PlayerState> _load() async {
     final detail = await LiveGoCatalog.detail(widget.item);
+    final realEpisodes = await LiveGoCatalog.episodes(detail);
+    final safeIndex = episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
+    final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
     final selected = ContentItem(
       id: detail.id,
       title: detail.title,
@@ -42,14 +45,14 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       posterUrl: detail.posterUrl,
       backdropUrl: detail.backdropUrl,
       rating: detail.rating,
-      episodes: detail.episodes,
+      episodes: realEpisodes.isEmpty ? detail.episodes : realEpisodes.length,
       updated: detail.updated,
       platformSlug: detail.platformSlug,
-      chapterId: '$episode',
+      chapterId: episodeId,
       lang: detail.lang,
     );
-    final stream = await LiveGoCatalog.streamInfo(selected, chapterId: '$episode');
-    final total = stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes;
+    final stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId);
+    final total = realEpisodes.isNotEmpty ? realEpisodes.length : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
     final playable = ContentItem(
       id: selected.id,
       title: selected.title,
@@ -62,7 +65,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       episodes: total <= 0 ? 1 : total,
       updated: selected.updated,
       platformSlug: selected.platformSlug,
-      chapterId: '$episode',
+      chapterId: episodeId,
       lang: selected.lang,
     );
     return _PlayerState(item: playable, stream: stream);
@@ -140,7 +143,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _fitCover = false;
   bool _landscape = false;
   bool _autoNextDone = false;
-  String _quality = LiveGoSettings.quality.isEmpty ? 'Auto Adaptive' : LiveGoSettings.quality;
+  String _quality = LiveGoSettings.quality.isEmpty ? '720p' : LiveGoSettings.quality;
   bool _subtitleEnabled = LiveGoSettings.subtitlesEnabled;
   String _subtitleLanguage = 'Auto';
   String _audioTrack = 'Source';
@@ -368,10 +371,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   style: TextStyle(color: Colors.white60, height: 1.35),
                 ),
               ),
-              _QualityChip(label: 'Auto Adaptive', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: 'Hemat Data', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: 'Normal', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: 'Kualitas Tinggi', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: '480p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: '720p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              _QualityChip(label: '1080p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
             ],
           ),
         ),
@@ -686,7 +688,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   controller: c,
                   episode: widget.episode,
                   total: widget.item.episodes,
-                  quality: _quality == 'Auto' ? 'Auto Adaptive' : _quality,
+                  quality: _quality,
                   muted: _muted,
                   fitCover: _fitCover,
                   landscape: _landscape,
@@ -970,7 +972,7 @@ class _QualityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = current == label || (label == 'Auto Adaptive' && current == 'Auto');
+    final selected = current == label;
     return ChoiceChip(
       label: Text(label),
       selected: selected,

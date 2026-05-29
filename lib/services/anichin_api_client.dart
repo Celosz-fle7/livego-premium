@@ -4,6 +4,7 @@ import 'dart:io';
 import '../core/livego_settings.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
+import '../models/livego_episode.dart';
 
 class AnichinApiClient {
   static const String baseUrl = 'https://priv-api.anichin.bio';
@@ -11,7 +12,29 @@ class AnichinApiClient {
 
   static const Map<String, String> _slugs = {
     'shortmax': 'shortmax',
+    'netshort': 'netshort',
+    'flickreels': 'flickreels',
+    'melolo': 'melolo',
+    'dramabox': 'dramabox',
+    'pinedrama': 'pinedrama',
   };
+
+  static const List<String> supportedPlatforms = [
+    'shortmax',
+    'netshort',
+    'pinedrama',
+    'dramabox',
+    'flickreels',
+    'melolo',
+  ];
+
+  static const List<String> defaultPlatforms = [
+    'shortmax',
+    'netshort',
+    'pinedrama',
+    'dramabox',
+    'flickreels',
+  ];
 
   static bool supports(String platform) => _slugs.containsKey(platform.toLowerCase());
 
@@ -74,12 +97,45 @@ class AnichinApiClient {
     return _parseItem(data, platform: item.platformSlug, lang: item.lang);
   }
 
+
+  static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
+    final slug = _apiSlug(item.platformSlug);
+    Map<String, dynamic> json = <String, dynamic>{};
+    try {
+      json = await _getJson('/api/$slug/allepisode', {
+        'id': item.id,
+        'lang': item.lang,
+      });
+    } catch (_) {
+      json = await _getJson('/api/$slug/detail', {
+        'id': item.id,
+        'lang': item.lang,
+      });
+    }
+
+    final raw = _episodeList(json);
+    if (raw.isNotEmpty) {
+      return raw.asMap().entries.map((entry) {
+        final idx = entry.key + 1;
+        final row = entry.value;
+        final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'episodeId', 'episode_id', 'ep'], fallback: '$idx');
+        final title = _first(row, const ['title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $idx');
+        return LiveGoEpisode(id: id, index: idx, title: title);
+      }).toList();
+    }
+
+    final total = item.episodes <= 0 ? 1 : item.episodes;
+    return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
+  }
+
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
     final slug = _apiSlug(item.platformSlug);
-    final ep = int.tryParse('${chapterId ?? item.chapterId}') ?? 1;
+    final chapter = '${chapterId ?? item.chapterId}';
+    final ep = int.tryParse(chapter) ?? 1;
     final json = await _getJson('/api/$slug/episode', {
       'id': item.id,
       'ep': '$ep',
+      if (int.tryParse(chapter) == null) 'chapterId': chapter,
       'lang': item.lang,
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     });
@@ -144,6 +200,25 @@ class AnichinApiClient {
           data['results'] ??
           data['dramas'] ??
           data['books'] ??
+          data['rows'] ??
+          data['data'];
+    }
+    if (data is List) {
+      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+
+  static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
+    Object? data = json['data'];
+    if (data is Map) {
+      data = data['episodes'] ??
+          data['episodeList'] ??
+          data['episode_list'] ??
+          data['chapters'] ??
+          data['list'] ??
+          data['items'] ??
           data['rows'] ??
           data['data'];
     }

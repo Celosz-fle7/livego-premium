@@ -1,5 +1,5 @@
 class ApiConfig {
-  static const String baseUrl = 'https://api-drama.dobda.id';
+  static const String baseUrl = 'https://priv-api.anichin.bio';
 
   // Development key langsung di aplikasi dulu. Nanti kalau app stabil, pindahkan ke GitHub Secrets.
   static const String apiSecret =

@@ -20,7 +20,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms;
-    if (platforms.isEmpty) return 'freereels';
+    if (platforms.isEmpty) return 'shortmax';
     if (source < 0 || source >= platforms.length) source = 0;
     return platforms[source];
   }
@@ -32,9 +32,16 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   Future<_TvHomeState> _load() async {
-    final hero = await LiveGoCatalog.hero(platform: _platform);
-    final items = await LiveGoCatalog.home(platform: _platform);
-    return _TvHomeState(hero: hero, items: items);
+    try {
+      final items = await LiveGoCatalog.home(platform: _platform).timeout(const Duration(seconds: 14));
+      final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
+      return _TvHomeState(hero: hero, items: items);
+    } catch (e) {
+      print('TV HOME LOAD ERROR: $e');
+      final fallback = await LiveGoCatalog.home(platform: 'shortmax').catchError((_) => <ContentItem>[]);
+      final hero = fallback.isNotEmpty ? fallback.first : await LiveGoCatalog.hero(platform: 'shortmax');
+      return _TvHomeState(hero: hero, items: fallback);
+    }
   }
 
   void _reload() {

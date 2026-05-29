@@ -267,8 +267,17 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
 
   Future<void> _pingVisibleOnce() async {
     setState(() => _pinging = true);
-    for (final p in LiveGoCatalog.allPlatforms) {
-      await LiveGoCatalog.pingPlatform(p);
+    final platforms = LiveGoCatalog.allPlatforms;
+    const batchSize = 3;
+    for (var i = 0; i < platforms.length; i += batchSize) {
+      final batch = platforms.skip(i).take(batchSize);
+      await Future.wait(batch.map((p) => LiveGoCatalog.pingPlatform(p).timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              LiveGoSettings.setPlatformStatus(p, 'offline');
+              return 'offline';
+            },
+          )));
       if (mounted) setState(() {});
     }
     if (mounted) setState(() => _pinging = false);
@@ -422,16 +431,13 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'freereels': 'Video pendek drama populer dan gratis.',
-      'dramawave': 'Drama viral dengan koleksi lengkap.',
-      'goodshort': 'Drama pendek cepat untuk HP.',
-      'netshort': 'Serial pendek populer dan ringan.',
-      'reelshort': 'Koleksi reels drama pendek.',
-      'melolo': 'Drama pendek kualitas tinggi.',
-      'youku': 'Drama China dan konten Asia.',
-      'wetv': 'Drama dan serial Asia pilihan.',
-    };
-    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
+      'shortmax': 'Default aman API Anichin.',
+      'netshort': 'Source API Anichin aktif.',
+      'pinedrama': 'Source API Anichin aktif.',
+      'dramabox': 'Source API Anichin aktif.',
+      'flickreels': 'Source API Anichin aktif.',
+      'melolo': 'Source API Anichin opsional, belum default karena DRM.',
+    };    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 }
 
