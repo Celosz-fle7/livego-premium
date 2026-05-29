@@ -129,7 +129,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: 9,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
                     mainAxisExtent: 250,
                     crossAxisSpacing: 10,
@@ -144,7 +144,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: items.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: grid,
                     mainAxisExtent: 250,
                     crossAxisSpacing: 10,
