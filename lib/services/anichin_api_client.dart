@@ -64,6 +64,21 @@ class AnichinApiClient {
     return _parseItems(json, platform: platform, lang: lang);
   }
 
+  static Future<List<ContentItem>> collection({
+    String platform = 'shortmax',
+    required String collection,
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final slug = _apiSlug(platform);
+    final key = collection.toLowerCase().replaceAll(' ', '');
+    final json = await _getJson('/api/$slug/$key', {
+      if (key == 'foryou') 'page': '$page',
+      'lang': lang,
+    });
+    return _parseItems(json, platform: platform, lang: lang);
+  }
+
   static Future<List<ContentItem>> banner({
     String platform = 'shortmax',
     String lang = 'id',
@@ -79,8 +94,9 @@ class AnichinApiClient {
   }) async {
     if (query.trim().isEmpty) return [];
     final slug = _apiSlug(platform);
+    final isDramaBox = slug == 'dramabox';
     final json = await _getJson('/api/$slug/search', {
-      'query': query.trim(),
+      (isDramaBox ? 'q' : 'query'): query.trim(),
       'lang': lang,
     });
     return _parseItems(json, platform: platform, lang: lang);
@@ -193,20 +209,48 @@ class AnichinApiClient {
   }
 
   static List<Map<String, dynamic>> _dataList(Map<String, dynamic> json) {
-    Object? data = json['data'];
-    if (data is Map) {
-      data = data['items'] ??
-          data['list'] ??
-          data['results'] ??
-          data['dramas'] ??
-          data['books'] ??
-          data['rows'] ??
-          data['data'];
+    final direct = _asList(json['data']) ??
+        _asList(json['items']) ??
+        _asList(json['list']) ??
+        _asList(json['results']) ??
+        _asList(json['dramas']) ??
+        _asList(json['books']) ??
+        _asList(json['rows']);
+    if (direct != null) return direct;
+
+    final found = _findFirstList(json);
+    return found ?? <Map<String, dynamic>>[];
+  }
+
+  static List<Map<String, dynamic>>? _asList(Object? value) {
+    if (value is List) {
+      return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     }
-    if (data is List) {
-      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      return _asList(map['items']) ??
+          _asList(map['list']) ??
+          _asList(map['results']) ??
+          _asList(map['dramas']) ??
+          _asList(map['books']) ??
+          _asList(map['rows']) ??
+          _asList(map['data']);
     }
-    return <Map<String, dynamic>>[];
+    return null;
+  }
+
+  static List<Map<String, dynamic>>? _findFirstList(Object? value) {
+    if (value is List) {
+      final rows = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return rows.isEmpty ? null : rows;
+    }
+    if (value is Map) {
+      for (final entry in value.values) {
+        final rows = _findFirstList(entry);
+        if (rows != null && rows.isNotEmpty) return rows;
+      }
+    }
+    return null;
   }
 
 
@@ -247,6 +291,10 @@ class AnichinApiClient {
       'drama_id',
       'seriesId',
       'series_id',
+      'bookID',
+      'dramaID',
+      'showId',
+      'show_id',
     ]);
 
     final title = _first(json, const [
@@ -256,6 +304,10 @@ class AnichinApiClient {
       'book_name',
       'dramaName',
       'drama_name',
+      'bookTitle',
+      'book_title',
+      'seriesName',
+      'series_name',
     ], fallback: 'Untitled');
 
     final cover = _first(json, const [
@@ -268,6 +320,13 @@ class AnichinApiClient {
       'thumb',
       'thumbnail',
       'thumbnailUrl',
+      'coverUrl',
+      'cover_url',
+      'pic',
+      'picUrl',
+      'pic_url',
+      'verticalCover',
+      'horizontalCover',
     ]);
 
     final backdrop = _first(json, const [
@@ -278,6 +337,9 @@ class AnichinApiClient {
       'cover',
       'poster',
       'image',
+      'horizontalCover',
+      'verticalCover',
+      'coverUrl',
     ]);
 
     final description = _first(json, const [
