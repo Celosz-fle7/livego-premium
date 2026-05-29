@@ -39,15 +39,17 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   Future<_HomeState> _load() async {
     final platform = _platform;
     try {
-      final result = await Future.wait<List<ContentItem>>([
-        LiveGoCatalog.banners(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
-        LiveGoCatalog.home(platform: platform).timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]),
-      ]).timeout(const Duration(seconds: 16));
+      final items = await LiveGoCatalog.home(platform: platform)
+          .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
 
-      final banners = result[0].isNotEmpty ? result[0] : result[1].take(5).toList();
-      final items = result[1];
+      print('HOME DIRECT $platform -> ${items.length}');
+
       final categories = _categoriesFromItems(platform, items);
-      return _HomeState(banners: banners, items: items, categories: categories);
+      return _HomeState(
+        banners: items.take(5).toList(),
+        items: items,
+        categories: categories,
+      );
     } catch (e) {
       print('LIVEGO HOME ERROR: $e');
       return _HomeState(
