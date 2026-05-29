@@ -141,6 +141,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _landscape = false;
   bool _autoNextDone = false;
   String _quality = LiveGoSettings.quality.isEmpty ? 'Auto Adaptive' : LiveGoSettings.quality;
+  bool _subtitleEnabled = LiveGoSettings.subtitlesEnabled;
+  String _subtitleLanguage = 'Auto';
+  String _audioTrack = 'Source';
   double _speed = 1.0;
   Duration _lastProgressSaved = Duration.zero;
   DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
@@ -278,10 +281,22 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Future<void> _toggleLandscape() async {
     _landscape = !_landscape;
     if (_landscape) {
+      _fitCover = false;
       await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     } else {
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
+    if (mounted) setState(() {});
+    _showControls();
+  }
+
+  Future<void> _togglePortraitFull() async {
+    _fitCover = !_fitCover;
+    if (_fitCover) {
+      _landscape = false;
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
+    if (mounted) setState(() {});
     _showControls();
   }
 
@@ -293,19 +308,32 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) {
         final subtitles = widget.stream.subtitles;
+        final subtitleText = !_subtitleEnabled
+            ? 'Mati'
+            : (subtitles.isEmpty ? 'Tidak tersedia' : _subtitleLanguage);
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Pengaturan Player', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
-                _SheetRow(title: 'Kualitas', value: _quality, onTap: _qualityMenu),
-                _SheetRow(title: 'Subtitle', value: subtitles.isEmpty ? 'Tidak tersedia' : subtitles.first.language, onTap: () {}),
-                _SheetRow(title: 'Kecepatan', value: '${_speed.toStringAsFixed(1)}x', onTap: _speedMenu),
-                _SheetRow(title: 'Suara', value: _muted ? 'Mute' : 'Aktif', onTap: _toggleMute),
+                _SheetRow(title: 'Kualitas Video', value: _quality, onTap: _qualityMenu),
+                _SheetRow(
+                  title: 'Auto Next',
+                  value: LiveGoSettings.autoNextEnabled ? 'Aktif' : 'Mati',
+                  onTap: () {
+                    setState(() => LiveGoSettings.autoNextEnabled = !LiveGoSettings.autoNextEnabled);
+                    Navigator.pop(context);
+                    _openPlayerSettings();
+                  },
+                ),
+                _SheetRow(title: 'Kecepatan Pemutaran', value: '${_speed.toStringAsFixed(1)}x', onTap: _speedMenu),
+                _SheetRow(title: 'Audio Track', value: _audioTrack, onTap: _audioMenu),
+                _SheetRow(title: 'Widevine DRM', value: LiveGoSettings.drmMode, onTap: _drmMenu),
+                _SheetRow(title: 'Pengaturan Subtitle', value: subtitleText, onTap: _subtitleMenu),
               ],
             ),
           ),
@@ -336,7 +364,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               const SizedBox(
                 width: double.infinity,
                 child: Text(
-                  'API memberi stream HLS adaptive. Pilihan di bawah adalah mode preferensi user. Kualitas manual real akan aktif kalau playlist m3u8 sudah diparse.',
+                  'Stream API saat ini HLS adaptive. Pilihan ini disimpan sebagai preferensi user; kualitas manual real akan aktif kalau provider mengirim pilihan stream berbeda.',
                   style: TextStyle(color: Colors.white60, height: 1.35),
                 ),
               ),
@@ -353,6 +381,117 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       setState(() => _quality = picked);
       LiveGoSettings.quality = picked;
     }
+    _showControls();
+  }
+
+  Future<void> _subtitleMenu() async {
+    final subtitles = widget.stream.subtitles;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Pilih Subtitle', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 14),
+              _OptionTile(label: 'Matikan', selected: !_subtitleEnabled, onTap: () => Navigator.pop(context, 'OFF')),
+              if (subtitles.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Text('Subtitle belum tersedia dari source ini.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+                )
+              else
+                ...subtitles.map((e) => _OptionTile(
+                      label: e.language.toUpperCase(),
+                      selected: _subtitleEnabled && _subtitleLanguage.toLowerCase() == e.language.toLowerCase(),
+                      onTap: () => Navigator.pop(context, e.language),
+                    )),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        if (picked == 'OFF') {
+          _subtitleEnabled = false;
+          LiveGoSettings.subtitlesEnabled = false;
+        } else {
+          _subtitleEnabled = true;
+          _subtitleLanguage = picked;
+          LiveGoSettings.subtitlesEnabled = true;
+        }
+      });
+    }
+    _showControls();
+  }
+
+  Future<void> _audioMenu() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Pilih Audio', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 14),
+              _OptionTile(label: 'Source / Default', selected: _audioTrack == 'Source', onTap: () => Navigator.pop(context, 'Source')),
+              _OptionTile(label: 'Mute', selected: _muted, onTap: () => Navigator.pop(context, 'Mute')),
+              const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: Text('Audio multi-track real akan aktif kalau provider mengirim audio track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) {
+      if (picked == 'Mute') {
+        _muted = true;
+        await _controller?.setVolume(0);
+      } else {
+        _audioTrack = picked;
+        _muted = false;
+        await _controller?.setVolume(1);
+      }
+      if (mounted) setState(() {});
+    }
+    _showControls();
+  }
+
+  Future<void> _drmMenu() async {
+    final values = const ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'];
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF0D1117),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Mode Widevine DRM', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 14),
+              for (final v in values) _OptionTile(label: v, selected: LiveGoSettings.drmMode == v, onTap: () => Navigator.pop(context, v)),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked != null) setState(() => LiveGoSettings.drmMode = picked);
     _showControls();
   }
 
@@ -463,7 +602,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               playerW = screenW;
               playerH = screenH;
             } else if (isPortraitVideo) {
-              playerH = screenH * 0.78;
+              playerH = screenH * 0.80;
               playerW = playerH * videoRatio;
               final maxW = screenW * 0.96;
               if (playerW > maxW) {
@@ -556,7 +695,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   onSettings: _openPlayerSettings,
                   onQuality: _qualityMenu,
                   onRotate: _toggleLandscape,
-                  onFit: () => setState(() => _fitCover = !_fitCover),
+                  onFit: _togglePortraitFull,
                 ),
                       ),
                     ],
@@ -727,9 +866,10 @@ class _BottomOverlay extends StatelessWidget {
   }
 
   static String _fmt(Duration d) {
-    final m = d.inMinutes;
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(h > 0 ? 2 : 1, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 }
 
@@ -791,6 +931,36 @@ class _MainPlayButton extends StatelessWidget {
   }
 }
 
+
+class _OptionTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _OptionTile({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? AppTheme.cyan : const Color(0xFF2D405C), width: selected ? 2 : 1),
+          ),
+          child: Text(
+            selected ? '▶  $label' : label,
+            style: TextStyle(color: selected ? const Color(0xFF9AF6FF) : Colors.white, fontWeight: selected ? FontWeight.w900 : FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _QualityChip extends StatelessWidget {
   final String label;
