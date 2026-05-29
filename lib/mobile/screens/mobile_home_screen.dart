@@ -38,15 +38,26 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
   Future<_HomeState> _load() async {
     final platform = _platform;
+
     try {
+      // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
       final items = await LiveGoCatalog.home(platform: platform)
           .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
 
-      print('HOME DIRECT $platform -> ${items.length}');
-
       final categories = _categoriesFromItems(platform, items);
+      final fallbackBanners = items.take(5).toList();
+
+      if (items.isEmpty) {
+        return _HomeState(
+          banners: const <ContentItem>[],
+          items: const <ContentItem>[],
+          categories: categories,
+        );
+      }
+
+      // Banner dibuat dari item Home supaya Home HP tidak blank kalau endpoint banner lambat/error.
       return _HomeState(
-        banners: items.take(5).toList(),
+        banners: fallbackBanners,
         items: items,
         categories: categories,
       );
@@ -211,7 +222,9 @@ class _HeroCarouselState extends State<_HeroCarousel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.items.length != widget.items.length) {
       index = 0;
-      _controller.jumpToPage(0);
+      if (_controller.hasClients) {
+        _controller.jumpToPage(0);
+      }
       _start();
     }
   }
@@ -221,7 +234,9 @@ class _HeroCarouselState extends State<_HeroCarousel> {
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || widget.items.length < 2) return;
       final next = (index + 1) % widget.items.length;
-      _controller.animateToPage(next, duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
+      if (_controller.hasClients) {
+        _controller.animateToPage(next, duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
+      }
     });
   }
 

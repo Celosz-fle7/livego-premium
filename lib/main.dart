@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
+import 'core/livego_settings.dart';
 import 'mobile/mobile_app.dart';
 import 'tv/tv_app.dart';
 
@@ -24,10 +25,21 @@ class LiveGoPremiumApp extends StatelessWidget {
 class AdaptiveRoot extends StatelessWidget {
   const AdaptiveRoot({super.key});
 
+  bool _isTvLayout(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+
+    if (LiveGoSettings.layoutMode == 'TV') return true;
+    if (LiveGoSettings.layoutMode == 'Mobile') return false;
+
+    // Aman untuk HP: landscape phone tidak boleh otomatis masuk TvApp.
+    // Android TV/box biasanya punya width besar dan tinggi/shortestSide besar.
+    final landscape = size.width > size.height;
+    final bigLandscape = landscape && size.width >= 960 && size.shortestSide >= 540;
+    return bigLandscape;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Stabilkan dulu: HP portrait/landscape tetap MobileApp.
-    // TV mode nanti dibuat manual dari setting/device detection yang lebih aman.
-    return const MobileApp();
+    return _isTvLayout(context) ? const TvApp() : const MobileApp();
   }
 }
