@@ -30,7 +30,7 @@ class LiveGoCatalog {
         if (values.length >= 12) break;
       }
       if (values.isNotEmpty) return values;
-    } catch (_) {}
+    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
     return const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
   }
 
@@ -46,7 +46,8 @@ class LiveGoCatalog {
       final status = ms > 2500 ? 'slow' : 'online';
       LiveGoSettings.setPlatformStatus(platform, status);
       return status;
-    } catch (_) {
+    } catch (e) {
+      print('LIVEGO PING ERROR $platform: $e');
       LiveGoSettings.setPlatformStatus(platform, 'offline');
       return 'offline';
     }
@@ -57,13 +58,13 @@ class LiveGoCatalog {
       final rows = await ApiDramaClient.home(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
       if (rows.isNotEmpty) return rows;
-    } catch (_) {}
+    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
       final rows = await ApiDramaClient.discover(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
       if (rows.isNotEmpty) return rows;
-    } catch (_) {}
+    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     return [];
   }
@@ -82,7 +83,7 @@ class LiveGoCatalog {
       final banners = await ApiDramaClient.banner(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 10));
       if (banners.isNotEmpty) return banners.take(8).toList();
-    } catch (_) {}
+    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     final items = await home(platform: platform);
     return items.take(5).toList();
@@ -94,7 +95,7 @@ class LiveGoCatalog {
       if (banners.isNotEmpty) return banners.first;
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
-    } catch (_) {}
+    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
     return MockCatalog.hero;
   }
 

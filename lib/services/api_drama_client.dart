@@ -182,6 +182,8 @@ class ApiDramaClient {
 
   static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
     final uri = Uri.parse(baseUrl).replace(path: path, queryParameters: query.isEmpty ? null : query);
+    print('LIVEGO API => GET $uri');
+
     final request = await HttpClient().getUrl(uri).timeout(const Duration(seconds: 18));
 
     for (final entry in _signedHeaders('GET', uri).entries) {
@@ -190,6 +192,7 @@ class ApiDramaClient {
 
     final response = await request.close().timeout(const Duration(seconds: 18));
     final body = await response.transform(utf8.decoder).join();
+    print('LIVEGO API <= ${response.statusCode} ${body.length > 220 ? body.substring(0, 220) : body}');
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('API ${response.statusCode}: $body');
