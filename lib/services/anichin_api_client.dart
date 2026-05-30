@@ -45,10 +45,11 @@ class AnichinApiClient {
     String lang = 'id',
   }) async {
     final slug = _apiSlug(platform);
+    final apiLang = _providerLang(slug, lang);
     final json = await _getJson('/api/$slug/trending', {
-      'lang': lang,
+      'lang': apiLang,
     });
-    return _parseItems(json, platform: platform, lang: lang);
+    return _parseItems(json, platform: platform, lang: apiLang);
   }
 
   static Future<List<ContentItem>> discover({
@@ -57,11 +58,12 @@ class AnichinApiClient {
     int page = 1,
   }) async {
     final slug = _apiSlug(platform);
+    final apiLang = _providerLang(slug, lang);
     final json = await _getJson('/api/$slug/foryou', {
       'page': '$page',
-      'lang': lang,
+      'lang': apiLang,
     });
-    return _parseItems(json, platform: platform, lang: lang);
+    return _parseItems(json, platform: platform, lang: apiLang);
   }
 
   static Future<List<ContentItem>> collection({
@@ -71,12 +73,13 @@ class AnichinApiClient {
     int page = 1,
   }) async {
     final slug = _apiSlug(platform);
+    final apiLang = _providerLang(slug, lang);
     final key = collection.toLowerCase().replaceAll(' ', '');
     final json = await _getJson('/api/$slug/$key', {
       if (key == 'foryou') 'page': '$page',
-      'lang': lang,
+      'lang': apiLang,
     });
-    return _parseItems(json, platform: platform, lang: lang);
+    return _parseItems(json, platform: platform, lang: apiLang);
   }
 
   static Future<List<ContentItem>> banner({
@@ -94,38 +97,40 @@ class AnichinApiClient {
   }) async {
     if (query.trim().isEmpty) return [];
     final slug = _apiSlug(platform);
-    final isDramaBox = slug == 'dramabox';
+    final apiLang = _providerLang(slug, lang);
     final json = await _getJson('/api/$slug/search', {
-      (isDramaBox ? 'q' : 'query'): query.trim(),
-      'lang': lang,
+      _searchParam(slug): query.trim(),
+      'lang': apiLang,
     });
-    return _parseItems(json, platform: platform, lang: lang);
+    return _parseItems(json, platform: platform, lang: apiLang);
   }
 
   static Future<ContentItem?> detail(ContentItem item) async {
     final slug = _apiSlug(item.platformSlug);
+    final apiLang = _providerLang(slug, item.lang);
     final json = await _getJson('/api/$slug/detail', {
       'id': item.id,
-      'lang': item.lang,
+      'lang': apiLang,
     });
     final data = _dataMap(json);
     if (data.isEmpty) return item;
-    return _parseItem(data, platform: item.platformSlug, lang: item.lang);
+    return _parseItem(data, platform: item.platformSlug, lang: apiLang);
   }
 
 
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
     final slug = _apiSlug(item.platformSlug);
     Map<String, dynamic> json = <String, dynamic>{};
+    final apiLang = _providerLang(slug, item.lang);
     try {
       json = await _getJson('/api/$slug/allepisode', {
         'id': item.id,
-        'lang': item.lang,
+        'lang': apiLang,
       });
     } catch (_) {
       json = await _getJson('/api/$slug/detail', {
         'id': item.id,
-        'lang': item.lang,
+        'lang': apiLang,
       });
     }
 
@@ -134,9 +139,13 @@ class AnichinApiClient {
       return raw.asMap().entries.map((entry) {
         final idx = entry.key + 1;
         final row = entry.value;
-        final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'episodeId', 'episode_id', 'ep'], fallback: '$idx');
-        final title = _first(row, const ['title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $idx');
-        return LiveGoEpisode(id: id, index: idx, title: title);
+        final number = _parseInt(
+          row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['ep'] ?? row['index'],
+          fallback: idx,
+        );
+        final id = '$number';
+        final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $number');
+        return LiveGoEpisode(id: id, index: number, title: title);
       }).toList();
     }
 
@@ -146,16 +155,84 @@ class AnichinApiClient {
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
     final slug = _apiSlug(item.platformSlug);
+    final apiLang = _providerLang(slug, item.lang);
     final chapter = '${chapterId ?? item.chapterId}';
-    final ep = int.tryParse(chapter) ?? 1;
-    final json = await _getJson('/api/$slug/episode', {
+    final ep = _episodeNumber(chapter);
+    final query = <String, String>{
       'id': item.id,
       'ep': '$ep',
-      if (int.tryParse(chapter) == null) 'chapterId': chapter,
-      'lang': item.lang,
+      'lang': apiLang,
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+    };
+
+    // DramaBox documents the playable signed hlsUrl mainly in allepisode.
+    // Other providers usually expose /episode, but all providers get an
+    // allepisode fallback because response shapes vary between platforms.
+    if (slug != 'dramabox') {
+      try {
+        final json = await _getJson('/api/$slug/episode', query);
+        final parsed = await _parseStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
+        if (parsed.url.isNotEmpty) return parsed;
+      } catch (e) {
+        print('ANICHIN EPISODE STREAM FALLBACK $slug ep=$ep: $e');
+      }
+    }
+
+    final all = await _getJson('/api/$slug/allepisode', {
+      'id': item.id,
+      'lang': apiLang,
     });
-    return _parseStream(json, item: item, ep: ep);
+    final row = _findEpisodeRow(all, ep);
+    if (row != null) {
+      final parsed = await _parseStream(row, item: item, ep: ep, slug: slug, lang: apiLang);
+      if (parsed.url.isNotEmpty) return parsed;
+    }
+
+    // Last chance for DramaBox/FlickReels style providers that may still have
+    // an /episode endpoint even when the docs recommend hlsUrl from allepisode.
+    if (slug == 'dramabox') {
+      final json = await _getJson('/api/$slug/episode', query);
+      return _parseStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
+    }
+
+    return StreamInfo.empty;
+  }
+
+  static int _episodeNumber(String chapter) {
+    final direct = int.tryParse(chapter);
+    if (direct != null && direct > 0) return direct;
+    final match = RegExp(r'\d+').firstMatch(chapter);
+    final parsed = match == null ? null : int.tryParse(match.group(0)!);
+    return parsed == null || parsed <= 0 ? 1 : parsed;
+  }
+
+
+  static String _providerLang(String slug, String requested) {
+    // Use provider-documented defaults. Invalid lang values can make a valid
+    // video endpoint return an empty payload, which appears as "stream unavailable".
+    switch (slug) {
+      case 'shortmax':
+      case 'melolo':
+        return 'id';
+      case 'netshort':
+        return 'in';
+      case 'dramabox':
+      case 'pinedrama':
+      case 'flickreels':
+        return 'en';
+    }
+    return requested.trim().isEmpty ? 'id' : requested.trim();
+  }
+
+  static String _searchParam(String slug) {
+    switch (slug) {
+      case 'melolo':
+      case 'pinedrama':
+      case 'dramabox':
+        return 'q';
+      default:
+        return 'query';
+    }
   }
 
   static String get _qualityParam {
@@ -372,11 +449,13 @@ class AnichinApiClient {
     );
   }
 
-  static StreamInfo _parseStream(
+  static Future<StreamInfo> _parseStream(
     Map<String, dynamic> json, {
     required ContentItem item,
     required int ep,
-  }) {
+    required String slug,
+    required String lang,
+  }) async {
     final data = _dataMap(json);
     final streamData = _streamData(data);
     final url = _extractUrl(streamData);
@@ -385,31 +464,34 @@ class AnichinApiClient {
     final subtitlesRaw = streamData['subtitles'] ??
         streamData['subtitle'] ??
         streamData['subtitleTracks'] ??
-        streamData['tracks'];
-    if (subtitlesRaw is List) {
-      for (final row in subtitlesRaw) {
-        if (row is Map) {
-          final subUrl = _first(Map<String, dynamic>.from(row), const [
-            'url',
-            'vttUrl',
-            'vtt_url',
-            'subtitleUrl',
-            'subtitle_url',
-            'src',
-          ]);
-          if (subUrl.isNotEmpty) {
-            subtitles.add(SubtitleTrack(
-              language: _first(Map<String, dynamic>.from(row), const [
-                'language',
-                'lang',
-                'label',
-                'name',
-              ], fallback: item.lang),
-              format: subUrl.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
-              url: subUrl,
-            ));
-          }
-        }
+        streamData['tracks'] ??
+        streamData['captions'];
+    _appendSubtitles(subtitles, subtitlesRaw, fallbackLang: lang);
+
+    final subtitlesUrl = _first(streamData, const [
+      'subtitlesUrl',
+      'subtitles_url',
+      'subtitleEndpoint',
+      'subtitle_endpoint',
+    ]);
+    if (subtitlesUrl.isNotEmpty) {
+      subtitles.add(SubtitleTrack(
+        language: lang,
+        format: subtitlesUrl.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
+        url: subtitlesUrl,
+      ));
+    }
+
+    if (slug == 'dramabox' && subtitles.isEmpty) {
+      try {
+        final subJson = await _getJson('/api/dramabox/subtitles', {
+          'id': item.id,
+          'ep': '$ep',
+          'lang': lang,
+        });
+        _appendSubtitles(subtitles, _dataList(subJson), fallbackLang: lang);
+      } catch (e) {
+        print('DRAMABOX SUBTITLE ERROR ep=$ep: $e');
       }
     }
 
@@ -441,9 +523,11 @@ class AnichinApiClient {
   static Map<String, dynamic> _streamData(Map<String, dynamic> data) {
     final candidates = [
       data,
+      if (data['data'] is Map) Map<String, dynamic>.from(data['data'] as Map),
       if (data['episode'] is Map) Map<String, dynamic>.from(data['episode'] as Map),
       if (data['video'] is Map) Map<String, dynamic>.from(data['video'] as Map),
       if (data['stream'] is Map) Map<String, dynamic>.from(data['stream'] as Map),
+      if (data['play'] is Map) Map<String, dynamic>.from(data['play'] as Map),
     ];
 
     for (final c in candidates) {
@@ -465,6 +549,12 @@ class AnichinApiClient {
       'hls_url',
       'm3u8',
       'src',
+      'cdnUrl',
+      'cdn_url',
+      'mediaUrl',
+      'media_url',
+      'file',
+      'link',
     ]);
     if (direct.isNotEmpty) return direct;
 
@@ -477,11 +567,11 @@ class AnichinApiClient {
         fallback ??= row;
         final quality = '${row['quality'] ?? row['resolution'] ?? row['label'] ?? ''}'.toLowerCase();
         if (preferred.isNotEmpty && quality.contains(preferred.replaceAll('p', ''))) {
-          return _first(Map<String, dynamic>.from(row), const ['url', 'src', 'videoUrl', 'hlsUrl', 'mp4Url']);
+          return _first(Map<String, dynamic>.from(row), const ['url', 'src', 'videoUrl', 'video_url', 'hlsUrl', 'hls_url', 'mp4Url', 'mp4_url', 'playUrl', 'play_url']);
         }
       }
       if (fallback != null) {
-        return _first(Map<String, dynamic>.from(fallback), const ['url', 'src', 'videoUrl', 'hlsUrl', 'mp4Url']);
+        return _first(Map<String, dynamic>.from(fallback), const ['url', 'src', 'videoUrl', 'video_url', 'hlsUrl', 'hls_url', 'mp4Url', 'mp4_url', 'playUrl', 'play_url']);
       }
     }
 
@@ -494,6 +584,68 @@ class AnichinApiClient {
     }
 
     return '';
+  }
+
+
+  static Map<String, dynamic>? _findEpisodeRow(Map<String, dynamic> json, int ep) {
+    final rows = _episodeList(json);
+    if (rows.isEmpty) return null;
+
+    for (final row in rows) {
+      final number = _parseInt(
+        row['number'] ??
+            row['episode'] ??
+            row['episodeNumber'] ??
+            row['episode_number'] ??
+            row['ep'] ??
+            row['index'],
+        fallback: -1,
+      );
+      if (number == ep) return row;
+    }
+
+    final index = ep - 1;
+    if (index >= 0 && index < rows.length) return rows[index];
+    return null;
+  }
+
+  static void _appendSubtitles(
+    List<SubtitleTrack> out,
+    Object? raw, {
+    required String fallbackLang,
+  }) {
+    if (raw is Map) {
+      _appendSubtitles(out, raw['data'] ?? raw['items'] ?? raw['list'] ?? raw['tracks'] ?? raw['subtitles'], fallbackLang: fallbackLang);
+      return;
+    }
+    if (raw is! List) return;
+
+    for (final row in raw) {
+      if (row is! Map) continue;
+      final map = Map<String, dynamic>.from(row);
+      final subUrl = _first(map, const [
+        'url',
+        'vttUrl',
+        'vtt_url',
+        'subtitleUrl',
+        'subtitle_url',
+        'src',
+        'file',
+        'link',
+      ]);
+      if (subUrl.isEmpty) continue;
+      out.add(SubtitleTrack(
+        language: _first(map, const [
+          'language',
+          'lang',
+          'label',
+          'name',
+          'code',
+        ], fallback: fallbackLang),
+        format: subUrl.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
+        url: subUrl,
+      ));
+    }
   }
 
   static String _category(Map<String, dynamic> json) {
