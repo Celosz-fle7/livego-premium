@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
+import 'livego_cached_image.dart';
 
 class HeroBanner extends StatelessWidget {
   final ContentItem item;
@@ -22,7 +23,7 @@ class HeroBanner extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(item.backdropUrl, fit: BoxFit.cover),
+            LiveGoCachedImage(url: item.backdropUrl, fit: BoxFit.cover),
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -66,8 +67,8 @@ class HeroBanner extends StatelessWidget {
               bottom: tv ? 32 : 40,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                child: Image.network(
-                  item.posterUrl,
+                child: LiveGoCachedImage(
+                  url: item.posterUrl,
                   width: tv ? 125 : 92,
                   height: tv ? 170 : 132,
                   fit: BoxFit.cover,

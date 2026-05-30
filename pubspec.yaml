@@ -12,6 +12,8 @@ dependencies:
   crypto: ^3.0.3
   video_player: ^2.9.1
   path_provider: ^2.1.5
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
 
 dev_dependencies:
   flutter_test:

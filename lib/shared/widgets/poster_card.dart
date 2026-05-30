@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
+import 'livego_cached_image.dart';
 
 class PosterCard extends StatelessWidget {
   final ContentItem item;
@@ -34,13 +35,9 @@ class PosterCard extends StatelessWidget {
                       children: [
                         item.posterUrl.isEmpty
                             ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 46))
-                            : Image.network(
-                                item.posterUrl,
+                            : LiveGoCachedImage(
+                                url: item.posterUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: AppTheme.surface2,
-                                  child: const Icon(Icons.broken_image_rounded, color: Colors.white38),
-                                ),
                               ),
                         const DecoratedBox(
                           decoration: BoxDecoration(
