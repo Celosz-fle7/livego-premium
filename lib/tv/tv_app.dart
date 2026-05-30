@@ -16,7 +16,7 @@ class TvApp extends StatefulWidget {
 
 class _TvAppState extends State<TvApp> {
   int index = 0;
-  bool navOpen = false;
+  bool navOpen = true;
 
   Widget _page() {
     return switch (index) {
@@ -51,20 +51,22 @@ class _TvAppState extends State<TvApp> {
       },
       child: Scaffold(
         body: PremiumShell(
-          child: MouseRegion(
-            onEnter: (_) => setState(() => navOpen = true),
-            onExit: (_) => setState(() => navOpen = false),
+          child: FocusTraversalGroup(
+            policy: ReadingOrderTraversalPolicy(),
             child: Stack(
               children: [
                 _page(),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Focus(
-                    onFocusChange: (v) => setState(() => navOpen = v),
+                    onFocusChange: (v) => setState(() => navOpen = v || navOpen),
                     child: TvSideNav(
                       index: index,
                       expanded: navOpen,
-                      onChanged: (v) => setState(() => index = v),
+                      onChanged: (v) => setState(() {
+                        index = v;
+                        navOpen = true;
+                      }),
                     ),
                   ),
                 ),

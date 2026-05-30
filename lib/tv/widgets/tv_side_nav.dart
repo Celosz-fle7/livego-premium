@@ -47,35 +47,81 @@ class TvSideNav extends StatelessWidget {
             child: ListView.separated(
               itemCount: items.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, i) {
-                final active = i == index;
-                return InkWell(
-                  onTap: () => onChanged(i),
-                  borderRadius: BorderRadius.circular(24),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    margin: const EdgeInsets.symmetric(horizontal: 14),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                    decoration: BoxDecoration(
-                      gradient: active ? const LinearGradient(colors: [Color(0xFF183455), Color(0xFF261B5B)]) : null,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: active ? AppTheme.cyan.withOpacity(0.55) : Colors.white10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(items[i].$1, color: active ? Colors.white : AppTheme.textSoft, size: 28),
-                        if (expanded) ...[
-                          const SizedBox(width: 14),
-                          Expanded(child: Text(items[i].$2, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
+              itemBuilder: (_, i) => _TvNavItem(
+                icon: items[i].$1,
+                label: items[i].$2,
+                active: i == index,
+                expanded: expanded,
+                autofocus: i == index,
+                onTap: () => onChanged(i),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TvNavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final bool expanded;
+  final bool autofocus;
+  final VoidCallback onTap;
+
+  const _TvNavItem({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.expanded,
+    required this.autofocus,
+    required this.onTap,
+  });
+
+  @override
+  State<_TvNavItem> createState() => _TvNavItemState();
+}
+
+class _TvNavItemState extends State<_TvNavItem> {
+  bool focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlight = widget.active || focused;
+
+    return FocusableActionDetector(
+      autofocus: widget.autofocus,
+      onShowFocusHighlight: (v) => setState(() => focused = v),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(24),
+        focusColor: Colors.transparent,
+        hoverColor: Colors.white10,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          margin: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          decoration: BoxDecoration(
+            gradient: highlight ? const LinearGradient(colors: [Color(0xFF183455), Color(0xFF261B5B)]) : null,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.55) : Colors.white10),
+              width: focused ? 2.2 : 1,
+            ),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 18)] : null,
+          ),
+          child: Row(
+            children: [
+              Icon(widget.icon, color: highlight ? Colors.white : AppTheme.textSoft, size: 28),
+              if (widget.expanded) ...[
+                const SizedBox(width: 14),
+                Expanded(child: Text(widget.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
