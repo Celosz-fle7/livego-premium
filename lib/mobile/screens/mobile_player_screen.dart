@@ -12,6 +12,7 @@ import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
+import '../../services/player/player_preferences.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -92,9 +93,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: SafeArea(
-            bottom: false,
-            child: _PlayerSurface(
+          body: _PlayerSurface(
               key: ValueKey('mobile-player-${stream.url}-$episode'),
               item: item,
               loading: loading,
@@ -104,7 +103,6 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
               onEpisode: _selectEpisode,
               onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
             ),
-          ),
         );
       },
     );
@@ -145,11 +143,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _fitCover = false;
   bool _landscape = false;
   bool _autoNextDone = false;
-  String _quality = LiveGoSettings.quality.isEmpty ? '720p' : LiveGoSettings.quality;
-  bool _subtitleEnabled = LiveGoSettings.subtitlesEnabled;
-  String _subtitleLanguage = 'Auto';
-  String _audioTrack = 'Source';
-  double _speed = 1.0;
+  String _quality = PlayerPreferences.quality;
+  bool _subtitleEnabled = PlayerPreferences.subtitleEnabled;
+  String _subtitleLanguage = PlayerPreferences.subtitleLanguage;
+  String _audioTrack = PlayerPreferences.audioTrack;
+  double _speed = PlayerPreferences.speed;
   Duration _lastProgressSaved = Duration.zero;
   DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastTapRight = DateTime.fromMillisecondsSinceEpoch(0);
@@ -157,8 +155,24 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   @override
   void initState() {
     super.initState();
+    _loadPreferences();
     _openStream();
     _startTimer();
+  }
+
+
+  Future<void> _loadPreferences() async {
+    await PlayerPreferences.load();
+    if (!mounted) return;
+    setState(() {
+      _quality = PlayerPreferences.quality;
+      _subtitleEnabled = PlayerPreferences.subtitleEnabled;
+      _subtitleLanguage = PlayerPreferences.subtitleLanguage;
+      _audioTrack = PlayerPreferences.audioTrack;
+      _speed = PlayerPreferences.speed;
+    });
+    await _controller?.setPlaybackSpeed(_speed);
+    await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
   }
 
   @override
@@ -190,6 +204,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _controller = controller;
       controller.addListener(_listen);
       await controller.initialize();
+      await controller.setPlaybackSpeed(_speed);
+      await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
       final saved = LiveGoLocalStore.progressFor(widget.item);
       if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
         await controller.seekTo(saved.position);
@@ -279,7 +295,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final c = _controller;
     if (c == null) return;
     _muted = !_muted;
+    _audioTrack = _muted ? 'Mute' : 'Source';
     await c.setVolume(_muted ? 0 : 1);
+    await PlayerPreferences.setAudioTrack(_audioTrack);
     _showControls();
   }
 
@@ -287,9 +305,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     _landscape = !_landscape;
     if (_landscape) {
       _fitCover = false;
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     } else {
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     if (mounted) setState(() {});
     _showControls();
@@ -300,6 +320,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (_fitCover) {
       _landscape = false;
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
     if (mounted) setState(() {});
     _showControls();
@@ -373,6 +396,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   style: TextStyle(color: Colors.white60, height: 1.35),
                 ),
               ),
+              _QualityChip(label: 'Auto', current: _quality, onPick: (v) => Navigator.pop(context, v)),
               _QualityChip(label: '480p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
               _QualityChip(label: '720p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
               _QualityChip(label: '1080p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
@@ -384,6 +408,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (picked != null) {
       setState(() => _quality = picked);
       LiveGoSettings.quality = picked;
+      await PlayerPreferences.setQuality(picked);
     }
     _showControls();
   }
@@ -425,10 +450,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         if (picked == 'OFF') {
           _subtitleEnabled = false;
           LiveGoSettings.subtitlesEnabled = false;
+          PlayerPreferences.setSubtitle(enabled: false);
         } else {
           _subtitleEnabled = true;
           _subtitleLanguage = picked;
           LiveGoSettings.subtitlesEnabled = true;
+          PlayerPreferences.setSubtitle(enabled: true, language: picked);
         }
       });
     }
@@ -463,11 +490,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (picked != null) {
       if (picked == 'Mute') {
         _muted = true;
+        _audioTrack = 'Mute';
         await _controller?.setVolume(0);
+        await PlayerPreferences.setAudioTrack('Mute');
       } else {
         _audioTrack = picked;
         _muted = false;
         await _controller?.setVolume(1);
+        await PlayerPreferences.setAudioTrack(picked);
       }
       if (mounted) setState(() {});
     }
@@ -504,6 +534,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final next = values[(values.indexOf(_speed) + 1) % values.length];
     _speed = next;
     await _controller?.setPlaybackSpeed(next);
+    await PlayerPreferences.setSpeed(next);
     _showControls();
   }
 
@@ -563,6 +594,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     _timer?.cancel();
     _controller?.removeListener(_listen);
     _controller?.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -616,7 +648,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
             } else {
               playerW = screenW * 0.94;
               playerH = playerW / videoRatio;
-              final maxH = screenH * 0.58;
+              final maxH = screenH * (_landscape ? 1.0 : 0.72);
               if (playerH > maxH) {
                 playerH = maxH;
                 playerW = playerH * videoRatio;

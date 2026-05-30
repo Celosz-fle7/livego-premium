@@ -9,6 +9,7 @@ import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
+import '../../services/player/player_preferences.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -25,13 +26,26 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   String _error = '';
   bool _loading = true;
   int _episode = 1;
+  double _speed = 1.0;
+  String _audioTrack = 'Source';
 
   @override
   void initState() {
     super.initState();
     _episode = LiveGoLocalStore.continueEpisode(widget.item);
     LiveGoLocalStore.addHistory(widget.item);
+    _loadPreferences();
     _load();
+  }
+
+
+  Future<void> _loadPreferences() async {
+    await PlayerPreferences.load();
+    if (!mounted) return;
+    _speed = PlayerPreferences.speed;
+    _audioTrack = PlayerPreferences.audioTrack;
+    await _controller?.setPlaybackSpeed(_speed);
+    await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
   }
 
   Future<void> _load() async {
@@ -107,6 +121,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           }
         });
         await controller.initialize();
+        await controller.setPlaybackSpeed(_speed);
+        await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
         final saved = LiveGoLocalStore.progressFor(playable);
         if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
           await controller.seekTo(saved.position);
@@ -153,12 +169,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       backgroundColor: AppTheme.bg,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(112, 30, 40, 30),
+          padding: const EdgeInsets.fromLTRB(92, 24, 32, 24),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 5,
+                flex: 6,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -254,9 +270,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 28),
+              const SizedBox(width: 22),
               SizedBox(
-                width: 310,
+                width: 290,
                 child: _EpisodePanel(
                   total: item.episodes.clamp(1, 120).toInt(),
                   selected: _episode,
