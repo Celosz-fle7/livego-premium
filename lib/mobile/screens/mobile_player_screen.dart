@@ -36,13 +36,36 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   }
 
   Future<_PlayerState> _load() async {
+    await PlayerPreferences.load();
+    LiveGoSettings.quality = PlayerPreferences.quality;
+
+    final requestedEpisode = episode <= 0 ? 1 : episode;
+    final fastPlayable = ContentItem(
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: widget.item.episodes,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: '$requestedEpisode',
+      lang: widget.item.lang,
+    );
+
+    // Start stream resolving immediately with the original Home/Search id.
+    // This avoids waiting for detail/allepisode before playback starts.
+    final streamFuture = LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode');
     final detail = await LiveGoCatalog.detail(widget.item);
     final realEpisodes = await LiveGoCatalog.episodes(detail);
-    final safeIndex = episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
+    final safeIndex = requestedEpisode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
     final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
     final selected = ContentItem(
-      // Some providers (ShortMax tested) return detail payloads with id="".
-      // The playable /episode endpoint still needs the original Home/Search id.
+      // Some providers return detail payloads with id=""; the player must keep
+      // the original Home/Search id so /episode?id=... receives a valid value.
       id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
       title: detail.title,
       source: detail.source,
@@ -57,7 +80,10 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       chapterId: episodeId,
       lang: detail.lang,
     );
-    final stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId);
+    var stream = await streamFuture;
+    if (stream.url.isEmpty || episodeId != '$requestedEpisode') {
+      stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId);
+    }
     final total = realEpisodes.isNotEmpty ? realEpisodes.length : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
     final playable = ContentItem(
       id: selected.id,
@@ -139,6 +165,8 @@ class _PlayerSurface extends StatefulWidget {
 class _PlayerSurfaceState extends State<_PlayerSurface> {
   VideoPlayerController? _controller;
   Timer? _timer;
+  Timer? _autoQualityTimer;
+  String _activeUrl = '';
   String _error = '';
   bool _controls = true;
   bool _buffering = true;
@@ -185,23 +213,43 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   Future<void> _openStream() async {
+    _autoQualityTimer?.cancel();
     await _controller?.dispose();
     _controller = null;
     _error = '';
     _buffering = true;
     _autoNextDone = false;
+    _activeUrl = '';
     if (mounted) setState(() {});
 
-    if (widget.stream.url.isEmpty) {
+    final url = _resolvedInitialUrl();
+    if (url.isEmpty) {
       _error = 'Stream belum tersedia dari API.';
       _buffering = false;
       if (mounted) setState(() {});
       return;
     }
 
+    await _openResolvedUrl(url, resume: true, autoplay: true);
+    _scheduleAutoQualityUpgrade();
+  }
+
+  String _resolvedInitialUrl() {
+    if (_quality.toLowerCase() == 'auto') {
+      return widget.stream.autoStartUrl;
+    }
+    return widget.stream.urlForQuality(_quality);
+  }
+
+  Future<void> _openResolvedUrl(String url, {required bool resume, required bool autoplay}) async {
     try {
+      _activeUrl = url;
+      final old = _controller;
+      old?.removeListener(_listen);
+      await old?.dispose();
+
       final controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.stream.url),
+        Uri.parse(url),
         httpHeaders: widget.stream.headers.isEmpty ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'} : widget.stream.headers,
       );
       _controller = controller;
@@ -209,17 +257,42 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       await controller.initialize();
       await controller.setPlaybackSpeed(_speed);
       await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
-      final saved = LiveGoLocalStore.progressFor(widget.item);
-      if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
-        await controller.seekTo(saved.position);
+      if (resume) {
+        final saved = LiveGoLocalStore.progressFor(widget.item);
+        if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
+          await controller.seekTo(saved.position);
+        }
       }
-      await controller.play();
+      if (autoplay) await controller.play();
       if (mounted) setState(() => _buffering = false);
     } catch (e) {
       _error = '$e';
       _buffering = false;
       if (mounted) setState(() {});
     }
+  }
+
+  void _scheduleAutoQualityUpgrade() {
+    _autoQualityTimer?.cancel();
+    if (_quality.toLowerCase() != 'auto') return;
+    final best = widget.stream.autoBestUrl;
+    if (best.isEmpty || best == _activeUrl) return;
+
+    _autoQualityTimer = Timer(const Duration(seconds: 10), () async {
+      final c = _controller;
+      if (!mounted || c == null || !c.value.isInitialized || _quality.toLowerCase() != 'auto') return;
+      if (c.value.position.inSeconds < 5 || c.value.isBuffering) return;
+      final pos = c.value.position;
+      final wasPlaying = c.value.isPlaying;
+      setState(() => _buffering = true);
+      await _openResolvedUrl(best, resume: false, autoplay: wasPlaying);
+      final next = _controller;
+      if (next != null && next.value.isInitialized) {
+        await next.seekTo(pos);
+        if (wasPlaying) await next.play();
+      }
+      if (mounted) setState(() => _buffering = false);
+    });
   }
 
   void _listen() {
@@ -414,25 +487,59 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               const SizedBox(
                 width: double.infinity,
                 child: Text(
-                  'Stream API saat ini HLS adaptive. Pilihan ini disimpan sebagai preferensi user; kualitas manual real akan aktif kalau provider mengirim pilihan stream berbeda.',
+                  'Mode Auto mulai dari kualitas ringan agar cepat play, lalu naik otomatis ke kualitas terbaik saat buffer sudah stabil. Manual 480p/720p/1080p memakai stream provider kalau tersedia.',
                   style: TextStyle(color: Colors.white60, height: 1.35),
                 ),
               ),
-              _QualityChip(label: 'Auto', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: '480p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: '720p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
-              _QualityChip(label: '1080p', current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              for (final label in _qualityLabels())
+                _QualityChip(label: label, current: _quality, onPick: (v) => Navigator.pop(context, v)),
             ],
           ),
         ),
       ),
     );
     if (picked != null) {
-      setState(() => _quality = picked);
+      setState(() {
+        _quality = picked;
+        _buffering = true;
+      });
       LiveGoSettings.quality = picked;
       await PlayerPreferences.setQuality(picked);
+
+      final url = picked.toLowerCase() == 'auto'
+          ? widget.stream.autoStartUrl
+          : widget.stream.urlForQuality(picked);
+      if (url.isNotEmpty && url != _activeUrl) {
+        final c = _controller;
+        final pos = c?.value.position ?? Duration.zero;
+        final wasPlaying = c?.value.isPlaying ?? true;
+        await _openResolvedUrl(url, resume: false, autoplay: wasPlaying);
+        final next = _controller;
+        if (next != null && next.value.isInitialized && pos > Duration.zero) {
+          await next.seekTo(pos);
+          if (wasPlaying) await next.play();
+        }
+      }
+      _scheduleAutoQualityUpgrade();
     }
     _showControls();
+  }
+
+  List<String> _qualityLabels() {
+    final labels = <String>['Auto'];
+    for (final quality in widget.stream.qualities) {
+      final label = quality.label.trim();
+      if (label.isEmpty) continue;
+      if (!labels.any((e) => e.toLowerCase() == label.toLowerCase())) {
+        labels.add(label);
+      }
+    }
+    for (final fallback in const ['480p', '720p', '1080p']) {
+      if (!labels.any((e) => e.toLowerCase() == fallback.toLowerCase())) {
+        labels.add(fallback);
+      }
+    }
+    return labels;
   }
 
   Future<void> _subtitleMenu() async {
@@ -614,6 +721,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   @override
   void dispose() {
     _timer?.cancel();
+    _autoQualityTimer?.cancel();
     _controller?.removeListener(_listen);
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

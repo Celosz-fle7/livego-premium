@@ -3,7 +3,7 @@ class LiveGoSettings {
 
   static String language = 'id';
   static String defaultPlatform = 'shortmax';
-  static String quality = '720p';
+  static String quality = 'Auto';
   static String layoutMode = 'Auto';
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
@@ -107,7 +107,7 @@ class LiveGoSettings {
   static void reset() {
     language = 'id';
     defaultPlatform = 'shortmax';
-    quality = '720p';
+    quality = 'Auto';
     layoutMode = 'Auto';
     drmMode = 'Auto';
     subtitlesEnabled = true;

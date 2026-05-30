@@ -577,6 +577,7 @@ class AnichinApiClient {
         'Accept': '*/*',
       },
       subtitles: subtitles,
+      qualities: _extractQualities(streamData),
     );
   }
 
@@ -634,7 +635,9 @@ class AnichinApiClient {
         }
       }
 
-      final selected = defaultRow ?? firstRow;
+      final selected = preferred.isEmpty
+          ? _lowestQualityRow(streams)
+          : (defaultRow ?? firstRow);
       if (selected != null) {
         final url = _first(selected, const [
           'url',
@@ -681,6 +684,74 @@ class AnichinApiClient {
     ]);
   }
 
+
+
+  static List<StreamQuality> _extractQualities(Map<String, dynamic> data) {
+    final streams = data['qualityList'] ??
+        data['quality_list'] ??
+        data['streams'] ??
+        data['qualities'] ??
+        data['urls'] ??
+        data['videos'];
+    final rows = <StreamQuality>[];
+    if (streams is List) {
+      for (final row in streams) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        final rawUrl = _first(map, const [
+          'url',
+          'src',
+          'videoUrl',
+          'video_url',
+          'hlsUrl',
+          'hls_url',
+          'mp4Url',
+          'mp4_url',
+          'playUrl',
+          'play_url',
+        ]);
+        if (rawUrl.isEmpty) continue;
+        final label = _first(map, const [
+          'label',
+          'quality',
+          'resolution',
+          'name',
+        ], fallback: 'Auto');
+        rows.add(StreamQuality(
+          label: label,
+          url: _normalizePlayableUrl(rawUrl),
+          isDefault: map['isDefault'] == true || '${map['default']}'.toLowerCase() == 'true',
+        ));
+      }
+    }
+    if (streams is Map) {
+      for (final entry in streams.entries) {
+        final rawUrl = '${entry.value}'.trim();
+        if (rawUrl.isEmpty || rawUrl == 'null') continue;
+        rows.add(StreamQuality(label: '${entry.key}', url: _normalizePlayableUrl(rawUrl)));
+      }
+    }
+    return rows;
+  }
+
+  static Map<String, dynamic>? _lowestQualityRow(List streams) {
+    Map<String, dynamic>? fallback;
+    Map<String, dynamic>? lowest;
+    var lowestHeight = 1 << 30;
+    for (final row in streams) {
+      if (row is! Map) continue;
+      final map = Map<String, dynamic>.from(row);
+      fallback ??= map;
+      final label = '${map['quality'] ?? map['resolution'] ?? map['label'] ?? ''}';
+      final match = RegExp(r'(\d{3,4})').firstMatch(label);
+      final height = match == null ? 0 : int.tryParse(match.group(1)!) ?? 0;
+      if (height > 0 && height < lowestHeight) {
+        lowestHeight = height;
+        lowest = map;
+      }
+    }
+    return lowest ?? fallback;
+  }
 
   static String _normalizePlayableUrl(String raw) {
     final url = raw.trim();
