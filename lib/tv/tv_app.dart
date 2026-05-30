@@ -15,6 +15,7 @@ class TvApp extends StatefulWidget {
 
 class _TvAppState extends State<TvApp> {
   int index = 0;
+  int _homeFocusTicket = 0;
   final FocusNode _contentGuard = FocusNode(debugLabel: 'tv-content-guard');
   late final List<FocusNode> _navNodes;
 
@@ -40,9 +41,17 @@ class _TvAppState extends State<TvApp> {
     _navNodes[target].requestFocus();
   }
 
+  void _focusRightZone() {
+    if (index == 0) {
+      setState(() => _homeFocusTicket++);
+    } else {
+      _contentGuard.requestFocus();
+    }
+  }
+
   Widget _page() {
     return switch (index) {
-      0 => TvHomeScreen(onMoveToNav: _focusCurrentNav),
+      0 => TvHomeScreen(onMoveToNav: _focusCurrentNav, focusTicket: _homeFocusTicket),
       1 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded),
       2 => const TvPlaceholderScreen(title: 'Riwayat', icon: Icons.history_rounded),
       3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded),
@@ -52,15 +61,14 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _selectPage(int value, {bool moveToContent = false}) {
-    setState(() => index = value);
+    setState(() {
+      index = value;
+      if (moveToContent && value == 0) _homeFocusTicket++;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (moveToContent) {
-        _contentGuard.requestFocus();
-        Future<void>.delayed(const Duration(milliseconds: 60), () {
-          if (!mounted) return;
-          FocusScope.of(context).nextFocus();
-        });
+        _focusRightZone();
       } else {
         _navNodes[value.clamp(0, _navNodes.length - 1)].requestFocus();
       }
@@ -108,7 +116,7 @@ class _TvAppState extends State<TvApp> {
       return KeyEventResult.handled;
     }
     if (node.hasFocus && (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select)) {
-      FocusScope.of(context).nextFocus();
+      _focusRightZone();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack) {

@@ -10,8 +10,9 @@ import 'tv_player_screen.dart';
 
 class TvHomeScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final int focusTicket;
 
-  const TvHomeScreen({super.key, this.onMoveToNav});
+  const TvHomeScreen({super.key, this.onMoveToNav, this.focusTicket = 0});
 
   @override
   State<TvHomeScreen> createState() => _TvHomeScreenState();
@@ -48,6 +49,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant TvHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusTicket != widget.focusTicket) {
+      _returnToLastContent();
+    }
   }
 
   @override
@@ -160,13 +169,26 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       widget.onMoveToNav?.call();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _lastZone = _TvZone.banner;
+      _focus(_bannerNode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
       if (_platformNodes.isNotEmpty) {
         _lastZone = _TvZone.platform;
         _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
         _focus(_platformNodes[_lastPlatform]);
-        return KeyEventResult.handled;
+      } else if (_categoryNodes.isNotEmpty) {
+        _lastZone = _TvZone.category;
+        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+        _focus(_categoryNodes[_lastCategory]);
+      } else if (_gridNodes.isNotEmpty) {
+        _lastZone = _TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
+      return KeyEventResult.handled;
     }
     if (_isSelect(key) && hero != null) {
       _open(hero);
@@ -178,11 +200,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _platformKey(int i, RawKeyEvent event) {
     if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowRight && i < _platformNodes.length - 1) {
-      _lastPlatform = i + 1;
-      _focus(_platformNodes[_lastPlatform]);
-      return KeyEventResult.handled;
-    }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (i == 0) {
         widget.onMoveToNav?.call();
@@ -192,21 +209,38 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       }
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (i < _platformNodes.length - 1) {
+        _lastPlatform = i + 1;
+        _focus(_platformNodes[_lastPlatform]);
+      } else {
+        _lastPlatform = i;
+        _focus(_platformNodes[_lastPlatform]);
+      }
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowUp) {
       _lastZone = _TvZone.banner;
       _focus(_bannerNode);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown && _categoryNodes.isNotEmpty) {
-      _lastZone = _TvZone.category;
-      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
-      _focus(_categoryNodes[_lastCategory]);
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (_categoryNodes.isNotEmpty) {
+        _lastZone = _TvZone.category;
+        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+        _focus(_categoryNodes[_lastCategory]);
+      } else if (_gridNodes.isNotEmpty) {
+        _lastZone = _TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
       setState(() {
         source = i;
         category = 0;
+        _lastZone = _TvZone.platform;
         _lastPlatform = i;
         _lastCategory = 0;
         _lastGrid = 0;
@@ -220,11 +254,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _categoryKey(int i, RawKeyEvent event) {
     if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowRight && i < _categoryNodes.length - 1) {
-      _lastCategory = i + 1;
-      _focus(_categoryNodes[_lastCategory]);
-      return KeyEventResult.handled;
-    }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (i == 0) {
         widget.onMoveToNav?.call();
@@ -234,21 +263,39 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowUp && _platformNodes.isNotEmpty) {
-      _lastZone = _TvZone.platform;
-      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
-      _focus(_platformNodes[_lastPlatform]);
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (i < _categoryNodes.length - 1) {
+        _lastCategory = i + 1;
+        _focus(_categoryNodes[_lastCategory]);
+      } else {
+        _lastCategory = i;
+        _focus(_categoryNodes[_lastCategory]);
+      }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown && _gridNodes.isNotEmpty) {
-      _lastZone = _TvZone.grid;
-      _lastGrid = _safe(_lastGrid, _gridNodes.length);
-      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (_platformNodes.isNotEmpty) {
+        _lastZone = _TvZone.platform;
+        _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+        _focus(_platformNodes[_lastPlatform]);
+      } else {
+        _lastZone = _TvZone.banner;
+        _focus(_bannerNode);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (_gridNodes.isNotEmpty) {
+        _lastZone = _TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
       setState(() {
         category = i;
+        _lastZone = _TvZone.category;
         _lastCategory = i;
         _lastGrid = 0;
       });
@@ -263,16 +310,21 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final key = event.logicalKey;
     final col = index % _gridColumns;
     final row = index ~/ _gridColumns;
-    if (key == LogicalKeyboardKey.arrowRight && index < _gridNodes.length - 1) {
-      _lastGrid = index + 1;
-      _focus(_gridNodes[_lastGrid], alignment: 0.35);
-      return KeyEventResult.handled;
-    }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
         widget.onMoveToNav?.call();
       } else {
         _lastGrid = index - 1;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (col < _gridColumns - 1 && index < _gridNodes.length - 1) {
+        _lastGrid = index + 1;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      } else {
+        _lastGrid = index;
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
@@ -283,21 +335,30 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           _lastZone = _TvZone.category;
           _lastCategory = _safe(_lastCategory, _categoryNodes.length);
           _focus(_categoryNodes[_lastCategory]);
-          return KeyEventResult.handled;
+        } else if (_platformNodes.isNotEmpty) {
+          _lastZone = _TvZone.platform;
+          _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+          _focus(_platformNodes[_lastPlatform]);
+        } else {
+          _lastZone = _TvZone.banner;
+          _focus(_bannerNode);
         }
       } else {
         _lastGrid = _safe(index - _gridColumns, _gridNodes.length);
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
-        return KeyEventResult.handled;
       }
+      return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = index + _gridColumns;
       if (next < _gridNodes.length) {
         _lastGrid = next;
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
-        return KeyEventResult.handled;
+      } else {
+        _lastGrid = index;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
+      return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
