@@ -113,8 +113,8 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     ContentItem detail = widget.item;
     List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
     try {
-      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(milliseconds: 900)));
-      realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(milliseconds: 900));
+      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(milliseconds: 1500)));
+      realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(milliseconds: 1500));
     } catch (e) {
       // Keep the fast stream path. Metadata/episode count can be refreshed on
       // the next open; playback must not wait for it.

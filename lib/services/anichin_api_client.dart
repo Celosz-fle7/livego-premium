@@ -392,7 +392,20 @@ class AnichinApiClient {
 
 
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
-    Object? data = json['data'];
+    // Anichin providers do not all wrap episode arrays the same way.
+    // ShortMax returns root-level { episodes: [...] }, while some providers
+    // wrap lists under data/items/rows. Keep this parser broad so the player
+    // episode sheet is filled from /allepisode instead of falling back to a
+    // synthetic single Episode 1.
+    Object? data = json['episodes'] ??
+        json['episodeList'] ??
+        json['episode_list'] ??
+        json['chapters'] ??
+        json['list'] ??
+        json['items'] ??
+        json['rows'] ??
+        json['data'];
+
     if (data is Map) {
       data = data['episodes'] ??
           data['episodeList'] ??
