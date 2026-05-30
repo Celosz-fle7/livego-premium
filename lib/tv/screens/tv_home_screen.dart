@@ -174,7 +174,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_bannerNode);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _lastZone = _TvZone.banner;
+      _focus(_bannerNode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
       if (_platformNodes.isNotEmpty) {
         _lastZone = _TvZone.platform;
         _lastPlatform = _safe(_lastPlatform, _platformNodes.length);

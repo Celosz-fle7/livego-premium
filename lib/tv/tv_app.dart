@@ -49,6 +49,18 @@ class _TvAppState extends State<TvApp> {
     }
   }
 
+  void _moveFromNavToContent(int navIndex) {
+    final safe = navIndex.clamp(0, _navNodes.length - 1);
+    if (safe != index) {
+      setState(() => index = safe);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusRightZone();
+      });
+      return;
+    }
+    _focusRightZone();
+  }
+
   Widget _page() {
     return switch (index) {
       0 => TvHomeScreen(onMoveToNav: _focusCurrentNav, focusTicket: _homeFocusTicket),
@@ -159,8 +171,8 @@ class _TvAppState extends State<TvApp> {
                       TvSideNav(
                         index: index,
                         focusNodes: _navNodes,
-                        onChanged: (v) => _selectPage(v),
-                        onOpenContent: (v) => _selectPage(v, moveToContent: true),
+                        onChanged: (v) => _selectPage(v, moveToContent: true),
+                        onOpenContent: _moveFromNavToContent,
                       ),
                       Expanded(
                         child: Focus(
