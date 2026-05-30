@@ -39,13 +39,33 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     _warmEpisodeMetadata();
   }
 
+  ContentItem _keepPlayableIdentity(ContentItem detail) {
+    return ContentItem(
+      id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
+      title: detail.title.trim().isNotEmpty ? detail.title : widget.item.title,
+      source: detail.source.trim().isNotEmpty ? detail.source : widget.item.source,
+      category: detail.category.trim().isNotEmpty ? detail.category : widget.item.category,
+      description: detail.description.trim().isNotEmpty ? detail.description : widget.item.description,
+      posterUrl: detail.posterUrl.trim().isNotEmpty ? detail.posterUrl : widget.item.posterUrl,
+      backdropUrl: detail.backdropUrl.trim().isNotEmpty ? detail.backdropUrl : widget.item.backdropUrl,
+      rating: detail.rating,
+      episodes: detail.episodes > 0 ? detail.episodes : widget.item.episodes,
+      updated: detail.updated || widget.item.updated,
+      platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
+      chapterId: detail.chapterId.trim().isNotEmpty ? detail.chapterId : widget.item.chapterId,
+      lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
+    );
+  }
+
   Future<void> _warmEpisodeMetadata() async {
     // Keep first playback fast, but fill the episode selector from cached/detail
     // metadata as soon as it is available. We only cache lightweight metadata:
     // id/title/poster/detail + episode numbers. Signed video URLs are always
     // fetched fresh when an episode is played.
     try {
-      final detail = await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8));
+      final detail = _keepPlayableIdentity(
+        await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8)),
+      );
       final rows = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 8));
       final count = rows.isNotEmpty ? rows.length : detail.episodes;
       if (!mounted || count <= 1) return;
@@ -93,7 +113,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     ContentItem detail = widget.item;
     List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
     try {
-      detail = await detailFuture.timeout(const Duration(milliseconds: 900));
+      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(milliseconds: 900)));
       realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(milliseconds: 900));
     } catch (e) {
       // Keep the fast stream path. Metadata/episode count can be refreshed on
@@ -389,8 +409,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 5), () {
-      if (mounted && _controls) setState(() => _controls = false);
+    _timer = Timer(const Duration(seconds: 12), () {
+      final controller = _controller;
+      final keepVisible = controller != null && controller.value.isInitialized && !controller.value.isPlaying;
+      if (mounted && _controls && !keepVisible) setState(() => _controls = false);
     });
   }
 
@@ -917,7 +939,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                 ),
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 220),
-                bottom: _controls ? 0 : -160,
+                bottom: _controls ? 22 : -190,
                 left: 0,
                 right: 0,
                 child: _BottomOverlay(
@@ -1054,51 +1076,78 @@ class _BottomOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 26),
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withOpacity(0.94), Colors.transparent])),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (c != null && c.value.isInitialized)
-            Row(
-              children: [
-                Text(_fmt(c.value.position), style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                Expanded(
-                  child: VideoProgressIndicator(
-                    c,
-                    allowScrubbing: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    colors: const VideoProgressColors(playedColor: AppTheme.cyan, bufferedColor: Colors.white30, backgroundColor: Colors.white12),
-                  ),
-                ),
-                Text(_fmt(c.value.duration), style: const TextStyle(color: Colors.white60, fontSize: 11)),
-              ],
-            ),
-          const SizedBox(height: 14),
-          Row(
+      padding: const EdgeInsets.fromLTRB(12, 38, 12, 0),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black.withOpacity(0.88), Colors.black.withOpacity(0.22), Colors.transparent],
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withOpacity(0.16)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.45), blurRadius: 22, offset: const Offset(0, 10))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _Shortcut(icon: Icons.menu_rounded, label: 'Eps', onTap: onEpisodes),
-              const SizedBox(width: 8),
-              _Shortcut(icon: Icons.download_rounded, label: 'Unduh', onTap: onDownload),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  height: 42,
-                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 18)),
-                      GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11))),
-                      GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 18)),
-                      GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 20)),
-                    ],
-                  ),
+              if (c != null && c.value.isInitialized)
+                Row(
+                  children: [
+                    Text(_fmt(c.value.position), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: SizedBox(
+                            height: 5,
+                            child: VideoProgressIndicator(
+                              c,
+                              allowScrubbing: true,
+                              padding: EdgeInsets.zero,
+                              colors: const VideoProgressColors(playedColor: AppTheme.cyan, bufferedColor: Colors.white30, backgroundColor: Colors.white12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(_fmt(c.value.duration), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+                  ],
                 ),
+              const SizedBox(height: 13),
+              Row(
+                children: [
+                  _Shortcut(icon: Icons.menu_rounded, label: 'Eps', onTap: onEpisodes),
+                  const SizedBox(width: 9),
+                  _Shortcut(icon: Icons.download_rounded, label: 'Unduh', onTap: onDownload),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.14))),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 19)),
+                          GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
+                          GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 19)),
+                          GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 21)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
