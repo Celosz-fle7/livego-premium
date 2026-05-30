@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
 import 'livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class HeroBanner extends StatelessWidget {
   final ContentItem item;
@@ -23,7 +24,7 @@ class HeroBanner extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            LiveGoCachedImage(url: item.backdropUrl, fit: BoxFit.cover),
+            LiveGoCachedImage(url: item.backdropUrl, fit: BoxFit.cover, role: LiveGoImageRole.banner, tv: tv),
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -72,6 +73,8 @@ class HeroBanner extends StatelessWidget {
                   width: tv ? 125 : 92,
                   height: tv ? 170 : 132,
                   fit: BoxFit.cover,
+                  role: LiveGoImageRole.poster,
+                  tv: tv,
                 ),
               ),
             ),

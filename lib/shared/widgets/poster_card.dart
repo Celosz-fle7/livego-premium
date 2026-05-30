@@ -3,6 +3,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
 import 'livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class PosterCard extends StatelessWidget {
   final ContentItem item;
@@ -38,6 +39,8 @@ class PosterCard extends StatelessWidget {
                             : LiveGoCachedImage(
                                 url: item.posterUrl,
                                 fit: BoxFit.cover,
+                                role: LiveGoImageRole.poster,
+                                tv: tv,
                               ),
                         const DecoratedBox(
                           decoration: BoxDecoration(

@@ -11,6 +11,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -647,7 +648,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                           ),
                         )
                       else if (image.isNotEmpty)
-                        LiveGoCachedImage(url: image, fit: BoxFit.cover)
+                        LiveGoCachedImage(url: image, fit: BoxFit.cover, role: LiveGoImageRole.thumbnail)
                       else
                         const ColoredBox(color: Color(0xFF101010)),
                       if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),

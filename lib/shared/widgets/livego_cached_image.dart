@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../core/app_theme.dart';
+import '../../services/image/image_quality_config.dart';
 
 class LiveGoImageCacheManager {
   static const key = 'livegoPosterImageCache';
@@ -26,6 +27,8 @@ class LiveGoCachedImage extends StatelessWidget {
   final BorderRadius? borderRadius;
   final Widget? placeholder;
   final Widget? errorWidget;
+  final LiveGoImageRole role;
+  final bool tv;
 
   const LiveGoCachedImage({
     super.key,
@@ -36,6 +39,8 @@ class LiveGoCachedImage extends StatelessWidget {
     this.borderRadius,
     this.placeholder,
     this.errorWidget,
+    this.role = LiveGoImageRole.poster,
+    this.tv = false,
   });
 
   @override
@@ -52,7 +57,8 @@ class LiveGoCachedImage extends StatelessWidget {
             fit: fit,
             fadeInDuration: const Duration(milliseconds: 120),
             fadeOutDuration: const Duration(milliseconds: 80),
-            memCacheWidth: _memWidth(context),
+            memCacheWidth: _decodeWidth(context),
+            maxWidthDiskCache: _decodeWidth(context),
             placeholder: (_, __) => placeholder ?? _placeholder(),
             errorWidget: (_, __, ___) => errorWidget ?? _fallback(),
           );
@@ -71,12 +77,18 @@ class LiveGoCachedImage extends StatelessWidget {
     }
   }
 
-  int? _memWidth(BuildContext context) {
-    final logicalWidth = width ?? MediaQuery.sizeOf(context).width;
-    final dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
+  int? _decodeWidth(BuildContext context) {
+    final configured = ImageQualityConfig.widthFor(role: role, tv: tv);
+    final logicalWidth = width;
+    if (logicalWidth == null || logicalWidth <= 0 || logicalWidth == double.infinity) {
+      return configured.clamp(ImageQualityConfig.minDecodeWidth, ImageQualityConfig.maxDecodeWidth);
+    }
+    final dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.5);
     final px = (logicalWidth * dpr).round();
-    if (px <= 0) return null;
-    return px.clamp(240, 1280);
+    return px.clamp(
+      ImageQualityConfig.minDecodeWidth,
+      configured.clamp(ImageQualityConfig.minDecodeWidth, ImageQualityConfig.maxDecodeWidth),
+    );
   }
 
   Widget _placeholder() {

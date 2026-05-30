@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/livego_content.dart';
 import 'livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class LiveGoPosterCard extends StatelessWidget {
   final LiveGoContent item;
@@ -50,6 +51,7 @@ class LiveGoPosterCard extends StatelessWidget {
                       url: item.cover,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      role: LiveGoImageRole.poster,
                       errorWidget: const ColoredBox(
                         color: Color(0xFF202638),
                         child: Center(

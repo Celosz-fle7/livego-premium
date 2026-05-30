@@ -8,6 +8,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -205,6 +206,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                               LiveGoCachedImage(
                                 url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
                                 fit: BoxFit.cover,
+                                role: LiveGoImageRole.thumbnail,
+                                tv: true,
                               ),
                             Container(color: Colors.black.withOpacity(ready ? 0 : 0.38)),
                             if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
