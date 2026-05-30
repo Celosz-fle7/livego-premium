@@ -15,7 +15,7 @@ class TvHomeScreen extends StatefulWidget {
   State<TvHomeScreen> createState() => _TvHomeScreenState();
 }
 
-enum _TvZone { platform, category, popular, continueRail }
+enum _TvZone { banner, platform, category, grid }
 
 class _TvHomeScreenState extends State<TvHomeScreen> {
   int source = 0;
@@ -23,19 +23,17 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   late Future<_TvHomeState> _future;
 
   final ScrollController _pageScroll = ScrollController();
-  final ScrollController _popularScroll = ScrollController();
-  final ScrollController _continueScroll = ScrollController();
-
+  final FocusNode _bannerNode = FocusNode(debugLabel: 'tv-banner');
   final List<FocusNode> _platformNodes = [];
   final List<FocusNode> _categoryNodes = [];
-  final List<FocusNode> _popularNodes = [];
-  final List<FocusNode> _continueNodes = [];
+  final List<FocusNode> _gridNodes = [];
 
-  _TvZone _lastZone = _TvZone.platform;
+  _TvZone _lastZone = _TvZone.banner;
   int _lastPlatform = 0;
   int _lastCategory = 0;
-  int _lastPopular = 0;
-  int _lastContinue = 0;
+  int _lastGrid = 0;
+
+  static const int _gridColumns = 7;
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms;
@@ -52,13 +50,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   @override
   void dispose() {
+    _bannerNode.dispose();
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
-    _disposeNodes(_popularNodes);
-    _disposeNodes(_continueNodes);
+    _disposeNodes(_gridNodes);
     _pageScroll.dispose();
-    _popularScroll.dispose();
-    _continueScroll.dispose();
     super.dispose();
   }
 
@@ -71,7 +67,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
       return _TvHomeState(hero: hero, items: items);
     } catch (e) {
-      print('TV HOME LOAD ERROR: $e');
+      debugPrint('TV HOME LOAD ERROR: $e');
       final fallback = await LiveGoCatalog.home(platform: 'shortmax').catchError((_) => <ContentItem>[]);
       final hero = fallback.isNotEmpty ? fallback.first : await LiveGoCatalog.hero(platform: 'shortmax');
       return _TvHomeState(hero: hero, items: fallback);
@@ -98,7 +94,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
   }
 
-  void _focus(FocusNode node) {
+  void _focus(FocusNode node, {double alignment = 0.15}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !node.canRequestFocus) return;
       node.requestFocus();
@@ -106,9 +102,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (context != null) {
         Scrollable.ensureVisible(
           context,
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          alignment: alignment,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         );
       }
     });
@@ -121,6 +118,55 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _open(ContentItem item) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item)));
+  }
+
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space;
+  }
+
+  void _returnToLastContent() {
+    switch (_lastZone) {
+      case _TvZone.grid:
+        if (_gridNodes.isNotEmpty) {
+          _focus(_gridNodes[_safe(_lastGrid, _gridNodes.length)], alignment: 0.35);
+          return;
+        }
+        break;
+      case _TvZone.category:
+        if (_categoryNodes.isNotEmpty) {
+          _focus(_categoryNodes[_safe(_lastCategory, _categoryNodes.length)]);
+          return;
+        }
+        break;
+      case _TvZone.platform:
+        if (_platformNodes.isNotEmpty) {
+          _focus(_platformNodes[_safe(_lastPlatform, _platformNodes.length)]);
+          return;
+        }
+        break;
+      case _TvZone.banner:
+        _focus(_bannerNode);
+        return;
+    }
+    _focus(_bannerNode);
+  }
+
+  KeyEventResult _bannerKey(ContentItem? hero, RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+      if (_platformNodes.isNotEmpty) {
+        _lastZone = _TvZone.platform;
+        _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+        _focus(_platformNodes[_lastPlatform]);
+        return KeyEventResult.handled;
+      }
+    }
+    if (_isSelect(key) && hero != null) {
+      _open(hero);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   KeyEventResult _platformKey(int i, RawKeyEvent event) {
@@ -136,7 +182,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_platformNodes[_lastPlatform]);
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _lastZone = _TvZone.banner;
+      _focus(_bannerNode);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowDown && _categoryNodes.isNotEmpty) {
+      _lastZone = _TvZone.category;
       _lastCategory = _safe(_lastCategory, _categoryNodes.length);
       _focus(_categoryNodes[_lastCategory]);
       return KeyEventResult.handled;
@@ -147,6 +199,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         category = 0;
         _lastPlatform = i;
         _lastCategory = 0;
+        _lastGrid = 0;
       });
       _reload();
       return KeyEventResult.handled;
@@ -168,19 +221,22 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp && _platformNodes.isNotEmpty) {
+      _lastZone = _TvZone.platform;
       _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
       _focus(_platformNodes[_lastPlatform]);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown && _popularNodes.isNotEmpty) {
-      _lastPopular = _safe(_lastPopular, _popularNodes.length);
-      _focus(_popularNodes[_lastPopular]);
+    if (key == LogicalKeyboardKey.arrowDown && _gridNodes.isNotEmpty) {
+      _lastZone = _TvZone.grid;
+      _lastGrid = _safe(_lastGrid, _gridNodes.length);
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
       setState(() {
         category = i;
         _lastCategory = i;
+        _lastGrid = 0;
       });
       _reload();
       return KeyEventResult.handled;
@@ -188,46 +244,45 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return KeyEventResult.ignored;
   }
 
-  KeyEventResult _posterKey({required bool secondRail, required int index, required RawKeyEvent event}) {
+  KeyEventResult _gridKey(int index, RawKeyEvent event) {
     if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    final nodes = secondRail ? _continueNodes : _popularNodes;
-    final other = secondRail ? _popularNodes : _continueNodes;
-
-    if (key == LogicalKeyboardKey.arrowRight && index < nodes.length - 1) {
-      final next = index + 1;
-      if (secondRail) _lastContinue = next; else _lastPopular = next;
-      _focus(nodes[next]);
+    final col = index % _gridColumns;
+    final row = index ~/ _gridColumns;
+    if (key == LogicalKeyboardKey.arrowRight && index < _gridNodes.length - 1) {
+      _lastGrid = index + 1;
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft && index > 0) {
-      final prev = index - 1;
-      if (secondRail) _lastContinue = prev; else _lastPopular = prev;
-      _focus(nodes[prev]);
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (col == 0) return KeyEventResult.ignored; // bubble to TvApp -> Navbar
+      _lastGrid = index - 1;
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (secondRail && other.isNotEmpty) {
-        _lastPopular = _safe(index, other.length);
-        _focus(other[_lastPopular]);
-      } else if (!secondRail && _categoryNodes.isNotEmpty) {
-        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
-        _focus(_categoryNodes[_lastCategory]);
+      if (row == 0) {
+        if (_categoryNodes.isNotEmpty) {
+          _lastZone = _TvZone.category;
+          _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+          _focus(_categoryNodes[_lastCategory]);
+          return KeyEventResult.handled;
+        }
+      } else {
+        _lastGrid = _safe(index - _gridColumns, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        return KeyEventResult.handled;
       }
-      return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!secondRail && other.isNotEmpty) {
-        _lastContinue = _safe(index, other.length);
-        _focus(other[_lastContinue]);
+      final next = index + _gridColumns;
+      if (next < _gridNodes.length) {
+        _lastGrid = next;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
         return KeyEventResult.handled;
       }
     }
     return KeyEventResult.ignored;
-  }
-
-  bool _isSelect(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space;
   }
 
   @override
@@ -240,74 +295,61 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final items = snap.data?.items ?? const <ContentItem>[];
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
-
         final platforms = LiveGoCatalog.platformLabels;
-        final popular = items.take(12).toList();
-        final cont = items.skip(6).take(12).toList();
+        final gridItems = items.take(42).toList();
+
         _syncNodes(_platformNodes, platforms.length, 'tv-platform');
         _syncNodes(_categoryNodes, categories.length, 'tv-category');
-        _syncNodes(_popularNodes, popular.length, 'tv-popular');
-        _syncNodes(_continueNodes, cont.length, 'tv-continue');
+        _syncNodes(_gridNodes, gridItems.length, 'tv-grid');
 
         return ListView(
           controller: _pageScroll,
-          padding: const EdgeInsets.fromLTRB(18, 30, 32, 34),
+          padding: const EdgeInsets.fromLTRB(18, 24, 32, 38),
           children: [
-            if (hero != null) HeroBanner(item: hero, tv: true) else const _TvSkeleton(height: 220),
-            const SizedBox(height: 22),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1523).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: const Color(0xFF1D3147)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ChipRow(
-                    labels: platforms,
-                    selected: source,
-                    nodes: _platformNodes,
-                    autofocusFirst: true,
-                    onFocus: (i) { _lastZone = _TvZone.platform; _lastPlatform = i; },
-                    onTap: (i) { setState(() { source = i; category = 0; _lastPlatform = i; _lastCategory = 0; }); _reload(); },
-                    onKey: _platformKey,
-                  ),
-                  const SizedBox(height: 12),
-                  _ChipRow(
-                    labels: categories,
-                    selected: category,
-                    nodes: _categoryNodes,
-                    onFocus: (i) { _lastZone = _TvZone.category; _lastCategory = i; },
-                    onTap: (i) { setState(() { category = i; _lastCategory = i; }); _reload(); },
-                    onKey: _categoryKey,
-                  ),
-                ],
+            _FocusableBanner(
+              item: hero,
+              focusNode: _bannerNode,
+              onFocus: () => _lastZone = _TvZone.banner,
+              onTap: hero == null ? null : () => _open(hero),
+              onKey: (node, event) => _bannerKey(hero, event),
+            ),
+            const SizedBox(height: 16),
+            _HeaderBox(
+              title: 'Platform',
+              height: 78,
+              child: _ChipRow(
+                labels: platforms,
+                selected: source,
+                nodes: _platformNodes,
+                autofocusFirst: true,
+                onFocus: (i) { _lastZone = _TvZone.platform; _lastPlatform = i; },
+                onTap: (i) { setState(() { source = i; category = 0; _lastPlatform = i; _lastCategory = 0; _lastGrid = 0; }); _reload(); },
+                onKey: _platformKey,
               ),
             ),
-            const SizedBox(height: 24),
-            if (loading)
-              const _TvSkeleton(height: 236)
-            else
-              _Rail(
-                title: 'Popular',
-                items: popular,
-                nodes: _popularNodes,
-                controller: _popularScroll,
-                onFocus: (i) { _lastZone = _TvZone.popular; _lastPopular = i; },
-                onKey: (i, e) => _posterKey(secondRail: false, index: i, event: e),
-                onTap: _open,
+            const SizedBox(height: 12),
+            _HeaderBox(
+              title: 'Kategori',
+              height: 68,
+              child: _ChipRow(
+                labels: categories,
+                selected: category,
+                nodes: _categoryNodes,
+                onFocus: (i) { _lastZone = _TvZone.category; _lastCategory = i; },
+                onTap: (i) { setState(() { category = i; _lastCategory = i; _lastGrid = 0; }); _reload(); },
+                onKey: _categoryKey,
               ),
-            const SizedBox(height: 26),
-            if (!loading)
-              _Rail(
-                title: 'Lanjut Nonton',
-                items: cont,
-                nodes: _continueNodes,
-                controller: _continueScroll,
-                onFocus: (i) { _lastZone = _TvZone.continueRail; _lastContinue = i; },
-                onKey: (i, e) => _posterKey(secondRail: true, index: i, event: e),
+            ),
+            const SizedBox(height: 22),
+            if (loading)
+              const _TvSkeleton(height: 260)
+            else
+              _ContentGrid(
+                title: 'Popular',
+                items: gridItems,
+                nodes: _gridNodes,
+                onFocus: (i) { _lastZone = _TvZone.grid; _lastGrid = i; },
+                onKey: _gridKey,
                 onTap: _open,
               ),
           ],
@@ -321,6 +363,80 @@ class _TvHomeState {
   final ContentItem hero;
   final List<ContentItem> items;
   const _TvHomeState({required this.hero, required this.items});
+}
+
+class _FocusableBanner extends StatefulWidget {
+  final ContentItem? item;
+  final FocusNode focusNode;
+  final VoidCallback onFocus;
+  final VoidCallback? onTap;
+  final FocusOnKeyCallback onKey;
+
+  const _FocusableBanner({required this.item, required this.focusNode, required this.onFocus, required this.onTap, required this.onKey});
+
+  @override
+  State<_FocusableBanner> createState() => _FocusableBannerState();
+}
+
+class _FocusableBannerState extends State<_FocusableBanner> {
+  bool focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onKey: widget.onKey,
+      onFocusChange: (v) {
+        setState(() => focused = v);
+        if (v) widget.onFocus();
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(26),
+        focusColor: Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 238,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.32), blurRadius: 24)] : null,
+          ),
+          child: widget.item != null ? HeroBanner(item: widget.item!, tv: true) : const _TvSkeleton(height: 238),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderBox extends StatelessWidget {
+  final String title;
+  final double height;
+  final Widget child;
+
+  const _HeaderBox({required this.title, required this.height, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1523).withOpacity(0.92),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF1D3147)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(title.toUpperCase(), style: const TextStyle(color: Colors.white54, letterSpacing: 1.2, fontWeight: FontWeight.w900, fontSize: 13, decoration: TextDecoration.none)),
+          ),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
 }
 
 class _ChipRow extends StatelessWidget {
@@ -344,20 +460,24 @@ class _ChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 10,
-      children: List.generate(labels.length, (i) {
-        return _TvChip(
-          text: labels[i],
-          active: i == selected,
-          focusNode: nodes[i],
-          autofocus: autofocusFirst && i == 0,
-          onTap: () => onTap(i),
-          onFocus: () => onFocus(i),
-          onKey: (node, event) => onKey(i, event),
-        );
-      }),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(labels.length, (i) {
+          return Padding(
+            padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 10),
+            child: _TvChip(
+              text: labels[i],
+              active: i == selected,
+              focusNode: nodes[i],
+              autofocus: autofocusFirst && i == 0,
+              onTap: () => onTap(i),
+              onFocus: () => onFocus(i),
+              onKey: (node, event) => onKey(i, event),
+            ),
+          );
+        }),
+      ),
     );
   }
 }
@@ -371,15 +491,7 @@ class _TvChip extends StatefulWidget {
   final VoidCallback onFocus;
   final FocusOnKeyCallback onKey;
 
-  const _TvChip({
-    required this.text,
-    required this.active,
-    required this.focusNode,
-    required this.onTap,
-    required this.onFocus,
-    required this.onKey,
-    this.autofocus = false,
-  });
+  const _TvChip({required this.text, required this.active, required this.focusNode, required this.onTap, required this.onFocus, required this.onKey, this.autofocus = false});
 
   @override
   State<_TvChip> createState() => _TvChipState();
@@ -405,7 +517,7 @@ class _TvChipState extends State<_TvChip> {
         focusColor: Colors.transparent,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
             gradient: widget.active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
             color: widget.active ? null : AppTheme.surface.withOpacity(0.82),
@@ -413,31 +525,22 @@ class _TvChipState extends State<_TvChip> {
             border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.3 : 1),
             boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 20)] : null,
           ),
-          child: Text(widget.text, style: TextStyle(color: selected ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          child: Text(widget.text, style: TextStyle(color: selected ? Colors.white : AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ),
       ),
     );
   }
 }
 
-class _Rail extends StatelessWidget {
+class _ContentGrid extends StatelessWidget {
   final String title;
   final List<ContentItem> items;
   final List<FocusNode> nodes;
-  final ScrollController controller;
   final ValueChanged<int> onFocus;
   final KeyEventResult Function(int, RawKeyEvent) onKey;
   final ValueChanged<ContentItem> onTap;
 
-  const _Rail({
-    required this.title,
-    required this.items,
-    required this.nodes,
-    required this.controller,
-    required this.onFocus,
-    required this.onKey,
-    required this.onTap,
-  });
+  const _ContentGrid({required this.title, required this.items, required this.nodes, required this.onFocus, required this.onKey, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -448,20 +551,22 @@ class _Rail extends StatelessWidget {
         children: [
           Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none)),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 238,
-            child: ListView.separated(
-              controller: controller,
-              scrollDirection: Axis.horizontal,
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 18),
-              itemBuilder: (_, i) => _TvPosterTile(
-                item: items[i],
-                focusNode: nodes[i],
-                onFocus: () => onFocus(i),
-                onKey: (node, event) => onKey(i, event),
-                onTap: () => onTap(items[i]),
-              ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _TvHomeScreenState._gridColumns,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 18,
+              childAspectRatio: 0.57,
+            ),
+            itemBuilder: (_, i) => _TvPosterTile(
+              item: items[i],
+              focusNode: nodes[i],
+              onFocus: () => onFocus(i),
+              onKey: (node, event) => onKey(i, event),
+              onTap: () => onTap(items[i]),
             ),
           ),
         ],
@@ -508,39 +613,36 @@ class _TvPosterTileState extends State<_TvPosterTile> {
           onTap: widget.onTap,
           borderRadius: BorderRadius.circular(18),
           focusColor: Colors.transparent,
-          child: SizedBox(
-            width: 138,
-            child: Column(
-              children: [
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 140),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
-                      boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.38), blurRadius: 24)] : null,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          widget.item.posterUrl.isEmpty
-                              ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
-                              : LiveGoCachedImage(url: widget.item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
-                          const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]))),
-                          Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
-                          if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
-                          Positioned(right: 8, bottom: 12, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
-                        ],
-                      ),
+          child: Column(
+            children: [
+              Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
+                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.38), blurRadius: 24)] : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        widget.item.posterUrl.isEmpty
+                            ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
+                            : LiveGoCachedImage(url: widget.item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
+                        const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]))),
+                        Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
+                        if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
+                        Positioned(right: 8, bottom: 12, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(widget.item.title, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none)),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Text(widget.item.title, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none)),
+            ],
           ),
         ),
       ),
