@@ -9,7 +9,9 @@ import '../../shared/widgets/livego_cached_image.dart';
 import 'tv_player_screen.dart';
 
 class TvHomeScreen extends StatefulWidget {
-  const TvHomeScreen({super.key});
+  final VoidCallback? onMoveToNav;
+
+  const TvHomeScreen({super.key, this.onMoveToNav});
 
   @override
   State<TvHomeScreen> createState() => _TvHomeScreenState();
@@ -154,6 +156,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _bannerKey(ContentItem? hero, RawKeyEvent event) {
     if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
       if (_platformNodes.isNotEmpty) {
         _lastZone = _TvZone.platform;
@@ -177,9 +183,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_platformNodes[_lastPlatform]);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft && i > 0) {
-      _lastPlatform = i - 1;
-      _focus(_platformNodes[_lastPlatform]);
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (i == 0) {
+        widget.onMoveToNav?.call();
+      } else {
+        _lastPlatform = i - 1;
+        _focus(_platformNodes[_lastPlatform]);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -215,9 +225,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_categoryNodes[_lastCategory]);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft && i > 0) {
-      _lastCategory = i - 1;
-      _focus(_categoryNodes[_lastCategory]);
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (i == 0) {
+        widget.onMoveToNav?.call();
+      } else {
+        _lastCategory = i - 1;
+        _focus(_categoryNodes[_lastCategory]);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp && _platformNodes.isNotEmpty) {
@@ -255,9 +269,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (col == 0) return KeyEventResult.ignored; // bubble to TvApp -> Navbar
-      _lastGrid = index - 1;
-      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      if (col == 0) {
+        widget.onMoveToNav?.call();
+      } else {
+        _lastGrid = index - 1;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -304,7 +321,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
         return ListView(
           controller: _pageScroll,
-          padding: const EdgeInsets.fromLTRB(18, 24, 32, 38),
+          padding: const EdgeInsets.fromLTRB(16, 22, 30, 38),
           children: [
             _FocusableBanner(
               item: hero,
@@ -315,8 +332,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             ),
             const SizedBox(height: 16),
             _HeaderBox(
-              title: 'Platform',
-              height: 78,
+              height: 74,
               child: _ChipRow(
                 labels: platforms,
                 selected: source,
@@ -329,8 +345,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             ),
             const SizedBox(height: 12),
             _HeaderBox(
-              title: 'Kategori',
-              height: 68,
+              height: 64,
               child: _ChipRow(
                 labels: categories,
                 selected: category,
@@ -410,11 +425,10 @@ class _FocusableBannerState extends State<_FocusableBanner> {
 }
 
 class _HeaderBox extends StatelessWidget {
-  final String title;
   final double height;
   final Widget child;
 
-  const _HeaderBox({required this.title, required this.height, required this.child});
+  const _HeaderBox({required this.height, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -426,14 +440,9 @@ class _HeaderBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF1D3147)),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 92,
-            child: Text(title.toUpperCase(), style: const TextStyle(color: Colors.white54, letterSpacing: 1.2, fontWeight: FontWeight.w900, fontSize: 13, decoration: TextDecoration.none)),
-          ),
-          Expanded(child: child),
-        ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: child,
       ),
     );
   }

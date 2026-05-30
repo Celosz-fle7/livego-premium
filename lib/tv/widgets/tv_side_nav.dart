@@ -31,13 +31,11 @@ class TvSideNav extends StatelessWidget {
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = (i + 1).clamp(0, items.length - 1);
       focusNodes[next].requestFocus();
-      onChanged(next);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       final prev = (i - 1).clamp(0, items.length - 1);
       focusNodes[prev].requestFocus();
-      onChanged(prev);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
@@ -55,10 +53,10 @@ class TvSideNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: SizedBox(
-        width: 86,
+        width: 132,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 18, 8, 18),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 7),
+          margin: const EdgeInsets.fromLTRB(12, 18, 10, 18),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
             color: const Color(0xFF050D18).withOpacity(0.96),
             borderRadius: BorderRadius.circular(24),
@@ -145,8 +143,8 @@ class _NavButtonState extends State<_NavButton> {
           focusColor: Colors.transparent,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            width: widget.logo ? 54 : 58,
-            height: widget.logo ? 58 : 58,
+            width: 104,
+            height: widget.logo ? 62 : 58,
             decoration: BoxDecoration(
               gradient: selected ? const LinearGradient(colors: [Color(0xFF123B54), Color(0xFF3C207E)]) : null,
               color: selected ? null : const Color(0xFF0A1422),
@@ -154,7 +152,26 @@ class _NavButtonState extends State<_NavButton> {
               border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.65) : Colors.white10), width: focused ? 2.2 : 1),
               boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.25), blurRadius: 18)] : null,
             ),
-            child: Icon(widget.icon, color: selected ? Colors.white : Colors.white54, size: widget.logo ? 30 : 27),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(widget.icon, color: selected ? Colors.white : Colors.white54, size: widget.logo ? 28 : 24),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.white54,
+                      fontSize: widget.logo ? 12 : 10.5,
+                      fontWeight: FontWeight.w900,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

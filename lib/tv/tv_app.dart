@@ -35,9 +35,14 @@ class _TvAppState extends State<TvApp> {
     super.dispose();
   }
 
+  void _focusCurrentNav() {
+    final target = index.clamp(0, _navNodes.length - 1);
+    _navNodes[target].requestFocus();
+  }
+
   Widget _page() {
     return switch (index) {
-      0 => const TvHomeScreen(),
+      0 => TvHomeScreen(onMoveToNav: _focusCurrentNav),
       1 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded),
       2 => const TvPlaceholderScreen(title: 'Riwayat', icon: Icons.history_rounded),
       3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded),
