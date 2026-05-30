@@ -114,7 +114,35 @@ class AnichinApiClient {
     });
     final data = _dataMap(json);
     if (data.isEmpty) return item;
-    return _parseItem(data, platform: item.platformSlug, lang: apiLang);
+
+    // Some Anichin providers, especially ShortMax, can return detail payloads
+    // with an empty `id` even though the request id is valid. If we pass that
+    // empty id into the player, /episode receives id= and the UI shows
+    // "Stream belum tersedia dari API" even while the real endpoint works.
+    final parsed = _parseItem(data, platform: item.platformSlug, lang: apiLang);
+    return _preserveIdentity(parsed, fallback: item, lang: apiLang);
+  }
+
+  static ContentItem _preserveIdentity(
+    ContentItem parsed, {
+    required ContentItem fallback,
+    required String lang,
+  }) {
+    return ContentItem(
+      id: parsed.id.isNotEmpty ? parsed.id : fallback.id,
+      title: parsed.title.trim().isNotEmpty && parsed.title != 'Untitled' ? parsed.title : fallback.title,
+      source: parsed.source.trim().isNotEmpty ? parsed.source : fallback.source,
+      category: parsed.category.trim().isNotEmpty ? parsed.category : fallback.category,
+      description: parsed.description.trim().isNotEmpty ? parsed.description : fallback.description,
+      posterUrl: parsed.posterUrl.trim().isNotEmpty ? parsed.posterUrl : fallback.posterUrl,
+      backdropUrl: parsed.backdropUrl.trim().isNotEmpty ? parsed.backdropUrl : fallback.backdropUrl,
+      rating: parsed.rating,
+      episodes: parsed.episodes > 0 ? parsed.episodes : fallback.episodes,
+      updated: parsed.updated || fallback.updated,
+      platformSlug: parsed.platformSlug.trim().isNotEmpty ? parsed.platformSlug : fallback.platformSlug,
+      chapterId: parsed.chapterId.trim().isNotEmpty ? parsed.chapterId : fallback.chapterId,
+      lang: lang,
+    );
   }
 
 
