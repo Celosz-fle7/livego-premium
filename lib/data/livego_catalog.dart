@@ -21,18 +21,7 @@ class LiveGoCatalog {
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
-    try {
-      final rows = await home(platform: platform).timeout(const Duration(seconds: 12));
-      final seen = <String>{};
-      final values = <String>[];
-      for (final item in rows) {
-        final c = item.category.trim();
-        if (c.isNotEmpty && c.toLowerCase() != 'drama' && seen.add(c.toLowerCase())) values.add(c);
-        if (values.length >= 12) break;
-      }
-      if (values.isNotEmpty) return values;
-    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
-    return LiveGoSettings.categoriesFor(platform);
+    return categoriesFor(platform);
   }
 
   static Future<String> pingPlatform(String platform) async {
@@ -71,15 +60,35 @@ class LiveGoCatalog {
     return [];
   }
 
+
+  static Future<List<ContentItem>> homeByCategory({
+    String platform = 'shortmax',
+    String category = 'Trending',
+  }) async {
+    final key = category.trim().toLowerCase().replaceAll(' ', '');
+    try {
+      if (key == 'foryou') {
+        final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
+            .timeout(const Duration(seconds: 12));
+        if (rows.isNotEmpty) return rows;
+      }
+      if (platform == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
+        final rows = await AnichinApiClient.collection(
+          platform: platform,
+          collection: key,
+          lang: LiveGoSettings.language,
+        ).timeout(const Duration(seconds: 12));
+        if (rows.isNotEmpty) return rows;
+      }
+    } catch (e) { print('LIVEGO CATEGORY ERROR: $e'); }
+    return home(platform: platform);
+  }
+
   static Future<Map<String, List<ContentItem>>> homeSections() async {
     final result = <String, List<ContentItem>>{};
-    final selected = platforms.take(6).toList();
-    final rows = await Future.wait(selected.map((platform) async {
-      final items = await home(platform: platform);
-      return MapEntry(platform, items);
-    }));
-    for (final row in rows) {
-      if (row.value.isNotEmpty) result[label(row.key)] = row.value;
+    for (final platform in platforms.take(6)) {
+      final rows = await home(platform: platform);
+      if (rows.isNotEmpty) result[label(platform)] = rows;
     }
     return result;
   }
@@ -119,8 +128,8 @@ class LiveGoCatalog {
     if (clean.isEmpty) return [];
     final merged = <ContentItem>[];
     final seen = <String>{};
-    final results = await Future.wait(platforms.map((platform) => search(clean, platform: platform)));
-    for (final rows in results) {
+    for (final platform in platforms) {
+      final rows = await search(clean, platform: platform);
       for (final item in rows) {
         final key = '${item.platformSlug}:${item.id}';
         if (seen.add(key)) merged.add(item);

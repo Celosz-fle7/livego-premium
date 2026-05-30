@@ -35,10 +35,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     final detail = await LiveGoCatalog.detail(widget.item);
     final realEpisodes = await LiveGoCatalog.episodes(detail);
     final safeIndex = episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
-    // Anichin episode endpoints use 1-based ep number.
-    // Do not pass provider chapterId here; some providers return non-numeric chapter ids
-    // from allepisode, which makes /episode resolve to eps 1 and returns no stream.
-    final episodeId = '$safeIndex';
+    final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
     final selected = ContentItem(
       id: detail.id,
       title: detail.title,

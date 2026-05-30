@@ -39,9 +39,10 @@ class LiveGoSettings {
   static final Map<String, List<String>> homeCategories = {
     'shortmax': ['Trending', 'For You'],
     'netshort': ['Trending', 'For You'],
-    'pinedrama': ['Trending', 'For You', 'Category'],
+    'pinedrama': ['Trending', 'For You'],
     'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
     'flickreels': ['Trending', 'For You'],
+    'melolo': ['Trending', 'For You'],
   };
 
   // unknown, online, slow, offline. Disimpan selama sesi aplikasi berjalan.
@@ -129,9 +130,10 @@ class LiveGoSettings {
       ..addAll({
         'shortmax': ['Trending', 'For You'],
         'netshort': ['Trending', 'For You'],
-        'pinedrama': ['Trending', 'For You', 'Category'],
+        'pinedrama': ['Trending', 'For You'],
         'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
         'flickreels': ['Trending', 'For You'],
+        'melolo': ['Trending', 'For You'],
       });
   }
 }

@@ -64,6 +64,21 @@ class AnichinApiClient {
     return _parseItems(json, platform: platform, lang: lang);
   }
 
+  static Future<List<ContentItem>> collection({
+    String platform = 'shortmax',
+    required String collection,
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final slug = _apiSlug(platform);
+    final key = collection.toLowerCase().replaceAll(' ', '');
+    final json = await _getJson('/api/$slug/$key', {
+      if (key == 'foryou') 'page': '$page',
+      'lang': lang,
+    });
+    return _parseItems(json, platform: platform, lang: lang);
+  }
+
   static Future<List<ContentItem>> banner({
     String platform = 'shortmax',
     String lang = 'id',
@@ -79,8 +94,9 @@ class AnichinApiClient {
   }) async {
     if (query.trim().isEmpty) return [];
     final slug = _apiSlug(platform);
+    final isDramaBox = slug == 'dramabox';
     final json = await _getJson('/api/$slug/search', {
-      if (slug == 'dramabox') 'q': query.trim() else 'query': query.trim(),
+      (isDramaBox ? 'q' : 'query'): query.trim(),
       'lang': lang,
     });
     return _parseItems(json, platform: platform, lang: lang);
@@ -118,9 +134,9 @@ class AnichinApiClient {
       return raw.asMap().entries.map((entry) {
         final idx = entry.key + 1;
         final row = entry.value;
-        final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name', 'episodeTitle', 'episode_title'], fallback: 'Episode $idx');
-        // Keep id numeric because Anichin /episode uses ep={number}, not provider chapterId.
-        return LiveGoEpisode(id: '$idx', index: idx, title: title);
+        final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'episodeId', 'episode_id', 'ep'], fallback: '$idx');
+        final title = _first(row, const ['title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $idx');
+        return LiveGoEpisode(id: id, index: idx, title: title);
       }).toList();
     }
 
@@ -130,37 +146,16 @@ class AnichinApiClient {
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
     final slug = _apiSlug(item.platformSlug);
-    final ep = int.tryParse('${chapterId ?? item.chapterId}') ?? 1;
-
-    // First try the official single-episode endpoint.
-    try {
-      final json = await _getJson('/api/$slug/episode', {
-        'id': item.id,
-        'ep': '$ep',
-        'lang': item.lang,
-        if (_qualityParam.isNotEmpty) 'q': _qualityParam,
-      });
-      final stream = _parseStream(json, item: item, ep: ep);
-      if (stream.url.isNotEmpty) return stream;
-    } catch (_) {}
-
-    // Some Anichin providers expose playable hlsUrl/videoUrl inside allepisode.
-    // Use it as fallback so player does not show "Stream belum tersedia".
-    try {
-      final all = await _getJson('/api/$slug/allepisode', {
-        'id': item.id,
-        'lang': item.lang,
-      });
-      final rows = _episodeList(all);
-      if (rows.isNotEmpty) {
-        final index = (ep - 1).clamp(0, rows.length - 1).toInt();
-        final row = Map<String, dynamic>.from(rows[index]);
-        final stream = _parseStream(<String, dynamic>{'data': row}, item: item, ep: ep);
-        if (stream.url.isNotEmpty) return stream;
-      }
-    } catch (_) {}
-
-    return StreamInfo.empty;
+    final chapter = '${chapterId ?? item.chapterId}';
+    final ep = int.tryParse(chapter) ?? 1;
+    final json = await _getJson('/api/$slug/episode', {
+      'id': item.id,
+      'ep': '$ep',
+      if (int.tryParse(chapter) == null) 'chapterId': chapter,
+      'lang': item.lang,
+      if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+    });
+    return _parseStream(json, item: item, ep: ep);
   }
 
   static String get _qualityParam {
@@ -214,23 +209,48 @@ class AnichinApiClient {
   }
 
   static List<Map<String, dynamic>> _dataList(Map<String, dynamic> json) {
-    Object? data = json['data'];
-    if (data is Map) {
-      data = data['items'] ??
-          data['list'] ??
-          data['results'] ??
-          data['dramas'] ??
-          data['books'] ??
-          data['records'] ??
-          data['content'] ??
-          data['result'] ??
-          data['rows'] ??
-          data['data'];
+    final direct = _asList(json['data']) ??
+        _asList(json['items']) ??
+        _asList(json['list']) ??
+        _asList(json['results']) ??
+        _asList(json['dramas']) ??
+        _asList(json['books']) ??
+        _asList(json['rows']);
+    if (direct != null) return direct;
+
+    final found = _findFirstList(json);
+    return found ?? <Map<String, dynamic>>[];
+  }
+
+  static List<Map<String, dynamic>>? _asList(Object? value) {
+    if (value is List) {
+      return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     }
-    if (data is List) {
-      return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      return _asList(map['items']) ??
+          _asList(map['list']) ??
+          _asList(map['results']) ??
+          _asList(map['dramas']) ??
+          _asList(map['books']) ??
+          _asList(map['rows']) ??
+          _asList(map['data']);
     }
-    return <Map<String, dynamic>>[];
+    return null;
+  }
+
+  static List<Map<String, dynamic>>? _findFirstList(Object? value) {
+    if (value is List) {
+      final rows = value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      return rows.isEmpty ? null : rows;
+    }
+    if (value is Map) {
+      for (final entry in value.values) {
+        final rows = _findFirstList(entry);
+        if (rows != null && rows.isNotEmpty) return rows;
+      }
+    }
+    return null;
   }
 
 
@@ -271,8 +291,10 @@ class AnichinApiClient {
       'drama_id',
       'seriesId',
       'series_id',
-      'bookIdString',
-      'book_id_string',
+      'bookID',
+      'dramaID',
+      'showId',
+      'show_id',
     ]);
 
     final title = _first(json, const [
@@ -282,6 +304,10 @@ class AnichinApiClient {
       'book_name',
       'dramaName',
       'drama_name',
+      'bookTitle',
+      'book_title',
+      'seriesName',
+      'series_name',
     ], fallback: 'Untitled');
 
     final cover = _first(json, const [
@@ -294,6 +320,13 @@ class AnichinApiClient {
       'thumb',
       'thumbnail',
       'thumbnailUrl',
+      'coverUrl',
+      'cover_url',
+      'pic',
+      'picUrl',
+      'pic_url',
+      'verticalCover',
+      'horizontalCover',
     ]);
 
     final backdrop = _first(json, const [
@@ -304,6 +337,9 @@ class AnichinApiClient {
       'cover',
       'poster',
       'image',
+      'horizontalCover',
+      'verticalCover',
+      'coverUrl',
     ]);
 
     final description = _first(json, const [
@@ -408,10 +444,6 @@ class AnichinApiClient {
       if (data['episode'] is Map) Map<String, dynamic>.from(data['episode'] as Map),
       if (data['video'] is Map) Map<String, dynamic>.from(data['video'] as Map),
       if (data['stream'] is Map) Map<String, dynamic>.from(data['stream'] as Map),
-      if (data['play'] is Map) Map<String, dynamic>.from(data['play'] as Map),
-      if (data['source'] is Map) Map<String, dynamic>.from(data['source'] as Map),
-      if (data['media'] is Map) Map<String, dynamic>.from(data['media'] as Map),
-      if (data['player'] is Map) Map<String, dynamic>.from(data['player'] as Map),
     ];
 
     for (final c in candidates) {
@@ -431,17 +463,6 @@ class AnichinApiClient {
       'mp4_url',
       'hlsUrl',
       'hls_url',
-      'play_url',
-      'playUrl',
-      'video',
-      'video_url',
-      'videoUrl',
-      'file',
-      'link',
-      'hlsUrl',
-      'hls_url',
-      'm3u8Url',
-      'm3u8_url',
       'm3u8',
       'src',
     ]);

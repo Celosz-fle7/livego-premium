@@ -33,7 +33,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   Future<_TvHomeState> _load() async {
     try {
-      final items = await LiveGoCatalog.home(platform: _platform).timeout(const Duration(seconds: 14));
+      final categories = LiveGoCatalog.categoriesFor(_platform);
+      if (category >= categories.length) category = 0;
+      final selectedCategory = categories.isEmpty ? 'Trending' : categories[category];
+      final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory).timeout(const Duration(seconds: 14));
       final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
       return _TvHomeState(hero: hero, items: items);
     } catch (e) {
@@ -51,12 +54,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   List<ContentItem> _filtered(List<ContentItem> items) {
-    if (category == 0) return items;
-    final categories = LiveGoCatalog.categories;
-    if (category < 0 || category >= categories.length) return items;
-    final categoryName = categories[category];
-    final filtered = items.where((e) => e.category.toLowerCase().contains(categoryName.toLowerCase())).toList();
-    return filtered.isEmpty ? items : filtered;
+    return items;
   }
 
   @override
@@ -67,6 +65,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final loading = snap.connectionState != ConnectionState.done;
         final hero = snap.data?.hero;
         final items = _filtered(snap.data?.items ?? const []);
+        final categories = LiveGoCatalog.categoriesFor(_platform);
+        if (category >= categories.length) category = 0;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(128, 36, 36, 36),
@@ -83,9 +83,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, onSelected: (v) { setState(() => source = v); _reload(); }),
+                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); }),
                   const SizedBox(height: 16),
-                  CategoryChips(items: LiveGoCatalog.categories, selected: category, tv: true, onSelected: (v) => setState(() => category = v)),
+                  CategoryChips(items: categories, selected: category, tv: true, onSelected: (v) { setState(() => category = v); _reload(); }),
                 ],
               ),
             ),

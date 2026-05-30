@@ -268,18 +268,14 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
   Future<void> _pingVisibleOnce() async {
     setState(() => _pinging = true);
     final platforms = LiveGoCatalog.allPlatforms;
-    const batchSize = 3;
-    for (var i = 0; i < platforms.length; i += batchSize) {
-      final batch = platforms.skip(i).take(batchSize);
-      await Future.wait(batch.map((p) => LiveGoCatalog.pingPlatform(p).timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              LiveGoSettings.setPlatformStatus(p, 'offline');
-              return 'offline';
-            },
-          )));
-      if (mounted) setState(() {});
-    }
+    await Future.wait(platforms.map((p) => LiveGoCatalog.pingPlatform(p).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            LiveGoSettings.setPlatformStatus(p, 'offline');
+            return 'offline';
+          },
+        )));
+    if (mounted) setState(() {});
     if (mounted) setState(() => _pinging = false);
   }
 
