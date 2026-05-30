@@ -264,16 +264,32 @@ class LiveGoCatalog {
 
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
     final cached = await LiveGoContentCache.readEpisodes(item);
-    if (cached != null && cached.isNotEmpty) return cached;
+
+    // Older fast-start builds could cache a synthetic fallback containing only
+    // Episode 1 before /allepisode finished. Do not trust a single-row episode
+    // cache for providers that normally expose a full episode list; refresh it
+    // from Anichin so the player sheet shows all episodes again.
+    if (cached != null && cached.length > 1) return cached;
+
     try {
       final rows = await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 12));
-      if (rows.isNotEmpty) await LiveGoContentCache.writeEpisodes(item, rows);
-      return rows;
+      if (rows.length > 1) {
+        await LiveGoContentCache.writeEpisodes(item, rows);
+        return rows;
+      }
+
+      // If the network still cannot provide the full list, only then fall back
+      // to the old cached single episode or item.episodes. Never overwrite a
+      // good future cache with this one-row fallback.
+      if (cached != null && cached.isNotEmpty) return cached;
+      if (rows.isNotEmpty) return rows;
     } catch (e) {
       print('LIVEGO EPISODES ERROR: $e');
-      final total = item.episodes <= 0 ? 1 : item.episodes;
-      return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
+      if (cached != null && cached.isNotEmpty) return cached;
     }
+
+    final total = item.episodes <= 0 ? 1 : item.episodes;
+    return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
   }
 
   static Future<int> episodeCount(ContentItem item) async {
