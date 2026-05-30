@@ -15,18 +15,18 @@ class TvApp extends StatefulWidget {
 
 class _TvAppState extends State<TvApp> {
   int index = 0;
-  final FocusNode _rootFocus = FocusNode(debugLabel: 'tv-root');
+  final FocusNode _shellFocus = FocusNode(debugLabel: 'tv-shell');
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _rootFocus.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _shellFocus.requestFocus());
   }
 
   @override
   void dispose() {
-    _rootFocus.dispose();
+    _shellFocus.dispose();
     super.dispose();
   }
 
@@ -42,21 +42,37 @@ class _TvAppState extends State<TvApp> {
   }
 
   Future<bool> _confirmExit() async {
-    final exit = await showDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0B1220),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26), side: const BorderSide(color: Color(0xFF1F3B55))),
-        title: const Text('Sudah selesai nonton?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
-        content: const Text('Tutup LiveGO di Android TV?', style: TextStyle(color: Colors.white70, fontSize: 16)),
-        actionsPadding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFF1E3850)),
+        ),
+        title: const Text('Keluar dari LiveGO?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, decoration: TextDecoration.none)),
+        content: const Text('Tutup aplikasi di Android TV?', style: TextStyle(color: Colors.white70, fontSize: 16, decoration: TextDecoration.none)),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Nanti Dulu')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ya, Keluar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
         ],
       ),
     );
-    return exit == true;
+    return result == true;
+  }
+
+  Future<void> _handleBack() async {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    if (index != 0) {
+      setState(() => index = 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _shellFocus.requestFocus());
+      return;
+    }
+    if (await _confirmExit()) SystemNavigator.pop();
   }
 
   @override
@@ -64,35 +80,33 @@ class _TvAppState extends State<TvApp> {
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
-        if (didPop) return;
-        if (await _confirmExit()) SystemNavigator.pop();
+        if (!didPop) await _handleBack();
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFF050914),
         body: PremiumShell(
-          child: Focus(
-            focusNode: _rootFocus,
-            autofocus: true,
-            child: Shortcuts(
-              shortcuts: const <ShortcutActivator, Intent>{
-                SingleActivator(LogicalKeyboardKey.goBack): _BackIntent(),
-                SingleActivator(LogicalKeyboardKey.escape): _BackIntent(),
+          child: Shortcuts(
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.goBack): _TvBackIntent(),
+              SingleActivator(LogicalKeyboardKey.escape): _TvBackIntent(),
+              SingleActivator(LogicalKeyboardKey.browserBack): _TvBackIntent(),
+            },
+            child: Actions(
+              actions: <Type, Action<Intent>>{
+                _TvBackIntent: CallbackAction<_TvBackIntent>(onInvoke: (_) {
+                  _handleBack();
+                  return null;
+                }),
               },
-              child: Actions(
-                actions: <Type, Action<Intent>>{
-                  _BackIntent: CallbackAction<_BackIntent>(onInvoke: (_) async {
-                    if (await _confirmExit()) SystemNavigator.pop();
-                    return null;
-                  }),
-                },
+              child: Focus(
+                focusNode: _shellFocus,
+                autofocus: true,
                 child: FocusTraversalGroup(
                   policy: ReadingOrderTraversalPolicy(),
                   child: Row(
                     children: [
-                      TvSideNav(
-                        index: index,
-                        onChanged: (v) => setState(() => index = v),
-                      ),
-                      Expanded(child: _page()),
+                      TvSideNav(index: index, onChanged: (v) => setState(() => index = v)),
+                      Expanded(child: RepaintBoundary(child: _page())),
                     ],
                   ),
                 ),
@@ -105,6 +119,6 @@ class _TvAppState extends State<TvApp> {
   }
 }
 
-class _BackIntent extends Intent {
-  const _BackIntent();
+class _TvBackIntent extends Intent {
+  const _TvBackIntent();
 }

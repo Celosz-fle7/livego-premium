@@ -11,78 +11,58 @@ class TvSettingsScreen extends StatefulWidget {
 
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
   int tab = 0;
-  final tabs = const ['Display', 'Player', 'Source'];
+  static const tabs = ['Display', 'Player', 'Source'];
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 30, 32, 34),
-      children: [
-        _Header(
-          tabs: tabs,
-          selected: tab,
-          onSelected: (v) => setState(() => tab = v),
-        ),
-        const SizedBox(height: 22),
-        if (tab == 0) _displayTab() else if (tab == 1) _playerTab() else _sourceTab(),
-      ],
+    return Scaffold(
+      backgroundColor: const Color(0xFF050914),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(30, 26, 34, 30),
+        children: [
+          _Header(tab: tab, onTab: (v) => setState(() => tab = v)),
+          const SizedBox(height: 18),
+          if (tab == 0) _display() else if (tab == 1) _player() else _source(),
+        ],
+      ),
     );
   }
 
-  Widget _displayTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Tampilan & Navigasi'),
-        _Panel(children: [
-          _OptionRow(title: 'Mode Tampilan', subtitle: LiveGoSettings.layoutMode, icon: Icons.tv_rounded, onTap: () => _cycleLayout()),
-          _OptionRow(title: 'Jumlah Kolom Grid', subtitle: '${LiveGoSettings.tvHomeGrid} kolom', icon: Icons.grid_view_rounded, onTap: () => _cycleGrid()),
-        ]),
-      ],
-    );
-  }
+  Widget _display() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    const _SectionTitle('Tampilan'),
+    _Panel(children: [
+      _OptionRow(icon: Icons.tv_rounded, title: 'Mode Tampilan', value: LiveGoSettings.layoutMode, onTap: _cycleLayout),
+      _OptionRow(icon: Icons.grid_view_rounded, title: 'Grid TV', value: '${LiveGoSettings.tvHomeGrid} kolom', onTap: _cycleGrid),
+    ]),
+  ]);
 
-  Widget _playerTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Player'),
-        _Panel(children: [
-          _ToggleRow(title: 'Cache Playback', subtitle: 'Simpan potongan stream sementara agar pindah episode lebih stabil.', icon: Icons.cached_rounded, value: LiveGoSettings.cachePlayback, onChanged: (v) => setState(() => LiveGoSettings.cachePlayback = v)),
-          _ToggleRow(title: 'Tombol Rotasi Manual', subtitle: 'Tampilkan tombol rotasi saat menonton di perangkat touch.', icon: Icons.screen_rotation_alt_rounded, value: LiveGoSettings.manualRotateButton, onChanged: (v) => setState(() => LiveGoSettings.manualRotateButton = v)),
-          _OptionRow(title: 'Kualitas Default', subtitle: LiveGoSettings.quality, icon: Icons.high_quality_rounded, onTap: () => _cycleQuality()),
-          _OptionRow(title: 'Widevine DRM', subtitle: LiveGoSettings.drmMode, icon: Icons.lock_rounded, onTap: () => _cycleDrm()),
-        ]),
-      ],
-    );
-  }
+  Widget _player() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    const _SectionTitle('Player'),
+    _Panel(children: [
+      _OptionRow(icon: Icons.high_quality_rounded, title: 'Kualitas Default', value: LiveGoSettings.quality, onTap: _cycleQuality),
+      _ToggleRow(icon: Icons.cached_rounded, title: 'Cache Playback', value: LiveGoSettings.cachePlayback, onChanged: (v) => setState(() => LiveGoSettings.cachePlayback = v)),
+      _ToggleRow(icon: Icons.screen_rotation_alt_rounded, title: 'Tombol Rotasi Manual', value: LiveGoSettings.manualRotateButton, onChanged: (v) => setState(() => LiveGoSettings.manualRotateButton = v)),
+      _OptionRow(icon: Icons.lock_rounded, title: 'Widevine DRM', value: LiveGoSettings.drmMode, onTap: _cycleDrm),
+    ]),
+  ]);
 
-  Widget _sourceTab() {
-    final platforms = LiveGoSettings.defaultPlatforms;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Sumber Data'),
-        _Panel(children: [
-          _OptionRow(title: 'Default Platform', subtitle: LiveGoSettings.defaultPlatform, icon: Icons.layers_rounded, onTap: () => _cyclePlatform(platforms)),
-          _OptionRow(title: 'Bahasa', subtitle: LiveGoSettings.language.toUpperCase(), icon: Icons.language_rounded, onTap: () => _cycleLanguage()),
-          _OptionRow(title: 'Platform Aktif', subtitle: '${LiveGoSettings.activePlatforms.length} aktif', icon: Icons.apps_rounded, onTap: () {}),
-          _DangerRow(title: 'Hapus Semua Cache', subtitle: 'Bersihkan cache streaming dan gambar.', icon: Icons.delete_rounded, onTap: () {}),
-        ]),
-      ],
-    );
-  }
+  Widget _source() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    const _SectionTitle('Sumber'),
+    _Panel(children: [
+      _OptionRow(icon: Icons.layers_rounded, title: 'Default Platform', value: LiveGoSettings.defaultPlatform, onTap: _cyclePlatform),
+      _OptionRow(icon: Icons.language_rounded, title: 'Bahasa', value: LiveGoSettings.language.toUpperCase(), onTap: _cycleLanguage),
+      _OptionRow(icon: Icons.apps_rounded, title: 'Platform Aktif', value: '${LiveGoSettings.activePlatforms.length} aktif', onTap: () {}),
+      _OptionRow(icon: Icons.delete_rounded, title: 'Hapus Cache', value: 'Bersihkan', danger: true, onTap: () {}),
+    ]),
+  ]);
 
   void _cycleLayout() {
     const values = ['Auto', 'Mobile', 'TV'];
-    final next = values[(values.indexOf(LiveGoSettings.layoutMode) + 1) % values.length];
-    setState(() => LiveGoSettings.layoutMode = next);
+    final idx = values.indexOf(LiveGoSettings.layoutMode);
+    setState(() => LiveGoSettings.layoutMode = values[(idx + 1) % values.length]);
   }
 
-  void _cycleGrid() {
-    final next = LiveGoSettings.tvHomeGrid >= 10 ? 5 : LiveGoSettings.tvHomeGrid + 1;
-    setState(() => LiveGoSettings.setTvHomeGrid(next));
-  }
+  void _cycleGrid() => setState(() => LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 5 : LiveGoSettings.tvHomeGrid + 1));
 
   void _cycleQuality() {
     const values = ['Auto Adaptive', '480p', '720p', '1080p'];
@@ -96,7 +76,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     setState(() => LiveGoSettings.drmMode = values[(idx + 1) % values.length]);
   }
 
-  void _cyclePlatform(List<String> values) {
+  void _cyclePlatform() {
+    final values = LiveGoSettings.defaultPlatforms;
     if (values.isEmpty) return;
     final idx = values.indexOf(LiveGoSettings.defaultPlatform);
     setState(() => LiveGoSettings.defaultPlatform = values[(idx + 1) % values.length]);
@@ -110,38 +91,41 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final List<String> tabs;
-  final int selected;
-  final ValueChanged<int> onSelected;
-  const _Header({required this.tabs, required this.selected, required this.onSelected});
+  final int tab;
+  final ValueChanged<int> onTab;
+  const _Header({required this.tab, required this.onTab});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0C2838), Color(0xFF0B0F1A)], begin: Alignment.centerLeft, end: Alignment.centerRight),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFF1F3B55)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: Colors.white)),
-            const SizedBox(width: 8),
-            const Text('Pengaturan LiveGO', style: TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900)),
-          ]),
-          const SizedBox(height: 8),
-          const Text('Atur tampilan, player, source, dan cache untuk Android TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 18),
-          Row(children: List.generate(tabs.length, (i) => Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: _TabChip(text: tabs[i], active: i == selected, onTap: () => onSelected(i)),
-          ))),
-        ],
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF0B2634), Color(0xFF080D17)]), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF1E3850))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          _CircleButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
+          const SizedBox(width: 14),
+          const Text('Pengaturan LiveGO', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+        ]),
+        const SizedBox(height: 8),
+        const Text('Atur tampilan, player, source, dan cache untuk Android TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+        const SizedBox(height: 14),
+        Row(children: List.generate(_TvSettingsScreenState.tabs.length, (i) => Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: _TabChip(text: _TvSettingsScreenState.tabs[i], active: i == tab, onTap: () => onTab(i)),
+        ))),
+      ]),
     );
+  }
+}
+
+class _CircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _CircleButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(onPressed: onTap, icon: Icon(icon, color: Colors.white), style: IconButton.styleFrom(backgroundColor: const Color(0xFF0A1422), fixedSize: const Size(46, 46)));
   }
 }
 
@@ -157,7 +141,6 @@ class _TabChip extends StatefulWidget {
 
 class _TabChipState extends State<_TabChip> {
   bool focused = false;
-
   @override
   Widget build(BuildContext context) {
     return FocusableActionDetector(
@@ -167,14 +150,10 @@ class _TabChipState extends State<_TabChip> {
         borderRadius: BorderRadius.circular(999),
         focusColor: Colors.transparent,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-          decoration: BoxDecoration(
-            color: widget.active ? const Color(0xFF12314A) : const Color(0xFF0B1220),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: focused || widget.active ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
-          ),
-          child: Text(widget.text, style: TextStyle(color: widget.active || focused ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900)),
+          duration: const Duration(milliseconds: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+          decoration: BoxDecoration(color: widget.active ? const Color(0xFF12314A) : const Color(0xFF090F19), borderRadius: BorderRadius.circular(999), border: Border.all(color: focused || widget.active ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1)),
+          child: Text(widget.text, style: TextStyle(color: focused || widget.active ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ),
       ),
     );
@@ -184,49 +163,43 @@ class _TabChipState extends State<_TabChip> {
 class _Panel extends StatelessWidget {
   final List<Widget> children;
   const _Panel({required this.children});
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: const Color(0xFF0B1220).withOpacity(0.92), borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFF1C3046))),
-      child: Column(children: children),
-    );
-  }
+  Widget build(BuildContext context) => Container(decoration: BoxDecoration(color: const Color(0xFF09111E).withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF1A2D43))), child: Column(children: children));
 }
 
 class _OptionRow extends StatefulWidget {
-  final String title;
-  final String subtitle;
   final IconData icon;
+  final String title;
+  final String value;
   final VoidCallback onTap;
-  const _OptionRow({required this.title, required this.subtitle, required this.icon, required this.onTap});
-
+  final bool danger;
+  const _OptionRow({required this.icon, required this.title, required this.value, required this.onTap, this.danger = false});
   @override
   State<_OptionRow> createState() => _OptionRowState();
 }
 
 class _OptionRowState extends State<_OptionRow> {
   bool focused = false;
-
   @override
   Widget build(BuildContext context) {
+    final color = widget.danger ? const Color(0xFFFF6B7A) : AppTheme.cyan;
     return FocusableActionDetector(
       onShowFocusHighlight: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(20),
         focusColor: Colors.transparent,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          height: 92,
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(color: focused ? const Color(0xFF12314A) : Colors.transparent, borderRadius: BorderRadius.circular(22), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2.2)),
+          duration: const Duration(milliseconds: 120),
+          height: 76,
+          margin: const EdgeInsets.all(7),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(color: focused ? const Color(0xFF102F45) : Colors.transparent, borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? color : Colors.transparent, width: 2)),
           child: Row(children: [
-            Container(width: 56, height: 56, decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)), child: Icon(widget.icon, color: Colors.white, size: 28)),
-            const SizedBox(width: 22),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)), const SizedBox(height: 5), Text(widget.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 14.5, fontWeight: FontWeight.w600))])),
-            Text(widget.subtitle, style: TextStyle(color: focused ? AppTheme.cyan : Colors.white70, fontSize: 16, fontWeight: FontWeight.w900)),
+            Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)), child: Icon(widget.icon, color: widget.danger ? color : Colors.white, size: 25)),
+            const SizedBox(width: 18),
+            Expanded(child: Text(widget.title, style: TextStyle(color: widget.danger ? color : Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+            Text(widget.value, style: TextStyle(color: focused ? color : AppTheme.textSoft, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           ]),
         ),
       ),
@@ -235,67 +208,21 @@ class _OptionRowState extends State<_OptionRow> {
 }
 
 class _ToggleRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
   final IconData icon;
+  final String title;
   final bool value;
   final ValueChanged<bool> onChanged;
-  const _ToggleRow({required this.title, required this.subtitle, required this.icon, required this.value, required this.onChanged});
+  const _ToggleRow({required this.icon, required this.title, required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return _SwitchLikeRow(title: title, subtitle: subtitle, icon: icon, value: value, onChanged: onChanged);
+    return _OptionRow(icon: icon, title: title, value: value ? 'ON' : 'OFF', onTap: () => onChanged(!value));
   }
-}
-
-class _SwitchLikeRow extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  const _SwitchLikeRow({required this.title, required this.subtitle, required this.icon, required this.value, required this.onChanged});
-
-  @override
-  State<_SwitchLikeRow> createState() => _SwitchLikeRowState();
-}
-
-class _SwitchLikeRowState extends State<_SwitchLikeRow> {
-  bool focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return FocusableActionDetector(
-      onShowFocusHighlight: (v) => setState(() => focused = v),
-      child: InkWell(
-        onTap: () => widget.onChanged(!widget.value),
-        borderRadius: BorderRadius.circular(26),
-        focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          height: 92,
-          margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(color: focused ? const Color(0xFF12314A) : Colors.transparent, borderRadius: BorderRadius.circular(22), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2.2)),
-          child: Row(children: [
-            Container(width: 56, height: 56, decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)), child: Icon(widget.icon, color: Colors.white, size: 28)),
-            const SizedBox(width: 22),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)), const SizedBox(height: 5), Text(widget.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 14.5, fontWeight: FontWeight.w600))])),
-            Switch(value: widget.value, onChanged: widget.onChanged, activeColor: AppTheme.cyan),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-class _DangerRow extends _OptionRow {
-  const _DangerRow({required super.title, required super.subtitle, required super.icon, required super.onTap});
 }
 
 class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 10), child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 1.2)));
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 9), child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)));
 }

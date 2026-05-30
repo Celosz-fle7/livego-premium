@@ -19,79 +19,79 @@ class TvSideNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: Container(
-        width: 118,
-        margin: const EdgeInsets.fromLTRB(22, 22, 14, 22),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF07111F).withOpacity(0.94),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFF1B3045)),
-          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 26)],
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 74,
-              height: 74,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: const Color(0xFF0D1A2B),
-                border: Border.all(color: const Color(0xFF233A52)),
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
-                  boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 18)],
-                ),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(width: 54, height: 1, color: Colors.white10),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.separated(
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (_, i) => _TvNavIcon(
-                  icon: items[i].$1,
-                  label: items[i].$2,
-                  active: i == index,
-                  autofocus: i == index,
-                  onTap: () => onChanged(i),
+      child: SizedBox(
+        width: 96,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(14, 20, 10, 20),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF06101D).withOpacity(0.94),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: const Color(0xFF172A3E)),
+            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 22)],
+          ),
+          child: Column(
+            children: [
+              _Logo(active: index == 0, onTap: () => onChanged(0)),
+              const SizedBox(height: 14),
+              Container(width: 42, height: 1, color: Colors.white10),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.separated(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length - 1,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, raw) {
+                    final i = raw + 1;
+                    return _NavButton(
+                      icon: items[i].$1,
+                      label: items[i].$2,
+                      active: i == index,
+                      autofocus: i == index,
+                      onTap: () => onChanged(i),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TvNavIcon extends StatefulWidget {
+class _Logo extends StatelessWidget {
+  final bool active;
+  final VoidCallback onTap;
+  const _Logo({required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return _NavButton(icon: Icons.play_arrow_rounded, label: 'Home', active: active, autofocus: active, onTap: onTap, logo: true);
+  }
+}
+
+class _NavButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool active;
   final bool autofocus;
   final VoidCallback onTap;
+  final bool logo;
 
-  const _TvNavIcon({required this.icon, required this.label, required this.active, required this.autofocus, required this.onTap});
+  const _NavButton({required this.icon, required this.label, required this.active, required this.autofocus, required this.onTap, this.logo = false});
 
   @override
-  State<_TvNavIcon> createState() => _TvNavIconState();
+  State<_NavButton> createState() => _NavButtonState();
 }
 
-class _TvNavIconState extends State<_TvNavIcon> {
+class _NavButtonState extends State<_NavButton> {
   bool focused = false;
 
   @override
   Widget build(BuildContext context) {
-    final selected = widget.active || focused;
+    final selected = focused || widget.active;
     return Tooltip(
       message: widget.label,
       child: FocusableActionDetector(
@@ -99,24 +99,18 @@ class _TvNavIconState extends State<_TvNavIcon> {
         onShowFocusHighlight: (v) => setState(() => focused = v),
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           focusColor: Colors.transparent,
-          hoverColor: Colors.white10,
-          child: AnimatedScale(
-            duration: const Duration(milliseconds: 120),
-            scale: focused ? 1.05 : 1,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              height: 76,
-              decoration: BoxDecoration(
-                gradient: widget.active ? const LinearGradient(colors: [Color(0xFF123C56), Color(0xFF3B1B79)]) : null,
-                color: widget.active ? null : const Color(0xFF0C1727),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.6) : Colors.white10), width: focused ? 2.2 : 1),
-                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.28), blurRadius: 18)] : null,
-              ),
-              child: Icon(widget.icon, color: selected ? Colors.white : Colors.white54, size: 31),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 130),
+            height: widget.logo ? 66 : 62,
+            decoration: BoxDecoration(
+              gradient: selected ? const LinearGradient(colors: [Color(0xFF123B54), Color(0xFF3C207E)]) : null,
+              color: selected ? null : const Color(0xFF0A1422),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.7) : Colors.white10), width: focused ? 2.2 : 1),
             ),
+            child: Icon(widget.icon, color: selected ? Colors.white : Colors.white54, size: widget.logo ? 32 : 28),
           ),
         ),
       ),
