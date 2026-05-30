@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/content_item.dart';
 
@@ -22,59 +25,169 @@ class WatchProgress {
     if (total <= 0) return 0;
     return (position.inMilliseconds / total).clamp(0.0, 1.0);
   }
+
+  Map<String, dynamic> toJson() => {
+        'item': LiveGoLocalStore.itemToJson(item),
+        'episode': episode,
+        'positionMs': position.inMilliseconds,
+        'durationMs': duration.inMilliseconds,
+        'updatedAt': updatedAt.toIso8601String(),
+      };
+
+  static WatchProgress? fromJson(Map<String, dynamic> json) {
+    final itemRaw = json['item'];
+    if (itemRaw is! Map) return null;
+    final item = LiveGoLocalStore.itemFromJson(Map<String, dynamic>.from(itemRaw));
+    return WatchProgress(
+      item: item,
+      episode: LiveGoLocalStore.parseInt(json['episode'], fallback: 1),
+      position: Duration(milliseconds: LiveGoLocalStore.parseInt(json['positionMs'], fallback: 0)),
+      duration: Duration(milliseconds: LiveGoLocalStore.parseInt(json['durationMs'], fallback: 0)),
+      updatedAt: DateTime.tryParse('${json['updatedAt'] ?? ''}') ?? DateTime.now(),
+    );
+  }
+}
+
+enum DownloadStatus { queued, downloading, completed, failed, canceled }
+
+class DownloadRecord {
+  final ContentItem item;
+  final int episode;
+  final String quality;
+  final String url;
+  final String localPath;
+  final double progress;
+  final DownloadStatus status;
+  final DateTime updatedAt;
+  final String error;
+
+  const DownloadRecord({
+    required this.item,
+    required this.episode,
+    required this.quality,
+    required this.url,
+    required this.localPath,
+    required this.progress,
+    required this.status,
+    required this.updatedAt,
+    this.error = '',
+  });
+
+  String get key => '${item.platformSlug}:${item.id}:$episode:$quality';
+
+  DownloadRecord copyWith({
+    String? localPath,
+    double? progress,
+    DownloadStatus? status,
+    DateTime? updatedAt,
+    String? error,
+  }) {
+    return DownloadRecord(
+      item: item,
+      episode: episode,
+      quality: quality,
+      url: url,
+      localPath: localPath ?? this.localPath,
+      progress: progress ?? this.progress,
+      status: status ?? this.status,
+      updatedAt: updatedAt ?? this.updatedAt,
+      error: error ?? this.error,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'item': LiveGoLocalStore.itemToJson(item),
+        'episode': episode,
+        'quality': quality,
+        'url': url,
+        'localPath': localPath,
+        'progress': progress,
+        'status': status.name,
+        'updatedAt': updatedAt.toIso8601String(),
+        'error': error,
+      };
+
+  static DownloadRecord? fromJson(Map<String, dynamic> json) {
+    final itemRaw = json['item'];
+    if (itemRaw is! Map) return null;
+    final statusName = '${json['status'] ?? 'queued'}';
+    return DownloadRecord(
+      item: LiveGoLocalStore.itemFromJson(Map<String, dynamic>.from(itemRaw)),
+      episode: LiveGoLocalStore.parseInt(json['episode'], fallback: 1),
+      quality: '${json['quality'] ?? 'Auto'}',
+      url: '${json['url'] ?? ''}',
+      localPath: '${json['localPath'] ?? ''}',
+      progress: double.tryParse('${json['progress'] ?? '0'}') ?? 0,
+      status: DownloadStatus.values.firstWhere((e) => e.name == statusName, orElse: () => DownloadStatus.queued),
+      updatedAt: DateTime.tryParse('${json['updatedAt'] ?? ''}') ?? DateTime.now(),
+      error: '${json['error'] ?? ''}',
+    );
+  }
 }
 
 class LiveGoLocalStore {
+  static const _historyKey = 'livego.history.v2';
+  static const _favoritesKey = 'livego.favorites.v2';
+  static const _progressKey = 'livego.progress.v2';
+  static const _downloadsKey = 'livego.downloads.v2';
+
   static final ValueNotifier<int> version = ValueNotifier<int>(0);
   static final List<ContentItem> _history = <ContentItem>[];
   static final List<ContentItem> _favorites = <ContentItem>[];
   static final Map<String, WatchProgress> _progress = <String, WatchProgress>{};
-  static final List<ContentItem> _downloads = <ContentItem>[];
+  static final List<DownloadRecord> _downloads = <DownloadRecord>[];
+  static SharedPreferences? _prefs;
 
   static List<ContentItem> get history => List.unmodifiable(_history);
   static List<ContentItem> get favorites => List.unmodifiable(_favorites);
-  static List<ContentItem> get downloads => List.unmodifiable(_downloads);
+  static List<DownloadRecord> get downloads => List.unmodifiable(_downloads);
   static List<WatchProgress> get continueWatching {
     final rows = _progress.values.toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return List.unmodifiable(rows);
   }
 
-  static String _key(ContentItem item) => '${item.platformSlug}:${item.id}';
-
-  static bool isFavorite(ContentItem item) {
-    return _favorites.any((e) => e.id == item.id && e.platformSlug == item.platformSlug);
-  }
-
-  static int continueEpisode(ContentItem item) {
-    return _progress[_key(item)]?.episode ?? int.tryParse(item.chapterId) ?? 1;
-  }
-
-  static WatchProgress? progressFor(ContentItem item) => _progress[_key(item)];
-
-  static void saveProgress(ContentItem item, int episode, Duration position, Duration duration) {
-    if (episode <= 0) return;
-    _progress[_key(item)] = WatchProgress(
-      item: item,
-      episode: episode,
-      position: position,
-      duration: duration,
-      updatedAt: DateTime.now(),
-    );
-    addHistory(item, notify: false);
+  static Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    _history
+      ..clear()
+      ..addAll(_decodeList(_prefs?.getString(_historyKey)).map(itemFromJson));
+    _favorites
+      ..clear()
+      ..addAll(_decodeList(_prefs?.getString(_favoritesKey)).map(itemFromJson));
+    _progress.clear();
+    for (final row in _decodeList(_prefs?.getString(_progressKey))) {
+      final progress = WatchProgress.fromJson(row);
+      if (progress != null) _progress[_key(progress.item)] = progress;
+    }
+    _downloads
+      ..clear()
+      ..addAll(_decodeList(_prefs?.getString(_downloadsKey)).map(DownloadRecord.fromJson).whereType<DownloadRecord>());
     _bump();
   }
 
-  static void markEpisodeComplete(ContentItem item, int episode) {
-    final next = episode + 1;
-    _progress[_key(item)] = WatchProgress(
-      item: item,
-      episode: next,
-      position: Duration.zero,
-      duration: Duration.zero,
-      updatedAt: DateTime.now(),
-    );
+  static String _key(ContentItem item) => '${item.platformSlug}:${item.id}';
+  static String downloadKey(ContentItem item, int episode, String quality) => '${item.platformSlug}:${item.id}:$episode:$quality';
+
+  static bool isFavorite(ContentItem item) => _favorites.any((e) => e.id == item.id && e.platformSlug == item.platformSlug);
+  static bool isDownloaded(ContentItem item, {int? episode}) => _downloads.any((e) => e.item.id == item.id && e.item.platformSlug == item.platformSlug && (episode == null || e.episode == episode));
+
+  static int continueEpisode(ContentItem item) => _progress[_key(item)]?.episode ?? int.tryParse(item.chapterId) ?? 1;
+  static WatchProgress? progressFor(ContentItem item) => _progress[_key(item)];
+
+  static Future<void> saveProgress(ContentItem item, int episode, Duration position, Duration duration) async {
+    if (episode <= 0) return;
+    _progress[_key(item)] = WatchProgress(item: item, episode: episode, position: position, duration: duration, updatedAt: DateTime.now());
     addHistory(item, notify: false);
+    await _persistProgress();
+    _bump();
+  }
+
+  static Future<void> markEpisodeComplete(ContentItem item, int episode) async {
+    final next = episode + 1;
+    _progress[_key(item)] = WatchProgress(item: item, episode: next, position: Duration.zero, duration: Duration.zero, updatedAt: DateTime.now());
+    addHistory(item, notify: false);
+    await _persistProgress();
     _bump();
   }
 
@@ -82,57 +195,120 @@ class LiveGoLocalStore {
     _history.removeWhere((e) => e.id == item.id && e.platformSlug == item.platformSlug);
     _history.insert(0, item);
     if (_history.length > 80) _history.removeRange(80, _history.length);
+    _persistHistory();
     if (notify) _bump();
   }
 
-  static void toggleFavorite(ContentItem item) {
+  static Future<void> toggleFavorite(ContentItem item) async {
     final index = _favorites.indexWhere((e) => e.id == item.id && e.platformSlug == item.platformSlug);
     if (index >= 0) {
       _favorites.removeAt(index);
     } else {
       _favorites.insert(0, item);
     }
+    await _persistFavorites();
     _bump();
   }
 
-
-  static bool isDownloaded(ContentItem item) {
-    return _downloads.any((e) => e.id == item.id && e.platformSlug == item.platformSlug);
-  }
-
-  static void toggleDownload(ContentItem item) {
-    final index = _downloads.indexWhere((e) => e.id == item.id && e.platformSlug == item.platformSlug);
+  static Future<void> addOrUpdateDownload(DownloadRecord record) async {
+    final index = _downloads.indexWhere((e) => e.key == record.key);
     if (index >= 0) {
-      _downloads.removeAt(index);
+      _downloads[index] = record;
     } else {
-      _downloads.insert(0, item);
+      _downloads.insert(0, record);
     }
+    await _persistDownloads();
     _bump();
   }
 
-  static void clearDownloads() {
+  static Future<void> removeDownload(DownloadRecord record) async {
+    _downloads.removeWhere((e) => e.key == record.key);
+    await _persistDownloads();
+    _bump();
+  }
+
+  static Future<void> clearDownloads() async {
     _downloads.clear();
+    await _persistDownloads();
     _bump();
   }
 
-  static void clearHistory() {
+  static Future<void> clearHistory() async {
     _history.clear();
     _progress.clear();
+    await _persistHistory();
+    await _persistProgress();
     _bump();
   }
 
-  static void clearFavorites() {
+  static Future<void> clearFavorites() async {
     _favorites.clear();
+    await _persistFavorites();
     _bump();
   }
 
-  static void clearAll() {
+  static Future<void> clearAll() async {
     _history.clear();
     _favorites.clear();
     _downloads.clear();
     _progress.clear();
+    await _persistHistory();
+    await _persistFavorites();
+    await _persistDownloads();
+    await _persistProgress();
     _bump();
   }
+
+  static Map<String, dynamic> itemToJson(ContentItem item) => {
+        'id': item.id,
+        'title': item.title,
+        'source': item.source,
+        'category': item.category,
+        'description': item.description,
+        'posterUrl': item.posterUrl,
+        'backdropUrl': item.backdropUrl,
+        'rating': item.rating,
+        'episodes': item.episodes,
+        'updated': item.updated,
+        'platformSlug': item.platformSlug,
+        'chapterId': item.chapterId,
+        'lang': item.lang,
+      };
+
+  static ContentItem itemFromJson(Map<String, dynamic> json) => ContentItem(
+        id: '${json['id'] ?? ''}',
+        title: '${json['title'] ?? 'Untitled'}',
+        source: '${json['source'] ?? json['platformSlug'] ?? ''}',
+        category: '${json['category'] ?? 'Drama'}',
+        description: '${json['description'] ?? ''}',
+        posterUrl: '${json['posterUrl'] ?? json['poster'] ?? json['cover'] ?? ''}',
+        backdropUrl: '${json['backdropUrl'] ?? json['backdrop'] ?? json['posterUrl'] ?? ''}',
+        rating: double.tryParse('${json['rating'] ?? '8.0'}') ?? 8.0,
+        episodes: parseInt(json['episodes'], fallback: 1),
+        updated: json['updated'] == true,
+        platformSlug: '${json['platformSlug'] ?? 'shortmax'}',
+        chapterId: '${json['chapterId'] ?? '1'}',
+        lang: '${json['lang'] ?? 'id'}',
+      );
+
+  static int parseInt(Object? value, {required int fallback}) {
+    if (value is int) return value;
+    return int.tryParse('$value') ?? fallback;
+  }
+
+  static List<Map<String, dynamic>> _decodeList(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return <Map<String, dynamic>>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {}
+    return <Map<String, dynamic>>[];
+  }
+
+  static Future<void> _persistHistory() async => _prefs?.setString(_historyKey, jsonEncode(_history.map(itemToJson).toList()));
+  static Future<void> _persistFavorites() async => _prefs?.setString(_favoritesKey, jsonEncode(_favorites.map(itemToJson).toList()));
+  static Future<void> _persistProgress() async => _prefs?.setString(_progressKey, jsonEncode(_progress.values.map((e) => e.toJson()).toList()));
+  static Future<void> _persistDownloads() async => _prefs?.setString(_downloadsKey, jsonEncode(_downloads.map((e) => e.toJson()).toList()));
 
   static void _bump() => version.value++;
 }

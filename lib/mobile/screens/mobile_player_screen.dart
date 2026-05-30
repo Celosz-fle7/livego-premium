@@ -13,6 +13,7 @@ import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
+import '../../services/download/download_service.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -326,6 +327,25 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     }
     if (mounted) setState(() {});
     _showControls();
+  }
+
+  Future<void> _downloadCurrentEpisode() async {
+    _showControls();
+    if (widget.stream.url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Stream belum tersedia dari API.')));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download dimulai...')));
+    final result = await DownloadService.enqueue(
+      item: widget.item,
+      episode: widget.episode,
+      stream: widget.stream,
+      quality: _quality,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result.status == DownloadStatus.completed ? 'Download selesai.' : 'Download: ${result.error.isEmpty ? result.status.name : result.error}'),
+    ));
   }
 
   void _openPlayerSettings() {
@@ -727,7 +747,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   fitCover: _fitCover,
                   landscape: _landscape,
                   onEpisodes: _showEpisodes,
-                  onDownload: () => LiveGoLocalStore.toggleDownload(widget.item),
+                  onDownload: _downloadCurrentEpisode,
                   onSettings: _openPlayerSettings,
                   onQuality: _qualityMenu,
                   onRotate: _toggleLandscape,

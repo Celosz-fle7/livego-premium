@@ -5,6 +5,8 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../shared/widgets/glow_container.dart';
 import 'mobile_settings_screen.dart';
+import 'mobile_library_screen.dart';
+import 'mobile_downloads_screen.dart';
 
 class MobileAccountScreen extends StatelessWidget {
   const MobileAccountScreen({super.key});
@@ -125,12 +127,19 @@ class MobileAccountScreen extends StatelessWidget {
               const SizedBox(width: 10),
               _stat('${LiveGoLocalStore.favorites.length}', 'FAVORIT'),
               const SizedBox(width: 10),
-              _stat('${LiveGoSettings.defaultPlatforms.length}', 'PLATFORM'),
+              _stat('${LiveGoLocalStore.downloads.length}', 'DOWNLOAD'),
             ]),
             _section('Koleksi Cepat'),
             _menuGroup(context, [
-              _menu(context, Icons.history_rounded, 'Riwayat', 'Lanjutkan tontonan terakhir yang sudah dibuka.', () {}),
-              _menu(context, Icons.favorite_border_rounded, 'Favorit', 'Buka daftar judul yang Anda simpan.', () {}),
+              _menu(context, Icons.history_rounded, 'Riwayat', 'Lanjutkan tontonan terakhir yang sudah dibuka.', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileLibraryScreen(title: 'Histori', icon: Icons.history_rounded, favorites: false)))));
+              }),
+              _menu(context, Icons.favorite_border_rounded, 'Favorit', 'Buka daftar judul yang Anda simpan.', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileLibraryScreen(title: 'Favorit', icon: Icons.favorite_rounded, favorites: true)))));
+              }),
+              _menu(context, Icons.download_for_offline_rounded, 'Download', 'Lihat antrean dan episode yang tersimpan.', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileDownloadsScreen()))));
+              }),
               _menu(context, Icons.settings_rounded, 'Pengaturan', 'Atur tampilan, player, subtitle, dan source aktif.', () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileSettingsScreen()))));
               }),
