@@ -28,6 +28,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   late Future<_PlayerState> _future;
   int episode = 1;
   int _knownEpisodeCount = 0;
+  List<LiveGoEpisode> _knownEpisodes = const <LiveGoEpisode>[];
 
 
   @override
@@ -58,20 +59,39 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   }
 
   Future<void> _warmEpisodeMetadata() async {
-    // Keep first playback fast, but fill the episode selector from cached/detail
-    // metadata as soon as it is available. We only cache lightweight metadata:
-    // id/title/poster/detail + episode numbers. Signed video URLs are always
-    // fetched fresh when an episode is played.
+    // Player must start fast, but the playlist should come from cached
+    // detail/allepisode metadata whenever available. Never let the synthetic
+    // single Episode 1 fallback lock the playlist.
+    Future<void> applyRows(List<LiveGoEpisode> rows) async {
+      if (!mounted || rows.length <= 1) return;
+      if (rows.length != _knownEpisodeCount) {
+        setState(() {
+          _knownEpisodes = rows;
+          _knownEpisodeCount = rows.length;
+        });
+      }
+    }
+
     try {
+      final cached = await LiveGoCatalog.cachedEpisodes(widget.item);
+      if (cached != null) await applyRows(cached);
+    } catch (_) {}
+
+    try {
+      // Use the original Home/Search id first. ShortMax detail can return
+      // id="", but /allepisode works with the original id and gives the full
+      // playlist. This keeps the episode sheet filled without waiting for detail.
+      final directRows = await LiveGoCatalog.episodes(widget.item).timeout(const Duration(seconds: 12));
+      if (directRows.length > 1) {
+        await applyRows(directRows);
+        return;
+      }
+
       final detail = _keepPlayableIdentity(
         await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8)),
       );
-      final rows = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 8));
-      final count = rows.isNotEmpty ? rows.length : detail.episodes;
-      if (!mounted || count <= 1) return;
-      if (count != _knownEpisodeCount) {
-        setState(() => _knownEpisodeCount = count);
-      }
+      final rows = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 12));
+      await applyRows(rows);
     } catch (e) {
       debugPrint('LIVEGO PLAYER episode metadata warm skipped: $e');
     }
@@ -111,14 +131,32 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     );
 
     ContentItem detail = widget.item;
-    List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
+    List<LiveGoEpisode> realEpisodes = _knownEpisodes;
+    if (realEpisodes.length <= 1) {
+      try {
+        final cached = await LiveGoCatalog.cachedEpisodes(widget.item);
+        if (cached != null && cached.length > 1) {
+          realEpisodes = cached;
+          if (mounted && _knownEpisodeCount != cached.length) {
+            Future.microtask(() {
+              if (mounted) {
+                setState(() {
+                  _knownEpisodes = cached;
+                  _knownEpisodeCount = cached.length;
+                });
+              }
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Do not block first video playback on slow detail/allepisode metadata.
+    // Metadata refresh continues in _warmEpisodeMetadata().
     try {
-      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(milliseconds: 1500)));
-      realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(milliseconds: 1500));
+      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(milliseconds: 800)));
     } catch (e) {
-      // Keep the fast stream path. Metadata/episode count can be refreshed on
-      // the next open; playback must not wait for it.
-      debugPrint('LIVEGO FAST PLAYER metadata skipped: $e');
+      debugPrint('LIVEGO FAST PLAYER detail skipped: $e');
     }
 
     final fallbackTotal = widget.item.episodes > 0
@@ -193,7 +231,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
         var item = state?.item ?? widget.item;
-        if (_knownEpisodeCount > item.episodes) {
+        if (_knownEpisodes.length > item.episodes || _knownEpisodeCount > item.episodes) {
           item = ContentItem(
             id: item.id,
             title: item.title,
@@ -203,7 +241,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
             posterUrl: item.posterUrl,
             backdropUrl: item.backdropUrl,
             rating: item.rating,
-            episodes: _knownEpisodeCount,
+            episodes: _knownEpisodes.length > _knownEpisodeCount ? _knownEpisodes.length : _knownEpisodeCount,
             updated: item.updated,
             platformSlug: item.platformSlug,
             chapterId: item.chapterId,
