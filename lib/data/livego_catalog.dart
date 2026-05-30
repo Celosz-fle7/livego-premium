@@ -2,6 +2,7 @@ import '../core/livego_settings.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import '../services/anichin_api_client.dart';
+import '../services/cache/livego_content_cache.dart';
 import '../models/livego_episode.dart';
 import 'mock_catalog.dart';
 
@@ -44,17 +45,40 @@ class LiveGoCatalog {
   }
 
   static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
+    final cached = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: 'home',
+      params: {'lang': LiveGoSettings.language},
+    );
+    if (cached != null && cached.isNotEmpty) return cached;
+
     try {
       final rows = await AnichinApiClient.home(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
       print('CATALOG HOME $platform -> ${rows.length}');
-      if (rows.isNotEmpty) return rows;
+      if (rows.isNotEmpty) {
+        await LiveGoContentCache.writeItems(
+          platform: platform,
+          endpoint: 'home',
+          params: {'lang': LiveGoSettings.language},
+          items: rows,
+        );
+        return rows;
+      }
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
       final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
           .timeout(const Duration(seconds: 12));
-      if (rows.isNotEmpty) return rows;
+      if (rows.isNotEmpty) {
+        await LiveGoContentCache.writeItems(
+          platform: platform,
+          endpoint: 'home',
+          params: {'lang': LiveGoSettings.language},
+          items: rows,
+        );
+        return rows;
+      }
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     return [];
@@ -66,11 +90,26 @@ class LiveGoCatalog {
     String category = 'Trending',
   }) async {
     final key = category.trim().toLowerCase().replaceAll(' ', '');
+    final cached = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: key.isEmpty ? 'home' : key,
+      params: {'lang': LiveGoSettings.language},
+    );
+    if (cached != null && cached.isNotEmpty) return cached;
+
     try {
       if (key == 'foryou') {
         final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
             .timeout(const Duration(seconds: 12));
-        if (rows.isNotEmpty) return rows;
+        if (rows.isNotEmpty) {
+          await LiveGoContentCache.writeItems(
+            platform: platform,
+            endpoint: key,
+            params: {'lang': LiveGoSettings.language},
+            items: rows,
+          );
+          return rows;
+        }
       }
       if (platform == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
         final rows = await AnichinApiClient.collection(
@@ -78,36 +117,47 @@ class LiveGoCatalog {
           collection: key,
           lang: LiveGoSettings.language,
         ).timeout(const Duration(seconds: 12));
-        if (rows.isNotEmpty) return rows;
+        if (rows.isNotEmpty) {
+          await LiveGoContentCache.writeItems(
+            platform: platform,
+            endpoint: key,
+            params: {'lang': LiveGoSettings.language},
+            items: rows,
+          );
+          return rows;
+        }
       }
     } catch (e) { print('LIVEGO CATEGORY ERROR: $e'); }
-    return home(platform: platform);
+    final rows = await home(platform: platform);
+    if (rows.isNotEmpty) {
+      await LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: key.isEmpty ? 'home' : key,
+        params: {'lang': LiveGoSettings.language},
+        items: rows,
+      );
+    }
+    return rows;
   }
 
   static Future<Map<String, List<ContentItem>>> homeSections() async {
-    final result = <String, List<ContentItem>>{};
-    for (final platform in platforms.take(6)) {
+    await LiveGoContentCache.cleanExpiredAndTrim();
+    final futures = platforms.take(6).map((platform) async {
       final rows = await home(platform: platform);
-      if (rows.isNotEmpty) result[label(platform)] = rows;
-    }
-    return result;
+      return MapEntry(label(platform), rows);
+    });
+    final entries = await Future.wait(futures);
+    return Map.fromEntries(entries.where((e) => e.value.isNotEmpty));
   }
 
   static Future<List<ContentItem>> banners({String platform = 'shortmax'}) async {
-    try {
-      final banners = await AnichinApiClient.banner(platform: platform, lang: LiveGoSettings.language)
-          .timeout(const Duration(seconds: 10));
-      if (banners.isNotEmpty) return banners.take(8).toList();
-    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
-
     final items = await home(platform: platform);
-    return items.take(5).toList();
+    if (items.isNotEmpty) return items.take(5).toList();
+    return [];
   }
 
   static Future<ContentItem> hero({String platform = 'shortmax'}) async {
     try {
-      final banners = await AnichinApiClient.banner(platform: platform, lang: LiveGoSettings.language);
-      if (banners.isNotEmpty) return banners.first;
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
@@ -115,8 +165,24 @@ class LiveGoCatalog {
   }
 
   static Future<List<ContentItem>> search(String query, {String platform = 'shortmax'}) async {
+    final clean = query.trim();
+    if (clean.isEmpty) return [];
+    final cached = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: 'search',
+      params: {'q': clean, 'lang': LiveGoSettings.language},
+    );
+    if (cached != null) return cached;
     try {
-      return await AnichinApiClient.search(query: query, platform: platform, lang: LiveGoSettings.language);
+      final rows = await AnichinApiClient.search(query: clean, platform: platform, lang: LiveGoSettings.language);
+      await LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: 'search',
+        params: {'q': clean, 'lang': LiveGoSettings.language},
+        items: rows,
+        ttl: LiveGoContentCache.searchTtl,
+      );
+      return rows;
     } catch (e) {
       print('LIVEGO SEARCH ERROR: $e');
       return [];
@@ -139,9 +205,13 @@ class LiveGoCatalog {
   }
 
   static Future<ContentItem> detail(ContentItem item) async {
+    final cached = await LiveGoContentCache.readDetail(item);
+    if (cached != null) return cached;
     try {
       final detail = await AnichinApiClient.detail(item);
-      return detail ?? item;
+      final resolved = detail ?? item;
+      await LiveGoContentCache.writeDetail(resolved);
+      return resolved;
     } catch (e) {
       print('LIVEGO DETAIL ERROR: $e');
       return item;
@@ -150,8 +220,12 @@ class LiveGoCatalog {
 
 
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
+    final cached = await LiveGoContentCache.readEpisodes(item);
+    if (cached != null && cached.isNotEmpty) return cached;
     try {
-      return await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 12));
+      final rows = await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 12));
+      if (rows.isNotEmpty) await LiveGoContentCache.writeEpisodes(item, rows);
+      return rows;
     } catch (e) {
       print('LIVEGO EPISODES ERROR: $e');
       final total = item.episodes <= 0 ? 1 : item.episodes;
