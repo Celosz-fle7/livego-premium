@@ -7,6 +7,10 @@ import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import 'tv_player_screen.dart';
+import '../focus/tv_focus_engine.dart';
+import '../focus/tv_focus_memory.dart';
+import '../focus/tv_focus_zone.dart';
+import '../focus/tv_scroll_engine.dart';
 
 class TvHomeScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -18,7 +22,6 @@ class TvHomeScreen extends StatefulWidget {
   State<TvHomeScreen> createState() => _TvHomeScreenState();
 }
 
-enum _TvZone { banner, platform, category, grid }
 
 class _TvHomeScreenState extends State<TvHomeScreen> {
   int source = 0;
@@ -31,11 +34,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   final List<FocusNode> _categoryNodes = [];
   final List<FocusNode> _gridNodes = [];
 
-  _TvZone _lastZone = _TvZone.grid;
+  TvFocusZone _lastZone = TvFocusZone.grid;
   int _lastPlatform = 0;
   int _lastCategory = 0;
   int _lastGrid = 0;
   FocusNode? _lastRightFocus;
+  late final TvFocusMemory _focusMemory;
+  late final TvFocusEngine _focusEngine;
 
   static const int _gridColumns = 7;
 
@@ -49,6 +54,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _focusMemory = TvFocusMemory();
+    _focusEngine = TvFocusEngine(memory: _focusMemory);
     _future = _load();
   }
 
@@ -106,35 +113,29 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
   }
 
-  void _rememberRightFocus(FocusNode node, _TvZone zone, {int? platform, int? category, int? grid}) {
+  void _rememberRightFocus(FocusNode node, TvFocusZone zone, {int? platform, int? category, int? grid}) {
     _lastRightFocus = node;
     _lastZone = zone;
     if (platform != null) _lastPlatform = platform;
     if (category != null) _lastCategory = category;
     if (grid != null) _lastGrid = grid;
+    _focusEngine.rememberRight(
+      node,
+      zone,
+      platformIndex: platform,
+      categoryIndex: category,
+      gridIndex: grid,
+    );
   }
 
-  void _moveToNavFrom(FocusNode node, _TvZone zone, {int? platform, int? category, int? grid}) {
+  void _moveToNavFrom(FocusNode node, TvFocusZone zone, {int? platform, int? category, int? grid}) {
     _rememberRightFocus(node, zone, platform: platform, category: category, grid: grid);
     widget.onMoveToNav?.call();
   }
 
   void _focus(FocusNode node, {double alignment = 0.15}) {
     _lastRightFocus = node;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !node.canRequestFocus) return;
-      node.requestFocus();
-      final context = node.context;
-      if (context != null) {
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: alignment,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-        );
-      }
-    });
+    TvScrollEngine.focusAndReveal(node, alignment: alignment);
   }
 
   int _safe(int value, int length) {
@@ -154,74 +155,75 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     // Entry point from the left navbar back into the right territory.
     // Strict ownership rule: restore the exact last right-side FocusNode first.
     // Only fall back to zone/index if that node is no longer attached.
+    if (_focusEngine.restoreLastRight(focus: _focus)) return;
     final remembered = _lastRightFocus;
     if (remembered != null && remembered.canRequestFocus && remembered.context != null) {
-      _focus(remembered, alignment: _lastZone == _TvZone.grid ? 0.35 : 0.15);
+      _focus(remembered, alignment: _lastZone == TvFocusZone.grid ? 0.35 : 0.15);
       return;
     }
-    if (_lastZone == _TvZone.grid && _gridNodes.isNotEmpty) {
+    if (_lastZone == TvFocusZone.grid && _gridNodes.isNotEmpty) {
       _lastGrid = _safe(_lastGrid, _gridNodes.length);
       _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return;
     }
-    if (_lastZone == _TvZone.category && _categoryNodes.isNotEmpty) {
+    if (_lastZone == TvFocusZone.category && _categoryNodes.isNotEmpty) {
       _lastCategory = _safe(_lastCategory, _categoryNodes.length);
       _focus(_categoryNodes[_lastCategory]);
       return;
     }
-    if (_lastZone == _TvZone.platform && _platformNodes.isNotEmpty) {
+    if (_lastZone == TvFocusZone.platform && _platformNodes.isNotEmpty) {
       _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
       _focus(_platformNodes[_lastPlatform]);
       return;
     }
-    if (_lastZone == _TvZone.banner && _bannerNode.canRequestFocus) {
+    if (_lastZone == TvFocusZone.banner && _bannerNode.canRequestFocus) {
       _focus(_bannerNode);
       return;
     }
 
     // Safe fallback: enter the real content area first, not the banner trap.
     if (_gridNodes.isNotEmpty) {
-      _lastZone = _TvZone.grid;
+      _lastZone = TvFocusZone.grid;
       _lastGrid = _safe(_lastGrid, _gridNodes.length);
       _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return;
     }
     if (_categoryNodes.isNotEmpty) {
-      _lastZone = _TvZone.category;
+      _lastZone = TvFocusZone.category;
       _lastCategory = _safe(_lastCategory, _categoryNodes.length);
       _focus(_categoryNodes[_lastCategory]);
       return;
     }
     if (_platformNodes.isNotEmpty) {
-      _lastZone = _TvZone.platform;
+      _lastZone = TvFocusZone.platform;
       _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
       _focus(_platformNodes[_lastPlatform]);
       return;
     }
-    _lastZone = _TvZone.banner;
+    _lastZone = TvFocusZone.banner;
     _focus(_bannerNode);
   }
 
   void _focusRightFallback() {
     if (_gridNodes.isNotEmpty) {
-      _lastZone = _TvZone.grid;
+      _lastZone = TvFocusZone.grid;
       _lastGrid = _safe(_lastGrid, _gridNodes.length);
       _focus(_gridNodes[_lastGrid], alignment: 0.35);
       return;
     }
     if (_categoryNodes.isNotEmpty) {
-      _lastZone = _TvZone.category;
+      _lastZone = TvFocusZone.category;
       _lastCategory = _safe(_lastCategory, _categoryNodes.length);
       _focus(_categoryNodes[_lastCategory]);
       return;
     }
     if (_platformNodes.isNotEmpty) {
-      _lastZone = _TvZone.platform;
+      _lastZone = TvFocusZone.platform;
       _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
       _focus(_platformNodes[_lastPlatform]);
       return;
     }
-    _lastZone = _TvZone.banner;
+    _lastZone = TvFocusZone.banner;
     _focus(_bannerNode);
   }
 
@@ -229,11 +231,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNavFrom(_bannerNode, _TvZone.banner);
+      _moveToNavFrom(_bannerNode, TvFocusZone.banner);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _lastZone = _TvZone.banner;
+      _lastZone = TvFocusZone.banner;
       _focus(_bannerNode);
       return KeyEventResult.handled;
     }
@@ -243,15 +245,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       if (_platformNodes.isNotEmpty) {
-        _lastZone = _TvZone.platform;
+        _lastZone = TvFocusZone.platform;
         _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
         _focus(_platformNodes[_lastPlatform]);
       } else if (_categoryNodes.isNotEmpty) {
-        _lastZone = _TvZone.category;
+        _lastZone = TvFocusZone.category;
         _lastCategory = _safe(_lastCategory, _categoryNodes.length);
         _focus(_categoryNodes[_lastCategory]);
       } else if (_gridNodes.isNotEmpty) {
-        _lastZone = _TvZone.grid;
+        _lastZone = TvFocusZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
@@ -269,7 +271,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (i == 0) {
-        _moveToNavFrom(_platformNodes[i], _TvZone.platform, platform: i);
+        _moveToNavFrom(_platformNodes[i], TvFocusZone.platform, platform: i);
       } else {
         _lastPlatform = i - 1;
         _focus(_platformNodes[_lastPlatform]);
@@ -278,11 +280,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _platformNodes.length - 1) {
-        _lastZone = _TvZone.platform;
+        _lastZone = TvFocusZone.platform;
         _lastPlatform = i + 1;
         _focus(_platformNodes[_lastPlatform]);
       } else if (_categoryNodes.isNotEmpty) {
-        _lastZone = _TvZone.category;
+        _lastZone = TvFocusZone.category;
         _lastCategory = _safe(_lastCategory, _categoryNodes.length);
         _focus(_categoryNodes[_lastCategory]);
       } else {
@@ -291,17 +293,17 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _lastZone = _TvZone.banner;
+      _lastZone = TvFocusZone.banner;
       _focus(_bannerNode);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       if (_categoryNodes.isNotEmpty) {
-        _lastZone = _TvZone.category;
+        _lastZone = TvFocusZone.category;
         _lastCategory = _safe(_lastCategory, _categoryNodes.length);
         _focus(_categoryNodes[_lastCategory]);
       } else if (_gridNodes.isNotEmpty) {
-        _lastZone = _TvZone.grid;
+        _lastZone = TvFocusZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
@@ -311,11 +313,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       setState(() {
         source = i;
         category = 0;
-        _lastZone = _TvZone.platform;
+        _lastZone = TvFocusZone.platform;
         _lastPlatform = i;
         _lastCategory = 0;
         _lastGrid = 0;
         _lastRightFocus = null;
+        _focusEngine.clearRightNode();
       });
       _reload();
       return KeyEventResult.handled;
@@ -328,7 +331,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (i == 0) {
-        _moveToNavFrom(_categoryNodes[i], _TvZone.category, category: i);
+        _moveToNavFrom(_categoryNodes[i], TvFocusZone.category, category: i);
       } else {
         _lastCategory = i - 1;
         _focus(_categoryNodes[_lastCategory]);
@@ -337,11 +340,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _categoryNodes.length - 1) {
-        _lastZone = _TvZone.category;
+        _lastZone = TvFocusZone.category;
         _lastCategory = i + 1;
         _focus(_categoryNodes[_lastCategory]);
       } else if (_gridNodes.isNotEmpty) {
-        _lastZone = _TvZone.grid;
+        _lastZone = TvFocusZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
       } else {
@@ -351,18 +354,18 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (_platformNodes.isNotEmpty) {
-        _lastZone = _TvZone.platform;
+        _lastZone = TvFocusZone.platform;
         _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
         _focus(_platformNodes[_lastPlatform]);
       } else {
-        _lastZone = _TvZone.banner;
+        _lastZone = TvFocusZone.banner;
         _focus(_bannerNode);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       if (_gridNodes.isNotEmpty) {
-        _lastZone = _TvZone.grid;
+        _lastZone = TvFocusZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
@@ -371,10 +374,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (_isSelect(key)) {
       setState(() {
         category = i;
-        _lastZone = _TvZone.category;
+        _lastZone = TvFocusZone.category;
         _lastCategory = i;
         _lastGrid = 0;
         _lastRightFocus = null;
+        _focusEngine.clearRightNode();
       });
       _reload();
       return KeyEventResult.handled;
@@ -389,7 +393,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final row = index ~/ _gridColumns;
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
-        _moveToNavFrom(_gridNodes[index], _TvZone.grid, grid: index);
+        _moveToNavFrom(_gridNodes[index], TvFocusZone.grid, grid: index);
       } else {
         _lastGrid = index - 1;
         _focus(_gridNodes[_lastGrid], alignment: 0.35);
@@ -409,15 +413,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
         if (_categoryNodes.isNotEmpty) {
-          _lastZone = _TvZone.category;
+          _lastZone = TvFocusZone.category;
           _lastCategory = _safe(_lastCategory, _categoryNodes.length);
           _focus(_categoryNodes[_lastCategory]);
         } else if (_platformNodes.isNotEmpty) {
-          _lastZone = _TvZone.platform;
+          _lastZone = TvFocusZone.platform;
           _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
           _focus(_platformNodes[_lastPlatform]);
         } else {
-          _lastZone = _TvZone.banner;
+          _lastZone = TvFocusZone.banner;
           _focus(_bannerNode);
         }
       } else {
@@ -464,7 +468,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             _FocusableBanner(
               item: hero,
               focusNode: _bannerNode,
-              onFocus: () => _rememberRightFocus(_bannerNode, _TvZone.banner),
+              onFocus: () => _rememberRightFocus(_bannerNode, TvFocusZone.banner),
               onTap: hero == null ? null : () => _open(hero),
               onKey: (node, event) => _bannerKey(hero, event),
             ),
@@ -475,8 +479,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 labels: platforms,
                 selected: source,
                 nodes: _platformNodes,
-                onFocus: (i) => _rememberRightFocus(_platformNodes[i], _TvZone.platform, platform: i),
-                onTap: (i) { setState(() { source = i; category = 0; _lastPlatform = i; _lastCategory = 0; _lastGrid = 0; _lastRightFocus = null; }); _reload(); },
+                onFocus: (i) => _rememberRightFocus(_platformNodes[i], TvFocusZone.platform, platform: i),
+                onTap: (i) { setState(() { source = i; category = 0; _lastPlatform = i; _lastCategory = 0; _lastGrid = 0; _lastRightFocus = null;
+        _focusEngine.clearRightNode(); }); _reload(); },
                 onKey: _platformKey,
               ),
             ),
@@ -487,8 +492,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 labels: categories,
                 selected: category,
                 nodes: _categoryNodes,
-                onFocus: (i) => _rememberRightFocus(_categoryNodes[i], _TvZone.category, category: i),
-                onTap: (i) { setState(() { category = i; _lastCategory = i; _lastGrid = 0; _lastRightFocus = null; }); _reload(); },
+                onFocus: (i) => _rememberRightFocus(_categoryNodes[i], TvFocusZone.category, category: i),
+                onTap: (i) { setState(() { category = i; _lastCategory = i; _lastGrid = 0; _lastRightFocus = null;
+        _focusEngine.clearRightNode(); }); _reload(); },
                 onKey: _categoryKey,
               ),
             ),
@@ -500,7 +506,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 title: 'Popular',
                 items: gridItems,
                 nodes: _gridNodes,
-                onFocus: (i) => _rememberRightFocus(_gridNodes[i], _TvZone.grid, grid: i),
+                onFocus: (i) => _rememberRightFocus(_gridNodes[i], TvFocusZone.grid, grid: i),
                 onKey: _gridKey,
                 onTap: _open,
               ),
