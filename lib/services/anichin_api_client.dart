@@ -148,37 +148,66 @@ class AnichinApiClient {
 
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
     final slug = _apiSlug(item.platformSlug);
-    Map<String, dynamic> json = <String, dynamic>{};
     final apiLang = _providerLang(slug, item.lang);
+
+    Map<String, dynamic> json = <String, dynamic>{};
     try {
       json = await _getJson('/api/$slug/allepisode', {
         'id': item.id,
         'lang': apiLang,
       });
     } catch (_) {
-      json = await _getJson('/api/$slug/detail', {
-        'id': item.id,
-        'lang': apiLang,
-      });
+      json = <String, dynamic>{};
     }
 
-    final raw = _episodeList(json);
-    if (raw.isNotEmpty) {
-      return raw.asMap().entries.map((entry) {
-        final idx = entry.key + 1;
-        final row = entry.value;
-        final number = _parseInt(
-          row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['ep'] ?? row['index'],
-          fallback: idx,
-        );
-        final id = '$number';
-        final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $number');
-        return LiveGoEpisode(id: id, index: number, title: title);
-      }).toList();
+    var rows = _episodesFromJson(json);
+
+    // ShortMax can be very fast for /episode, but the first player open must
+    // still show the full playlist. If /allepisode returns an incomplete shape
+    // or only a synthetic single row, fall back to /detail where ShortMax often
+    // carries the complete episode metadata/count.
+    if (rows.length <= 1 && slug == 'shortmax') {
+      try {
+        final detailJson = await _getJson('/api/$slug/detail', {
+          'id': item.id,
+          'lang': apiLang,
+        });
+        final detailRows = _episodesFromJson(detailJson);
+        if (detailRows.length > rows.length) rows = detailRows;
+
+        final detailCount = _episodes(_dataMap(detailJson));
+        if (rows.length <= 1 && detailCount > 1) {
+          rows = _syntheticEpisodes(detailCount);
+        }
+      } catch (_) {
+        // Keep the generic fallback below.
+      }
     }
+
+    if (rows.isNotEmpty) return rows;
 
     final total = item.episodes <= 0 ? 1 : item.episodes;
-    return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
+    return _syntheticEpisodes(total);
+  }
+
+  static List<LiveGoEpisode> _episodesFromJson(Map<String, dynamic> json) {
+    final raw = _episodeList(json);
+    if (raw.isEmpty) return const <LiveGoEpisode>[];
+    return raw.asMap().entries.map((entry) {
+      final idx = entry.key + 1;
+      final row = entry.value;
+      final number = _parseInt(
+        row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['ep'] ?? row['index'],
+        fallback: idx,
+      );
+      final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $number');
+      return LiveGoEpisode(id: '$number', index: number, title: title);
+    }).toList();
+  }
+
+  static List<LiveGoEpisode> _syntheticEpisodes(int total) {
+    final safeTotal = total <= 0 ? 1 : total;
+    return List.generate(safeTotal, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
   }
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {

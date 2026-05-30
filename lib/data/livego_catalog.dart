@@ -262,13 +262,6 @@ class LiveGoCatalog {
   }
 
 
-
-  static Future<List<LiveGoEpisode>?> cachedEpisodes(ContentItem item) async {
-    final cached = await LiveGoContentCache.readEpisodes(item);
-    if (cached == null || cached.length <= 1) return null;
-    return cached;
-  }
-
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
     final cached = await LiveGoContentCache.readEpisodes(item);
 
