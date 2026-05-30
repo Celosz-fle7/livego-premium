@@ -14,6 +14,7 @@ class TvHomeScreen extends StatefulWidget {
 }
 
 class _TvHomeScreenState extends State<TvHomeScreen> {
+  final ScrollController _scroll = ScrollController();
   int source = 0;
   int category = 0;
   late Future<_TvHomeState> _future;
@@ -29,6 +30,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<_TvHomeState> _load() async {
@@ -62,11 +69,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 30, 32, 34),
+        return FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(),
+          child: ListView(
+          controller: _scroll,
+          padding: const EdgeInsets.fromLTRB(18, 24, 28, 34),
           children: [
             if (hero != null) HeroBanner(item: hero, tv: true) else const _TvSkeleton(height: 220),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
@@ -77,17 +87,18 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); }),
+                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, autofocusFirst: true, onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); }),
                   const SizedBox(height: 12),
                   CategoryChips(items: categories, selected: category, tv: true, onSelected: (v) { setState(() => category = v); _reload(); }),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            if (loading) const _TvSkeleton(height: 236) else _Rail(title: 'Popular', items: items.take(12).toList()),
+            const SizedBox(height: 18),
+            if (loading) const _TvSkeleton(height: 220) else _Rail(title: 'Popular', items: items.take(12).toList()),
             const SizedBox(height: 26),
             if (!loading) _Rail(title: 'Lanjut Nonton', items: items.skip(6).take(12).toList()),
           ],
+        ),
         );
       },
     );
@@ -115,7 +126,7 @@ class _Rail extends StatelessWidget {
           Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18)),
           const SizedBox(height: 12),
           SizedBox(
-            height: 238,
+            height: 220,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: items.length,

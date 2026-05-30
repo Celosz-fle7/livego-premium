@@ -136,6 +136,7 @@ class _NavButtonState extends State<_NavButton> {
       message: widget.label,
       child: Focus(
         focusNode: widget.focusNode,
+        autofocus: widget.logo,
         onKey: widget.onKey,
         onFocusChange: (v) => setState(() => focused = v),
         child: InkWell(

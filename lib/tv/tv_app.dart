@@ -52,7 +52,10 @@ class _TvAppState extends State<TvApp> {
       if (!mounted) return;
       if (moveToContent) {
         _contentGuard.requestFocus();
-        FocusScope.of(context).nextFocus();
+        Future<void>.delayed(const Duration(milliseconds: 60), () {
+          if (!mounted) return;
+          FocusScope.of(context).nextFocus();
+        });
       } else {
         _navNodes[value.clamp(0, _navNodes.length - 1)].requestFocus();
       }
@@ -97,6 +100,10 @@ class _TvAppState extends State<TvApp> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _navNodes[index.clamp(0, _navNodes.length - 1)].requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (node.hasFocus && (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select)) {
+      FocusScope.of(context).nextFocus();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack) {

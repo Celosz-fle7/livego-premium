@@ -7,8 +7,9 @@ class CategoryChips extends StatelessWidget {
   final int selected;
   final ValueChanged<int>? onSelected;
   final bool tv;
+  final bool autofocusFirst;
 
-  const CategoryChips({super.key, required this.items, this.selected = 0, this.onSelected, this.tv = false});
+  const CategoryChips({super.key, required this.items, this.selected = 0, this.onSelected, this.tv = false, this.autofocusFirst = false});
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +22,7 @@ class CategoryChips extends StatelessWidget {
           text: items[index],
           active: active,
           tv: tv,
+          autofocus: autofocusFirst && index == 0,
           onTap: () => onSelected?.call(index),
         );
       }),
@@ -33,12 +35,14 @@ class _FocusableChip extends StatefulWidget {
   final bool active;
   final bool tv;
   final VoidCallback onTap;
+  final bool autofocus;
 
   const _FocusableChip({
     required this.text,
     required this.active,
     required this.tv,
     required this.onTap,
+    this.autofocus = false,
   });
 
   @override
@@ -54,6 +58,7 @@ class _FocusableChipState extends State<_FocusableChip> {
     final tv = widget.tv;
 
     return Focus(
+      autofocus: widget.autofocus,
       onKey: (node, event) {
         if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
           widget.onTap();

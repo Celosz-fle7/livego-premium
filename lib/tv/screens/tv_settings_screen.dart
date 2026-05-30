@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 
@@ -143,8 +144,15 @@ class _TabChipState extends State<_TabChip> {
   bool focused = false;
   @override
   Widget build(BuildContext context) {
-    return FocusableActionDetector(
-      onShowFocusHighlight: (v) => setState(() => focused = v),
+    return Focus(
+      onKey: (node, event) {
+        if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      onFocusChange: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(999),
@@ -183,8 +191,15 @@ class _OptionRowState extends State<_OptionRow> {
   @override
   Widget build(BuildContext context) {
     final color = widget.danger ? const Color(0xFFFF6B7A) : AppTheme.cyan;
-    return FocusableActionDetector(
-      onShowFocusHighlight: (v) => setState(() => focused = v),
+    return Focus(
+      onKey: (node, event) {
+        if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      onFocusChange: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(20),
