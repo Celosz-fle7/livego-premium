@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../services/download/download_service.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/image/image_quality_config.dart';
 
 class MobileDownloadsScreen extends StatelessWidget {
   const MobileDownloadsScreen({super.key});
