@@ -31,7 +31,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   final List<FocusNode> _categoryNodes = [];
   final List<FocusNode> _gridNodes = [];
 
-  _TvZone _lastZone = _TvZone.banner;
+  _TvZone _lastZone = _TvZone.grid;
   int _lastPlatform = 0;
   int _lastCategory = 0;
   int _lastGrid = 0;
@@ -136,29 +136,72 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _returnToLastContent() {
-    switch (_lastZone) {
-      case _TvZone.grid:
-        if (_gridNodes.isNotEmpty) {
-          _focus(_gridNodes[_safe(_lastGrid, _gridNodes.length)], alignment: 0.35);
-          return;
-        }
-        break;
-      case _TvZone.category:
-        if (_categoryNodes.isNotEmpty) {
-          _focus(_categoryNodes[_safe(_lastCategory, _categoryNodes.length)]);
-          return;
-        }
-        break;
-      case _TvZone.platform:
-        if (_platformNodes.isNotEmpty) {
-          _focus(_platformNodes[_safe(_lastPlatform, _platformNodes.length)]);
-          return;
-        }
-        break;
-      case _TvZone.banner:
-        _focus(_bannerNode);
-        return;
+    // Entry point from the left navbar back into the right territory.
+    // Do not let Flutter guess the next focus. Prefer the last known right-side
+    // position, but if that target is unavailable, fall back deeper into content.
+    if (_lastZone == _TvZone.grid && _gridNodes.isNotEmpty) {
+      _lastGrid = _safe(_lastGrid, _gridNodes.length);
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      return;
     }
+    if (_lastZone == _TvZone.category && _categoryNodes.isNotEmpty) {
+      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+      _focus(_categoryNodes[_lastCategory]);
+      return;
+    }
+    if (_lastZone == _TvZone.platform && _platformNodes.isNotEmpty) {
+      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+      _focus(_platformNodes[_lastPlatform]);
+      return;
+    }
+    if (_lastZone == _TvZone.banner && _bannerNode.canRequestFocus) {
+      _focus(_bannerNode);
+      return;
+    }
+
+    // Safe fallback: enter the real content area first, not the banner trap.
+    if (_gridNodes.isNotEmpty) {
+      _lastZone = _TvZone.grid;
+      _lastGrid = _safe(_lastGrid, _gridNodes.length);
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      return;
+    }
+    if (_categoryNodes.isNotEmpty) {
+      _lastZone = _TvZone.category;
+      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+      _focus(_categoryNodes[_lastCategory]);
+      return;
+    }
+    if (_platformNodes.isNotEmpty) {
+      _lastZone = _TvZone.platform;
+      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+      _focus(_platformNodes[_lastPlatform]);
+      return;
+    }
+    _lastZone = _TvZone.banner;
+    _focus(_bannerNode);
+  }
+
+  void _focusRightFallback() {
+    if (_gridNodes.isNotEmpty) {
+      _lastZone = _TvZone.grid;
+      _lastGrid = _safe(_lastGrid, _gridNodes.length);
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      return;
+    }
+    if (_categoryNodes.isNotEmpty) {
+      _lastZone = _TvZone.category;
+      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+      _focus(_categoryNodes[_lastCategory]);
+      return;
+    }
+    if (_platformNodes.isNotEmpty) {
+      _lastZone = _TvZone.platform;
+      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+      _focus(_platformNodes[_lastPlatform]);
+      return;
+    }
+    _lastZone = _TvZone.banner;
     _focus(_bannerNode);
   }
 
@@ -175,8 +218,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _lastZone = _TvZone.banner;
-      _focus(_bannerNode);
+      _focusRightFallback();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -216,11 +258,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _platformNodes.length - 1) {
+        _lastZone = _TvZone.platform;
         _lastPlatform = i + 1;
         _focus(_platformNodes[_lastPlatform]);
+      } else if (_categoryNodes.isNotEmpty) {
+        _lastZone = _TvZone.category;
+        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+        _focus(_categoryNodes[_lastCategory]);
       } else {
-        _lastPlatform = i;
-        _focus(_platformNodes[_lastPlatform]);
+        _focusRightFallback();
       }
       return KeyEventResult.handled;
     }
@@ -270,11 +316,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _categoryNodes.length - 1) {
+        _lastZone = _TvZone.category;
         _lastCategory = i + 1;
         _focus(_categoryNodes[_lastCategory]);
+      } else if (_gridNodes.isNotEmpty) {
+        _lastZone = _TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       } else {
-        _lastCategory = i;
-        _focus(_categoryNodes[_lastCategory]);
+        _focusRightFallback();
       }
       return KeyEventResult.handled;
     }
@@ -403,7 +453,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 labels: platforms,
                 selected: source,
                 nodes: _platformNodes,
-                autofocusFirst: true,
                 onFocus: (i) { _lastZone = _TvZone.platform; _lastPlatform = i; },
                 onTap: (i) { setState(() { source = i; category = 0; _lastPlatform = i; _lastCategory = 0; _lastGrid = 0; }); _reload(); },
                 onKey: _platformKey,
