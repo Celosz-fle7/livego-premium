@@ -165,37 +165,63 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    // DramaBox documents the playable signed hlsUrl mainly in allepisode.
-    // Other providers usually expose /episode, but all providers get an
-    // allepisode fallback because response shapes vary between platforms.
-    if (slug != 'dramabox') {
-      try {
-        final json = await _getJson('/api/$slug/episode', query);
-        final parsed = await _parseStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
-        if (parsed.url.isNotEmpty) return parsed;
-      } catch (e) {
-        print('ANICHIN EPISODE STREAM FALLBACK $slug ep=$ep: $e');
-      }
-    }
-
-    final all = await _getJson('/api/$slug/allepisode', {
-      'id': item.id,
-      'lang': apiLang,
-    });
-    final row = _findEpisodeRow(all, ep);
-    if (row != null) {
-      final parsed = await _parseStream(row, item: item, ep: ep, slug: slug, lang: apiLang);
-      if (parsed.url.isNotEmpty) return parsed;
-    }
-
-    // Last chance for DramaBox/FlickReels style providers that may still have
-    // an /episode endpoint even when the docs recommend hlsUrl from allepisode.
+    // Provider-aware route based on the Anichin endpoint contract and Termux
+    // checks:
+    // - ShortMax/PineDrama/FlickReels expose playable streams from /episode.
+    // - DramaBox exposes playable signed hlsUrl in /allepisode.
+    // - NetShort can return an empty body when upstream is unavailable, so keep
+    //   the player safe and return StreamInfo.empty instead of crashing.
     if (slug == 'dramabox') {
-      final json = await _getJson('/api/$slug/episode', query);
-      return _parseStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
+      final stream = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
+      if (stream.url.isNotEmpty) return stream;
+      return StreamInfo.empty;
     }
+
+    final stream = await _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang);
+    if (stream.url.isNotEmpty) return stream;
+
+    // Some providers may include stream fields in /allepisode as a fallback.
+    final fallback = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
+    if (fallback.url.isNotEmpty) return fallback;
 
     return StreamInfo.empty;
+  }
+
+  static Future<StreamInfo> _streamFromEpisodeEndpoint(
+    ContentItem item, {
+    required Map<String, String> query,
+    required int ep,
+    required String slug,
+    required String lang,
+  }) async {
+    try {
+      final json = await _getJson('/api/$slug/episode', query);
+      if (json.isEmpty) return StreamInfo.empty;
+      return _parseStream(json, item: item, ep: ep, slug: slug, lang: lang);
+    } catch (e) {
+      print('ANICHIN EPISODE STREAM EMPTY $slug ep=$ep: $e');
+      return StreamInfo.empty;
+    }
+  }
+
+  static Future<StreamInfo> _streamFromAllEpisodes(
+    ContentItem item, {
+    required int ep,
+    required String slug,
+    required String lang,
+  }) async {
+    try {
+      final all = await _getJson('/api/$slug/allepisode', {
+        'id': item.id,
+        'lang': lang,
+      });
+      final row = _findEpisodeRow(all, ep);
+      if (row == null) return StreamInfo.empty;
+      return _parseStream(row, item: item, ep: ep, slug: slug, lang: lang);
+    } catch (e) {
+      print('ANICHIN ALLEPISODE STREAM EMPTY $slug ep=$ep: $e');
+      return StreamInfo.empty;
+    }
   }
 
   static int _episodeNumber(String chapter) {
@@ -458,7 +484,7 @@ class AnichinApiClient {
   }) async {
     final data = _dataMap(json);
     final streamData = _streamData(data);
-    final url = _extractUrl(streamData);
+    final url = _normalizePlayableUrl(_extractUrl(streamData));
 
     final subtitles = <SubtitleTrack>[];
     final subtitlesRaw = streamData['subtitles'] ??
@@ -478,7 +504,7 @@ class AnichinApiClient {
       subtitles.add(SubtitleTrack(
         language: lang,
         format: subtitlesUrl.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
-        url: subtitlesUrl,
+        url: _normalizePlayableUrl(subtitlesUrl),
       ));
     }
 
@@ -537,7 +563,70 @@ class AnichinApiClient {
   }
 
   static String _extractUrl(Map<String, dynamic> data) {
-    final direct = _first(data, const [
+    final streams = data['qualityList'] ??
+        data['quality_list'] ??
+        data['streams'] ??
+        data['qualities'] ??
+        data['urls'] ??
+        data['videos'];
+
+    if (streams is List && streams.isNotEmpty) {
+      final preferred = _qualityParam;
+      Map<String, dynamic>? defaultRow;
+      Map<String, dynamic>? firstRow;
+
+      for (final row in streams) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        firstRow ??= map;
+        if (map['isDefault'] == true || '${map['default']}'.toLowerCase() == 'true') {
+          defaultRow = map;
+        }
+        final quality = '${map['quality'] ?? map['resolution'] ?? map['label'] ?? ''}'.toLowerCase();
+        if (preferred.isNotEmpty && quality.contains(preferred.replaceAll('p', ''))) {
+          final url = _first(map, const [
+            'url',
+            'src',
+            'videoUrl',
+            'video_url',
+            'hlsUrl',
+            'hls_url',
+            'mp4Url',
+            'mp4_url',
+            'playUrl',
+            'play_url',
+          ]);
+          if (url.isNotEmpty) return url;
+        }
+      }
+
+      final selected = defaultRow ?? firstRow;
+      if (selected != null) {
+        final url = _first(selected, const [
+          'url',
+          'src',
+          'videoUrl',
+          'video_url',
+          'hlsUrl',
+          'hls_url',
+          'mp4Url',
+          'mp4_url',
+          'playUrl',
+          'play_url',
+        ]);
+        if (url.isNotEmpty) return url;
+      }
+    }
+
+    if (streams is Map) {
+      final preferred = _qualityParam;
+      if (preferred.isNotEmpty && streams[preferred] != null) return '${streams[preferred]}';
+      for (final key in ['auto', 'default', '1080p', '720p', '480p', 'url']) {
+        if (streams[key] != null) return '${streams[key]}';
+      }
+    }
+
+    return _first(data, const [
       'url',
       'videoUrl',
       'video_url',
@@ -556,36 +645,16 @@ class AnichinApiClient {
       'file',
       'link',
     ]);
-    if (direct.isNotEmpty) return direct;
-
-    final streams = data['streams'] ?? data['qualities'] ?? data['urls'] ?? data['videos'];
-    if (streams is List && streams.isNotEmpty) {
-      final preferred = _qualityParam;
-      Map? fallback;
-      for (final row in streams) {
-        if (row is! Map) continue;
-        fallback ??= row;
-        final quality = '${row['quality'] ?? row['resolution'] ?? row['label'] ?? ''}'.toLowerCase();
-        if (preferred.isNotEmpty && quality.contains(preferred.replaceAll('p', ''))) {
-          return _first(Map<String, dynamic>.from(row), const ['url', 'src', 'videoUrl', 'video_url', 'hlsUrl', 'hls_url', 'mp4Url', 'mp4_url', 'playUrl', 'play_url']);
-        }
-      }
-      if (fallback != null) {
-        return _first(Map<String, dynamic>.from(fallback), const ['url', 'src', 'videoUrl', 'video_url', 'hlsUrl', 'hls_url', 'mp4Url', 'mp4_url', 'playUrl', 'play_url']);
-      }
-    }
-
-    if (streams is Map) {
-      final preferred = _qualityParam;
-      if (preferred.isNotEmpty && streams[preferred] != null) return '${streams[preferred]}';
-      for (final key in ['auto', '1080p', '720p', '480p', 'url']) {
-        if (streams[key] != null) return '${streams[key]}';
-      }
-    }
-
-    return '';
   }
 
+
+  static String _normalizePlayableUrl(String raw) {
+    final url = raw.trim();
+    if (url.isEmpty) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '$baseUrl$url';
+    return url;
+  }
 
   static Map<String, dynamic>? _findEpisodeRow(Map<String, dynamic> json, int ep) {
     final rows = _episodeList(json);
@@ -643,7 +712,7 @@ class AnichinApiClient {
           'code',
         ], fallback: fallbackLang),
         format: subUrl.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
-        url: subUrl,
+        url: _normalizePlayableUrl(subUrl),
       ));
     }
   }
