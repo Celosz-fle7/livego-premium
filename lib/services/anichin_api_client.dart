@@ -186,8 +186,14 @@ class AnichinApiClient {
     final apiLang = _providerLang(slug, item.lang);
     final chapter = '${chapterId ?? item.chapterId}';
     final ep = _episodeNumber(chapter);
+    final playableId = item.id.trim();
+    if (playableId.isEmpty) {
+      print('ANICHIN STREAM EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
+      return StreamInfo.empty;
+    }
+
     final query = <String, String>{
-      'id': item.id,
+      'id': playableId,
       'ep': '$ep',
       'lang': apiLang,
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,

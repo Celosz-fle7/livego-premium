@@ -228,16 +228,37 @@ class LiveGoCatalog {
 
   static Future<ContentItem> detail(ContentItem item) async {
     final cached = await LiveGoContentCache.readDetail(item);
-    if (cached != null) return cached;
+    if (cached != null) {
+      final resolvedCached = _preservePlayableIdentity(cached, item);
+      if (resolvedCached.id.isNotEmpty) return resolvedCached;
+    }
     try {
       final detail = await AnichinApiClient.detail(item);
-      final resolved = detail ?? item;
+      final resolved = _preservePlayableIdentity(detail ?? item, item);
       await LiveGoContentCache.writeDetail(resolved);
       return resolved;
     } catch (e) {
       print('LIVEGO DETAIL ERROR: $e');
       return item;
     }
+  }
+
+  static ContentItem _preservePlayableIdentity(ContentItem detail, ContentItem original) {
+    return ContentItem(
+      id: detail.id.trim().isNotEmpty ? detail.id : original.id,
+      title: detail.title.trim().isNotEmpty ? detail.title : original.title,
+      source: detail.source.trim().isNotEmpty ? detail.source : original.source,
+      category: detail.category.trim().isNotEmpty ? detail.category : original.category,
+      description: detail.description.trim().isNotEmpty ? detail.description : original.description,
+      posterUrl: detail.posterUrl.trim().isNotEmpty ? detail.posterUrl : original.posterUrl,
+      backdropUrl: detail.backdropUrl.trim().isNotEmpty ? detail.backdropUrl : original.backdropUrl,
+      rating: detail.rating,
+      episodes: detail.episodes > 0 ? detail.episodes : original.episodes,
+      updated: detail.updated || original.updated,
+      platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : original.platformSlug,
+      chapterId: detail.chapterId.trim().isNotEmpty ? detail.chapterId : original.chapterId,
+      lang: detail.lang.trim().isNotEmpty ? detail.lang : original.lang,
+    );
   }
 
 

@@ -41,7 +41,9 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     final safeIndex = episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
     final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
     final selected = ContentItem(
-      id: detail.id,
+      // Some providers (ShortMax tested) return detail payloads with id="".
+      // The playable /episode endpoint still needs the original Home/Search id.
+      id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
       title: detail.title,
       source: detail.source,
       category: detail.category,
