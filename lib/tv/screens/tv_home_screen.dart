@@ -69,7 +69,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         if (category >= categories.length) category = 0;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(128, 36, 36, 36),
+          padding: const EdgeInsets.fromLTRB(56, 36, 56, 56),
           children: [
             if (hero != null) HeroBanner(item: hero, tv: true) else const _TvSkeleton(height: 245),
             const SizedBox(height: 28),
