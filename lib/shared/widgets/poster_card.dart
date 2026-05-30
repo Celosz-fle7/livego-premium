@@ -21,7 +21,7 @@ class _PosterCardState extends State<PosterCard> {
 
   @override
   Widget build(BuildContext context) {
-    final width = widget.tv ? 158.0 : 150.0;
+    final width = widget.tv ? 138.0 : 150.0;
     return ValueListenableBuilder<int>(
       valueListenable: LiveGoLocalStore.version,
       builder: (context, _, __) {
@@ -30,7 +30,7 @@ class _PosterCardState extends State<PosterCard> {
         return FocusableActionDetector(
           onShowFocusHighlight: (v) => setState(() => focused = v),
           child: AnimatedScale(
-            scale: focused && widget.tv ? 1.06 : 1.0,
+            scale: focused && widget.tv ? 1.045 : 1.0,
             duration: const Duration(milliseconds: 140),
             child: InkWell(
               onTap: widget.onTap,
@@ -106,7 +106,7 @@ class _PosterCardState extends State<PosterCard> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: focused ? Colors.white : Colors.white,
-                        fontSize: widget.tv ? 14 : 13,
+                        fontSize: widget.tv ? 13 : 13,
                         fontWeight: FontWeight.w800,
                         height: 1.1,
                       ),

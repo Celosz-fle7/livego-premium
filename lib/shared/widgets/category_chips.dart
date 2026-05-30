@@ -12,8 +12,8 @@ class CategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: tv ? 14 : 12,
-      runSpacing: tv ? 12 : 10,
+      spacing: tv ? 12 : 12,
+      runSpacing: tv ? 10 : 10,
       children: List.generate(items.length, (index) {
         final active = index == selected;
         return _FocusableChip(
@@ -61,7 +61,7 @@ class _FocusableChipState extends State<_FocusableChip> {
         hoverColor: Colors.white10,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          padding: EdgeInsets.symmetric(horizontal: tv ? 26 : 20, vertical: tv ? 14 : 12),
+          padding: EdgeInsets.symmetric(horizontal: tv ? 22 : 20, vertical: tv ? 11 : 12),
           decoration: BoxDecoration(
             gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
             color: active ? null : AppTheme.surface.withOpacity(0.82),
@@ -80,7 +80,7 @@ class _FocusableChipState extends State<_FocusableChip> {
             widget.text,
             style: TextStyle(
               color: active || focused ? Colors.white : AppTheme.textSoft,
-              fontSize: tv ? 16 : 14,
+              fontSize: tv ? 15 : 14,
               fontWeight: FontWeight.w900,
             ),
           ),

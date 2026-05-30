@@ -12,15 +12,15 @@ class HeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: tv ? 245 : 335,
+      height: tv ? 218 : 335,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(34),
+        borderRadius: BorderRadius.circular(tv ? 28 : 34),
         border: Border.all(color: const Color(0xFF26415D)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(tv ? 22 : 26),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -35,9 +35,9 @@ class HeroBanner extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: tv ? 36 : 28,
-              bottom: tv ? 36 : 32,
-              right: tv ? 260 : 128,
+              left: tv ? 32 : 28,
+              bottom: tv ? 30 : 32,
+              right: tv ? 230 : 128,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -49,7 +49,7 @@ class HeroBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 34 : 28,
+                      fontSize: tv ? 29 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -58,20 +58,20 @@ class HeroBanner extends StatelessWidget {
                     item.description,
                     maxLines: tv ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 15 : 13),
+                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 13.5 : 13),
                   ),
                 ],
               ),
             ),
             Positioned(
-              right: tv ? 44 : 24,
-              bottom: tv ? 32 : 40,
+              right: tv ? 36 : 24,
+              bottom: tv ? 26 : 40,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: LiveGoCachedImage(
                   url: item.posterUrl,
-                  width: tv ? 125 : 92,
-                  height: tv ? 170 : 132,
+                  width: tv ? 104 : 92,
+                  height: tv ? 146 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,

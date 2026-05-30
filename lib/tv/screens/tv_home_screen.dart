@@ -47,7 +47,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() {
+    setState(() => _future = _load());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,52 +62,32 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
 
-        return RepaintBoundary(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(166, 30, 36, 46),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1220).withOpacity(.42),
-                  borderRadius: BorderRadius.circular(34),
-                  border: Border.all(color: const Color(0xFF17283C)),
-                ),
-                child: hero != null ? HeroBanner(item: hero, tv: true) : const _TvSkeleton(height: 245),
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(18, 30, 32, 34),
+          children: [
+            if (hero != null) HeroBanner(item: hero, tv: true) else const _TvSkeleton(height: 220),
+            const SizedBox(height: 22),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1523).withOpacity(0.92),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: const Color(0xFF1D3147)),
               ),
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF101826).withOpacity(0.86),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: const Color(0xFF23364A)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CategoryChips(
-                      items: LiveGoCatalog.platformLabels,
-                      selected: source,
-                      tv: true,
-                      onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); },
-                    ),
-                    const SizedBox(height: 15),
-                    CategoryChips(
-                      items: categories,
-                      selected: category,
-                      tv: true,
-                      onSelected: (v) { setState(() => category = v); _reload(); },
-                    ),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); }),
+                  const SizedBox(height: 12),
+                  CategoryChips(items: categories, selected: category, tv: true, onSelected: (v) { setState(() => category = v); _reload(); }),
+                ],
               ),
-              const SizedBox(height: 22),
-              if (loading) const _TvSkeleton(height: 270) else _Rail(title: 'Popular', items: items.take(12).toList()),
-              const SizedBox(height: 30),
-              if (!loading) _Rail(title: 'Lanjut Nonton', items: items.skip(6).take(12).toList()),
-            ],
-          ),
+            ),
+            const SizedBox(height: 24),
+            if (loading) const _TvSkeleton(height: 236) else _Rail(title: 'Popular', items: items.take(12).toList()),
+            const SizedBox(height: 26),
+            if (!loading) _Rail(title: 'Lanjut Nonton', items: items.skip(6).take(12).toList()),
+          ],
         );
       },
     );
@@ -126,25 +108,27 @@ class _Rail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 13),
-        SizedBox(
-          height: 268,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 18),
-            itemBuilder: (_, i) => PosterCard(
-              item: items[i],
-              tv: true,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: items[i]))),
+    return RepaintBoundary(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18)),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 238,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 18),
+              itemBuilder: (_, i) => PosterCard(
+                item: items[i],
+                tv: true,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: items[i]))),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -158,9 +142,9 @@ class _TvSkeleton extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFF23364A)),
+        color: const Color(0xFF0B1523),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF1D3147)),
       ),
     );
   }
