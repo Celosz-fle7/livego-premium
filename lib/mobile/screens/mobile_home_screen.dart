@@ -88,8 +88,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       if (values.length >= 6) break;
     }
 
-    const fallback = ['New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
-    for (final item in fallback) {
+    for (final item in stored) {
       if (values.length >= 6) break;
       if (seen.add(item.toLowerCase())) values.add(item);
     }

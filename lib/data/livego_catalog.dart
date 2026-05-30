@@ -32,7 +32,7 @@ class LiveGoCatalog {
       }
       if (values.isNotEmpty) return values;
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
-    return const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
+    return LiveGoSettings.categoriesFor(platform);
   }
 
   static Future<String> pingPlatform(String platform) async {
@@ -73,9 +73,13 @@ class LiveGoCatalog {
 
   static Future<Map<String, List<ContentItem>>> homeSections() async {
     final result = <String, List<ContentItem>>{};
-    for (final platform in platforms.take(6)) {
-      final rows = await home(platform: platform);
-      if (rows.isNotEmpty) result[label(platform)] = rows;
+    final selected = platforms.take(6).toList();
+    final rows = await Future.wait(selected.map((platform) async {
+      final items = await home(platform: platform);
+      return MapEntry(platform, items);
+    }));
+    for (final row in rows) {
+      if (row.value.isNotEmpty) result[label(row.key)] = row.value;
     }
     return result;
   }
@@ -115,8 +119,8 @@ class LiveGoCatalog {
     if (clean.isEmpty) return [];
     final merged = <ContentItem>[];
     final seen = <String>{};
-    for (final platform in platforms) {
-      final rows = await search(clean, platform: platform);
+    final results = await Future.wait(platforms.map((platform) => search(clean, platform: platform)));
+    for (final rows in results) {
       for (final item in rows) {
         final key = '${item.platformSlug}:${item.id}';
         if (seen.add(key)) merged.add(item);

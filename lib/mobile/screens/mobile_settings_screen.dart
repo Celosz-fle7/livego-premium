@@ -236,8 +236,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
   late Set<String> _active;
   late List<String> _home;
   String _selectedPlatform = LiveGoSettings.defaultPlatform;
-  List<String> _availableCategories = const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
-  List<String> _selectedCategories = const ['Trending', 'New', 'Drama', 'Movies', 'Anime', 'Dubbing'];
+  List<String> _availableCategories = const ['Trending', 'For You'];
+  List<String> _selectedCategories = const ['Trending', 'For You'];
   bool _loadingCategories = false;
   bool _pinging = false;
 

@@ -80,7 +80,7 @@ class AnichinApiClient {
     if (query.trim().isEmpty) return [];
     final slug = _apiSlug(platform);
     final json = await _getJson('/api/$slug/search', {
-      'query': query.trim(),
+      if (slug == 'dramabox') 'q': query.trim() else 'query': query.trim(),
       'lang': lang,
     });
     return _parseItems(json, platform: platform, lang: lang);
@@ -221,6 +221,9 @@ class AnichinApiClient {
           data['results'] ??
           data['dramas'] ??
           data['books'] ??
+          data['records'] ??
+          data['content'] ??
+          data['result'] ??
           data['rows'] ??
           data['data'];
     }
@@ -268,6 +271,8 @@ class AnichinApiClient {
       'drama_id',
       'seriesId',
       'series_id',
+      'bookIdString',
+      'book_id_string',
     ]);
 
     final title = _first(json, const [
@@ -405,6 +410,8 @@ class AnichinApiClient {
       if (data['stream'] is Map) Map<String, dynamic>.from(data['stream'] as Map),
       if (data['play'] is Map) Map<String, dynamic>.from(data['play'] as Map),
       if (data['source'] is Map) Map<String, dynamic>.from(data['source'] as Map),
+      if (data['media'] is Map) Map<String, dynamic>.from(data['media'] as Map),
+      if (data['player'] is Map) Map<String, dynamic>.from(data['player'] as Map),
     ];
 
     for (final c in candidates) {
@@ -431,6 +438,8 @@ class AnichinApiClient {
       'videoUrl',
       'file',
       'link',
+      'hlsUrl',
+      'hls_url',
       'm3u8Url',
       'm3u8_url',
       'm3u8',
