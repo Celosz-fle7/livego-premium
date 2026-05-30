@@ -25,8 +25,8 @@ class TvSideNav extends StatelessWidget {
     (Icons.search_rounded, 'Cari'),
   ];
 
-  KeyEventResult _handleKey(BuildContext context, int i, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  KeyEventResult _handleKey(BuildContext context, int i, RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = (i + 1).clamp(0, items.length - 1);
@@ -74,7 +74,7 @@ class TvSideNav extends StatelessWidget {
                 active: index == 0,
                 logo: true,
                 onTap: () => onOpenContent(0),
-                onKeyEvent: (node, event) => _handleKey(context, 0, event),
+                onKey: (node, event) => _handleKey(context, 0, event),
               ),
               const SizedBox(height: 12),
               Container(width: 40, height: 1, color: Colors.white10),
@@ -90,7 +90,7 @@ class TvSideNav extends StatelessWidget {
                       label: items[i].$2,
                       active: i == index,
                       onTap: () => onOpenContent(i),
-                      onKeyEvent: (node, event) => _handleKey(context, i, event),
+                      onKey: (node, event) => _handleKey(context, i, event),
                     );
                   }),
                 ),
@@ -110,7 +110,7 @@ class _NavButton extends StatefulWidget {
   final bool active;
   final VoidCallback onTap;
   final bool logo;
-  final FocusOnKeyEventCallback onKeyEvent;
+  final FocusOnKeyCallback onKey;
 
   const _NavButton({
     required this.focusNode,
@@ -118,7 +118,7 @@ class _NavButton extends StatefulWidget {
     required this.label,
     required this.active,
     required this.onTap,
-    required this.onKeyEvent,
+    required this.onKey,
     this.logo = false,
   });
 
@@ -134,16 +134,10 @@ class _NavButtonState extends State<_NavButton> {
     final selected = focused || widget.active;
     return Tooltip(
       message: widget.label,
-      child: FocusableActionDetector(
+      child: Focus(
         focusNode: widget.focusNode,
-        onKeyEvent: widget.onKeyEvent,
-        onShowFocusHighlight: (v) => setState(() => focused = v),
-        actions: <Type, Action<Intent>>{
-          ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
-            widget.onTap();
-            return null;
-          }),
-        },
+        onKey: widget.onKey,
+        onFocusChange: (v) => setState(() => focused = v),
         child: InkWell(
           onTap: widget.onTap,
           borderRadius: BorderRadius.circular(18),

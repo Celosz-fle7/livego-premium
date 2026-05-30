@@ -101,8 +101,8 @@ class _ActionRow extends StatefulWidget {
 class _ActionRowState extends State<_ActionRow> {
   bool focused = false;
 
-  KeyEventResult _key(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+  KeyEventResult _key(FocusNode node, RawKeyEvent event) {
+    if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
       widget.onTap();
       return KeyEventResult.handled;
     }
@@ -111,10 +111,10 @@ class _ActionRowState extends State<_ActionRow> {
 
   @override
   Widget build(BuildContext context) {
-    return FocusableActionDetector(
+    return Focus(
       autofocus: widget.autofocus,
-      onKeyEvent: _key,
-      onShowFocusHighlight: (v) => setState(() => focused = v),
+      onKey: _key,
+      onFocusChange: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(22),

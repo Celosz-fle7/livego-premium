@@ -53,15 +53,15 @@ class _FocusableChipState extends State<_FocusableChip> {
     final active = widget.active;
     final tv = widget.tv;
 
-    return FocusableActionDetector(
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+    return Focus(
+      onKey: (node, event) {
+        if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
           widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
-      onShowFocusHighlight: (v) => setState(() => focused = v),
+      onFocusChange: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(999),

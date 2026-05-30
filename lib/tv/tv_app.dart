@@ -92,8 +92,8 @@ class _TvAppState extends State<TvApp> {
     if (await _confirmExit()) SystemNavigator.pop();
   }
 
-  KeyEventResult _contentKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  KeyEventResult _contentKey(FocusNode node, RawKeyEvent event) {
+    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _navNodes[index.clamp(0, _navNodes.length - 1)].requestFocus();
@@ -145,7 +145,7 @@ class _TvAppState extends State<TvApp> {
                       Expanded(
                         child: Focus(
                           focusNode: _contentGuard,
-                          onKeyEvent: _contentKey,
+                          onKey: _contentKey,
                           child: RepaintBoundary(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 150),
