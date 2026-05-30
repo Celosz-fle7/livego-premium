@@ -5,14 +5,15 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
+import '../feed/feed_config.dart';
 
 class LiveGoContentCache {
   LiveGoContentCache._();
 
-  static const int maxItemsPerList = 36;
+  static const int maxItemsPerList = FeedConfig.itemsPerCategory;
   static const int maxJsonCacheBytes = 30 * 1024 * 1024;
 
-  static const Duration homeTtl = Duration(hours: 4);
+  static const Duration homeTtl = FeedConfig.hardHomeCacheTtl;
   static const Duration latestTtl = Duration(hours: 1);
   static const Duration searchTtl = Duration(minutes: 30);
   static const Duration detailTtl = Duration(hours: 24);

@@ -3,6 +3,9 @@ import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import '../services/anichin_api_client.dart';
 import '../services/cache/livego_content_cache.dart';
+import '../services/feed/feed_config.dart';
+import '../services/feed/feed_limiter.dart';
+import '../services/feed/feed_session_state.dart';
 import '../models/livego_episode.dart';
 import 'mock_catalog.dart';
 
@@ -90,54 +93,73 @@ class LiveGoCatalog {
     String category = 'Trending',
   }) async {
     final key = category.trim().toLowerCase().replaceAll(' ', '');
-    final cached = await LiveGoContentCache.readItems(
-      platform: platform,
-      endpoint: key.isEmpty ? 'home' : key,
-      params: {'lang': LiveGoSettings.language},
+    final endpoint = key.isEmpty ? 'home' : key;
+    final lang = LiveGoSettings.language;
+    final sessionKey = FeedSessionState.key(platform, endpoint, lang: lang);
+    final visitSeed = FeedSessionState.markVisited(sessionKey);
+    final shouldRefresh = FeedSessionState.shouldRefresh(
+      sessionKey,
+      FeedConfig.activeRefreshInterval,
     );
-    if (cached != null && cached.isNotEmpty) return cached;
+
+    if (!shouldRefresh) {
+      final cached = await LiveGoContentCache.readItems(
+        platform: platform,
+        endpoint: endpoint,
+        params: {'lang': lang},
+      );
+      if (cached != null && cached.isNotEmpty) {
+        return FeedLimiter.prepare(cached, visitSeed: visitSeed);
+      }
+    }
 
     try {
+      List<ContentItem> rows = const <ContentItem>[];
       if (key == 'foryou') {
-        final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
+        rows = await AnichinApiClient.discover(platform: platform, lang: lang)
             .timeout(const Duration(seconds: 12));
-        if (rows.isNotEmpty) {
-          await LiveGoContentCache.writeItems(
-            platform: platform,
-            endpoint: key,
-            params: {'lang': LiveGoSettings.language},
-            items: rows,
-          );
-          return rows;
-        }
-      }
-      if (platform == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
-        final rows = await AnichinApiClient.collection(
+      } else if (platform == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
+        rows = await AnichinApiClient.collection(
           platform: platform,
           collection: key,
-          lang: LiveGoSettings.language,
+          lang: lang,
         ).timeout(const Duration(seconds: 12));
-        if (rows.isNotEmpty) {
-          await LiveGoContentCache.writeItems(
-            platform: platform,
-            endpoint: key,
-            params: {'lang': LiveGoSettings.language},
-            items: rows,
-          );
-          return rows;
-        }
+      } else {
+        rows = await AnichinApiClient.home(platform: platform, lang: lang)
+            .timeout(const Duration(seconds: 12));
+      }
+
+      if (rows.isNotEmpty) {
+        FeedSessionState.markNetworkRefresh(sessionKey);
+        await LiveGoContentCache.writeItems(
+          platform: platform,
+          endpoint: endpoint,
+          params: {'lang': lang},
+          items: rows,
+        );
+        return FeedLimiter.prepare(rows, visitSeed: visitSeed);
       }
     } catch (e) { print('LIVEGO CATEGORY ERROR: $e'); }
+
+    final cached = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: endpoint,
+      params: {'lang': lang},
+    );
+    if (cached != null && cached.isNotEmpty) {
+      return FeedLimiter.prepare(cached, visitSeed: visitSeed);
+    }
+
     final rows = await home(platform: platform);
     if (rows.isNotEmpty) {
       await LiveGoContentCache.writeItems(
         platform: platform,
-        endpoint: key.isEmpty ? 'home' : key,
-        params: {'lang': LiveGoSettings.language},
+        endpoint: endpoint,
+        params: {'lang': lang},
         items: rows,
       );
     }
-    return rows;
+    return FeedLimiter.prepare(rows, visitSeed: visitSeed);
   }
 
   static Future<Map<String, List<ContentItem>>> homeSections() async {
