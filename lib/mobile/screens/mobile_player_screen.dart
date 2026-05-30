@@ -27,6 +27,8 @@ class MobilePlayerScreen extends StatefulWidget {
 class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   late Future<_PlayerState> _future;
   int episode = 1;
+  int _knownEpisodeCount = 0;
+
 
   @override
   void initState() {
@@ -34,6 +36,25 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     episode = LiveGoLocalStore.continueEpisode(widget.item);
     LiveGoLocalStore.addHistory(widget.item);
     _future = _load();
+    _warmEpisodeMetadata();
+  }
+
+  Future<void> _warmEpisodeMetadata() async {
+    // Keep first playback fast, but fill the episode selector from cached/detail
+    // metadata as soon as it is available. We only cache lightweight metadata:
+    // id/title/poster/detail + episode numbers. Signed video URLs are always
+    // fetched fresh when an episode is played.
+    try {
+      final detail = await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8));
+      final rows = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 8));
+      final count = rows.isNotEmpty ? rows.length : detail.episodes;
+      if (!mounted || count <= 1) return;
+      if (count != _knownEpisodeCount) {
+        setState(() => _knownEpisodeCount = count);
+      }
+    } catch (e) {
+      debugPrint('LIVEGO PLAYER episode metadata warm skipped: $e');
+    }
   }
 
   Future<_PlayerState> _load() async {
@@ -114,6 +135,11 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     final total = realEpisodes.isNotEmpty
         ? realEpisodes.length
         : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
+    if (realEpisodes.length > 1 && mounted && _knownEpisodeCount != realEpisodes.length) {
+      Future.microtask(() {
+        if (mounted) setState(() => _knownEpisodeCount = realEpisodes.length);
+      });
+    }
     final playable = ContentItem(
       id: selected.id,
       title: selected.title,
@@ -146,7 +172,24 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
-        final item = state?.item ?? widget.item;
+        var item = state?.item ?? widget.item;
+        if (_knownEpisodeCount > item.episodes) {
+          item = ContentItem(
+            id: item.id,
+            title: item.title,
+            source: item.source,
+            category: item.category,
+            description: item.description,
+            posterUrl: item.posterUrl,
+            backdropUrl: item.backdropUrl,
+            rating: item.rating,
+            episodes: _knownEpisodeCount,
+            updated: item.updated,
+            platformSlug: item.platformSlug,
+            chapterId: item.chapterId,
+            lang: item.lang,
+          );
+        }
         final stream = state?.stream ?? StreamInfo.empty;
 
         return Scaffold(
