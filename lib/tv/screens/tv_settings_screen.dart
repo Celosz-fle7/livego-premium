@@ -17,14 +17,14 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF050914),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(30, 26, 34, 30),
+      body: DefaultTextStyle.merge(style: const TextStyle(decoration: TextDecoration.none), child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 30, 30),
         children: [
           _Header(tab: tab, onTab: (v) => setState(() => tab = v)),
           const SizedBox(height: 18),
           if (tab == 0) _display() else if (tab == 1) _player() else _source(),
         ],
-      ),
+      )),
     );
   }
 
@@ -104,10 +104,10 @@ class _Header extends StatelessWidget {
         Row(children: [
           _CircleButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
           const SizedBox(width: 14),
-          const Text('Pengaturan LiveGO', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          const Text('Pengaturan LiveGO', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ]),
         const SizedBox(height: 8),
-        const Text('Atur tampilan, player, source, dan cache untuk Android TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+        const Text('Atur tampilan, player, source, dan cache untuk Android TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
         const SizedBox(height: 14),
         Row(children: List.generate(_TvSettingsScreenState.tabs.length, (i) => Padding(
           padding: const EdgeInsets.only(right: 10),
@@ -153,7 +153,7 @@ class _TabChipState extends State<_TabChip> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
           decoration: BoxDecoration(color: widget.active ? const Color(0xFF12314A) : const Color(0xFF090F19), borderRadius: BorderRadius.circular(999), border: Border.all(color: focused || widget.active ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1)),
-          child: Text(widget.text, style: TextStyle(color: focused || widget.active ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          child: Text(widget.text, style: TextStyle(color: focused || widget.active ? Colors.white : AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ),
       ),
     );
@@ -191,15 +191,15 @@ class _OptionRowState extends State<_OptionRow> {
         focusColor: Colors.transparent,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          height: 76,
+          height: 70,
           margin: const EdgeInsets.all(7),
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(color: focused ? const Color(0xFF102F45) : Colors.transparent, borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? color : Colors.transparent, width: 2)),
           child: Row(children: [
             Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)), child: Icon(widget.icon, color: widget.danger ? color : Colors.white, size: 25)),
             const SizedBox(width: 18),
-            Expanded(child: Text(widget.title, style: TextStyle(color: widget.danger ? color : Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
-            Text(widget.value, style: TextStyle(color: focused ? color : AppTheme.textSoft, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+            Expanded(child: Text(widget.title, style: TextStyle(color: widget.danger ? color : Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+            Text(widget.value, style: TextStyle(color: focused ? color : AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           ]),
         ),
       ),
@@ -224,5 +224,5 @@ class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 9), child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)));
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(left: 4, bottom: 9), child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)));
 }

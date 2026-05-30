@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
@@ -28,6 +29,13 @@ class _PosterCardState extends State<PosterCard> {
         final progress = LiveGoLocalStore.progressFor(widget.item)?.ratio ?? 0;
         final fav = LiveGoLocalStore.isFavorite(widget.item);
         return FocusableActionDetector(
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+              widget.onTap?.call();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
           onShowFocusHighlight: (v) => setState(() => focused = v),
           child: AnimatedScale(
             scale: focused && widget.tv ? 1.045 : 1.0,

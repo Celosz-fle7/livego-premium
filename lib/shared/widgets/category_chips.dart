@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 
 class CategoryChips extends StatelessWidget {
@@ -53,6 +54,13 @@ class _FocusableChipState extends State<_FocusableChip> {
     final tv = widget.tv;
 
     return FocusableActionDetector(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       onShowFocusHighlight: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,
