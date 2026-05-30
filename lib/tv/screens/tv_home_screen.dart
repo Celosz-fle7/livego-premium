@@ -47,15 +47,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
   }
 
-  void _reload() {
-    setState(() {
-      _future = _load();
-    });
-  }
-
-  List<ContentItem> _filtered(List<ContentItem> items) {
-    return items;
-  }
+  void _reload() => setState(() => _future = _load());
 
   @override
   Widget build(BuildContext context) {
@@ -64,36 +56,56 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final hero = snap.data?.hero;
-        final items = _filtered(snap.data?.items ?? const []);
+        final items = snap.data?.items ?? const <ContentItem>[];
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(56, 36, 56, 56),
-          children: [
-            if (hero != null) HeroBanner(item: hero, tv: true) else const _TvSkeleton(height: 245),
-            const SizedBox(height: 28),
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101826).withOpacity(0.86),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFF23364A)),
+        return RepaintBoundary(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(166, 30, 36, 46),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B1220).withOpacity(.42),
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(color: const Color(0xFF17283C)),
+                ),
+                child: hero != null ? HeroBanner(item: hero, tv: true) : const _TvSkeleton(height: 245),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CategoryChips(items: LiveGoCatalog.platformLabels, selected: source, tv: true, onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); }),
-                  const SizedBox(height: 16),
-                  CategoryChips(items: categories, selected: category, tv: true, onSelected: (v) { setState(() => category = v); _reload(); }),
-                ],
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF101826).withOpacity(0.86),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFF23364A)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CategoryChips(
+                      items: LiveGoCatalog.platformLabels,
+                      selected: source,
+                      tv: true,
+                      onSelected: (v) { setState(() { source = v; category = 0; }); _reload(); },
+                    ),
+                    const SizedBox(height: 15),
+                    CategoryChips(
+                      items: categories,
+                      selected: category,
+                      tv: true,
+                      onSelected: (v) { setState(() => category = v); _reload(); },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 26),
-            if (loading) const _TvSkeleton(height: 270) else _Rail(title: 'Popular', items: items.take(10).toList()),
-            const SizedBox(height: 30),
-            if (!loading) _Rail(title: 'Lanjut Nonton', items: items.skip(6).take(10).toList()),
-          ],
+              const SizedBox(height: 22),
+              if (loading) const _TvSkeleton(height: 270) else _Rail(title: 'Popular', items: items.take(12).toList()),
+              const SizedBox(height: 30),
+              if (!loading) _Rail(title: 'Lanjut Nonton', items: items.skip(6).take(12).toList()),
+            ],
+          ),
         );
       },
     );
@@ -113,25 +125,22 @@ class _Rail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 13),
         SizedBox(
-          height: 270,
+          height: 268,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 20),
+            separatorBuilder: (_, __) => const SizedBox(width: 18),
             itemBuilder: (_, i) => PosterCard(
               item: items[i],
               tv: true,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => TvPlayerScreen(item: items[i])),
-                );
-              },
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: items[i]))),
             ),
           ),
         ),

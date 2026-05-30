@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/app_theme.dart';
 import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_home_screen.dart';
@@ -16,151 +17,54 @@ class TvApp extends StatefulWidget {
 
 class _TvAppState extends State<TvApp> {
   int index = 0;
-  bool navOpen = false;
-  final FocusNode _rootFocus = FocusNode(debugLabel: 'tv-root');
-  final FocusNode _navFocus = FocusNode(debugLabel: 'tv-nav');
-  final FocusNode _contentFocus = FocusNode(debugLabel: 'tv-content');
-
-  @override
-  void initState() {
-    super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _contentFocus.requestFocus());
-  }
-
-  @override
-  void dispose() {
-    _rootFocus.dispose();
-    _navFocus.dispose();
-    _contentFocus.dispose();
-    super.dispose();
-  }
 
   Widget _page() {
     return switch (index) {
       0 => const TvHomeScreen(),
-      1 => const TvPlaceholderScreen(title: 'Histori', icon: Icons.history_rounded),
-      2 => const TvPlaceholderScreen(title: 'Search', icon: Icons.search_rounded),
-      3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded),
+      1 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded, subtitle: 'Download manager TV akan dipasang setelah player stabil.'),
+      2 => const TvPlaceholderScreen(title: 'Riwayat', icon: Icons.history_rounded, subtitle: 'Lanjutkan tontonan terakhir dari layar TV.'),
+      3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded, subtitle: 'Daftar judul favorit kamu akan tampil di sini.'),
       4 => const TvAccountScreen(),
       _ => const TvSettingsScreen(),
     };
   }
 
-  void _openNav() {
-    if (navOpen) return;
-    setState(() => navOpen = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _navFocus.requestFocus());
-  }
-
-  void _closeNav() {
-    if (!navOpen) return;
-    setState(() => navOpen = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _contentFocus.requestFocus());
-  }
-
-  void _selectPage(int value) {
-    setState(() {
-      index = value;
-      navOpen = false;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _contentFocus.requestFocus());
-  }
-
   Future<void> _confirmExit() async {
     final exit = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0D1117),
-        title: const Text('Keluar dari LiveGO?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        content: const Text('Tutup aplikasi di Android TV?', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Keluar')),
-        ],
-      ),
+      barrierColor: Colors.black.withOpacity(.62),
+      builder: (_) => const _TvExitDialog(),
     );
     if (exit == true) SystemNavigator.pop();
   }
 
-  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft && !navOpen) {
-      _openNav();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.browserBack) {
-      if (navOpen) {
-        _closeNav();
-      } else {
-        _confirmExit();
-      }
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        if (navOpen) {
-          _closeNav();
-        } else {
-          await _confirmExit();
-        }
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
       },
-      child: Scaffold(
-        body: PremiumShell(
-          child: Focus(
-            focusNode: _rootFocus,
-            autofocus: true,
-            onKeyEvent: _handleKey,
-            child: Shortcuts(
-              shortcuts: const <ShortcutActivator, Intent>{
-                SingleActivator(LogicalKeyboardKey.arrowLeft): DirectionalFocusIntent(TraversalDirection.left),
-                SingleActivator(LogicalKeyboardKey.arrowRight): DirectionalFocusIntent(TraversalDirection.right),
-                SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(TraversalDirection.up),
-                SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(TraversalDirection.down),
-                SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
-                SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-              },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          DismissIntent: CallbackAction<DismissIntent>(onInvoke: (_) { _confirmExit(); return null; }),
+        },
+        child: PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) async {
+            if (!didPop) await _confirmExit();
+          },
+          child: Scaffold(
+            body: PremiumShell(
               child: FocusTraversalGroup(
                 policy: ReadingOrderTraversalPolicy(),
                 child: Stack(
                   children: [
-                    FocusScope(
-                      node: FocusScopeNode(debugLabel: 'tv-content-scope'),
-                      child: Focus(
-                        focusNode: _contentFocus,
-                        child: RepaintBoundary(child: _page()),
-                      ),
-                    ),
-                    if (!navOpen)
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        child: GestureDetector(
-                          onTap: _openNav,
-                          child: Container(width: 28, color: Colors.transparent),
-                        ),
-                      ),
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      left: navOpen ? 0 : -270,
-                      top: 0,
-                      bottom: 0,
+                    Positioned.fill(child: _page()),
+                    Align(
+                      alignment: Alignment.centerLeft,
                       child: TvSideNav(
-                        focusNode: _navFocus,
                         index: index,
-                        expanded: navOpen,
-                        onChanged: _selectPage,
-                        onClose: _closeNav,
+                        onChanged: (v) => setState(() => index = v),
                       ),
                     ),
                   ],
@@ -168,6 +72,90 @@ class _TvAppState extends State<TvApp> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TvExitDialog extends StatelessWidget {
+  const _TvExitDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 620,
+        padding: const EdgeInsets.all(30),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111B2B).withOpacity(.98),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: const Color(0xFF2A3D59)),
+          boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 38)],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              decoration: BoxDecoration(color: const Color(0xFF102337), borderRadius: BorderRadius.circular(999), border: Border.all(color: AppTheme.cyan.withOpacity(.45))),
+              child: const Text('Konfirmasi', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(height: 22),
+            const Text('Sudah selesai nontonnya?', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            const Text('Yakin mau keluar dari LiveGO sekarang?', style: TextStyle(color: AppTheme.textSoft, fontSize: 18)),
+            const SizedBox(height: 26),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(child: _DialogButton(label: 'Nanti Dulu', onTap: () => Navigator.pop(context, false))),
+                const SizedBox(width: 16),
+                Expanded(child: _DialogButton(label: 'Ya, Keluar', primary: true, onTap: () => Navigator.pop(context, true))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogButton extends StatefulWidget {
+  final String label;
+  final bool primary;
+  final VoidCallback onTap;
+  const _DialogButton({required this.label, required this.onTap, this.primary = false});
+
+  @override
+  State<_DialogButton> createState() => _DialogButtonState();
+}
+
+class _DialogButtonState extends State<_DialogButton> {
+  bool focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FocusableActionDetector(
+      autofocus: widget.primary,
+      onShowFocusHighlight: (v) => setState(() => focused = v),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 72,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: widget.primary ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
+            color: widget.primary ? null : const Color(0xFF172235),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2.4 : 1),
+          ),
+          child: Text(widget.label, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
         ),
       ),
     );
