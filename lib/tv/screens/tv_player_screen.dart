@@ -59,13 +59,17 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _load();
   }
 
-  void _markDebug(String label, Stopwatch watch, {String extra = ''}) {
-    final value = '${watch.elapsedMilliseconds}ms${extra.isEmpty ? '' : ' • $extra'}';
+  void _setTiming(String label, String value) {
     debugPrint('LIVEGO TV TIMING $label $value');
     if (!mounted) return;
     setState(() {
       _debugTiming[label] = value;
     });
+  }
+
+  void _markTiming(String label, Stopwatch watch, {String extra = ''}) {
+    final value = '${watch.elapsedMilliseconds}ms${extra.isEmpty ? '' : ' • $extra'}';
+    _setTiming(label, value);
   }
 
   void _resetDebugTiming() {
@@ -103,7 +107,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<void> _load() async {
     final ticket = ++_loadTicket;
-    final watch = Stopwatch()..start();
     _cancelControlAutoHide();
     setState(() {
       _loading = true;
@@ -112,6 +115,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _resetDebugTiming();
     });
 
+    final watch = Stopwatch()..start();
     try {
       final requestedEpisode = _episode <= 0 ? 1 : _episode;
       final fastPlayable = ContentItem(
@@ -173,7 +177,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             lang: resolved.lang,
           );
         });
-        _markDebug('DETAIL', watch, extra: 'count=$count');
+        _markTiming('DETAIL', watch, extra: 'count=$count');
         debugPrint('LIVEGO TV DETAIL DONE ${watch.elapsedMilliseconds}ms count=$count');
       });
 
@@ -183,7 +187,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         if (count > 1 && count != _knownEpisodeCount) {
           setState(() => _knownEpisodeCount = count);
         }
-        _markDebug('ALLEPISODE', watch, extra: 'count=$count stream=${bundle.stream.url.isNotEmpty}');
+        _markTiming('ALLEPISODE', watch, extra: 'count=$count stream=${bundle.stream.url.isNotEmpty}');
         debugPrint('LIVEGO TV ALLEPISODE DONE ${watch.elapsedMilliseconds}ms count=$count stream=${bundle.stream.url.isNotEmpty}');
       }).catchError((e) {
         debugPrint('LIVEGO TV ALLEPISODE BACKGROUND ERROR: $e');
@@ -200,12 +204,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       }
 
       void offerPlayable(String source, StreamInfo stream) {
-        _markDebug(source, watch, extra: 'ok=${stream.url.isNotEmpty}');
+        _markTiming(source, watch, extra: 'ok=${stream.url.isNotEmpty}');
         debugPrint('LIVEGO TV PLAYABLE $source ${watch.elapsedMilliseconds}ms ok=${stream.url.isNotEmpty}');
         if (!playableCompleter.isCompleted && stream.url.isNotEmpty) {
-          if (mounted) {
-            setState(() => _debugTiming['SOURCE'] = source);
-          }
+          _setTiming('SOURCE', source);
           playableCompleter.complete(stream);
         }
       }
@@ -230,9 +232,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (!mounted || ticket != _loadTicket) return;
 
       if (stream.url.isEmpty) {
+        _setTiming('ERROR', 'no playable stream');
         _error = 'Stream belum tersedia dari API';
         _loading = false;
-        _markDebug('ERROR', watch, extra: 'no playable stream');
         if (mounted) setState(() {});
         return;
       }
@@ -261,7 +263,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         lang: base.lang.trim().isNotEmpty ? base.lang : widget.item.lang,
       );
 
-      _markDebug('INIT START', watch);
+      _markTiming('INIT START', watch);
       debugPrint('LIVEGO TV VIDEO INIT START ${watch.elapsedMilliseconds}ms url=${stream.url.substring(0, stream.url.length > 80 ? 80 : stream.url.length)}');
 
       await _controller?.dispose();
@@ -295,7 +297,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         }
       });
       await controller.initialize();
-      _markDebug('INIT DONE', watch);
+      _markTiming('INIT DONE', watch);
       if (!mounted || ticket != _loadTicket) return;
       await controller.setPlaybackSpeed(_speed);
       await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
@@ -308,14 +310,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _loading = false;
       _error = '';
       setState(() {});
-      _markDebug('PLAY', watch, extra: 'total=$total');
+      _markTiming('PLAY', watch, extra: 'total=$total');
       debugPrint('LIVEGO TV VIDEO PLAY ${watch.elapsedMilliseconds}ms total=$total');
       _showInitialControls();
     } catch (e) {
       if (!mounted || ticket != _loadTicket) return;
+      _setTiming('ERROR', '$e');
       _error = '$e';
       _loading = false;
-      _markDebug('ERROR', watch, extra: '$e');
       setState(() {});
     }
   }
@@ -748,12 +750,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 tv: true,
               ),
             Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
-            if (_debugTiming.isNotEmpty)
-              Positioned(
-                right: 18,
-                top: 18,
-                child: _PlayerTimingOverlay(entries: Map<String, String>.from(_debugTiming)),
-              ),
             if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
             if (!_loading && !ready)
               Center(
@@ -808,6 +804,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 bottom: 72,
                 child: _QualityPanel(speed: _speed, audioTrack: _audioTrack, quality: LiveGoSettings.quality, subtitlesEnabled: LiveGoSettings.subtitlesEnabled, cursor: _optionCursor),
               ),
+            Positioned(
+              right: 18,
+              top: 18,
+              child: _PlayerTimingOverlay(entries: Map<String, String>.from(_debugTiming)),
+            ),
           ],
         ),
       ),
@@ -843,39 +844,45 @@ class _PlayerTimingOverlay extends StatelessWidget {
 
     return IgnorePointer(
       child: Container(
-        width: 300,
+        width: 310,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xE6040A16),
+          color: const Color(0xEE030814),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.cyan.withOpacity(0.42)),
-          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 18)],
+          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.65), width: 1.2),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF38BDF8).withOpacity(0.26), blurRadius: 24),
+          ],
         ),
         child: DefaultTextStyle(
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 10.5,
+            fontSize: 11,
             fontWeight: FontWeight.w800,
-            decoration: TextDecoration.none,
             height: 1.25,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('PLAYER DEBUG TIMING', style: TextStyle(color: AppTheme.cyan, fontSize: 11.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-              const SizedBox(height: 6),
-              for (final row in rows.take(10))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(width: 92, child: Text(row.key, style: const TextStyle(color: AppTheme.textSoft, decoration: TextDecoration.none))),
-                      Expanded(child: Text(row.value, style: const TextStyle(color: Colors.white, decoration: TextDecoration.none))),
-                    ],
+              const Text('PLAYER TIMING DEBUG', style: TextStyle(color: Color(0xFF38BDF8), letterSpacing: 1.2)),
+              const SizedBox(height: 8),
+              if (rows.isEmpty)
+                const Text('OPEN: waiting...', style: TextStyle(color: Colors.white70))
+              else
+                for (final row in rows)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, height: 1.25),
+                        children: [
+                          TextSpan(text: '${row.key}: ', style: const TextStyle(color: Color(0xFF93C5FD))),
+                          TextSpan(text: row.value, style: const TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
             ],
           ),
         ),
