@@ -130,6 +130,18 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         key == LogicalKeyboardKey.space;
   }
 
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack ||
+        key == LogicalKeyboardKey.backspace;
+  }
+
+  void _cancelPendingEntry() {
+    _entryPending = false;
+    _entryRetry = 0;
+  }
+
   void _handleBack() {
     _moveToNav(_zone);
   }
@@ -172,6 +184,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (!mounted || !_entryPending) return;
 
     if (_pendingZone == TvZone.grid && !_gridDataReady) {
+      _retryFocusEntry();
       return;
     }
 
@@ -181,32 +194,35 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           _focusByZone(TvZone.platform, index: _lastPlatform) ||
           _focusByZone(TvZone.banner);
       if (fallbackFocused) {
-        _entryPending = false;
-        _entryRetry = 0;
+        _cancelPendingEntry();
+      } else {
+        _retryFocusEntry();
       }
       return;
     }
 
     final focused = _focusByZone(_pendingZone, index: _pendingIndex);
     if (focused) {
-      _entryPending = false;
-      _entryRetry = 0;
+      _cancelPendingEntry();
       return;
     }
 
+    _retryFocusEntry();
+  }
+
+  void _retryFocusEntry() {
+    if (!mounted || !_entryPending) return;
     _entryRetry++;
-    if (_entryRetry > 18) {
+    if (_entryRetry > 24) {
       final fallbackFocused =
           _focusByZone(TvZone.category, index: _lastCategory) ||
           _focusByZone(TvZone.platform, index: _lastPlatform) ||
           _focusByZone(TvZone.banner);
       if (fallbackFocused) {
-        _entryPending = false;
-        _entryRetry = 0;
-        return;
+        _cancelPendingEntry();
       }
+      return;
     }
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
   }
 
@@ -251,6 +267,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _moveToNav(TvZone fromZone, {int? platform, int? category, int? grid}) {
+    _cancelPendingEntry();
     _zone = fromZone;
     if (platform != null) _lastPlatform = platform;
     if (category != null) _lastCategory = category;
@@ -311,6 +328,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (_isBack(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       _moveToNav(TvZone.banner);
@@ -345,6 +367,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _platformKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (_isBack(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (index == 0) {
@@ -393,6 +420,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _categoryKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (_isBack(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (index == 0) {
@@ -443,6 +475,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   KeyEventResult _gridKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (_isBack(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+
     final col = index % _gridColumns;
     final row = index ~/ _gridColumns;
 
