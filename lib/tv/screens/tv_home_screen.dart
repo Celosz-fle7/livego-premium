@@ -43,6 +43,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _lastCategory = 0;
   int _lastGrid = 0;
   bool _entryPending = false;
+  TvZone _pendingZone = TvZone.banner;
+  int _pendingIndex = 0;
+  int _entryRetry = 0;
+  bool _gridDataReady = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
 
   String get _platform {
@@ -135,50 +139,115 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _focusEntry() {
+    _queueFocusEntry(_zone, index: _indexForZone(_zone));
+  }
+
+  int _indexForZone(TvZone zone) {
+    switch (zone) {
+      case TvZone.platform:
+        return _lastPlatform;
+      case TvZone.category:
+        return _lastCategory;
+      case TvZone.grid:
+        return _lastGrid;
+      case TvZone.nav:
+      case TvZone.banner:
+      case TvZone.list:
+      case TvZone.settings:
+      case TvZone.placeholder:
+      case TvZone.player:
+        return 0;
+    }
+  }
+
+  void _queueFocusEntry(TvZone zone, {int index = 0}) {
+    _pendingZone = zone;
+    _pendingIndex = index;
     _entryPending = true;
+    _entryRetry = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
   }
 
   void _tryFocusEntry() {
     if (!mounted || !_entryPending) return;
-    // Guard: kalau node zona target masih kosong (build belum selesai sync),
-    // jadwal ulang satu frame lagi.
-    final zoneReady = switch (_zone) {
-      TvZone.platform  => _platformNodes.isNotEmpty,
-      TvZone.category  => _categoryNodes.isNotEmpty,
-      TvZone.grid      => _gridNodes.isNotEmpty,
-      _                => true,
-    };
-    if (!zoneReady) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+
+    if (_pendingZone == TvZone.grid && !_gridDataReady) {
       return;
     }
-    final focused = _focusByZone(_zone);
-    if (focused) _entryPending = false;
+
+    if (_pendingZone == TvZone.grid && _gridDataReady && _gridNodes.isEmpty) {
+      final fallbackFocused =
+          _focusByZone(TvZone.category, index: _lastCategory) ||
+          _focusByZone(TvZone.platform, index: _lastPlatform) ||
+          _focusByZone(TvZone.banner);
+      if (fallbackFocused) {
+        _entryPending = false;
+        _entryRetry = 0;
+      }
+      return;
+    }
+
+    final focused = _focusByZone(_pendingZone, index: _pendingIndex);
+    if (focused) {
+      _entryPending = false;
+      _entryRetry = 0;
+      return;
+    }
+
+    _entryRetry++;
+    if (_entryRetry > 18) {
+      final fallbackFocused =
+          _focusByZone(TvZone.category, index: _lastCategory) ||
+          _focusByZone(TvZone.platform, index: _lastPlatform) ||
+          _focusByZone(TvZone.banner);
+      if (fallbackFocused) {
+        _entryPending = false;
+        _entryRetry = 0;
+        return;
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
   }
 
-  bool _focusByZone(TvZone zone) {
+  bool _ready(FocusNode node) {
+    return node.canRequestFocus && node.context != null;
+  }
+
+  bool _focusByZone(TvZone zone, {int? index}) {
     if (zone == TvZone.grid && _gridNodes.isNotEmpty) {
+      final target = _safe(index ?? _lastGrid, _gridNodes.length);
+      final node = _gridNodes[target];
+      if (!_ready(node)) return false;
       _zone = TvZone.grid;
-      _lastGrid = _safe(_lastGrid, _gridNodes.length);
-      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      _lastGrid = target;
+      _focus(node, alignment: 0.35);
       return true;
     }
     if (zone == TvZone.category && _categoryNodes.isNotEmpty) {
+      final target = _safe(index ?? _lastCategory, _categoryNodes.length);
+      final node = _categoryNodes[target];
+      if (!_ready(node)) return false;
       _zone = TvZone.category;
-      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
-      _focus(_categoryNodes[_lastCategory], alignment: 0.12);
+      _lastCategory = target;
+      _focus(node, alignment: 0.12);
       return true;
     }
     if (zone == TvZone.platform && _platformNodes.isNotEmpty) {
+      final target = _safe(index ?? _lastPlatform, _platformNodes.length);
+      final node = _platformNodes[target];
+      if (!_ready(node)) return false;
       _zone = TvZone.platform;
-      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
-      _focus(_platformNodes[_lastPlatform], alignment: 0.08);
+      _lastPlatform = target;
+      _focus(node, alignment: 0.08);
       return true;
     }
-    _zone = TvZone.banner;
-    _focus(_bannerNode, alignment: 0.02);
-    return true;
+    if (zone == TvZone.banner && _ready(_bannerNode)) {
+      _zone = TvZone.banner;
+      _focus(_bannerNode, alignment: 0.02);
+      return true;
+    }
+    return false;
   }
 
   void _moveToNav(TvZone fromZone, {int? platform, int? category, int? grid}) {
@@ -192,57 +261,51 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void _open(ContentItem item) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusByZone(_zone));
+      _queueFocusEntry(_zone, index: _indexForZone(_zone));
     });
   }
 
   void _selectPlatform(int index) {
-    if (index == source) {
-      // Platform sama, cukup pastikan fokus kembali ke chip ini
-      _zone = TvZone.platform;
-      _lastPlatform = index;
-      final safe = _safe(index, _platformNodes.length);
-      if (safe < _platformNodes.length) {
-        _focus(_platformNodes[safe], alignment: 0.08);
-      }
+    final targetPlatform = _safe(index, LiveGoCatalog.platformLabels.length);
+    if (targetPlatform == source) {
+      _lastPlatform = targetPlatform;
+      _zone = TvZone.category;
+      _queueFocusEntry(TvZone.category, index: _lastCategory);
       return;
     }
-    // Platform beda — reset semua posisi, muat ulang data.
-    // JANGAN panggil _focus() di sini: _categoryNodes belum di-sync
-    // dengan kategori platform baru. Biarkan _tryFocusEntry() yang
-    // panggil setelah build() selesai me-rebuild dan sync node.
+
     setState(() {
-      source = index;
+      source = targetPlatform;
       category = 0;
-      _lastPlatform = index;
+      _zone = TvZone.category;
+      _lastPlatform = targetPlatform;
       _lastCategory = 0;
       _lastGrid = 0;
-      _zone = TvZone.platform;   // entry point setelah load = platform row
-      _entryPending = true;       // trigger fokus setelah build selesai
+      _gridDataReady = false;
       _future = _load();
     });
+    _queueFocusEntry(TvZone.category, index: 0);
   }
 
   void _selectCategory(int index) {
-    if (index == category) {
-      _zone = TvZone.category;
-      _lastCategory = index;
-      final safe = _safe(index, _categoryNodes.length);
-      if (safe < _categoryNodes.length) {
-        _focus(_categoryNodes[safe], alignment: 0.12);
-      }
+    final categories = LiveGoCatalog.categoriesFor(_platform);
+    final targetCategory = _safe(index, categories.length);
+    if (targetCategory == category) {
+      _lastCategory = targetCategory;
+      _zone = TvZone.grid;
+      _queueFocusEntry(TvZone.grid, index: _lastGrid);
       return;
     }
-    // Kategori beda — grid akan berubah isinya.
-    // Biarkan _tryFocusEntry() urus fokus setelah build selesai.
+
     setState(() {
-      category = index;
-      _lastCategory = index;
+      category = targetCategory;
+      _zone = TvZone.grid;
+      _lastCategory = targetCategory;
       _lastGrid = 0;
-      _zone = TvZone.category;   // kembali ke category row setelah load
-      _entryPending = true;
+      _gridDataReady = false;
       _future = _load();
     });
+    _queueFocusEntry(TvZone.grid, index: 0);
   }
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
@@ -451,6 +514,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         if (category >= categories.length) category = 0;
         final gridItems = items.take(42).toList();
         _visibleGridItems = gridItems;
+        _gridDataReady = !loading;
 
         _syncNodes(_platformNodes, platforms.length, 'tv-platform');
         _syncNodes(_categoryNodes, categories.length, 'tv-category');
