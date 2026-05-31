@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,11 +18,21 @@ class TvSourceManagerScreen extends StatefulWidget {
 class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<FocusNode> _sourceNodes = [];
+  final List<FocusNode> _categoryNodes = [];
   late final FocusNode _backNode;
   late final FocusNode _pingNode;
+  late final FocusNode _cancelNode;
+  late final FocusNode _saveNode;
+
+  late Set<String> _active;
+  late Set<String> _home;
+  late Map<String, List<String>> _categories;
 
   int _lastIndex = 0;
+  String? _expandedSlug;
+  bool _categoryMode = false;
   bool _pinging = false;
+  final Map<String, int> _categoryCursor = {};
 
   List<String> get _platforms => LiveGoCatalog.allPlatforms;
 
@@ -30,16 +41,24 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     super.initState();
     _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-back');
     _pingNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-ping');
+    _cancelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-cancel');
+    _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-save');
+    _active = Set<String>.from(LiveGoSettings.activePlatforms);
+    _home = Set<String>.from(LiveGoSettings.homePlatforms);
+    _categories = {
+      for (final slug in _platforms) slug: LiveGoSettings.categoriesFor(slug),
+    };
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusSource(_lastIndex));
   }
 
   @override
   void dispose() {
-    for (final node in _sourceNodes) {
-      node.dispose();
-    }
+    for (final node in _sourceNodes) node.dispose();
+    for (final node in _categoryNodes) node.dispose();
     _backNode.dispose();
     _pingNode.dispose();
+    _cancelNode.dispose();
+    _saveNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -50,6 +69,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
     while (_sourceNodes.length > count) {
       _sourceNodes.removeLast().dispose();
+    }
+    while (_categoryNodes.length < count) {
+      _categoryNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-source-category-${_categoryNodes.length}'));
+    }
+    while (_categoryNodes.length > count) {
+      _categoryNodes.removeLast().dispose();
     }
   }
 
@@ -73,14 +98,42 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   void _focusSource(int index) {
     if (_sourceNodes.isEmpty) return;
+    _categoryMode = false;
     _lastIndex = _safe(index);
-    tvFocus(_sourceNodes[_lastIndex], alignment: 0.28);
+    tvFocus(_sourceNodes[_lastIndex], alignment: 0.25);
+  }
+
+  void _focusCategory(int index) {
+    if (_categoryNodes.isEmpty) return;
+    _categoryMode = true;
+    _lastIndex = _safe(index);
+    tvFocus(_categoryNodes[_lastIndex], alignment: 0.35);
   }
 
   void _focusBack() => tvFocus(_backNode, alignment: 0.05);
   void _focusPing() => tvFocus(_pingNode, alignment: 0.05);
+  void _focusCancel() => tvFocus(_cancelNode, alignment: 0.05);
+  void _focusSave() => tvFocus(_saveNode, alignment: 0.05);
 
-  void _goBack() => Navigator.of(context).maybePop();
+  void _cancel() => Navigator.of(context).maybePop();
+
+  void _save() {
+    final active = _active.isEmpty ? <String>{'shortmax'} : Set<String>.from(_active);
+    final home = _home.where(active.contains).take(6).toList();
+    if (home.isEmpty) home.add(active.first);
+
+    LiveGoSettings.activePlatforms
+      ..clear()
+      ..addAll(active);
+    LiveGoSettings.homePlatforms
+      ..clear()
+      ..addAll(home);
+    LiveGoSettings.defaultPlatform = LiveGoSettings.homePlatforms.first;
+    for (final entry in _categories.entries) {
+      LiveGoSettings.setCategoriesFor(entry.key, entry.value);
+    }
+    Navigator.of(context).maybePop();
+  }
 
   Future<void> _pingAll() async {
     if (_pinging) return;
@@ -99,53 +152,97 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
   }
 
-  void _toggleActive(String slug, int index) {
+  void _setActive(String slug, bool value) {
     setState(() {
-      LiveGoSettings.togglePlatform(slug);
-      _lastIndex = index;
+      if (value) {
+        _active.add(slug);
+        _home.add(slug);
+      } else if (_active.length > 1) {
+        _active.remove(slug);
+        _home.remove(slug);
+      }
     });
-    _focusSource(index);
   }
 
-  void _toggleHome(String slug, int index) {
+  void _toggleExpanded(String slug, int index) {
     setState(() {
-      LiveGoSettings.toggleHomePlatform(slug);
-      _lastIndex = index;
+      if (_expandedSlug == slug) {
+        _expandedSlug = null;
+        _categoryMode = false;
+      } else {
+        _expandedSlug = slug;
+        _categoryCursor[slug] = (_categoryCursor[slug] ?? 0).clamp(0, _allCategoriesFor(slug).length - 1).toInt();
+      }
     });
-    _focusSource(index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_expandedSlug == slug) {
+        _focusCategory(index);
+      } else {
+        _focusSource(index);
+      }
+    });
   }
 
-  KeyEventResult _backKey(FocusNode node, KeyEvent event) {
+  List<String> _allCategoriesFor(String slug) {
+    if (slug == 'dramabox') return const ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'];
+    return const ['Trending', 'For You'];
+  }
+
+  bool _categoryActive(String slug, String category) {
+    return (_categories[slug] ?? const <String>['Trending']).contains(category);
+  }
+
+  void _moveCategory(String slug, int delta) {
+    final all = _allCategoriesFor(slug);
+    if (all.isEmpty) return;
+    final current = _categoryCursor[slug] ?? 0;
+    _categoryCursor[slug] = (current + delta).clamp(0, all.length - 1).toInt();
+    setState(() {});
+  }
+
+  void _toggleCategory(String slug) {
+    final all = _allCategoriesFor(slug);
+    if (all.isEmpty) return;
+    final index = (_categoryCursor[slug] ?? 0).clamp(0, all.length - 1).toInt();
+    final category = all[index];
+    final selected = List<String>.from(_categories[slug] ?? const <String>['Trending']);
+    if (selected.contains(category)) {
+      if (selected.length > 1) selected.remove(category);
+    } else {
+      selected.add(category);
+      selected.sort((a, b) => all.indexOf(a).compareTo(all.indexOf(b)));
+    }
+    setState(() => _categories[slug] = selected);
+  }
+
+  KeyEventResult _headerKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+    if (key == LogicalKeyboardKey.arrowDown) {
       _focusSource(_lastIndex);
       return KeyEventResult.handled;
     }
-    if (_isSelect(key) || _isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
-      _goBack();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  KeyEventResult _pingKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _focusBack();
+      if (node == _saveNode) _focusCancel();
+      else if (node == _cancelNode) _focusPing();
+      else if (node == _pingNode) _focusBack();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-      _focusSource(_lastIndex);
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (node == _backNode) _focusPing();
+      else if (node == _pingNode) _focusCancel();
+      else if (node == _cancelNode) _focusSave();
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      _pingAll();
+      if (node == _backNode || node == _cancelNode) _cancel();
+      if (node == _pingNode) _pingAll();
+      if (node == _saveNode) _save();
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _goBack();
+      _cancel();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -156,11 +253,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (index == 0) {
-        _focusBack();
-      } else {
-        _focusSource(index - 1);
-      }
+      if (index == 0) _focusPing();
+      else _focusSource(index - 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -168,19 +262,58 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _goBack();
+      _setActive(slug, false);
+      _focusSource(index);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _toggleHome(slug, index);
+      _setActive(slug, true);
+      _focusSource(index);
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      _toggleActive(slug, index);
+      _toggleExpanded(slug, index);
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _goBack();
+      _cancel();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _categoryKey(int index, String slug, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveCategory(slug, -1);
+      _focusCategory(index);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _moveCategory(slug, 1);
+      _focusCategory(index);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _focusSource(index);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+      return KeyEventResult.handled;
+    }
+    if (_isSelect(key)) {
+      _toggleCategory(slug);
+      _focusCategory(index);
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
+      setState(() {
+        _expandedSlug = null;
+        _categoryMode = false;
+      });
+      _focusSource(index);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -188,14 +321,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   Color _statusColor(String slug) {
     switch (LiveGoSettings.statusFor(slug)) {
-      case 'online':
-        return Colors.greenAccent;
-      case 'slow':
-        return Colors.orangeAccent;
-      case 'offline':
-        return Colors.redAccent;
-      default:
-        return Colors.blueGrey;
+      case 'online': return Colors.greenAccent;
+      case 'slow': return Colors.orangeAccent;
+      case 'offline': return Colors.redAccent;
+      default: return Colors.blueGrey;
     }
   }
 
@@ -214,7 +343,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   @override
   Widget build(BuildContext context) {
     _syncNodes(_platforms.length);
-
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.goBack): _TvSourceBackIntent(),
@@ -224,7 +352,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       child: Actions(
         actions: <Type, Action<Intent>>{
           _TvSourceBackIntent: CallbackAction<_TvSourceBackIntent>(onInvoke: (_) {
-            _goBack();
+            _cancel();
             return null;
           }),
         },
@@ -234,22 +362,22 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
             style: const TextStyle(decoration: TextDecoration.none),
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 22, 38, 34),
+              padding: const EdgeInsets.fromLTRB(28, 18, 38, 30),
               children: [
                 _Header(
                   backNode: _backNode,
                   pingNode: _pingNode,
-                  onBackKey: _backKey,
-                  onPingKey: _pingKey,
-                  onBack: _goBack,
+                  cancelNode: _cancelNode,
+                  saveNode: _saveNode,
+                  onKey: _headerKey,
+                  onBack: _cancel,
                   onPing: _pingAll,
+                  onCancel: _cancel,
+                  onSave: _save,
                   pinging: _pinging,
                 ),
-                const SizedBox(height: 18),
-                const Text(
-                  'SUMBER HOME',
-                  style: TextStyle(color: Colors.white60, fontSize: 12.5, fontWeight: FontWeight.w900, letterSpacing: 1.1),
-                ),
+                const SizedBox(height: 16),
+                const Text('SUMBER HOME', style: TextStyle(color: Colors.white60, fontSize: 12.5, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -260,26 +388,39 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                   ),
                   child: Column(
                     children: [
-                      for (var i = 0; i < _platforms.length; i++)
+                      for (var i = 0; i < _platforms.length; i++) ...[
                         _SourceRow(
                           node: _sourceNodes[i],
                           slug: _platforms[i],
                           title: LiveGoCatalog.label(_platforms[i]),
                           subtitle: _sourceDescription(_platforms[i]),
-                          active: LiveGoSettings.isPlatformActive(_platforms[i]),
-                          home: LiveGoSettings.isHomePlatform(_platforms[i]),
+                          active: _active.contains(_platforms[i]),
+                          home: _home.contains(_platforms[i]),
+                          expanded: _expandedSlug == _platforms[i],
                           statusColor: _statusColor(_platforms[i]),
                           onKey: (node, event) => _sourceKey(i, _platforms[i], event),
-                          onTap: () => _toggleActive(_platforms[i], i),
-                          onHomeTap: () => _toggleHome(_platforms[i], i),
-                          isLast: i == _platforms.length - 1,
+                          onTap: () => _toggleExpanded(_platforms[i], i),
+                          isLast: i == _platforms.length - 1 && _expandedSlug != _platforms[i],
                         ),
+                        if (_expandedSlug == _platforms[i])
+                          _CategoryRow(
+                            node: _categoryNodes[i],
+                            slug: _platforms[i],
+                            allCategories: _allCategoriesFor(_platforms[i]),
+                            selectedCategories: _categories[_platforms[i]] ?? const <String>['Trending'],
+                            cursor: _categoryCursor[_platforms[i]] ?? 0,
+                            onKey: (node, event) => _categoryKey(i, _platforms[i], event),
+                            isLast: i == _platforms.length - 1,
+                          ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Text(
-                  'Remote: ↑↓ pilih source • OK aktif/nonaktif • → tampil/sembunyikan di Home • Back kembali',
+                  _categoryMode
+                      ? 'Kategori: ←/→ pilih • OK tampil/sembunyi di Home TV • ↑ kembali platform'
+                      : 'Platform: ← OFF • → ON • OK buka kategori • ↑ ke Ping/Simpan',
                   style: TextStyle(color: AppTheme.textSoft.withOpacity(0.75), fontSize: 12, fontWeight: FontWeight.w800),
                 ),
               ],
@@ -298,26 +439,32 @@ class _TvSourceBackIntent extends Intent {
 class _Header extends StatelessWidget {
   final FocusNode backNode;
   final FocusNode pingNode;
-  final FocusOnKeyEventCallback onBackKey;
-  final FocusOnKeyEventCallback onPingKey;
+  final FocusNode cancelNode;
+  final FocusNode saveNode;
+  final FocusOnKeyEventCallback onKey;
   final VoidCallback onBack;
   final VoidCallback onPing;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
   final bool pinging;
 
   const _Header({
     required this.backNode,
     required this.pingNode,
-    required this.onBackKey,
-    required this.onPingKey,
+    required this.cancelNode,
+    required this.saveNode,
+    required this.onKey,
     required this.onBack,
     required this.onPing,
+    required this.onCancel,
+    required this.onSave,
     required this.pinging,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
         color: const Color(0xFF09111E).withOpacity(0.96),
         borderRadius: BorderRadius.circular(18),
@@ -325,58 +472,66 @@ class _Header extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Focus(
-            focusNode: backNode,
-            skipTraversal: true,
-            onKeyEvent: onBackKey,
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: onBack,
-              borderRadius: BorderRadius.circular(16),
-              child: TvFocusedBorder(
-                focusNode: backNode,
-                color: AppTheme.cyan,
-                radius: 16,
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-                ),
-              ),
-            ),
-          ),
+          _HeaderButton(node: backNode, onKey: onKey, onTap: onBack, icon: Icons.arrow_back_rounded, label: ''),
           const SizedBox(width: 14),
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Kelola Sumber Data', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900)),
+              children: [
+                Text('Kelola Sumber Data', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
                 SizedBox(height: 5),
-                Text('Atur platform aktif dan source yang tampil di Home TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                Text('Simpan source aktif, tampil di Home TV, dan kategori per platform.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12.2, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
-          Focus(
-            focusNode: pingNode,
-            skipTraversal: true,
-            onKeyEvent: onPingKey,
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: pinging ? null : onPing,
-              borderRadius: BorderRadius.circular(999),
-              child: TvFocusedBorder(
-                focusNode: pingNode,
-                color: AppTheme.cyan,
-                radius: 999,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  child: Text(pinging ? 'PING...' : 'PING', style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ),
-          ),
+          _HeaderButton(node: pingNode, onKey: onKey, onTap: pinging ? null : onPing, label: pinging ? 'PING...' : 'PING'),
+          const SizedBox(width: 10),
+          _HeaderButton(node: cancelNode, onKey: onKey, onTap: onCancel, label: 'BATAL'),
+          const SizedBox(width: 10),
+          _HeaderButton(node: saveNode, onKey: onKey, onTap: onSave, label: 'SIMPAN', filled: true),
         ],
+      ),
+    );
+  }
+}
+
+class _HeaderButton extends StatelessWidget {
+  final FocusNode node;
+  final FocusOnKeyEventCallback onKey;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final String label;
+  final bool filled;
+
+  const _HeaderButton({required this.node, required this.onKey, this.onTap, this.icon, required this.label, this.filled = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: node,
+      skipTraversal: true,
+      onKeyEvent: onKey,
+      child: InkWell(
+        canRequestFocus: false,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: TvFocusedBorder(
+          focusNode: node,
+          color: AppTheme.cyan,
+          radius: 999,
+          child: Container(
+            height: 44,
+            padding: EdgeInsets.symmetric(horizontal: icon == null ? 18 : 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: filled ? AppTheme.cyan.withOpacity(0.16) : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: icon != null
+                ? Icon(icon, color: Colors.white, size: 24)
+                : Text(label, style: const TextStyle(color: AppTheme.cyan, fontSize: 11.5, fontWeight: FontWeight.w900)),
+          ),
+        ),
       ),
     );
   }
@@ -389,10 +544,10 @@ class _SourceRow extends StatelessWidget {
   final String subtitle;
   final bool active;
   final bool home;
+  final bool expanded;
   final Color statusColor;
   final FocusOnKeyEventCallback onKey;
   final VoidCallback onTap;
-  final VoidCallback onHomeTap;
   final bool isLast;
 
   const _SourceRow({
@@ -402,10 +557,10 @@ class _SourceRow extends StatelessWidget {
     required this.subtitle,
     required this.active,
     required this.home,
+    required this.expanded,
     required this.statusColor,
     required this.onKey,
     required this.onTap,
-    required this.onHomeTap,
     required this.isLast,
   });
 
@@ -454,14 +609,11 @@ class _SourceRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      _Pill(text: active ? 'AKTIF' : 'OFF', active: active),
+                      _Pill(text: active ? 'ON' : 'OFF', active: active),
                       const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: onHomeTap,
-                        child: _Pill(text: home ? 'HOME' : 'SEMBUNYI', active: home),
-                      ),
+                      _Pill(text: home ? 'TAMPIL DI TV' : 'SEMBUNYI', active: home && active),
                       const SizedBox(width: 10),
-                      Icon(Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 26),
+                      Icon(expanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 26),
                     ],
                   ),
                 ),
@@ -471,6 +623,94 @@ class _SourceRow extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget {
+  final FocusNode node;
+  final String slug;
+  final List<String> allCategories;
+  final List<String> selectedCategories;
+  final int cursor;
+  final FocusOnKeyEventCallback onKey;
+  final bool isLast;
+
+  const _CategoryRow({
+    required this.node,
+    required this.slug,
+    required this.allCategories,
+    required this.selectedCategories,
+    required this.cursor,
+    required this.onKey,
+    required this.isLast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: node,
+      skipTraversal: true,
+      onKeyEvent: onKey,
+      child: ListenableBuilder(
+        listenable: node,
+        builder: (context, _) {
+          final focused = node.hasFocus;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            margin: const EdgeInsets.fromLTRB(36, 2, 8, 8),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF101827),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.85) : const Color(0xFF25354B), width: focused ? 2 : 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Kategori ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    for (var i = 0; i < allCategories.length; i++)
+                      _CategoryChip(
+                        text: allCategories[i],
+                        selected: selectedCategories.contains(allCategories[i]),
+                        focused: focused && i == cursor,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final bool focused;
+
+  const _CategoryChip({required this.text, required this.selected, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: selected ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
+        color: selected ? null : const Color(0xFF111B2A),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: focused ? Colors.white : (selected ? Colors.transparent : Colors.white12), width: focused ? 2 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 14)] : null,
+      ),
+      child: Text(text, style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.w900)),
     );
   }
 }
