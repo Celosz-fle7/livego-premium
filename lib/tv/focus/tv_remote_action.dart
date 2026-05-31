@@ -16,7 +16,7 @@ extension TvRemoteActionFromKey on TvRemoteAction {
     if (key == LogicalKeyboardKey.arrowRight) return TvRemoteAction.right;
     if (key == LogicalKeyboardKey.arrowUp) return TvRemoteAction.up;
     if (key == LogicalKeyboardKey.arrowDown) return TvRemoteAction.down;
-    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.space) {
       return TvRemoteAction.select;
     }
     if (key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack) {

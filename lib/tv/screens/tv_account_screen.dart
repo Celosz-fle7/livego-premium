@@ -9,9 +9,7 @@ class TvAccountScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FocusTraversalGroup(
-      policy: ReadingOrderTraversalPolicy(),
-      child: ListView(
+    return ListView(
         padding: const EdgeInsets.fromLTRB(18, 24, 30, 30),
         children: [
           const _ProfileHeader(),
@@ -29,8 +27,7 @@ class TvAccountScreen extends StatelessWidget {
             _ActionRow(icon: Icons.info_outline_rounded, title: 'Tentang LiveGO', subtitle: 'LiveGO Premium • Anichin API • Android TV.', onTap: () {}),
           ]),
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -101,8 +98,8 @@ class _ActionRow extends StatefulWidget {
 class _ActionRowState extends State<_ActionRow> {
   bool focused = false;
 
-  KeyEventResult _key(FocusNode node, RawKeyEvent event) {
-    if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
+    if ((event is KeyDownEvent || event is KeyRepeatEvent) && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.numpadEnter || event.logicalKey == LogicalKeyboardKey.space)) {
       widget.onTap();
       return KeyEventResult.handled;
     }
@@ -112,8 +109,9 @@ class _ActionRowState extends State<_ActionRow> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      skipTraversal: true,
       autofocus: widget.autofocus,
-      onKey: _key,
+      onKeyEvent: _key,
       onFocusChange: (v) => setState(() => focused = v),
       child: InkWell(
         onTap: widget.onTap,

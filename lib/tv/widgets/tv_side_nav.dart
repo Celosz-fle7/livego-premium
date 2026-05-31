@@ -71,8 +71,8 @@ class _TvSideNavState extends State<TvSideNav> {
 
   int _safeIndex(int value) => value.clamp(0, TvSideNav.items.length - 1);
 
-  KeyEventResult _handleKey(BuildContext context, int i, RawKeyEvent event) {
-    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
+  KeyEventResult _handleKey(BuildContext context, int i, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -91,7 +91,7 @@ class _TvSideNavState extends State<TvSideNav> {
       widget.onOpenContent(i);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.space) {
       widget.onChanged(i);
       return KeyEventResult.handled;
     }
@@ -162,7 +162,7 @@ class _NavButton extends StatefulWidget {
   final bool expanded;
   final VoidCallback onTap;
   final bool logo;
-  final FocusOnKeyCallback onKey;
+  final FocusOnKeyEventCallback onKey;
 
   const _NavButton({
     required this.focusNode,
@@ -191,7 +191,7 @@ class _NavButtonState extends State<_NavButton> {
         focusNode: widget.focusNode,
         skipTraversal: true,
         autofocus: false,
-        onKey: widget.onKey,
+        onKeyEvent: widget.onKey,
         onFocusChange: (v) => setState(() => focused = v),
         child: InkWell(
           onTap: widget.onTap,

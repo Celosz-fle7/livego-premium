@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
@@ -148,6 +149,65 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     setState(() {});
   }
 
+  KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.mediaPlayPause) {
+      _toggle();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _seekRelative(const Duration(seconds: 10));
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _seekRelative(const Duration(seconds: -10));
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      final s = (_speed + 0.25).clamp(0.5, 2.0).toDouble();
+      setState(() => _speed = s);
+      _controller?.setPlaybackSpeed(s);
+      PlayerPreferences.setSpeed(s);
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowDown) {
+      final s = (_speed - 0.25).clamp(0.5, 2.0).toDouble();
+      setState(() => _speed = s);
+      _controller?.setPlaybackSpeed(s);
+      PlayerPreferences.setSpeed(s);
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack) {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  void _seekRelative(Duration offset) {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final target = c.value.position + offset;
+    final duration = c.value.duration;
+    c.seekTo(target.isNegative ? Duration.zero : (target > duration ? duration : target));
+  }
+
   void _selectEpisode(int episode) {
     _episode = episode;
     _load();
@@ -165,9 +225,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: SafeArea(
+    return Focus(
+      autofocus: true,
+      skipTraversal: true,
+      onKeyEvent: _handleRemoteKey,
+      child: Scaffold(
+        backgroundColor: AppTheme.bg,
+        body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(92, 24, 32, 24),
           child: Row(
@@ -282,6 +346,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

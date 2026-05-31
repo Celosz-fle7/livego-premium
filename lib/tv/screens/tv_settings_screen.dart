@@ -145,8 +145,9 @@ class _TabChipState extends State<_TabChip> {
   @override
   Widget build(BuildContext context) {
     return Focus(
-      onKey: (node, event) {
-        if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if ((event is KeyDownEvent || event is KeyRepeatEvent) && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.numpadEnter || event.logicalKey == LogicalKeyboardKey.space)) {
           widget.onTap();
           return KeyEventResult.handled;
         }
@@ -192,8 +193,9 @@ class _OptionRowState extends State<_OptionRow> {
   Widget build(BuildContext context) {
     final color = widget.danger ? const Color(0xFFFF6B7A) : AppTheme.cyan;
     return Focus(
-      onKey: (node, event) {
-        if (event is RawKeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if ((event is KeyDownEvent || event is KeyRepeatEvent) && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.numpadEnter || event.logicalKey == LogicalKeyboardKey.space)) {
           widget.onTap();
           return KeyEventResult.handled;
         }

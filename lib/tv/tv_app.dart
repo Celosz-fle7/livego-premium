@@ -16,13 +16,13 @@ class TvApp extends StatefulWidget {
 class _TvAppState extends State<TvApp> {
   int index = 0;
   int _homeFocusTicket = 0;
-  final FocusNode _contentGuard = FocusNode(debugLabel: 'tv-content-guard');
+  final FocusNode _contentGuard = FocusNode(skipTraversal: true, debugLabel: 'tv-content-guard');
   late final List<FocusNode> _navNodes;
 
   @override
   void initState() {
     super.initState();
-    _navNodes = List.generate(TvSideNav.items.length, (i) => FocusNode(debugLabel: 'tv-nav-$i'));
+    _navNodes = List.generate(TvSideNav.items.length, (i) => FocusNode(skipTraversal: true, debugLabel: 'tv-nav-$i'));
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WidgetsBinding.instance.addPostFrameCallback((_) => _navNodes.first.requestFocus());
   }
@@ -120,14 +120,14 @@ class _TvAppState extends State<TvApp> {
     if (await _confirmExit()) SystemNavigator.pop();
   }
 
-  KeyEventResult _contentKey(FocusNode node, RawKeyEvent event) {
-    if (event is! RawKeyDownEvent) return KeyEventResult.ignored;
+  KeyEventResult _contentKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _navNodes[index.clamp(0, _navNodes.length - 1)].requestFocus();
       return KeyEventResult.handled;
     }
-    if (node.hasFocus && (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select)) {
+    if (node.hasFocus && (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.select)) {
       _focusRightZone();
       return KeyEventResult.handled;
     }
@@ -164,30 +164,28 @@ class _TvAppState extends State<TvApp> {
                     return null;
                   }),
                 },
-                child: FocusTraversalGroup(
-                  policy: ReadingOrderTraversalPolicy(),
-                  child: Row(
-                    children: [
-                      TvSideNav(
-                        index: index,
-                        focusNodes: _navNodes,
-                        onChanged: (v) => _selectPage(v, moveToContent: true),
-                        onOpenContent: _moveFromNavToContent,
-                      ),
-                      Expanded(
-                        child: Focus(
-                          focusNode: _contentGuard,
-                          onKey: _contentKey,
-                          child: RepaintBoundary(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 150),
-                              child: KeyedSubtree(key: ValueKey(index), child: _page()),
-                            ),
+                child: Row(
+                  children: [
+                    TvSideNav(
+                      index: index,
+                      focusNodes: _navNodes,
+                      onChanged: (v) => _selectPage(v, moveToContent: true),
+                      onOpenContent: _moveFromNavToContent,
+                    ),
+                    Expanded(
+                      child: Focus(
+                        focusNode: _contentGuard,
+                        skipTraversal: true,
+                        onKeyEvent: _contentKey,
+                        child: RepaintBoundary(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 150),
+                            child: KeyedSubtree(key: ValueKey(index), child: _page()),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
