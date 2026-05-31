@@ -73,8 +73,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               kind: _SettingKind.drmMode,
               icon: Icons.lock_rounded,
               title: 'Kompatibilitas Widevine DRM',
-              subtitle: 'Remote: kiri/kanan ganti mode DRM.',
-              value: LiveGoSettings.drmMode,
+              subtitle: 'Mode saat ini: ${LiveGoSettings.drmMode}',
+              value: 'ATUR',
             ),
           ],
         ),
@@ -85,7 +85,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
               title: 'Jumlah Grid Home TV',
-              subtitle: 'Remote: kiri kurang, kanan tambah. Batas TV 4 sampai 10 poster.',
+              subtitle: 'Tekan OK atau kanan untuk mengatur jumlah poster TV. Batas TV sampai 10 grid.',
               value: '${LiveGoSettings.tvHomeGrid}',
               showGridBar: true,
             ),
@@ -301,6 +301,22 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     return KeyEventResult.ignored;
   }
 
+  void _adjustTvGrid(int delta) {
+    setState(() => LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta));
+  }
+
+  String _nextDrm(int delta) {
+    const values = ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'];
+    final current = values.indexOf(LiveGoSettings.drmMode);
+    final base = current < 0 ? 0 : current;
+    final next = (base + delta) % values.length;
+    return values[next < 0 ? next + values.length : next];
+  }
+
+  void _cycleDrm(int delta) {
+    setState(() => LiveGoSettings.drmMode = _nextDrm(delta));
+  }
+
   void _activate(_SettingKind kind) {
     if (kind == _SettingKind.sourceManager) {
       Navigator.of(context)
@@ -333,10 +349,10 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           LiveGoSettings.manualRotateButton = !LiveGoSettings.manualRotateButton;
           break;
         case _SettingKind.drmMode:
-          _cycleDrm(1);
+          LiveGoSettings.drmMode = _nextDrm(1);
           break;
         case _SettingKind.tvGrid:
-          _adjustTvGrid(1);
+          LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + 1);
           break;
         case _SettingKind.sourceManager:
           break;
@@ -348,17 +364,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
       }
     });
-  }
-
-  void _adjustTvGrid(int delta) {
-    LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta);
-  }
-
-  void _cycleDrm(int delta) {
-    const values = ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'];
-    final current = values.indexOf(LiveGoSettings.drmMode);
-    final base = current < 0 ? 0 : current;
-    LiveGoSettings.drmMode = values[(base + delta) % values.length];
   }
 
   @override
@@ -800,24 +805,20 @@ class _TileContent extends StatelessWidget {
               Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               if (item.showGridBar) ...[
                 const SizedBox(height: 12),
-                _GridPreview(value: LiveGoSettings.tvHomeGrid),
+                _TvGridStepper(value: LiveGoSettings.tvHomeGrid, focused: focused),
               ],
             ],
           ),
         ),
         const SizedBox(width: 12),
-        if (item.showGridBar)
-          _GridStepper(value: LiveGoSettings.tvHomeGrid, focused: focused)
-        else if (item.switchValue != null)
+        if (item.switchValue != null)
           _SwitchPill(value: item.switchValue!, focused: focused)
+        else if (item.showGridBar)
+          Text('←  ${LiveGoSettings.tvHomeGrid}  →', style: TextStyle(color: focused ? accent : AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12.5, decoration: TextDecoration.none))
         else
           Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 12.5, decoration: TextDecoration.none)),
         const SizedBox(width: 12),
-        Icon(
-          item.showGridBar ? Icons.keyboard_double_arrow_left_rounded : (item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded),
-          color: focused ? accent : Colors.white38,
-          size: 24,
-        ),
+        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 26),
       ],
     );
   }
@@ -847,6 +848,43 @@ class _SwitchPill extends StatelessWidget {
   }
 }
 
+
+class _TvGridStepper extends StatelessWidget {
+  final int value;
+  final bool focused;
+
+  const _TvGridStepper({required this.value, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget box(String text, {bool active = false}) {
+      return Container(
+        width: active ? 56 : 36,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: active || focused ? AppTheme.cyan.withOpacity(0.75) : Colors.white12),
+        ),
+        child: Text(text, style: TextStyle(color: active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+      );
+    }
+
+    return Row(
+      children: [
+        box('-'),
+        const SizedBox(width: 8),
+        box('$value', active: true),
+        const SizedBox(width: 8),
+        box('+'),
+        const SizedBox(width: 14),
+        Expanded(child: _GridPreview(value: value)),
+      ],
+    );
+  }
+}
+
 class _GridPreview extends StatelessWidget {
   final int value;
   const _GridPreview({required this.value});
@@ -867,37 +905,6 @@ class _GridPreview extends StatelessWidget {
           ),
         );
       }),
-    );
-  }
-}
-
-
-class _GridStepper extends StatelessWidget {
-  final int value;
-  final bool focused;
-
-  const _GridStepper({required this.value, required this.focused});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = focused ? AppTheme.cyan : Colors.white54;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: focused ? AppTheme.cyan.withOpacity(0.12) : Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.7) : Colors.white12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.remove_rounded, color: color, size: 18),
-          const SizedBox(width: 12),
-          Text('$value', style: TextStyle(color: focused ? Colors.white : AppTheme.cyan, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-          const SizedBox(width: 12),
-          Icon(Icons.add_rounded, color: color, size: 18),
-        ],
-      ),
     );
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -24,35 +22,30 @@ class TvPlayerScreen extends StatefulWidget {
 }
 
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
-  final FocusNode _remoteNode = FocusNode(skipTraversal: true, debugLabel: 'tv-player-remote');
-
   VideoPlayerController? _controller;
   ContentItem? _detail;
-  StreamInfo _streamInfo = StreamInfo.empty;
   String _url = '';
   String _error = '';
   bool _loading = true;
-  bool _controlsVisible = true;
-  bool _episodePanelOpen = false;
-  bool _qualityPanelOpen = false;
   int _episode = 1;
   int _knownEpisodeCount = 0;
-  int _episodeCursor = 0;
-  int _qualityCursor = 0;
   double _speed = 1.0;
   String _audioTrack = 'Source';
-  Timer? _hideTimer;
+  bool _showControls = true;
+  bool _episodePanelOpen = false;
+  bool _qualityPanelOpen = false;
+  int _episodeCursor = 1;
 
   @override
   void initState() {
     super.initState();
     _episode = LiveGoLocalStore.continueEpisode(widget.item);
-    _episodeCursor = (_episode - 1).clamp(0, 119).toInt();
+    _episodeCursor = _episode;
     LiveGoLocalStore.addHistory(widget.item);
     _loadPreferences();
     _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _remoteNode.requestFocus());
   }
+
 
   Future<void> _loadPreferences() async {
     await PlayerPreferences.load();
@@ -86,7 +79,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _loading = true;
       _error = '';
       _url = '';
-      _controlsVisible = true;
     });
 
     try {
@@ -107,10 +99,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         lang: widget.item.lang,
       );
 
+      // TV API test path: hit the playable /episode route first, like mobile.
+      // Detail + episode metadata is slower and must not block first playback.
       final streamFuture = LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode');
       final detailFuture = LiveGoCatalog.detail(widget.item);
 
-      var stream = await streamFuture.timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
+      var stream = await streamFuture.timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => StreamInfo.empty,
+      );
 
       ContentItem detail = widget.item;
       List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
@@ -146,6 +143,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
       );
 
+      // Retry with resolved detail/episode id only if the fast video API path failed.
       if (stream.url.isEmpty) {
         stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId)
             .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
@@ -175,15 +173,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       await _controller?.dispose();
       _controller = null;
       _detail = playable;
-      _streamInfo = stream;
-      _url = stream.urlForQuality(PlayerPreferences.quality);
-      if (_url.isEmpty) _url = stream.url;
-      _episodeCursor = (_episode - 1).clamp(0, (playable.episodes <= 0 ? 1 : playable.episodes) - 1).toInt();
+      _url = stream.url;
 
-      if (_url.isNotEmpty) {
+      if (stream.url.isNotEmpty) {
         final controller = VideoPlayerController.networkUrl(
-          Uri.parse(_url),
-          httpHeaders: stream.headers.isEmpty ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'} : stream.headers,
+          Uri.parse(stream.url),
+          httpHeaders: stream.headers.isEmpty
+              ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+              : stream.headers,
         );
         _controller = controller;
         controller.addListener(() {
@@ -210,7 +207,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           await controller.seekTo(saved.position);
         }
         await controller.play();
-        _scheduleHideControls();
       }
     } catch (e) {
       _error = '$e';
@@ -218,19 +214,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     _loading = false;
     if (mounted) setState(() {});
-  }
-
-  void _showControls({bool keep = false}) {
-    if (!_controlsVisible) setState(() => _controlsVisible = true);
-    if (!keep) _scheduleHideControls();
-  }
-
-  void _scheduleHideControls() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted || _episodePanelOpen || _qualityPanelOpen) return;
-      setState(() => _controlsVisible = false);
-    });
   }
 
   void _toggle() {
@@ -241,16 +224,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     } else {
       c.play();
     }
-    _showControls();
     setState(() {});
   }
 
-  List<String> get _qualityLabels {
-    final labels = <String>['Auto'];
-    for (final quality in _streamInfo.qualities) {
-      if (quality.label.trim().isNotEmpty && !labels.contains(quality.label)) labels.add(quality.label);
-    }
-    return labels;
+  int _episodeTotal(ContentItem item) {
+    final total = _knownEpisodeCount > item.episodes ? _knownEpisodeCount : item.episodes;
+    return total.clamp(1, 120).toInt();
   }
 
   bool _isSelect(LogicalKeyboardKey key) {
@@ -262,147 +241,136 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   bool _isBack(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack;
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
   }
 
-  bool _isMenuKey(LogicalKeyboardKey key) {
-    return key.keyLabel.toLowerCase().contains('menu');
+  bool _isMenu(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.contextMenu ||
+        key == LogicalKeyboardKey.f10;
+  }
+
+  void _openEpisodePanel() {
+    setState(() {
+      _episodePanelOpen = true;
+      _qualityPanelOpen = false;
+      _showControls = true;
+      _episodeCursor = _episode;
+    });
+  }
+
+  void _openQualityPanel() {
+    setState(() {
+      _qualityPanelOpen = true;
+      _episodePanelOpen = false;
+      _showControls = true;
+    });
   }
 
   KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
-
-    if (_episodePanelOpen) return _episodePanelKey(key);
-    if (_qualityPanelOpen) return _qualityPanelKey(key);
+    final item = _detail ?? widget.item;
 
     if (_isBack(key)) {
-      if (_controlsVisible) {
-        setState(() => _controlsVisible = false);
+      if (_episodePanelOpen || _qualityPanelOpen) {
+        setState(() {
+          _episodePanelOpen = false;
+          _qualityPanelOpen = false;
+          _showControls = true;
+        });
+      } else if (_showControls) {
+        setState(() => _showControls = false);
       } else if (Navigator.canPop(context)) {
         Navigator.pop(context);
       }
       return KeyEventResult.handled;
     }
 
-    if (_isMenuKey(key)) {
+    if (_episodePanelOpen) {
+      final total = _episodeTotal(item);
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        setState(() => _episodeCursor = _episodeCursor <= 1 ? 1 : _episodeCursor - 1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        setState(() => _episodeCursor = _episodeCursor >= total ? total : _episodeCursor + 1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() => _episodePanelOpen = false);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _selectEpisode(_episodeCursor);
+        setState(() => _episodePanelOpen = false);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
+    }
+
+    if (_qualityPanelOpen) {
+      if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowDown) {
+        final s = (_speed - 0.25).clamp(0.5, 2.0).toDouble();
+        setState(() => _speed = s);
+        _controller?.setPlaybackSpeed(s);
+        PlayerPreferences.setSpeed(s);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowUp) {
+        final s = (_speed + 0.25).clamp(0.5, 2.0).toDouble();
+        setState(() => _speed = s);
+        _controller?.setPlaybackSpeed(s);
+        PlayerPreferences.setSpeed(s);
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        setState(() => _qualityPanelOpen = false);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
+    }
+
+    if (_isMenu(key)) {
       _openQualityPanel();
       return KeyEventResult.handled;
     }
 
     if (_isSelect(key)) {
       _toggle();
+      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowRight) {
       _seekRelative(const Duration(seconds: 10));
-      _showControls();
+      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowLeft) {
       _seekRelative(const Duration(seconds: -10));
-      _showControls();
+      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowUp) {
-      _showControls(keep: true);
+      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowDown) {
       _openEpisodePanel();
       return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
-  }
-
-  KeyEventResult _episodePanelKey(LogicalKeyboardKey key) {
-    final total = _episodeTotal;
-    if (_isBack(key) || key == LogicalKeyboardKey.arrowUp) {
-      setState(() {
-        _episodePanelOpen = false;
-        _controlsVisible = true;
-      });
-      _scheduleHideControls();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      setState(() => _episodeCursor = (_episodeCursor - 1).clamp(0, total - 1).toInt());
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      setState(() => _episodeCursor = (_episodeCursor + 1).clamp(0, total - 1).toInt());
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _episodeCursor = (_episodeCursor + 4).clamp(0, total - 1).toInt());
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
-      _selectEpisode(_episodeCursor + 1);
-      setState(() => _episodePanelOpen = false);
-      return KeyEventResult.handled;
-    }
-    if (_isMenuKey(key)) {
-      setState(() {
-        _episodePanelOpen = false;
-        _qualityPanelOpen = true;
-      });
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
-  }
-
-  KeyEventResult _qualityPanelKey(LogicalKeyboardKey key) {
-    final labels = _qualityLabels;
-    if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
-      setState(() => _qualityPanelOpen = false);
-      _scheduleHideControls();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      setState(() => _qualityCursor = (_qualityCursor - 1).clamp(0, labels.length - 1).toInt());
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-      setState(() => _qualityCursor = (_qualityCursor + 1).clamp(0, labels.length - 1).toInt());
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
-      _changeQuality(labels[_qualityCursor]);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
-  }
-
-  int get _episodeTotal {
-    final item = _detail ?? widget.item;
-    final total = _knownEpisodeCount > item.episodes ? _knownEpisodeCount : item.episodes;
-    return total.clamp(1, 120).toInt();
-  }
-
-  void _openEpisodePanel() {
-    final total = _episodeTotal;
-    setState(() {
-      _episodePanelOpen = true;
-      _qualityPanelOpen = false;
-      _controlsVisible = true;
-      _episodeCursor = (_episode - 1).clamp(0, total - 1).toInt();
-    });
-    _hideTimer?.cancel();
-  }
-
-  void _openQualityPanel() {
-    final labels = _qualityLabels;
-    final current = labels.indexOf(PlayerPreferences.quality);
-    setState(() {
-      _qualityPanelOpen = true;
-      _episodePanelOpen = false;
-      _controlsVisible = true;
-      _qualityCursor = current < 0 ? 0 : current;
-    });
-    _hideTimer?.cancel();
   }
 
   void _seekRelative(Duration offset) {
@@ -413,23 +381,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     c.seekTo(target.isNegative ? Duration.zero : (target > duration ? duration : target));
   }
 
-  Future<void> _changeQuality(String label) async {
-    await PlayerPreferences.setQuality(label);
-    if (!mounted) return;
-    setState(() => _qualityPanelOpen = false);
-    _load();
-  }
-
   void _selectEpisode(int episode) {
     _episode = episode;
-    _episodeCursor = (episode - 1).clamp(0, 119).toInt();
     _load();
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
-    _remoteNode.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -441,7 +399,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final ready = controller != null && controller.value.isInitialized;
 
     return Focus(
-      focusNode: _remoteNode,
       autofocus: true,
       skipTraversal: true,
       onKeyEvent: _handleRemoteKey,
@@ -463,27 +420,65 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               LiveGoCachedImage(
                 url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
                 fit: BoxFit.cover,
-                role: LiveGoImageRole.thumbnail,
+                role: LiveGoImageRole.banner,
                 tv: true,
               ),
-            Container(color: Colors.black.withOpacity(ready ? 0 : 0.38)),
+            Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
             if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
             if (!_loading && !ready)
               Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(36),
                   child: Text(
                     _error.isNotEmpty ? _error : (_url.isEmpty ? 'Stream belum tersedia' : 'Menyiapkan player...'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 18),
                   ),
                 ),
               ),
-            if (_controlsVisible) _PlayerOverlay(item: item, controller: controller, ready: ready, episode: _episode, total: _episodeTotal, speed: _speed, quality: PlayerPreferences.quality, streamOk: _url.isNotEmpty),
-            if (_episodePanelOpen) _EpisodePanel(total: _episodeTotal, cursor: _episodeCursor, selected: _episode),
-            if (_qualityPanelOpen) _QualityPanel(labels: _qualityLabels, cursor: _qualityCursor, selected: PlayerPreferences.quality),
+            if (_showControls || _episodePanelOpen || _qualityPanelOpen)
+              _TvPlayerOverlay(
+                item: item,
+                ready: ready,
+                playing: ready && controller.value.isPlaying,
+                episode: _episode,
+                total: _episodeTotal(item),
+                speed: _speed,
+                audioTrack: _audioTrack,
+                apiText: _url.isEmpty ? 'Video API: belum ada stream' : 'Video API: OK • ${item.platformSlug} • Ep $_episode',
+              ),
+            if (ready)
+              Positioned(
+                left: 36,
+                right: 36,
+                bottom: _episodePanelOpen || _qualityPanelOpen ? 180 : 34,
+                child: VideoProgressIndicator(
+                  controller,
+                  allowScrubbing: false,
+                  colors: const VideoProgressColors(
+                    playedColor: AppTheme.cyan,
+                    bufferedColor: Colors.white30,
+                    backgroundColor: Colors.white12,
+                  ),
+                ),
+              ),
+            if (_episodePanelOpen)
+              Positioned(
+                left: 36,
+                right: 36,
+                bottom: 26,
+                child: _EpisodeStrip(
+                  total: _episodeTotal(item),
+                  selected: _episode,
+                  cursor: _episodeCursor,
+                ),
+              ),
+            if (_qualityPanelOpen)
+              Positioned(
+                right: 38,
+                bottom: 72,
+                child: _QualityPanel(speed: _speed, audioTrack: _audioTrack),
+              ),
           ],
         ),
       ),
@@ -491,169 +486,186 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 }
 
-class _PlayerOverlay extends StatelessWidget {
+class _TvPlayerOverlay extends StatelessWidget {
   final ContentItem item;
-  final VideoPlayerController? controller;
   final bool ready;
+  final bool playing;
   final int episode;
   final int total;
   final double speed;
-  final String quality;
-  final bool streamOk;
+  final String audioTrack;
+  final String apiText;
 
-  const _PlayerOverlay({required this.item, required this.controller, required this.ready, required this.episode, required this.total, required this.speed, required this.quality, required this.streamOk});
+  const _TvPlayerOverlay({
+    required this.item,
+    required this.ready,
+    required this.playing,
+    required this.episode,
+    required this.total,
+    required this.speed,
+    required this.audioTrack,
+    required this.apiText,
+  });
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black87, Colors.transparent, Colors.black87],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(34, 24, 34, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 32,
+            top: 26,
+            right: 32,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.tv_rounded, color: AppTheme.cyan, size: 24),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900))),
-                    Text('Ep $episode/$total  •  $quality  •  ${speed.toStringAsFixed(2)}x', style: const TextStyle(color: AppTheme.cyan, fontSize: 13, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-                const Spacer(),
-                if (ready && controller != null) ...[
-                  VideoProgressIndicator(
-                    controller!,
-                    allowScrubbing: false,
-                    colors: const VideoProgressColors(playedColor: AppTheme.cyan, bufferedColor: Colors.white30, backgroundColor: Colors.white12),
+                const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 4),
+                      Text('EP $episode / $total • ${speed.toStringAsFixed(2)}x • Audio: $audioTrack', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800)),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                ],
-                Row(
-                  children: [
-                    Icon(ready && controller!.value.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        'OK Play/Pause   ←/→ Seek 10s   ↑ Kontrol   ↓ Episode   Menu Quality   Back Tutup/Keluar',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    Text(streamOk ? 'Video API: OK' : 'Video API: belum ada stream', style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
-                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white12)),
+                  child: const Text('OK Play/Pause • ←/→ Seek • ↓ Episode • MENU Quality', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
           ),
-        ),
+          Center(
+            child: Icon(
+              playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+              color: Colors.white.withOpacity(playing ? 0.18 : 0.88),
+              size: 96,
+            ),
+          ),
+          Positioned(
+            left: 36,
+            bottom: 54,
+            child: Text(apiText, style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _EpisodePanel extends StatelessWidget {
+class _EpisodeStrip extends StatelessWidget {
   final int total;
-  final int cursor;
   final int selected;
+  final int cursor;
 
-  const _EpisodePanel({required this.total, required this.cursor, required this.selected});
+  const _EpisodeStrip({required this.total, required this.selected, required this.cursor});
 
   @override
   Widget build(BuildContext context) {
-    final count = total > 120 ? 120 : total;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        width: 330,
-        margin: const EdgeInsets.only(right: 28),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: const Color(0xEE09111E), borderRadius: BorderRadius.circular(26), border: Border.all(color: AppTheme.cyan.withOpacity(0.45))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 14),
-            SizedBox(
-              height: 430,
-              child: GridView.builder(
-                itemCount: count,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.35),
-                itemBuilder: (_, i) {
-                  final ep = i + 1;
-                  final active = ep == selected;
-                  final focused = i == cursor;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 100),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: active ? AppTheme.cyan.withOpacity(0.26) : const Color(0xFF111B2A),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.5) : Colors.white12), width: focused ? 2.5 : 1),
-                    ),
-                    child: Text('$ep', style: TextStyle(color: active || focused ? Colors.white : Colors.white60, fontWeight: FontWeight.w900)),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+    final start = (cursor - 4).clamp(1, total).toInt();
+    final end = (start + 8).clamp(1, total).toInt();
+    final episodes = [for (var i = start; i <= end; i++) i];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xDD07101E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final ep in episodes) ...[
+                _EpisodeChip(ep: ep, selected: ep == selected, focused: ep == cursor),
+                const SizedBox(width: 10),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EpisodeChip extends StatelessWidget {
+  final int ep;
+  final bool selected;
+  final bool focused;
+
+  const _EpisodeChip({required this.ep, required this.selected, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 62,
+      height: 46,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? AppTheme.cyan.withOpacity(0.25) : Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.6) : Colors.white12), width: focused ? 2 : 1),
+      ),
+      child: Text('$ep', style: TextStyle(color: focused || selected ? Colors.white : Colors.white54, fontWeight: FontWeight.w900)),
     );
   }
 }
 
 class _QualityPanel extends StatelessWidget {
-  final List<String> labels;
-  final int cursor;
-  final String selected;
+  final double speed;
+  final String audioTrack;
 
-  const _QualityPanel({required this.labels, required this.cursor, required this.selected});
+  const _QualityPanel({required this.speed, required this.audioTrack});
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: 280,
-        margin: const EdgeInsets.only(left: 34),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: const Color(0xEE09111E), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.cyan.withOpacity(0.45))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Quality', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 12),
-            for (var i = 0; i < labels.length; i++)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: labels[i] == selected ? AppTheme.cyan.withOpacity(0.18) : const Color(0xFF111B2A),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: i == cursor ? AppTheme.cyan : Colors.white12, width: i == cursor ? 2 : 1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(labels[i] == selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: labels[i] == selected || i == cursor ? AppTheme.cyan : Colors.white38, size: 20),
-                    const SizedBox(width: 10),
-                    Text(labels[i], style: TextStyle(color: labels[i] == selected || i == cursor ? Colors.white : Colors.white60, fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ),
-          ],
-        ),
+    return Container(
+      width: 280,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xEE07101E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Quality / Speed', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 14),
+          _QualityRow(label: 'Quality', value: LiveGoSettings.quality),
+          _QualityRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x'),
+          _QualityRow(label: 'Audio', value: audioTrack),
+          const SizedBox(height: 10),
+          const Text('←/→ atau ↑/↓ ubah speed • OK tutup', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QualityRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _QualityRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800))),
+          Text(value, style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)),
+        ],
       ),
     );
   }
