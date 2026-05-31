@@ -43,8 +43,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _optionCursor = 0;
   _TvPlayerMode _mode = _TvPlayerMode.controls;
   Timer? _controlHideTimer;
-  int _loadTicket = 0;
-  final Map<String, String> _debugTiming = <String, String>{};
 
   static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
   static const int _controlCount = 8;
@@ -59,24 +57,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _load();
   }
 
-  void _setTiming(String label, String value) {
-    debugPrint('LIVEGO TV TIMING $label $value');
-    if (!mounted) return;
-    setState(() {
-      _debugTiming[label] = value;
-    });
-  }
-
-  void _markTiming(String label, Stopwatch watch, {String extra = ''}) {
-    final value = '${watch.elapsedMilliseconds}ms${extra.isEmpty ? '' : ' • $extra'}';
-    _setTiming(label, value);
-  }
-
-  void _resetDebugTiming() {
-    _debugTiming
-      ..clear()
-      ..['OPEN'] = '0ms';
-  }
 
   Future<void> _loadPreferences() async {
     await PlayerPreferences.load();
@@ -106,175 +86,72 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   Future<void> _load() async {
-    final ticket = ++_loadTicket;
-    _cancelControlAutoHide();
     setState(() {
       _loading = true;
       _error = '';
       _url = '';
-      _resetDebugTiming();
     });
 
-    final watch = Stopwatch()..start();
-    try {
-      final requestedEpisode = _episode <= 0 ? 1 : _episode;
-      final fastPlayable = ContentItem(
-        id: widget.item.id,
-        title: widget.item.title,
-        source: widget.item.source,
-        category: widget.item.category,
-        description: widget.item.description,
-        posterUrl: widget.item.posterUrl,
-        backdropUrl: widget.item.backdropUrl,
-        rating: widget.item.rating,
-        episodes: widget.item.episodes,
-        updated: widget.item.updated,
-        platformSlug: widget.item.platformSlug,
-        chapterId: '$requestedEpisode',
-        lang: widget.item.lang,
-      );
+    final startedAt = DateTime.now();
+    final requestedEpisode = _episode <= 0 ? 1 : _episode;
+    final fastPlayable = ContentItem(
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: '$requestedEpisode',
+      lang: widget.item.lang,
+    );
 
-      debugPrint('LIVEGO TV PLAYER OPEN ${fastPlayable.platformSlug} id=${fastPlayable.id} ep=$requestedEpisode');
+    if ((widget.item.episodes) > _knownEpisodeCount) {
+      _knownEpisodeCount = widget.item.episodes;
+    }
 
-      // Start the three expensive player requests at the same time. Playback must
-      // use the first valid playable URL. Detail and full episode metadata update
-      // the overlay/list later and must never block the first frame of video.
-      final directStreamFuture = LiveGoCatalog.directStreamInfo(
-        fastPlayable,
-        chapterId: '$requestedEpisode',
-      ).timeout(const Duration(seconds: 10), onTimeout: () => StreamInfo.empty);
+    bool playbackStarted = false;
+    final playCompleter = Completer<void>();
 
-      final episodeBundleFuture = LiveGoCatalog.episodeBundle(
-        fastPlayable,
-        episode: requestedEpisode,
-      );
+    Future<void> startPlayback(StreamInfo stream, String source) async {
+      if (!mounted || playbackStarted || stream.url.isEmpty) return;
+      playbackStarted = true;
+      if (!playCompleter.isCompleted) playCompleter.complete();
 
-      final detailFuture = LiveGoCatalog.detail(widget.item)
-          .timeout(const Duration(seconds: 18), onTimeout: () => widget.item)
-          .catchError((e) {
-        debugPrint('LIVEGO TV DETAIL BACKGROUND ERROR: $e');
-        return widget.item;
-      });
-
-      detailFuture.then((detail) {
-        if (!mounted || ticket != _loadTicket) return;
-        final resolved = _keepPlayableIdentity(detail);
-        final count = resolved.episodes > 0 ? resolved.episodes : widget.item.episodes;
-        setState(() {
-          _detail = ContentItem(
-            id: resolved.id,
-            title: resolved.title,
-            source: resolved.source,
-            category: resolved.category,
-            description: resolved.description,
-            posterUrl: resolved.posterUrl,
-            backdropUrl: resolved.backdropUrl,
-            rating: resolved.rating,
-            episodes: count > _knownEpisodeCount ? count : _knownEpisodeCount,
-            updated: resolved.updated,
-            platformSlug: resolved.platformSlug,
-            chapterId: '$_episode',
-            lang: resolved.lang,
-          );
-        });
-        _markTiming('DETAIL', watch, extra: 'count=$count');
-        debugPrint('LIVEGO TV DETAIL DONE ${watch.elapsedMilliseconds}ms count=$count');
-      });
-
-      episodeBundleFuture.then((bundle) {
-        if (!mounted || ticket != _loadTicket) return;
-        final count = bundle.episodes.length;
-        if (count > 1 && count != _knownEpisodeCount) {
-          setState(() => _knownEpisodeCount = count);
-        }
-        _markTiming('ALLEPISODE', watch, extra: 'count=$count stream=${bundle.stream.url.isNotEmpty}');
-        debugPrint('LIVEGO TV ALLEPISODE DONE ${watch.elapsedMilliseconds}ms count=$count stream=${bundle.stream.url.isNotEmpty}');
-      }).catchError((e) {
-        debugPrint('LIVEGO TV ALLEPISODE BACKGROUND ERROR: $e');
-      });
-
-      final playableCompleter = Completer<StreamInfo>();
-      var pendingPlayable = 2;
-
-      void finishOne() {
-        pendingPlayable -= 1;
-        if (pendingPlayable <= 0 && !playableCompleter.isCompleted) {
-          playableCompleter.complete(StreamInfo.empty);
-        }
-      }
-
-      void offerPlayable(String source, StreamInfo stream) {
-        _markTiming(source, watch, extra: 'ok=${stream.url.isNotEmpty}');
-        debugPrint('LIVEGO TV PLAYABLE $source ${watch.elapsedMilliseconds}ms ok=${stream.url.isNotEmpty}');
-        if (!playableCompleter.isCompleted && stream.url.isNotEmpty) {
-          _setTiming('SOURCE', source);
-          playableCompleter.complete(stream);
-        }
-      }
-
-      directStreamFuture.then((stream) {
-        offerPlayable('/episode', stream);
-      }).catchError((e) {
-        debugPrint('LIVEGO TV DIRECT STREAM ERROR: $e');
-      }).whenComplete(finishOne);
-
-      episodeBundleFuture.then((bundle) {
-        offerPlayable('/allepisode', bundle.stream);
-      }).catchError((e) {
-        debugPrint('LIVEGO TV ALLEPISODE STREAM ERROR: $e');
-      }).whenComplete(finishOne);
-
-      final stream = await playableCompleter.future.timeout(
-        const Duration(seconds: 22),
-        onTimeout: () => StreamInfo.empty,
-      );
-
-      if (!mounted || ticket != _loadTicket) return;
-
-      if (stream.url.isEmpty) {
-        _setTiming('ERROR', 'no playable stream');
-        _error = 'Stream belum tersedia dari API';
-        _loading = false;
-        if (mounted) setState(() {});
-        return;
-      }
-
-      final base = _detail ?? widget.item;
-      final total = [
-        base.episodes,
-        widget.item.episodes,
-        _knownEpisodeCount,
-        stream.totalEpisodes,
-      ].where((e) => e > 0).fold<int>(1, (a, b) => b > a ? b : a);
-
+      final total = stream.totalEpisodes > fastPlayable.episodes
+          ? stream.totalEpisodes
+          : fastPlayable.episodes;
       final playable = ContentItem(
-        id: base.id.trim().isNotEmpty ? base.id : widget.item.id,
-        title: base.title.trim().isNotEmpty ? base.title : widget.item.title,
-        source: base.source.trim().isNotEmpty ? base.source : widget.item.source,
-        category: base.category.trim().isNotEmpty ? base.category : widget.item.category,
-        description: base.description.trim().isNotEmpty ? base.description : widget.item.description,
-        posterUrl: base.posterUrl.trim().isNotEmpty ? base.posterUrl : widget.item.posterUrl,
-        backdropUrl: base.backdropUrl.trim().isNotEmpty ? base.backdropUrl : widget.item.backdropUrl,
-        rating: base.rating,
-        episodes: total,
-        updated: base.updated || widget.item.updated,
-        platformSlug: base.platformSlug.trim().isNotEmpty ? base.platformSlug : widget.item.platformSlug,
+        id: fastPlayable.id,
+        title: fastPlayable.title,
+        source: fastPlayable.source,
+        category: fastPlayable.category,
+        description: fastPlayable.description,
+        posterUrl: fastPlayable.posterUrl,
+        backdropUrl: fastPlayable.backdropUrl,
+        rating: fastPlayable.rating,
+        episodes: total <= 0 ? 1 : total,
+        updated: fastPlayable.updated,
+        platformSlug: fastPlayable.platformSlug,
         chapterId: '$requestedEpisode',
-        lang: base.lang.trim().isNotEmpty ? base.lang : widget.item.lang,
+        lang: fastPlayable.lang,
       );
 
-      _markTiming('INIT START', watch);
-      debugPrint('LIVEGO TV VIDEO INIT START ${watch.elapsedMilliseconds}ms url=${stream.url.substring(0, stream.url.length > 80 ? 80 : stream.url.length)}');
+      final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+      debugPrint('LIVEGO TV PLAYER PLAYABLE $source ep=$requestedEpisode in=${elapsed}ms url=${stream.url.isNotEmpty}');
 
       await _controller?.dispose();
-      if (!mounted || ticket != _loadTicket) return;
       _controller = null;
       _detail = playable;
       _url = stream.url;
       _knownEpisodeCount = total > _knownEpisodeCount ? total : _knownEpisodeCount;
 
       final controller = VideoPlayerController.networkUrl(
-        Uri.parse(stream.urlForQuality(LiveGoSettings.quality)),
+        Uri.parse(stream.url),
         httpHeaders: stream.headers.isEmpty
             ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
             : stream.headers,
@@ -296,29 +173,129 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           }
         }
       });
-      await controller.initialize();
-      _markTiming('INIT DONE', watch);
-      if (!mounted || ticket != _loadTicket) return;
-      await controller.setPlaybackSpeed(_speed);
-      await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
-      final saved = LiveGoLocalStore.progressFor(playable);
-      if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
-        await controller.seekTo(saved.position);
+
+      try {
+        final initStart = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER INIT START source=$source at=${initStart}ms');
+        await controller.initialize();
+        await controller.setPlaybackSpeed(_speed);
+        await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+        final saved = LiveGoLocalStore.progressFor(playable);
+        if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
+          await controller.seekTo(saved.position);
+        }
+        await controller.play();
+        final playAt = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER PLAY source=$source at=${playAt}ms');
+        _loading = false;
+        if (mounted) setState(() {});
+        _showInitialControls();
+      } catch (e) {
+        debugPrint('LIVEGO TV PLAYER INIT ERROR source=$source: $e');
+        if (mounted) {
+          setState(() {
+            _error = '$e';
+            _loading = false;
+          });
+        }
       }
-      await controller.play();
-      if (!mounted || ticket != _loadTicket) return;
-      _loading = false;
-      _error = '';
-      setState(() {});
-      _markTiming('PLAY', watch, extra: 'total=$total');
-      debugPrint('LIVEGO TV VIDEO PLAY ${watch.elapsedMilliseconds}ms total=$total');
-      _showInitialControls();
+    }
+
+    Future<void> tryStream(Future<StreamInfo> future, String source) async {
+      try {
+        final stream = await future;
+        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER STREAM DONE $source in=${elapsed}ms ok=${stream.url.isNotEmpty}');
+        if (stream.url.isNotEmpty) {
+          await startPlayback(stream, source);
+        }
+      } catch (e) {
+        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER STREAM ERROR $source in=${elapsed}ms: $e');
+      }
+    }
+
+    try {
+      debugPrint('LIVEGO TV PLAYER OPEN platform=${fastPlayable.platformSlug} id=${fastPlayable.id} ep=$requestedEpisode');
+
+      final episodeFuture = LiveGoCatalog.streamInfoFromEpisode(fastPlayable, chapterId: '$requestedEpisode')
+          .timeout(const Duration(seconds: 14), onTimeout: () => StreamInfo.empty);
+      final allStreamFuture = LiveGoCatalog.streamInfoFromAllEpisodes(fastPlayable, chapterId: '$requestedEpisode')
+          .timeout(const Duration(seconds: 16), onTimeout: () => StreamInfo.empty);
+      final detailFuture = LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 18), onTimeout: () => widget.item);
+      final episodesFuture = LiveGoCatalog.episodes(widget.item).timeout(
+        const Duration(seconds: 18),
+        onTimeout: () => <LiveGoEpisode>[],
+      );
+
+      detailFuture.then((detail) {
+        if (!mounted) return;
+        final resolved = _keepPlayableIdentity(detail);
+        final current = _detail ?? widget.item;
+        final merged = ContentItem(
+          id: current.id.trim().isNotEmpty ? current.id : resolved.id,
+          title: resolved.title.trim().isNotEmpty ? resolved.title : current.title,
+          source: resolved.source.trim().isNotEmpty ? resolved.source : current.source,
+          category: resolved.category.trim().isNotEmpty ? resolved.category : current.category,
+          description: resolved.description.trim().isNotEmpty ? resolved.description : current.description,
+          posterUrl: resolved.posterUrl.trim().isNotEmpty ? resolved.posterUrl : current.posterUrl,
+          backdropUrl: resolved.backdropUrl.trim().isNotEmpty ? resolved.backdropUrl : current.backdropUrl,
+          rating: resolved.rating,
+          episodes: resolved.episodes > current.episodes ? resolved.episodes : current.episodes,
+          updated: resolved.updated || current.updated,
+          platformSlug: current.platformSlug.trim().isNotEmpty ? current.platformSlug : resolved.platformSlug,
+          chapterId: current.chapterId.trim().isNotEmpty ? current.chapterId : '$requestedEpisode',
+          lang: current.lang.trim().isNotEmpty ? current.lang : resolved.lang,
+        );
+        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER DETAIL DONE in=${elapsed}ms episodes=${merged.episodes}');
+        setState(() => _detail = merged);
+      }).catchError((e) {
+        debugPrint('LIVEGO TV PLAYER DETAIL ERROR: $e');
+      });
+
+      episodesFuture.then((episodes) {
+        if (!mounted || episodes.isEmpty) return;
+        final count = episodes.length;
+        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+        debugPrint('LIVEGO TV PLAYER ALLEPISODE DONE in=${elapsed}ms count=$count');
+        if (count > _knownEpisodeCount) {
+          setState(() => _knownEpisodeCount = count);
+        }
+      }).catchError((e) {
+        debugPrint('LIVEGO TV PLAYER ALLEPISODE ERROR: $e');
+      });
+
+      final episodeTask = tryStream(episodeFuture, '/episode');
+      final allTask = tryStream(allStreamFuture, '/allepisode');
+
+      await Future.any(<Future<void>>[
+        playCompleter.future,
+        Future.wait(<Future<void>>[episodeTask, allTask]),
+      ]).timeout(const Duration(seconds: 18), onTimeout: () {});
+
+      if (!playbackStarted) {
+        debugPrint('LIVEGO TV PLAYER FALLBACK streamInfo start');
+        final fallback = await LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode')
+            .timeout(const Duration(seconds: 12), onTimeout: () => StreamInfo.empty);
+        if (fallback.url.isNotEmpty) {
+          await startPlayback(fallback, 'fallback');
+        }
+      }
+
+      if (!playbackStarted && mounted) {
+        setState(() {
+          _error = 'Stream belum tersedia dari API';
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (!mounted || ticket != _loadTicket) return;
-      _setTiming('ERROR', '$e');
-      _error = '$e';
-      _loading = false;
-      setState(() {});
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -804,87 +781,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 bottom: 72,
                 child: _QualityPanel(speed: _speed, audioTrack: _audioTrack, quality: LiveGoSettings.quality, subtitlesEnabled: LiveGoSettings.subtitlesEnabled, cursor: _optionCursor),
               ),
-            Positioned(
-              right: 18,
-              top: 18,
-              child: _PlayerTimingOverlay(entries: Map<String, String>.from(_debugTiming)),
-            ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlayerTimingOverlay extends StatelessWidget {
-  final Map<String, String> entries;
-
-  const _PlayerTimingOverlay({required this.entries});
-
-  @override
-  Widget build(BuildContext context) {
-    final ordered = <String>[
-      'OPEN',
-      '/episode',
-      '/allepisode',
-      'SOURCE',
-      'INIT START',
-      'INIT DONE',
-      'PLAY',
-      'ALLEPISODE',
-      'DETAIL',
-      'ERROR',
-    ];
-    final rows = <MapEntry<String, String>>[
-      for (final key in ordered)
-        if (entries.containsKey(key)) MapEntry(key, entries[key]!),
-      for (final e in entries.entries)
-        if (!ordered.contains(e.key)) e,
-    ];
-
-    return IgnorePointer(
-      child: Container(
-        width: 310,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xEE030814),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.65), width: 1.2),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF38BDF8).withOpacity(0.26), blurRadius: 24),
-          ],
-        ),
-        child: DefaultTextStyle(
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('PLAYER TIMING DEBUG', style: TextStyle(color: Color(0xFF38BDF8), letterSpacing: 1.2)),
-              const SizedBox(height: 8),
-              if (rows.isEmpty)
-                const Text('OPEN: waiting...', style: TextStyle(color: Colors.white70))
-              else
-                for (final row in rows)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: RichText(
-                      text: TextSpan(
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, height: 1.25),
-                        children: [
-                          TextSpan(text: '${row.key}: ', style: const TextStyle(color: Color(0xFF93C5FD))),
-                          TextSpan(text: row.value, style: const TextStyle(color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                  ),
-            ],
-          ),
         ),
       ),
     );

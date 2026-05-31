@@ -297,34 +297,30 @@ class LiveGoCatalog {
     return rows.isEmpty ? (item.episodes <= 0 ? 1 : item.episodes) : rows.length;
   }
 
+  static Future<StreamInfo> streamInfoFromEpisode(ContentItem item, {String? chapterId}) async {
+    try {
+      return await AnichinApiClient.videoInfoFromEpisodeOnly(item, chapterId: chapterId ?? item.chapterId);
+    } catch (e) {
+      print('LIVEGO DIRECT EPISODE STREAM ERROR: $e');
+      return StreamInfo.empty;
+    }
+  }
+
+  static Future<StreamInfo> streamInfoFromAllEpisodes(ContentItem item, {String? chapterId}) async {
+    try {
+      return await AnichinApiClient.videoInfoFromAllEpisodesOnly(item, chapterId: chapterId ?? item.chapterId);
+    } catch (e) {
+      print('LIVEGO DIRECT ALLEPISODE STREAM ERROR: $e');
+      return StreamInfo.empty;
+    }
+  }
+
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
       return await AnichinApiClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
     } catch (e) {
       print('LIVEGO STREAM ERROR: $e');
       return StreamInfo.empty;
-    }
-  }
-
-  static Future<StreamInfo> directStreamInfo(ContentItem item, {String? chapterId}) async {
-    try {
-      return await AnichinApiClient.directVideoInfo(item, chapterId: chapterId ?? item.chapterId);
-    } catch (e) {
-      print('LIVEGO DIRECT STREAM ERROR: $e');
-      return StreamInfo.empty;
-    }
-  }
-
-  static Future<AnichinEpisodeBundle> episodeBundle(ContentItem item, {required int episode}) async {
-    try {
-      final bundle = await AnichinApiClient.episodeBundle(item, ep: episode);
-      if (bundle.episodes.length > 1) {
-        await LiveGoContentCache.writeEpisodes(item, bundle.episodes);
-      }
-      return bundle;
-    } catch (e) {
-      print('LIVEGO EPISODE BUNDLE ERROR: $e');
-      return AnichinEpisodeBundle.empty;
     }
   }
 

@@ -6,21 +6,6 @@ import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import '../models/livego_episode.dart';
 
-class AnichinEpisodeBundle {
-  final List<LiveGoEpisode> episodes;
-  final StreamInfo stream;
-
-  const AnichinEpisodeBundle({
-    required this.episodes,
-    required this.stream,
-  });
-
-  static const empty = AnichinEpisodeBundle(
-    episodes: <LiveGoEpisode>[],
-    stream: StreamInfo.empty,
-  );
-}
-
 class AnichinApiClient {
   static const String baseUrl = 'https://priv-api.anichin.bio';
   static const String apiKey = 'dk_live_c261cb5920f82cf971e29edf0c8183d8';
@@ -205,53 +190,6 @@ class AnichinApiClient {
     return _syntheticEpisodes(total);
   }
 
-  static Future<StreamInfo> directVideoInfo(ContentItem item, {String? chapterId}) async {
-    final slug = _apiSlug(item.platformSlug);
-    final apiLang = _providerLang(slug, item.lang);
-    final chapter = '${chapterId ?? item.chapterId}';
-    final ep = _episodeNumber(chapter);
-    final playableId = item.id.trim();
-    if (playableId.isEmpty) {
-      print('ANICHIN DIRECT STREAM EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
-      return StreamInfo.empty;
-    }
-
-    final query = <String, String>{
-      'id': playableId,
-      'ep': '$ep',
-      'lang': apiLang,
-      if (_qualityParam.isNotEmpty) 'q': _qualityParam,
-    };
-
-    return _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang);
-  }
-
-  static Future<AnichinEpisodeBundle> episodeBundle(ContentItem item, {required int ep}) async {
-    final slug = _apiSlug(item.platformSlug);
-    final apiLang = _providerLang(slug, item.lang);
-    try {
-      final all = await _getJson('/api/$slug/allepisode', {
-        'id': item.id,
-        'lang': apiLang,
-      });
-
-      var episodes = _episodesFromJson(all);
-      if (episodes.isEmpty && item.episodes > 1) {
-        episodes = _syntheticEpisodes(item.episodes);
-      }
-
-      final row = _findEpisodeRow(all, ep);
-      final stream = row == null
-          ? StreamInfo.empty
-          : await _parseStream(row, item: item, ep: ep, slug: slug, lang: apiLang);
-
-      return AnichinEpisodeBundle(episodes: episodes, stream: stream);
-    } catch (e) {
-      print('ANICHIN EPISODE BUNDLE ERROR $slug ep=$ep: $e');
-      return AnichinEpisodeBundle.empty;
-    }
-  }
-
   static List<LiveGoEpisode> _episodesFromJson(Map<String, dynamic> json) {
     final raw = _episodeList(json);
     if (raw.isEmpty) return const <LiveGoEpisode>[];
@@ -270,6 +208,39 @@ class AnichinApiClient {
   static List<LiveGoEpisode> _syntheticEpisodes(int total) {
     final safeTotal = total <= 0 ? 1 : total;
     return List.generate(safeTotal, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
+  }
+
+  static Future<StreamInfo> videoInfoFromEpisodeOnly(ContentItem item, {String? chapterId}) async {
+    final slug = _apiSlug(item.platformSlug);
+    final apiLang = _providerLang(slug, item.lang);
+    final chapter = '${chapterId ?? item.chapterId}';
+    final ep = _episodeNumber(chapter);
+    final playableId = item.id.trim();
+    if (playableId.isEmpty) {
+      print('ANICHIN DIRECT EPISODE EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
+      return StreamInfo.empty;
+    }
+
+    final query = <String, String>{
+      'id': playableId,
+      'ep': '$ep',
+      'lang': apiLang,
+      if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+    };
+
+    return _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang);
+  }
+
+  static Future<StreamInfo> videoInfoFromAllEpisodesOnly(ContentItem item, {String? chapterId}) async {
+    final slug = _apiSlug(item.platformSlug);
+    final apiLang = _providerLang(slug, item.lang);
+    final chapter = '${chapterId ?? item.chapterId}';
+    final ep = _episodeNumber(chapter);
+    if (item.id.trim().isEmpty) {
+      print('ANICHIN DIRECT ALLEPISODE EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
+      return StreamInfo.empty;
+    }
+    return _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
   }
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
