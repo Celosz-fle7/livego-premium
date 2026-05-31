@@ -4,7 +4,9 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 
 class TvSettingsScreen extends StatefulWidget {
-  const TvSettingsScreen({super.key});
+  final bool showBackButton;
+
+  const TvSettingsScreen({super.key, this.showBackButton = true});
 
   @override
   State<TvSettingsScreen> createState() => _TvSettingsScreenState();
@@ -21,7 +23,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       body: DefaultTextStyle.merge(style: const TextStyle(decoration: TextDecoration.none), child: ListView(
         padding: const EdgeInsets.fromLTRB(24, 24, 30, 30),
         children: [
-          _Header(tab: tab, onTab: (v) => setState(() => tab = v)),
+          _Header(tab: tab, showBackButton: widget.showBackButton, onTab: (v) => setState(() => tab = v)),
           const SizedBox(height: 18),
           if (tab == 0) _display() else if (tab == 1) _player() else _source(),
         ],
@@ -93,8 +95,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
 class _Header extends StatelessWidget {
   final int tab;
+  final bool showBackButton;
   final ValueChanged<int> onTab;
-  const _Header({required this.tab, required this.onTab});
+  const _Header({required this.tab, required this.showBackButton, required this.onTab});
 
   @override
   Widget build(BuildContext context) {
@@ -103,8 +106,10 @@ class _Header extends StatelessWidget {
       decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF0B2634), Color(0xFF080D17)]), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF1E3850))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          _CircleButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
-          const SizedBox(width: 14),
+          if (showBackButton) ...[
+            _CircleButton(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
+            const SizedBox(width: 14),
+          ],
           const Text('Pengaturan LiveGO', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ]),
         const SizedBox(height: 8),

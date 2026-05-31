@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 
+class TvNavItem {
+  final IconData icon;
+  final String label;
+
+  const TvNavItem(this.icon, this.label);
+}
+
 class TvSideNav extends StatefulWidget {
   final int index;
   final List<FocusNode> focusNodes;
@@ -17,12 +24,13 @@ class TvSideNav extends StatefulWidget {
   });
 
   static const items = [
-    (Icons.home_rounded, 'Home'),
-    (Icons.download_rounded, 'Unduhan'),
-    (Icons.history_rounded, 'Riwayat'),
-    (Icons.favorite_border_rounded, 'Favorit'),
-    (Icons.person_rounded, 'Akun'),
-    (Icons.search_rounded, 'Cari'),
+    TvNavItem(Icons.home_rounded, 'Home'),
+    TvNavItem(Icons.history_rounded, 'Histori'),
+    TvNavItem(Icons.search_rounded, 'Cari'),
+    TvNavItem(Icons.favorite_rounded, 'Favorit'),
+    TvNavItem(Icons.download_rounded, 'Unduhan'),
+    TvNavItem(Icons.person_rounded, 'Akun'),
+    TvNavItem(Icons.settings_rounded, 'Pengaturan'),
   ];
 
   @override
@@ -35,9 +43,7 @@ class _TvSideNavState extends State<TvSideNav> {
   @override
   void initState() {
     super.initState();
-    for (final node in widget.focusNodes) {
-      node.addListener(_syncExpanded);
-    }
+    _bindNodeListeners(widget.focusNodes);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncExpanded());
   }
 
@@ -45,22 +51,28 @@ class _TvSideNavState extends State<TvSideNav> {
   void didUpdateWidget(covariant TvSideNav oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusNodes != widget.focusNodes) {
-      for (final node in oldWidget.focusNodes) {
-        node.removeListener(_syncExpanded);
-      }
-      for (final node in widget.focusNodes) {
-        node.addListener(_syncExpanded);
-      }
+      _unbindNodeListeners(oldWidget.focusNodes);
+      _bindNodeListeners(widget.focusNodes);
       _syncExpanded();
     }
   }
 
   @override
   void dispose() {
-    for (final node in widget.focusNodes) {
+    _unbindNodeListeners(widget.focusNodes);
+    super.dispose();
+  }
+
+  void _bindNodeListeners(List<FocusNode> nodes) {
+    for (final node in nodes) {
+      node.addListener(_syncExpanded);
+    }
+  }
+
+  void _unbindNodeListeners(List<FocusNode> nodes) {
+    for (final node in nodes) {
       node.removeListener(_syncExpanded);
     }
-    super.dispose();
   }
 
   void _syncExpanded() {
@@ -71,30 +83,45 @@ class _TvSideNavState extends State<TvSideNav> {
 
   int _safeIndex(int value) => value.clamp(0, TvSideNav.items.length - 1);
 
-  KeyEventResult _handleKey(BuildContext context, int i, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space;
+  }
+
+  KeyEventResult _handleKey(int i, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowDown) {
       widget.focusNodes[_safeIndex(i + 1)].requestFocus();
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowUp) {
       widget.focusNodes[_safeIndex(i - 1)].requestFocus();
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowLeft) {
       widget.focusNodes[_safeIndex(i)].requestFocus();
       return KeyEventResult.handled;
     }
+
     if (key == LogicalKeyboardKey.arrowRight) {
       widget.onOpenContent(i);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.space) {
+
+    if (_isSelect(key)) {
       widget.onChanged(i);
       return KeyEventResult.handled;
     }
+
     return KeyEventResult.ignored;
   }
 
@@ -104,44 +131,51 @@ class _TvSideNavState extends State<TvSideNav> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        width: _expanded ? 220 : 92,
+        width: _expanded ? 214 : 88,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 18, 10, 18),
+          margin: const EdgeInsets.fromLTRB(10, 18, 10, 18),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
             color: const Color(0xFF050D18).withOpacity(0.97),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.35) : const Color(0xFF172A3E)),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: _expanded ? AppTheme.cyan.withOpacity(0.35) : const Color(0xFF172A3E),
+            ),
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 22)],
           ),
           child: Column(
             children: [
               _NavButton(
                 focusNode: widget.focusNodes[0],
-                icon: TvSideNav.items[0].$1,
-                label: TvSideNav.items[0].$2,
+                icon: TvSideNav.items[0].icon,
+                label: TvSideNav.items[0].label,
                 active: widget.index == 0,
                 expanded: _expanded,
                 logo: true,
                 onTap: () => widget.onChanged(0),
-                onKey: (node, event) => _handleKey(context, 0, event),
+                onKey: (node, event) => _handleKey(0, event),
               ),
-              const SizedBox(height: 12),
-              Container(width: _expanded ? 150 : 40, height: 1, color: Colors.white10),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: _expanded ? 154 : 38,
+                height: 1,
+                color: Colors.white10,
+              ),
+              const SizedBox(height: 10),
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(TvSideNav.items.length - 1, (raw) {
                     final i = raw + 1;
                     return _NavButton(
                       focusNode: widget.focusNodes[i],
-                      icon: TvSideNav.items[i].$1,
-                      label: TvSideNav.items[i].$2,
+                      icon: TvSideNav.items[i].icon,
+                      label: TvSideNav.items[i].label,
                       active: i == widget.index,
                       expanded: _expanded,
                       onTap: () => widget.onChanged(i),
-                      onKey: (node, event) => _handleKey(context, i, event),
+                      onKey: (node, event) => _handleKey(i, event),
                     );
                   }),
                 ),
@@ -185,6 +219,9 @@ class _NavButtonState extends State<_NavButton> {
   @override
   Widget build(BuildContext context) {
     final selected = focused || widget.active;
+    final height = widget.logo ? 60.0 : 54.0;
+    final collapsedWidth = widget.logo ? 58.0 : 54.0;
+
     return Tooltip(
       message: widget.label,
       child: Focus(
@@ -199,20 +236,45 @@ class _NavButtonState extends State<_NavButton> {
           focusColor: Colors.transparent,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
-            width: widget.expanded ? 188 : 58,
-            height: widget.logo ? 62 : 58,
-            padding: EdgeInsets.symmetric(horizontal: widget.expanded ? 14 : 0),
+            width: widget.expanded ? 182 : collapsedWidth,
+            height: height,
+            padding: EdgeInsets.symmetric(horizontal: widget.expanded ? 12 : 0),
             decoration: BoxDecoration(
-              gradient: selected ? const LinearGradient(colors: [Color(0xFF123B54), Color(0xFF3C207E)]) : null,
+              gradient: selected
+                  ? const LinearGradient(
+                      colors: [Color(0xFF123B54), Color(0xFF3C207E)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    )
+                  : null,
               color: selected ? null : const Color(0xFF0A1422),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.65) : Colors.white10), width: focused ? 2.2 : 1),
-              boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.25), blurRadius: 18)] : null,
+              border: Border.all(
+                color: focused
+                    ? AppTheme.cyan
+                    : (widget.active ? AppTheme.cyan.withOpacity(0.62) : Colors.white10),
+                width: focused ? 2.2 : 1,
+              ),
+              boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 18)] : null,
             ),
             child: Row(
               mainAxisAlignment: widget.expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
               children: [
-                Icon(widget.icon, color: selected ? Colors.white : Colors.white54, size: widget.logo ? 28 : 24),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  width: focused ? 4 : 0,
+                  height: 28,
+                  margin: EdgeInsets.only(right: focused && widget.expanded ? 10 : 0),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cyan,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Icon(
+                  widget.icon,
+                  color: selected ? Colors.white : Colors.white54,
+                  size: widget.logo ? 28 : 23,
+                ),
                 if (widget.expanded) ...[
                   const SizedBox(width: 12),
                   Flexible(
@@ -222,7 +284,7 @@ class _NavButtonState extends State<_NavButton> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: selected ? Colors.white : Colors.white54,
-                        fontSize: widget.logo ? 13 : 12.5,
+                        fontSize: widget.logo ? 13 : 12.2,
                         fontWeight: FontWeight.w900,
                         decoration: TextDecoration.none,
                       ),

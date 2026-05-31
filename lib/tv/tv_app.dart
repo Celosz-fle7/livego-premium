@@ -4,6 +4,7 @@ import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_home_screen.dart';
 import 'screens/tv_placeholder_screen.dart';
+import 'screens/tv_settings_screen.dart';
 import 'widgets/tv_side_nav.dart';
 
 class TvApp extends StatefulWidget {
@@ -64,11 +65,12 @@ class _TvAppState extends State<TvApp> {
   Widget _page() {
     return switch (index) {
       0 => TvHomeScreen(onMoveToNav: _focusCurrentNav, focusTicket: _homeFocusTicket),
-      1 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded),
-      2 => const TvPlaceholderScreen(title: 'Riwayat', icon: Icons.history_rounded),
+      1 => const TvPlaceholderScreen(title: 'Histori', icon: Icons.history_rounded),
+      2 => const TvPlaceholderScreen(title: 'Cari', icon: Icons.search_rounded),
       3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded),
-      4 => const TvAccountScreen(),
-      _ => const TvPlaceholderScreen(title: 'Cari', icon: Icons.search_rounded),
+      4 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded),
+      5 => const TvAccountScreen(),
+      _ => const TvSettingsScreen(showBackButton: false),
     };
   }
 
