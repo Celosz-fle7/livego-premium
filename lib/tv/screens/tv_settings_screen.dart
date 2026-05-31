@@ -21,21 +21,117 @@ class TvSettingsScreen extends StatefulWidget {
   State<TvSettingsScreen> createState() => _TvSettingsScreenState();
 }
 
-enum _SettingsFocusZone { tab, row, back }
-
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
-  static const tabs = ['Tampilan', 'Player', 'Sumber'];
-
-  final List<FocusNode> _tabNodes = List.generate(
-    tabs.length,
-    (i) => FocusNode(skipTraversal: true, debugLabel: 'tv-settings-tab-$i'),
-  );
   final List<FocusNode> _rowNodes = [];
   late final FocusNode _backNode;
-
-  int _tab = 0;
   int _row = 0;
-  _SettingsFocusZone _zone = _SettingsFocusZone.row;
+
+  List<_SettingsSection> get _sections => [
+        _SettingsSection(
+          title: 'Tampilan & Navigasi',
+          description: 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
+          items: [
+            _SettingItem.radio(
+              kind: _SettingKind.layoutAuto,
+              title: 'Otomatis (Ikuti Hardware)',
+              active: LiveGoSettings.layoutMode == 'Auto',
+            ),
+            _SettingItem.radio(
+              kind: _SettingKind.layoutMobile,
+              title: 'Smartphone / Tablet (Android)',
+              active: LiveGoSettings.layoutMode == 'Mobile',
+            ),
+            _SettingItem.radio(
+              kind: _SettingKind.layoutTv,
+              title: 'Android TV (Leanback Style)',
+              active: LiveGoSettings.layoutMode == 'TV',
+            ),
+          ],
+        ),
+        _SettingsSection(
+          title: 'Player',
+          items: [
+            _SettingItem.tile(
+              kind: _SettingKind.backgroundPoster,
+              icon: Icons.image_rounded,
+              title: 'Tampilkan Background Poster',
+              subtitle: 'Poster menjadi ambience di halaman detail dan player.',
+              value: LiveGoSettings.backgroundPoster ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.backgroundPoster,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.cachePlayback,
+              icon: Icons.sync_rounded,
+              title: 'Gunakan Cache Playback',
+              subtitle: 'Simpan potongan stream sementara agar perpindahan lebih stabil.',
+              value: LiveGoSettings.cachePlayback ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.cachePlayback,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.manualRotate,
+              icon: Icons.screen_rotation_rounded,
+              title: 'Tampilkan Tombol Rotasi Manual',
+              subtitle: 'Tampilkan kontrol rotasi manual saat menonton.',
+              value: LiveGoSettings.manualRotateButton ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.manualRotateButton,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.drmMode,
+              icon: Icons.lock_rounded,
+              title: 'Kompatibilitas Widevine DRM',
+              subtitle: 'Mode saat ini: ${LiveGoSettings.drmMode}',
+              value: 'ATUR',
+            ),
+          ],
+        ),
+        _SettingsSection(
+          title: 'Tampilan Home',
+          items: [
+            _SettingItem.tile(
+              kind: _SettingKind.tvGrid,
+              icon: Icons.grid_view_rounded,
+              title: 'Jumlah Grid Home',
+              subtitle: 'Tekan OK atau kanan untuk mengatur jumlah poster TV. Batas TV sampai 10 grid.',
+              value: '${LiveGoSettings.tvHomeGrid}',
+              showGridBar: true,
+            ),
+          ],
+        ),
+        _SettingsSection(
+          title: 'Sumber & Izin',
+          items: [
+            _SettingItem.tile(
+              kind: _SettingKind.defaultPlatform,
+              icon: Icons.layers_rounded,
+              title: 'Kelola Sumber Data',
+              subtitle: 'Pilih platform Home, kategori, dan cek status server.',
+              value: LiveGoSettings.defaultPlatform.toUpperCase(),
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.downloadNotice,
+              icon: Icons.info_rounded,
+              title: 'Kelola Notifikasi Unduhan',
+              subtitle: 'Belum aktif. Aktifkan lagi agar progress unduhan mudah dipantau.',
+              value: LiveGoSettings.downloadWifiOnly ? 'AKTIFKAN' : 'AKTIF',
+            ),
+          ],
+        ),
+        _SettingsSection(
+          title: 'Perawatan',
+          items: [
+            _SettingItem.tile(
+              kind: _SettingKind.reset,
+              icon: Icons.delete_rounded,
+              title: 'Hapus Semua Cache',
+              subtitle: 'Bersihkan cache streaming dan gambar agar ruang penyimpanan lega.',
+              value: 'RESET',
+              danger: true,
+            ),
+          ],
+        ),
+      ];
+
+  int get _itemCount => _sections.fold<int>(0, (sum, section) => sum + section.items.length);
 
   @override
   void initState() {
@@ -43,7 +139,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _syncRowNodes(_entries.length);
+      _syncRowNodes(_itemCount);
       _focusRow(0);
     });
   }
@@ -54,16 +150,14 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (oldWidget.focusTicket != widget.focusTicket) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _restoreRightFocus();
+        _syncRowNodes(_itemCount);
+        _focusRow(_row);
       });
     }
   }
 
   @override
   void dispose() {
-    for (final node in _tabNodes) {
-      node.dispose();
-    }
     for (final node in _rowNodes) {
       node.dispose();
     }
@@ -73,137 +167,12 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _syncRowNodes(int count) {
     while (_rowNodes.length < count) {
-      _rowNodes.add(FocusNode(
-        skipTraversal: true,
-        debugLabel: 'tv-settings-row-${_rowNodes.length}',
-      ));
+      _rowNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-settings-row-${_rowNodes.length}'));
     }
     while (_rowNodes.length > count) {
       _rowNodes.removeLast().dispose();
     }
     if (_rowNodes.isNotEmpty) _row = _row.clamp(0, _rowNodes.length - 1);
-  }
-
-  List<_SettingEntry> get _entries {
-    if (_tab == 0) {
-      return [
-        _SettingEntry(
-          icon: Icons.auto_awesome_motion_rounded,
-          title: 'Mode Tampilan',
-          subtitle: 'Untuk Android TV gunakan Auto atau TV.',
-          value: LiveGoSettings.layoutMode,
-          onTap: _cycleLayout,
-        ),
-        _SettingEntry(
-          icon: Icons.grid_view_rounded,
-          title: 'Grid Home TV',
-          subtitle: 'Jumlah kolom poster di layar Home TV.',
-          value: '${LiveGoSettings.tvHomeGrid} kolom',
-          onTap: _cycleGrid,
-        ),
-        _SettingEntry(
-          icon: Icons.speed_rounded,
-          title: 'Mode TV Ringan',
-          subtitle: 'Kurangi efek agar remote dan scroll lebih responsif.',
-          value: LiveGoSettings.lowEndTvMode ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.lowEndTvMode = !LiveGoSettings.lowEndTvMode),
-        ),
-        _SettingEntry(
-          icon: Icons.image_rounded,
-          title: 'Background Poster',
-          subtitle: 'Poster ambience di detail/player.',
-          value: LiveGoSettings.backgroundPoster ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.backgroundPoster = !LiveGoSettings.backgroundPoster),
-        ),
-      ];
-    }
-
-    if (_tab == 1) {
-      return [
-        _SettingEntry(
-          icon: Icons.high_quality_rounded,
-          title: 'Kualitas Default',
-          subtitle: 'Pilihan awal stream saat player dibuka.',
-          value: LiveGoSettings.quality,
-          onTap: _cycleQuality,
-        ),
-        _SettingEntry(
-          icon: Icons.subtitles_rounded,
-          title: 'Subtitle',
-          subtitle: 'Aktifkan subtitle bawaan jika tersedia.',
-          value: LiveGoSettings.subtitlesEnabled ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.subtitlesEnabled = !LiveGoSettings.subtitlesEnabled),
-        ),
-        _SettingEntry(
-          icon: Icons.skip_next_rounded,
-          title: 'Auto Next Episode',
-          subtitle: 'Lanjut otomatis ke episode berikutnya.',
-          value: LiveGoSettings.autoNextEnabled ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.autoNextEnabled = !LiveGoSettings.autoNextEnabled),
-        ),
-        _SettingEntry(
-          icon: Icons.cached_rounded,
-          title: 'Cache Playback',
-          subtitle: 'Cache sementara agar playback lebih stabil.',
-          value: LiveGoSettings.cachePlayback ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.cachePlayback = !LiveGoSettings.cachePlayback),
-        ),
-        _SettingEntry(
-          icon: Icons.screen_rotation_alt_rounded,
-          title: 'Tombol Rotasi Manual',
-          subtitle: 'Tampilkan tombol rotasi saat menonton.',
-          value: LiveGoSettings.manualRotateButton ? 'ON' : 'OFF',
-          onTap: () => setState(() => LiveGoSettings.manualRotateButton = !LiveGoSettings.manualRotateButton),
-        ),
-        _SettingEntry(
-          icon: Icons.lock_rounded,
-          title: 'Widevine DRM',
-          subtitle: 'Mode kompatibilitas DRM perangkat tertentu.',
-          value: LiveGoSettings.drmMode,
-          onTap: _cycleDrm,
-        ),
-      ];
-    }
-
-    return [
-      _SettingEntry(
-        icon: Icons.layers_rounded,
-        title: 'Default Platform',
-        subtitle: 'Platform utama untuk data awal.',
-        value: LiveGoSettings.defaultPlatform,
-        onTap: _cyclePlatform,
-      ),
-      _SettingEntry(
-        icon: Icons.language_rounded,
-        title: 'Bahasa',
-        subtitle: 'Bahasa UI dan metadata jika tersedia.',
-        value: LiveGoSettings.language.toUpperCase(),
-        onTap: _cycleLanguage,
-      ),
-      _SettingEntry(
-        icon: Icons.apps_rounded,
-        title: 'Platform Aktif',
-        subtitle: 'Jumlah provider yang aktif saat ini.',
-        value: '${LiveGoSettings.activePlatforms.length} aktif',
-        onTap: _cyclePlatform,
-      ),
-      _SettingEntry(
-        icon: Icons.home_repair_service_rounded,
-        title: 'Platform Home',
-        subtitle: 'Provider yang tampil di Home.',
-        value: '${LiveGoSettings.homePlatforms.length} home',
-        onTap: _cyclePlatform,
-      ),
-      _SettingEntry(
-        icon: Icons.delete_rounded,
-        title: 'Reset Pengaturan',
-        subtitle: 'Kembalikan semua pengaturan ke bawaan.',
-        value: 'RESET',
-        danger: true,
-        changeWithRight: false,
-        onTap: () => setState(LiveGoSettings.reset),
-      ),
-    ];
   }
 
   bool _isSelect(LogicalKeyboardKey key) {
@@ -219,67 +188,32 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         key == LogicalKeyboardKey.browserBack;
   }
 
-  void _moveToNav() {
-    widget.onMoveToNav?.call();
-  }
-
   void _focusBack() {
     if (!widget.showBackButton) return;
-    _zone = _SettingsFocusZone.back;
-    focusAndReveal(_backNode, alignment: 0.04);
-  }
-
-  void _focusTab(int index) {
-    final safe = index.clamp(0, _tabNodes.length - 1);
-    _tab = safe;
-    _zone = _SettingsFocusZone.tab;
-    focusAndReveal(_tabNodes[safe], alignment: 0.06);
+    focusAndReveal(_backNode, alignment: 0.05);
   }
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
     final safe = index.clamp(0, _rowNodes.length - 1);
     _row = safe;
-    _zone = _SettingsFocusZone.row;
-    focusAndReveal(_rowNodes[safe], alignment: 0.22);
+    focusAndReveal(_rowNodes[safe], alignment: 0.30);
   }
 
-  void _restoreRightFocus() {
-    _syncRowNodes(_entries.length);
-    if (_zone == _SettingsFocusZone.tab) {
-      _focusTab(_tab);
+  void _moveToNav() {
+    if (widget.onMoveToNav != null) {
+      widget.onMoveToNav!.call();
       return;
     }
-    if (_zone == _SettingsFocusZone.back && widget.showBackButton) {
-      _focusBack();
-      return;
-    }
-    _focusRow(_row);
-  }
-
-  void _selectTab(int index, {bool moveToRows = false}) {
-    final safe = index.clamp(0, tabs.length - 1);
-    setState(() {
-      _tab = safe;
-      _row = 0;
-      _syncRowNodes(_entries.length);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (moveToRows) {
-        _focusRow(0);
-      } else {
-        _focusTab(safe);
-      }
-    });
+    _focusBack();
   }
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
-      _focusTab(_tab);
+    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+      _focusRow(0);
       return KeyEventResult.handled;
     }
 
@@ -291,63 +225,13 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     return KeyEventResult.ignored;
   }
 
-  KeyEventResult _tabKey(int index, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (index == 0) {
-        if (widget.showBackButton) {
-          _focusBack();
-        } else {
-          _moveToNav();
-        }
-      } else {
-        _selectTab(index - 1);
-      }
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (index < tabs.length - 1) {
-        _selectTab(index + 1);
-      }
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(0);
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.arrowUp) {
-      if (widget.showBackButton) _focusBack();
-      return KeyEventResult.handled;
-    }
-
-    if (_isSelect(key)) {
-      _selectTab(index, moveToRows: true);
-      return KeyEventResult.handled;
-    }
-
-    if (_isBack(key)) {
-      if (widget.showBackButton) {
-        Navigator.of(context).maybePop();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    return KeyEventResult.ignored;
-  }
-
-  KeyEventResult _rowKey(int index, _SettingEntry entry, KeyEvent event) {
+  KeyEventResult _rowKey(int index, _SettingItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
       if (index == 0) {
-        _focusTab(_tab);
+        if (widget.showBackButton) _focusBack();
       } else {
         _focusRow(index - 1);
       }
@@ -355,9 +239,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (index < _rowNodes.length - 1) {
-        _focusRow(index + 1);
-      }
+      if (index < _rowNodes.length - 1) _focusRow(index + 1);
       return KeyEventResult.handled;
     }
 
@@ -366,13 +248,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       return KeyEventResult.handled;
     }
 
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (entry.changeWithRight) entry.onTap();
-      return KeyEventResult.handled;
-    }
-
-    if (_isSelect(key)) {
-      entry.onTap();
+    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      _activate(item.kind);
       return KeyEventResult.handled;
     }
 
@@ -387,94 +264,117 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     return KeyEventResult.ignored;
   }
 
-  void _cycleLayout() {
-    const values = ['Auto', 'Mobile', 'TV'];
-    final idx = values.indexOf(LiveGoSettings.layoutMode);
-    setState(() => LiveGoSettings.layoutMode = values[(idx + 1) % values.length]);
-  }
-
-  void _cycleGrid() {
+  void _activate(_SettingKind kind) {
     setState(() {
-      LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 4 : LiveGoSettings.tvHomeGrid + 1);
+      switch (kind) {
+        case _SettingKind.layoutAuto:
+          LiveGoSettings.layoutMode = 'Auto';
+          break;
+        case _SettingKind.layoutMobile:
+          LiveGoSettings.layoutMode = 'Mobile';
+          break;
+        case _SettingKind.layoutTv:
+          LiveGoSettings.layoutMode = 'TV';
+          break;
+        case _SettingKind.backgroundPoster:
+          LiveGoSettings.backgroundPoster = !LiveGoSettings.backgroundPoster;
+          break;
+        case _SettingKind.cachePlayback:
+          LiveGoSettings.cachePlayback = !LiveGoSettings.cachePlayback;
+          break;
+        case _SettingKind.manualRotate:
+          LiveGoSettings.manualRotateButton = !LiveGoSettings.manualRotateButton;
+          break;
+        case _SettingKind.drmMode:
+          _cycleString(
+            current: LiveGoSettings.drmMode,
+            values: const ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'],
+            setter: (value) => LiveGoSettings.drmMode = value,
+          );
+          break;
+        case _SettingKind.tvGrid:
+          LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 4 : LiveGoSettings.tvHomeGrid + 1);
+          break;
+        case _SettingKind.defaultPlatform:
+          final values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
+          if (values.isEmpty) return;
+          final index = values.indexOf(LiveGoSettings.defaultPlatform);
+          LiveGoSettings.defaultPlatform = values[index < 0 ? 0 : (index + 1) % values.length];
+          break;
+        case _SettingKind.downloadNotice:
+          LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
+          break;
+        case _SettingKind.reset:
+          LiveGoSettings.reset();
+          break;
+      }
     });
   }
 
-  void _cycleQuality() {
-    const values = ['Auto', '480p', '720p', '1080p'];
-    final idx = values.indexOf(LiveGoSettings.quality);
-    setState(() => LiveGoSettings.quality = values[(idx + 1) % values.length]);
-  }
-
-  void _cycleDrm() {
-    const values = ['Auto', 'Paksa L3', 'Matikan'];
-    final idx = values.indexOf(LiveGoSettings.drmMode);
-    setState(() => LiveGoSettings.drmMode = values[(idx + 1) % values.length]);
-  }
-
-  void _cyclePlatform() {
-    final values = LiveGoSettings.defaultPlatforms;
-    if (values.isEmpty) return;
-    final idx = values.indexOf(LiveGoSettings.defaultPlatform);
-    setState(() => LiveGoSettings.defaultPlatform = values[(idx + 1) % values.length]);
-  }
-
-  void _cycleLanguage() {
-    const values = ['id', 'en', 'th', 'ar'];
-    final idx = values.indexOf(LiveGoSettings.language);
-    setState(() => LiveGoSettings.language = values[(idx + 1) % values.length]);
+  void _cycleString({required String current, required List<String> values, required ValueChanged<String> setter}) {
+    final index = values.indexOf(current);
+    setter(values[index < 0 ? 0 : (index + 1) % values.length]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final entries = _entries;
-    _syncRowNodes(entries.length);
+    _syncRowNodes(_itemCount);
+    final sectionWidgets = <Widget>[];
+    var cursor = 0;
+
+    for (final section in _sections) {
+      final rows = <Widget>[];
+      for (final item in section.items) {
+        final index = cursor++;
+        rows.add(
+          _FocusedSettingRow(
+            node: _rowNodes[index],
+            item: item,
+            onKey: (node, event) => _rowKey(index, item, event),
+            onTap: () => _activate(item.kind),
+            isLast: item == section.items.last,
+          ),
+        );
+      }
+
+      sectionWidgets.addAll([
+        _SectionTitle(section.title),
+        const SizedBox(height: 10),
+        _SettingsCard(description: section.description, children: rows),
+        const SizedBox(height: 22),
+      ]);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF050914),
       body: DefaultTextStyle.merge(
         style: const TextStyle(decoration: TextDecoration.none),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 30, 30),
+          padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
           children: [
             _Header(
               showBackButton: widget.showBackButton,
               backNode: _backNode,
               onBackKey: _backKey,
             ),
-            const SizedBox(height: 14),
-            _TabZone(
-              tab: _tab,
-              nodes: _tabNodes,
-              labels: tabs,
-              onKey: _tabKey,
-              onTap: (i) => _selectTab(i),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
             Row(
-              children: [
-                const _SectionTitle('Bagian Kanan'),
-                const Spacer(),
-                Text(
-                  '↑↓ pilih • OK/→ ubah • ← kembali navbar',
-                  style: TextStyle(
-                    color: AppTheme.textSoft.withOpacity(0.72),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+              children: const [
+                _HeaderPill('Display'),
+                SizedBox(width: 10),
+                _HeaderPill('Player'),
+                SizedBox(width: 10),
+                _HeaderPill('Source'),
               ],
             ),
-            const SizedBox(height: 8),
-            _Panel(
-              children: List.generate(entries.length, (i) {
-                return _SettingRow(
-                  node: _rowNodes[i],
-                  entry: entries[i],
-                  onKey: (node, event) => _rowKey(i, entries[i], event),
-                  onTap: entries[i].onTap,
-                );
-              }),
+            const SizedBox(height: 20),
+            ...sectionWidgets,
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 10),
+              child: Text(
+                'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
+                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
+              ),
             ),
           ],
         ),
@@ -483,24 +383,89 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 }
 
-class _SettingEntry {
+class _SettingsSection {
+  final String title;
+  final String? description;
+  final List<_SettingItem> items;
+
+  const _SettingsSection({required this.title, required this.items, this.description});
+}
+
+enum _SettingKind {
+  layoutAuto,
+  layoutMobile,
+  layoutTv,
+  backgroundPoster,
+  cachePlayback,
+  manualRotate,
+  drmMode,
+  tvGrid,
+  defaultPlatform,
+  downloadNotice,
+  reset,
+}
+
+enum _SettingItemStyle { radio, tile }
+
+class _SettingItem {
+  final _SettingKind kind;
+  final _SettingItemStyle style;
   final IconData icon;
   final String title;
   final String subtitle;
   final String value;
-  final VoidCallback onTap;
+  final bool active;
   final bool danger;
-  final bool changeWithRight;
+  final bool? switchValue;
+  final bool showGridBar;
 
-  const _SettingEntry({
+  const _SettingItem._({
+    required this.kind,
+    required this.style,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.value,
-    required this.onTap,
+    this.active = false,
     this.danger = false,
-    this.changeWithRight = true,
+    this.switchValue,
+    this.showGridBar = false,
   });
+
+  factory _SettingItem.radio({required _SettingKind kind, required String title, required bool active}) {
+    return _SettingItem._(
+      kind: kind,
+      style: _SettingItemStyle.radio,
+      icon: active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+      title: title,
+      subtitle: '',
+      value: active ? 'AKTIF' : '',
+      active: active,
+    );
+  }
+
+  factory _SettingItem.tile({
+    required _SettingKind kind,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String value,
+    bool danger = false,
+    bool? switchValue,
+    bool showGridBar = false,
+  }) {
+    return _SettingItem._(
+      kind: kind,
+      style: _SettingItemStyle.tile,
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      value: value,
+      danger: danger,
+      switchValue: switchValue,
+      showGridBar: showGridBar,
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -508,69 +473,44 @@ class _Header extends StatelessWidget {
   final FocusNode backNode;
   final FocusOnKeyEventCallback onBackKey;
 
-  const _Header({
-    required this.showBackButton,
-    required this.backNode,
-    required this.onBackKey,
-  });
+  const _Header({required this.showBackButton, required this.backNode, required this.onBackKey});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0B2634), Color(0xFF080D17)]),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1E3850)),
+        color: const Color(0xFF09111E).withOpacity(0.96),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF1C3148)),
+        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
       ),
       child: Row(
         children: [
           if (showBackButton) ...[
             _BackButton(node: backNode, onKey: onBackKey),
-            const SizedBox(width: 14),
+            const SizedBox(width: 18),
           ],
+          Container(
+            width: 86,
+            height: 86,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Icon(Icons.settings_rounded, color: Colors.white, size: 42),
+          ),
+          const SizedBox(width: 22),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                Text(
-                  'Pengaturan LiveGO TV',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Navigasi kanan dibuat manual untuk remote Android TV.',
-                  style: TextStyle(
-                    color: AppTheme.textSoft,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+                Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
+                SizedBox(height: 10),
+                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+                SizedBox(height: 8),
+                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 14, height: 1.35, fontWeight: FontWeight.w700)),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: const Color(0xFF08111F),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppTheme.cyan.withOpacity(0.24)),
-            ),
-            child: const Text(
-              'REMOTE MODE',
-              style: TextStyle(
-                color: AppTheme.cyan,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1,
-                decoration: TextDecoration.none,
-              ),
             ),
           ),
         ],
@@ -605,8 +545,8 @@ class _BackButtonState extends State<_BackButton> {
         focusColor: Colors.transparent,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
-          width: 52,
-          height: 52,
+          width: 54,
+          height: 54,
           decoration: BoxDecoration(
             color: _focused ? const Color(0xFF12314A) : const Color(0xFF0A1422),
             borderRadius: BorderRadius.circular(16),
@@ -619,160 +559,84 @@ class _BackButtonState extends State<_BackButton> {
   }
 }
 
-class _TabZone extends StatelessWidget {
-  final int tab;
-  final List<FocusNode> nodes;
-  final List<String> labels;
-  final KeyEventResult Function(int index, KeyEvent event) onKey;
-  final ValueChanged<int> onTap;
-
-  const _TabZone({
-    required this.tab,
-    required this.nodes,
-    required this.labels,
-    required this.onKey,
-    required this.onTap,
-  });
+class _HeaderPill extends StatelessWidget {
+  final String text;
+  const _HeaderPill(this.text);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF08111E).withOpacity(0.96),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1A2D43)),
+        color: const Color(0xFF111B2A),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white10),
       ),
-      child: Row(
-        children: List.generate(labels.length, (i) {
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 8),
-              child: _TabChip(
-                node: nodes[i],
-                text: labels[i],
-                active: i == tab,
-                onTap: () => onTap(i),
-                onKey: (node, event) => onKey(i, event),
-              ),
-            ),
-          );
-        }),
-      ),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
     );
   }
 }
 
-class _TabChip extends StatefulWidget {
-  final FocusNode node;
-  final String text;
-  final bool active;
-  final VoidCallback onTap;
-  final FocusOnKeyEventCallback onKey;
-
-  const _TabChip({
-    required this.node,
-    required this.text,
-    required this.active,
-    required this.onTap,
-    required this.onKey,
-  });
-
-  @override
-  State<_TabChip> createState() => _TabChipState();
-}
-
-class _TabChipState extends State<_TabChip> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = _focused || widget.active;
-    return Focus(
-      focusNode: widget.node,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => _focused = v),
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(18),
-        focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 58,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(
-                    colors: [Color(0xFF123B54), Color(0xFF3C207E)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  )
-                : null,
-            color: selected ? null : const Color(0xFF0A1422),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: _focused ? AppTheme.cyan : (widget.active ? AppTheme.cyan.withOpacity(0.62) : Colors.white10),
-              width: _focused ? 2.2 : 1,
-            ),
-            boxShadow: _focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 16)] : null,
-          ),
-          child: Text(
-            widget.text,
-            style: TextStyle(
-              color: selected ? Colors.white : AppTheme.textSoft,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Panel extends StatelessWidget {
+class _SettingsCard extends StatelessWidget {
+  final String? description;
   final List<Widget> children;
 
-  const _Panel({required this.children});
+  const _SettingsCard({required this.children, this.description});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.94),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1A2D43)),
+        color: const Color(0xFF09111E).withOpacity(0.96),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFF1C3148)),
       ),
-      child: Column(children: children),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (description != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.35, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(height: 4),
+          ],
+          ...children,
+        ],
+      ),
     );
   }
 }
 
-class _SettingRow extends StatefulWidget {
+class _FocusedSettingRow extends StatefulWidget {
   final FocusNode node;
-  final _SettingEntry entry;
+  final _SettingItem item;
   final FocusOnKeyEventCallback onKey;
   final VoidCallback onTap;
+  final bool isLast;
 
-  const _SettingRow({
+  const _FocusedSettingRow({
     required this.node,
-    required this.entry,
+    required this.item,
     required this.onKey,
     required this.onTap,
+    required this.isLast,
   });
 
   @override
-  State<_SettingRow> createState() => _SettingRowState();
+  State<_FocusedSettingRow> createState() => _FocusedSettingRowState();
 }
 
-class _SettingRowState extends State<_SettingRow> {
+class _FocusedSettingRowState extends State<_FocusedSettingRow> {
   bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.entry.danger ? const Color(0xFFFF6B7A) : AppTheme.cyan;
+    final item = widget.item;
+    final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
+    final isRadio = item.style == _SettingItemStyle.radio;
+
     return Focus(
       focusNode: widget.node,
       skipTraversal: true,
@@ -782,88 +646,170 @@ class _SettingRowState extends State<_SettingRow> {
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(20),
         focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          minHeight: 76,
-          margin: const EdgeInsets.all(7),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: _focused ? const Color(0xFF102F45) : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _focused ? color : Colors.transparent, width: 2),
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              margin: const EdgeInsets.symmetric(vertical: 5),
+              padding: EdgeInsets.symmetric(horizontal: isRadio ? 14 : 16, vertical: isRadio ? 15 : 12),
+              decoration: BoxDecoration(
+                color: _focused ? const Color(0xFF102F45) : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _focused ? accent : Colors.transparent, width: 2),
+                boxShadow: _focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
+              ),
+              child: isRadio ? _RadioContent(item: item, focused: _focused) : _TileContent(item: item, focused: _focused, accent: accent),
+            ),
+            if (!widget.isLast) const Divider(color: Color(0xFF24344A), height: 1),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RadioContent extends StatelessWidget {
+  final _SettingItem item;
+  final bool focused;
+
+  const _RadioContent({required this.item, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+          color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft,
+          size: 28,
+        ),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Text(
+            item.title,
+            style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17),
           ),
-          child: Row(
+        ),
+        if (item.active)
+          const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _TileContent extends StatelessWidget {
+  final _SettingItem item;
+  final bool focused;
+  final Color accent;
+
+  const _TileContent({required this.item, required this.focused, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: const Color(0xFF142338),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: focused ? accent.withOpacity(0.85) : const Color(0xFF2B4058)),
+          ),
+          child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 27),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF102033),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Icon(widget.entry.icon, color: widget.entry.danger ? color : Colors.white, size: 25),
+              Text(
+                item.title,
+                style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.entry.title,
-                      style: TextStyle(
-                        color: widget.entry.danger ? color : Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.entry.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppTheme.textSoft,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 5),
+              Text(
+                item.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700),
               ),
-              const SizedBox(width: 14),
-              Container(
-                constraints: const BoxConstraints(minWidth: 92),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: _focused ? color.withOpacity(0.14) : const Color(0xFF07101C),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: _focused ? color.withOpacity(0.8) : Colors.white10),
-                ),
-                child: Text(
-                  widget.entry.value,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _focused ? color : AppTheme.textSoft,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(
-                widget.entry.danger ? Icons.check_rounded : Icons.keyboard_arrow_right_rounded,
-                color: _focused ? color : Colors.white30,
-                size: 28,
-              ),
+              if (item.showGridBar) ...[
+                const SizedBox(height: 12),
+                _GridPreview(value: LiveGoSettings.tvHomeGrid),
+              ],
             ],
           ),
         ),
+        const SizedBox(width: 16),
+        if (item.switchValue != null)
+          _SwitchPill(value: item.switchValue!, focused: focused)
+        else
+          Text(
+            item.value,
+            style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+        const SizedBox(width: 12),
+        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 30),
+      ],
+    );
+  }
+}
+
+class _SwitchPill extends StatelessWidget {
+  final bool value;
+  final bool focused;
+
+  const _SwitchPill({required this.value, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: 70,
+      height: 36,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : const Color(0xFF233048),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: focused ? Colors.white70 : Colors.transparent),
       ),
+      alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+class _GridPreview extends StatelessWidget {
+  final int value;
+
+  const _GridPreview({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = ((value - 4) / 6).clamp(0.0, 1.0);
+    return Row(
+      children: [
+        const Text('Grid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+        const SizedBox(width: 14),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: normalized,
+              minHeight: 5,
+              backgroundColor: const Color(0xFF24344A),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.cyan),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
+      ],
     );
   }
 }
@@ -875,14 +821,11 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        color: Colors.white60,
-        fontSize: 14,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 1.1,
-        decoration: TextDecoration.none,
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
       ),
     );
   }
