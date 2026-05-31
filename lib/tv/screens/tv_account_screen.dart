@@ -314,7 +314,7 @@ class _CommunityBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      minHeight: 84,
+      constraints: const BoxConstraints(minHeight: 84),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
