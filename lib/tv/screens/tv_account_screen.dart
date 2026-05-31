@@ -346,6 +346,7 @@ class _ActionRow extends StatelessWidget {
           autofocus: false,
           onKeyEvent: onKey,
           child: InkWell(
+              canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(22),
             focusColor: Colors.transparent,

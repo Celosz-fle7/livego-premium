@@ -576,6 +576,7 @@ class _BackButton extends StatelessWidget {
           autofocus: false,
           onKeyEvent: onKey,
           child: InkWell(
+              canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             focusColor: Colors.transparent,
@@ -689,6 +690,7 @@ class _FocusedSettingRow extends StatelessWidget {
           autofocus: false,
           onKeyEvent: onKey,
           child: InkWell(
+              canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(20),
             focusColor: Colors.transparent,

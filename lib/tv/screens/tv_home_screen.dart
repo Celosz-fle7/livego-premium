@@ -46,6 +46,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   TvZone _pendingZone = TvZone.banner;
   int _pendingIndex = 0;
   int _entryRetry = 0;
+  int _entryTicket = 0;
   bool _gridDataReady = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
 
@@ -133,16 +134,17 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   bool _isBack(LogicalKeyboardKey key) {
     return key == LogicalKeyboardKey.goBack ||
         key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.browserBack ||
-        key == LogicalKeyboardKey.backspace;
+        key == LogicalKeyboardKey.browserBack;
   }
 
-  void _cancelPendingEntry() {
+  void _cancelPendingFocus() {
     _entryPending = false;
     _entryRetry = 0;
+    _entryTicket++;
   }
 
   void _handleBack() {
+    _cancelPendingFocus();
     _moveToNav(_zone);
   }
 
@@ -177,14 +179,32 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _pendingIndex = index;
     _entryPending = true;
     _entryRetry = 0;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+    final ticket = ++_entryTicket;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry(ticket));
   }
 
-  void _tryFocusEntry() {
-    if (!mounted || !_entryPending) return;
+  void _retryFocusEntry(int ticket) {
+    if (!mounted || !_entryPending || ticket != _entryTicket) return;
+    _entryRetry++;
+    if (_entryRetry > 24) {
+      final fallbackFocused =
+          _focusByZone(TvZone.category, index: _lastCategory) ||
+          _focusByZone(TvZone.platform, index: _lastPlatform) ||
+          _focusByZone(TvZone.banner);
+      if (fallbackFocused) {
+        _entryPending = false;
+        _entryRetry = 0;
+      }
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry(ticket));
+  }
+
+  void _tryFocusEntry(int ticket) {
+    if (!mounted || !_entryPending || ticket != _entryTicket) return;
 
     if (_pendingZone == TvZone.grid && !_gridDataReady) {
-      _retryFocusEntry();
+      _retryFocusEntry(ticket);
       return;
     }
 
@@ -194,36 +214,22 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           _focusByZone(TvZone.platform, index: _lastPlatform) ||
           _focusByZone(TvZone.banner);
       if (fallbackFocused) {
-        _cancelPendingEntry();
+        _entryPending = false;
+        _entryRetry = 0;
       } else {
-        _retryFocusEntry();
+        _retryFocusEntry(ticket);
       }
       return;
     }
 
     final focused = _focusByZone(_pendingZone, index: _pendingIndex);
     if (focused) {
-      _cancelPendingEntry();
+      _entryPending = false;
+      _entryRetry = 0;
       return;
     }
 
-    _retryFocusEntry();
-  }
-
-  void _retryFocusEntry() {
-    if (!mounted || !_entryPending) return;
-    _entryRetry++;
-    if (_entryRetry > 24) {
-      final fallbackFocused =
-          _focusByZone(TvZone.category, index: _lastCategory) ||
-          _focusByZone(TvZone.platform, index: _lastPlatform) ||
-          _focusByZone(TvZone.banner);
-      if (fallbackFocused) {
-        _cancelPendingEntry();
-      }
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+    _retryFocusEntry(ticket);
   }
 
   bool _ready(FocusNode node) {
@@ -267,7 +273,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _moveToNav(TvZone fromZone, {int? platform, int? category, int? grid}) {
-    _cancelPendingEntry();
+    _cancelPendingFocus();
     _zone = fromZone;
     if (platform != null) _lastPlatform = platform;
     if (category != null) _lastCategory = category;
@@ -283,6 +289,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _selectPlatform(int index) {
+    _cancelPendingFocus();
     final targetPlatform = _safe(index, LiveGoCatalog.platformLabels.length);
     if (targetPlatform == source) {
       _lastPlatform = targetPlatform;
@@ -305,6 +312,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _selectCategory(int index) {
+    _cancelPendingFocus();
     final categories = LiveGoCatalog.categoriesFor(_platform);
     final targetCategory = _safe(index, categories.length);
     if (targetCategory == category) {
@@ -332,7 +340,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-
+    _cancelPendingFocus();
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       _moveToNav(TvZone.banner);
@@ -371,7 +379,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-
+    _cancelPendingFocus();
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (index == 0) {
@@ -424,7 +432,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-
+    _cancelPendingFocus();
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (index == 0) {
@@ -479,6 +487,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+    _cancelPendingFocus();
 
     final col = index % _gridColumns;
     final row = index ~/ _gridColumns;
@@ -558,7 +567,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         _syncNodes(_gridNodes, gridItems.length, 'tv-grid');
 
         if (_entryPending) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+          final ticket = _entryTicket;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry(ticket));
         }
 
         return Shortcuts(
@@ -679,6 +689,7 @@ class _FocusableBanner extends StatelessWidget {
             if (v) onFocus();
           },
           child: InkWell(
+            canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(26),
             focusColor: Colors.transparent,
@@ -795,6 +806,7 @@ class _TvChip extends StatelessWidget {
             if (v) onFocus();
           },
           child: InkWell(
+            canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(999),
             focusColor: Colors.transparent,
@@ -911,6 +923,7 @@ class _TvPosterTile extends StatelessWidget {
             scale: focused ? 1.045 : 1.0,
             duration: const Duration(milliseconds: 140),
             child: InkWell(
+              canRequestFocus: false,
               onTap: onTap,
               borderRadius: BorderRadius.circular(18),
               focusColor: Colors.transparent,

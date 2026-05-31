@@ -212,6 +212,7 @@ class _NavButton extends StatelessWidget {
             autofocus: false,
             onKeyEvent: onKey,
             child: InkWell(
+              canRequestFocus: false,
               onTap: onTap,
               borderRadius: BorderRadius.circular(18),
               focusColor: Colors.transparent,

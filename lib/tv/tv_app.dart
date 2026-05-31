@@ -356,6 +356,7 @@ class _ExitDialogButton extends StatelessWidget {
         color: primary ? const Color(0xFF25D7FF) : const Color(0xFFFF6B7C),
         radius: 16,
         child: InkWell(
+              canRequestFocus: false,
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           focusColor: Colors.transparent,

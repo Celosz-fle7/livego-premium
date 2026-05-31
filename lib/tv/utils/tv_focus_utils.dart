@@ -1,15 +1,22 @@
 import 'package:flutter/widgets.dart';
 
-void tvFocus(
+/// TV focus helper.
+///
+/// Request focus immediately when the node is already mounted, then reveal it
+/// after the frame. This avoids a queue of delayed requestFocus() calls when
+/// the user presses the remote quickly.
+bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
   Duration duration = const Duration(milliseconds: 160),
 }) {
+  if (!node.canRequestFocus || node.context == null) return false;
+
+  node.requestFocus();
+
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!node.canRequestFocus) return;
-    node.requestFocus();
     final context = node.context;
-    if (context == null) return;
+    if (context == null || !node.hasFocus) return;
     Scrollable.ensureVisible(
       context,
       duration: duration,
@@ -18,4 +25,6 @@ void tvFocus(
       alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );
   });
+
+  return true;
 }
