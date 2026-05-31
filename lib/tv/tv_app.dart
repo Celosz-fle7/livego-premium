@@ -17,6 +17,7 @@ class TvApp extends StatefulWidget {
 class _TvAppState extends State<TvApp> {
   int index = 0;
   int _homeFocusTicket = 0;
+  int _settingsFocusTicket = 0;
   final FocusNode _contentGuard = FocusNode(skipTraversal: true, debugLabel: 'tv-content-guard');
   late final List<FocusNode> _navNodes;
 
@@ -45,6 +46,8 @@ class _TvAppState extends State<TvApp> {
   void _focusRightZone() {
     if (index == 0) {
       setState(() => _homeFocusTicket++);
+    } else if (index == 6) {
+      setState(() => _settingsFocusTicket++);
     } else {
       _contentGuard.requestFocus();
     }
@@ -70,7 +73,11 @@ class _TvAppState extends State<TvApp> {
       3 => const TvPlaceholderScreen(title: 'Favorit', icon: Icons.favorite_rounded),
       4 => const TvPlaceholderScreen(title: 'Unduhan', icon: Icons.download_rounded),
       5 => const TvAccountScreen(),
-      _ => const TvSettingsScreen(showBackButton: false),
+      _ => TvSettingsScreen(
+          showBackButton: false,
+          onMoveToNav: _focusCurrentNav,
+          focusTicket: _settingsFocusTicket,
+        ),
     };
   }
 
