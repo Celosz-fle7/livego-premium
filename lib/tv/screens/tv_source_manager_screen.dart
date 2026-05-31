@@ -335,6 +335,7 @@ class _Header extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               child: TvFocusedBorder(
                 focusNode: backNode,
+                color: AppTheme.cyan,
                 radius: 16,
                 child: Container(
                   width: 52,
@@ -366,6 +367,7 @@ class _Header extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               child: TvFocusedBorder(
                 focusNode: pingNode,
+                color: AppTheme.cyan,
                 radius: 999,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
