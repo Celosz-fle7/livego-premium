@@ -22,6 +22,8 @@ class TvPlayerScreen extends StatefulWidget {
   State<TvPlayerScreen> createState() => _TvPlayerScreenState();
 }
 
+enum _TvPlayerMode { playback, controls, episodes, options }
+
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
   VideoPlayerController? _controller;
   ContentItem? _detail;
@@ -36,6 +38,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _episodePanelOpen = false;
   bool _qualityPanelOpen = false;
   int _episodeCursor = 1;
+  int _controlCursor = 1;
+  int _optionCursor = 0;
+  _TvPlayerMode _mode = _TvPlayerMode.playback;
+
+  static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
+  static const int _controlCount = 8;
 
   @override
   void initState() {
@@ -254,6 +262,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _openEpisodePanel() {
     setState(() {
+      _mode = _TvPlayerMode.episodes;
       _episodePanelOpen = true;
       _qualityPanelOpen = false;
       _showControls = true;
@@ -263,10 +272,109 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _openQualityPanel() {
     setState(() {
+      _mode = _TvPlayerMode.options;
       _qualityPanelOpen = true;
       _episodePanelOpen = false;
       _showControls = true;
     });
+  }
+
+  void _openControls() {
+    setState(() {
+      _mode = _TvPlayerMode.controls;
+      _showControls = true;
+      _episodePanelOpen = false;
+      _qualityPanelOpen = false;
+    });
+  }
+
+  void _hidePanels({bool hideControls = false}) {
+    setState(() {
+      _mode = _TvPlayerMode.playback;
+      _episodePanelOpen = false;
+      _qualityPanelOpen = false;
+      _showControls = !hideControls;
+    });
+  }
+
+  void _moveControl(int delta) {
+    setState(() {
+      _mode = _TvPlayerMode.controls;
+      _showControls = true;
+      _controlCursor = (_controlCursor + delta).clamp(0, _controlCount - 1).toInt();
+    });
+  }
+
+  void _cycleQuality(int delta) {
+    final current = LiveGoSettings.quality;
+    var index = _qualities.indexOf(current);
+    if (index < 0) index = 0;
+    index = (index + delta) % _qualities.length;
+    if (index < 0) index += _qualities.length;
+    final next = _qualities[index];
+    setState(() => LiveGoSettings.quality = next);
+    PlayerPreferences.setQuality(next);
+  }
+
+  void _changeSpeed(double delta) {
+    final s = (_speed + delta).clamp(0.5, 2.0).toDouble();
+    setState(() => _speed = s);
+    _controller?.setPlaybackSpeed(s);
+    PlayerPreferences.setSpeed(s);
+  }
+
+  void _toggleAudio() {
+    final next = _audioTrack == 'Mute' ? 'Source' : 'Mute';
+    setState(() => _audioTrack = next);
+    _controller?.setVolume(next == 'Mute' ? 0 : 1);
+    PlayerPreferences.setAudioTrack(next);
+  }
+
+  void _toggleSubtitle() {
+    final next = !LiveGoSettings.subtitlesEnabled;
+    setState(() => LiveGoSettings.subtitlesEnabled = next);
+    PlayerPreferences.setSubtitle(enabled: next);
+  }
+
+  void _activateControl() {
+    switch (_controlCursor) {
+      case 0:
+        _seekRelative(const Duration(seconds: -10));
+        break;
+      case 1:
+        _toggle();
+        break;
+      case 2:
+        _openEpisodePanel();
+        break;
+      case 3:
+        _toggleSubtitle();
+        break;
+      case 4:
+        _openQualityPanel();
+        break;
+      case 5:
+        _changeSpeed(0.25);
+        break;
+      case 6:
+        _toggleAudio();
+        break;
+      case 7:
+        _openQualityPanel();
+        break;
+    }
+  }
+
+  void _changeOption(int delta) {
+    if (_optionCursor == 0) {
+      _cycleQuality(delta);
+    } else if (_optionCursor == 1) {
+      _changeSpeed(delta > 0 ? 0.25 : -0.25);
+    } else if (_optionCursor == 2) {
+      _toggleSubtitle();
+    } else if (_optionCursor == 3) {
+      _toggleAudio();
+    }
   }
 
   KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
@@ -278,20 +386,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_isBack(key)) {
       if (_episodePanelOpen || _qualityPanelOpen) {
-        setState(() {
-          _episodePanelOpen = false;
-          _qualityPanelOpen = false;
-          _showControls = true;
-        });
-      } else if (_showControls) {
-        setState(() => _showControls = false);
+        _hidePanels();
+      } else if (_mode == _TvPlayerMode.controls || _showControls) {
+        _hidePanels(hideControls: true);
       } else if (Navigator.canPop(context)) {
         Navigator.pop(context);
       }
       return KeyEventResult.handled;
     }
 
-    if (_episodePanelOpen) {
+    if (_episodePanelOpen || _mode == _TvPlayerMode.episodes) {
       final total = _episodeTotal(item);
       const episodeColumns = 5;
       if (key == LogicalKeyboardKey.arrowLeft) {
@@ -312,29 +416,31 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       }
       if (_isSelect(key)) {
         _selectEpisode(_episodeCursor);
-        setState(() => _episodePanelOpen = false);
+        _hidePanels();
+        return KeyEventResult.handled;
+      }
+      if (_isMenu(key)) {
+        _openQualityPanel();
         return KeyEventResult.handled;
       }
       return KeyEventResult.handled;
     }
 
-    if (_qualityPanelOpen) {
-      if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowDown) {
-        final s = (_speed - 0.25).clamp(0.5, 2.0).toDouble();
-        setState(() => _speed = s);
-        _controller?.setPlaybackSpeed(s);
-        PlayerPreferences.setSpeed(s);
+    if (_qualityPanelOpen || _mode == _TvPlayerMode.options) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 3).toInt());
         return KeyEventResult.handled;
       }
-      if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowUp) {
-        final s = (_speed + 0.25).clamp(0.5, 2.0).toDouble();
-        setState(() => _speed = s);
-        _controller?.setPlaybackSpeed(s);
-        PlayerPreferences.setSpeed(s);
+      if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 3).toInt());
         return KeyEventResult.handled;
       }
-      if (_isSelect(key)) {
-        setState(() => _qualityPanelOpen = false);
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _changeOption(-1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+        _changeOption(1);
         return KeyEventResult.handled;
       }
       return KeyEventResult.handled;
@@ -345,6 +451,31 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
+    if (_mode == _TvPlayerMode.controls) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _moveControl(-1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _moveControl(1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _openEpisodePanel();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() => _showControls = true);
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _activateControl();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
+    }
+
+    // Playback mode: arrows are direct media actions unless UP enters the control bar.
     if (_isSelect(key)) {
       _toggle();
       setState(() => _showControls = true);
@@ -364,7 +495,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      setState(() => _showControls = true);
+      _openControls();
       return KeyEventResult.handled;
     }
 
@@ -485,8 +616,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 episode: _episode,
                 total: _episodeTotal(item),
                 speed: _speed,
-                audioTrack: _audioTrack,
-                apiText: _url.isEmpty ? 'Video API: belum ada stream' : 'Video API: OK • ${item.platformSlug} • Ep $_episode',
+                audioTrack: _audioTrack
               ),
             if (ready && (_showControls || _episodePanelOpen || _qualityPanelOpen))
               Positioned(
@@ -499,6 +629,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   speed: _speed,
                   quality: LiveGoSettings.quality,
                   audioTrack: _audioTrack,
+                  focusedIndex: _controlCursor,
                 ),
               ),
             if (_episodePanelOpen)
@@ -517,7 +648,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               Positioned(
                 right: 38,
                 bottom: 72,
-                child: _QualityPanel(speed: _speed, audioTrack: _audioTrack),
+                child: _QualityPanel(speed: _speed, audioTrack: _audioTrack, quality: LiveGoSettings.quality, subtitlesEnabled: LiveGoSettings.subtitlesEnabled, cursor: _optionCursor),
               ),
           ],
         ),
@@ -534,8 +665,6 @@ class _TvPlayerOverlay extends StatelessWidget {
   final int total;
   final double speed;
   final String audioTrack;
-  final String apiText;
-
   const _TvPlayerOverlay({
     required this.item,
     required this.ready,
@@ -544,7 +673,6 @@ class _TvPlayerOverlay extends StatelessWidget {
     required this.total,
     required this.speed,
     required this.audioTrack,
-    required this.apiText,
   });
 
   @override
@@ -570,11 +698,6 @@ class _TvPlayerOverlay extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white12)),
-                  child: const Text('OK Play/Pause • ←/→ Seek • ↓ Episode • MENU Quality', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800)),
-                ),
               ],
             ),
           ),
@@ -584,11 +707,6 @@ class _TvPlayerOverlay extends StatelessWidget {
               color: Colors.white.withOpacity(playing ? 0.18 : 0.88),
               size: 96,
             ),
-          ),
-          Positioned(
-            left: 36,
-            bottom: 54,
-            child: Text(apiText, style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -602,8 +720,16 @@ class _PlayerControlDock extends StatelessWidget {
   final double speed;
   final String quality;
   final String audioTrack;
+  final int focusedIndex;
 
-  const _PlayerControlDock({required this.controller, required this.playing, required this.speed, required this.quality, required this.audioTrack});
+  const _PlayerControlDock({
+    required this.controller,
+    required this.playing,
+    required this.speed,
+    required this.quality,
+    required this.audioTrack,
+    required this.focusedIndex,
+  });
 
   String _fmt(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -649,15 +775,14 @@ class _PlayerControlDock extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _DockButton(icon: Icons.replay_10_rounded, label: '10'),
-              _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'OK', active: true),
-              _DockButton(icon: Icons.video_library_rounded, label: 'EP'),
-              _DockButton(icon: Icons.subtitles_rounded, label: 'SUB'),
-              _DockTextButton(text: quality.toUpperCase()),
-              _DockButton(icon: Icons.fit_screen_rounded, label: 'FULL'),
-              _DockTextButton(text: '${speed.toStringAsFixed(2)}x'),
-              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack),
-              _DockButton(icon: Icons.menu_rounded, label: 'MENU'),
+              _DockButton(icon: Icons.replay_10_rounded, label: '-10', focused: focusedIndex == 0),
+              _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'OK', active: true, focused: focusedIndex == 1),
+              _DockButton(icon: Icons.video_library_rounded, label: 'EP', focused: focusedIndex == 2),
+              _DockButton(icon: Icons.subtitles_rounded, label: 'SUB', focused: focusedIndex == 3),
+              _DockTextButton(text: quality.toUpperCase(), focused: focusedIndex == 4),
+              _DockTextButton(text: '${speed.toStringAsFixed(2)}x', focused: focusedIndex == 5),
+              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack, focused: focusedIndex == 6),
+              _DockButton(icon: Icons.tune_rounded, label: 'MENU', focused: focusedIndex == 7),
             ],
           ),
         ],
@@ -670,42 +795,57 @@ class _DockButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool active;
-  const _DockButton({required this.icon, required this.label, this.active = false});
+  final bool focused;
+  const _DockButton({required this.icon, required this.label, this.active = false, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 54,
-      height: 48,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 110),
+      width: focused ? 62 : 54,
+      height: focused ? 54 : 48,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
-        color: active ? AppTheme.cyan.withOpacity(0.16) : Colors.white.withOpacity(0.055),
+        color: focused
+            ? AppTheme.cyan.withOpacity(0.20)
+            : (active ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.055)),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: active ? AppTheme.cyan : Colors.white12, width: active ? 2 : 1),
+        border: Border.all(color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.75) : Colors.white12), width: focused ? 2.5 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 18)] : null,
       ),
-      child: Icon(icon, color: active ? Colors.white : Colors.white70, size: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: focused || active ? Colors.white : Colors.white70, size: 23),
+          const SizedBox(height: 1),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused ? Colors.white : AppTheme.textSoft, fontSize: 8.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+        ],
+      ),
     );
   }
 }
 
 class _DockTextButton extends StatelessWidget {
   final String text;
-  const _DockTextButton({required this.text});
+  final bool focused;
+  const _DockTextButton({required this.text, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 48,
-      constraints: const BoxConstraints(minWidth: 68),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 110),
+      height: focused ? 54 : 48,
+      constraints: const BoxConstraints(minWidth: 76),
       alignment: Alignment.center,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: focused ? AppTheme.cyan.withOpacity(0.20) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2.5 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 18)] : null,
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+      child: Text(text, style: TextStyle(color: focused ? Colors.white : Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }
 }
@@ -855,30 +995,39 @@ class _EpisodeChip extends StatelessWidget {
 class _QualityPanel extends StatelessWidget {
   final double speed;
   final String audioTrack;
+  final String quality;
+  final bool subtitlesEnabled;
+  final int cursor;
 
-  const _QualityPanel({required this.speed, required this.audioTrack});
+  const _QualityPanel({
+    required this.speed,
+    required this.audioTrack,
+    required this.quality,
+    required this.subtitlesEnabled,
+    required this.cursor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 280,
+      width: 310,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xEE07101E),
+        color: const Color(0xF207101E),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 24), const BoxShadow(color: Colors.black87, blurRadius: 22)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Quality / Speed', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const Text('Opsi Player', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           const SizedBox(height: 14),
-          _QualityRow(label: 'Quality', value: LiveGoSettings.quality),
-          _QualityRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x'),
-          _QualityRow(label: 'Audio', value: audioTrack),
-          const SizedBox(height: 10),
-          const Text('←/→ atau ↑/↓ ubah speed • OK tutup', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w800)),
+          _QualityRow(label: 'Quality', value: quality, focused: cursor == 0),
+          _QualityRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 1),
+          _QualityRow(label: 'Subtitle', value: subtitlesEnabled ? 'ON' : 'OFF', focused: cursor == 2),
+          _QualityRow(label: 'Audio', value: audioTrack, focused: cursor == 3),
         ],
       ),
     );
@@ -888,17 +1037,25 @@ class _QualityPanel extends StatelessWidget {
 class _QualityRow extends StatelessWidget {
   final String label;
   final String value;
+  final bool focused;
 
-  const _QualityRow({required this.label, required this.value});
+  const _QualityRow({required this.label, required this.value, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 110),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: focused ? AppTheme.cyan.withOpacity(0.16) : Colors.white.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2 : 1),
+      ),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800))),
-          Text(value, style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)),
+          Expanded(child: Text(label, style: TextStyle(color: focused ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+          Text(value, style: TextStyle(color: focused ? Colors.white : AppTheme.cyan, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );
