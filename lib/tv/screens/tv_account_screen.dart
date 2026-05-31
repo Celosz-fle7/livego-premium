@@ -3,19 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
-import '../focus/tv_focus_memory.dart';
-import '../focus/tv_focus_zone.dart';
-import '../focus/tv_scroll_engine.dart';
+import '../models/tv_zone.dart';
+import '../utils/tv_focus_utils.dart';
 import 'tv_settings_screen.dart';
 
 class TvAccountScreen extends StatefulWidget {
-  final TvFocusMemory? memory;
   final VoidCallback? onMoveToNav;
   final int focusTicket;
 
   const TvAccountScreen({
     super.key,
-    this.memory,
     this.onMoveToNav,
     this.focusTicket = 0,
   });
@@ -27,9 +24,10 @@ class TvAccountScreen extends StatefulWidget {
 class _TvAccountScreenState extends State<TvAccountScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<FocusNode> _rowNodes = [];
-  late final TvFocusMemory _localMemory;
 
-  TvFocusMemory get _memory => widget.memory ?? _localMemory;
+  TvZone _zone = TvZone.list;
+  int _lastRow = 0;
+  bool _entryPending = false;
 
   List<_AccountSection> get _sections => [
         _AccountSection(
@@ -38,9 +36,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             _AccountItem(icon: Icons.history_rounded, title: 'Riwayat', subtitle: 'Lanjutkan tontonan terakhir yang sudah dibuka.', onTap: () {}),
             _AccountItem(icon: Icons.favorite_border_rounded, title: 'Favorit', subtitle: 'Buka daftar judul yang Anda simpan.', onTap: () {}),
             _AccountItem(icon: Icons.download_rounded, title: 'Download', subtitle: 'Lihat antrean dan episode yang tersimpan.', onTap: () {}),
-            _AccountItem(icon: Icons.settings_rounded, title: 'Pengaturan', subtitle: 'Atur tampilan, player, subtitle, dan source aktif.', onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen()));
-            }),
+            _AccountItem(
+              icon: Icons.settings_rounded,
+              title: 'Pengaturan',
+              subtitle: 'Atur tampilan, player, subtitle, dan source aktif.',
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen()));
+              },
+            ),
           ],
         ),
         _AccountSection(
@@ -59,10 +62,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   void initState() {
     super.initState();
-    _localMemory = TvFocusMemory();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusEntry();
-    });
   }
 
   @override
@@ -89,15 +88,12 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     while (_rowNodes.length > count) {
       _rowNodes.removeLast().dispose();
     }
-    if (_rowNodes.isNotEmpty) {
-      _memory.lastAccountIndex = _safeIndex(_memory.lastAccountIndex);
-    }
   }
 
-  int _safeIndex(int value) {
+  int _safe(int value) {
     if (_rowNodes.isEmpty) return 0;
-    final max = _rowNodes.length - 1;
     if (value < 0) return 0;
+    final max = _rowNodes.length - 1;
     if (value > max) return max;
     return value;
   }
@@ -109,25 +105,22 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         key == LogicalKeyboardKey.space;
   }
 
-  bool _isBack(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.goBack ||
-        key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.browserBack;
+  void _focusEntry() {
+    _entryPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
   }
 
-  void _focusEntry() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncRowNodes(_itemCount);
-      if (_rowNodes.isNotEmpty) _focusRow(_memory.lastAccountIndex);
-    });
+  void _tryFocusEntry() {
+    if (!mounted || !_entryPending || _rowNodes.isEmpty) return;
+    _entryPending = false;
+    _focusRow(_lastRow);
   }
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
-    final safe = _safeIndex(index);
-    _memory.rememberRight(_rowNodes[safe], TvFocusZone.account, accountIndex: safe);
-    focusAndReveal(_rowNodes[safe], alignment: 0.30);
+    _zone = TvZone.list;
+    _lastRow = _safe(index);
+    tvFocus(_rowNodes[_lastRow], alignment: 0.30);
   }
 
   KeyEventResult _rowKey(int index, _AccountItem item, KeyEvent event) {
@@ -135,6 +128,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowLeft) {
+      _zone = TvZone.nav;
+      _lastRow = index;
       widget.onMoveToNav?.call();
       return KeyEventResult.handled;
     }
@@ -147,20 +142,22 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      _lastRow = index;
       item.onTap();
-      _focusRow(index);
       return KeyEventResult.handled;
     }
-    if (_isBack(key)) return KeyEventResult.ignored;
     return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
     _syncRowNodes(_itemCount);
+    if (_entryPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+    }
+
     final sectionWidgets = <Widget>[];
     var cursor = 0;
-
     for (final section in _sections) {
       final rows = <Widget>[];
       for (final item in section.items) {
@@ -171,8 +168,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           title: item.title,
           subtitle: item.subtitle,
           onTap: () {
+            _lastRow = index;
             item.onTap();
-            _focusRow(index);
           },
           onKey: (node, event) => _rowKey(index, item, event),
           isLast: item == section.items.last,
@@ -192,6 +189,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         const _ProfileHeader(),
         const SizedBox(height: 18),
         ...sectionWidgets,
+        Text(
+          _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← kembali ke navbar' : '',
+          style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+        ),
       ],
     );
   }
@@ -246,7 +247,10 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 const Text('Penggemar LiveGO', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 const SizedBox(height: 5),
-                Text('Default: ${LiveGoSettings.defaultPlatform} • Bahasa: ${LiveGoSettings.language.toUpperCase()}', style: const TextStyle(color: AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                Text(
+                  'Default: ${LiveGoSettings.defaultPlatform} • Bahasa: ${LiveGoSettings.language.toUpperCase()}',
+                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+                ),
               ],
             ),
           ),
@@ -273,7 +277,7 @@ class _Panel extends StatelessWidget {
   }
 }
 
-class _ActionRow extends StatefulWidget {
+class _ActionRow extends StatelessWidget {
   final FocusNode node;
   final IconData icon;
   final String title;
@@ -293,64 +297,63 @@ class _ActionRow extends StatefulWidget {
   });
 
   @override
-  State<_ActionRow> createState() => _ActionRowState();
-}
-
-class _ActionRowState extends State<_ActionRow> {
-  bool focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.node,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => focused = v),
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(22),
-        focusColor: Colors.transparent,
-        child: Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 130),
-              height: 74,
-              margin: const EdgeInsets.all(6),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: focused ? const Color(0xFF102F45) : Colors.transparent,
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
-                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 16)] : null,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
-                    child: Icon(widget.icon, color: Colors.white, size: 25),
+    return ListenableBuilder(
+      listenable: node,
+      builder: (context, _) {
+        final focused = node.hasFocus;
+        return Focus(
+          focusNode: node,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(22),
+            focusColor: Colors.transparent,
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 130),
+                  height: 74,
+                  margin: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: focused ? const Color(0xFF102F45) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(19),
+                    border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
+                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 16)] : null,
                   ),
-                  const SizedBox(width: 18),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                        const SizedBox(height: 3),
-                        Text(widget.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
-                      ],
-                    ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+                        child: Icon(icon, color: Colors.white, size: 25),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                            const SizedBox(height: 3),
+                            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 27),
+                    ],
                   ),
-                  Icon(Icons.arrow_forward_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 27),
-                ],
-              ),
+                ),
+                if (!isLast) const Divider(color: Color(0xFF24344A), height: 1),
+              ],
             ),
-            if (!widget.isLast) const Divider(color: Color(0xFF24344A), height: 1),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

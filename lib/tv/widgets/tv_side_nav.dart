@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../core/app_theme.dart';
 
 class TvNavItem {
@@ -42,7 +43,7 @@ class _TvSideNavState extends State<TvSideNav> {
   @override
   void initState() {
     super.initState();
-    _bindNodeListeners(widget.focusNodes);
+    _bind(widget.focusNodes);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncExpanded());
   }
 
@@ -50,25 +51,25 @@ class _TvSideNavState extends State<TvSideNav> {
   void didUpdateWidget(covariant TvSideNav oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusNodes != widget.focusNodes) {
-      _unbindNodeListeners(oldWidget.focusNodes);
-      _bindNodeListeners(widget.focusNodes);
+      _unbind(oldWidget.focusNodes);
+      _bind(widget.focusNodes);
       _syncExpanded();
     }
   }
 
   @override
   void dispose() {
-    _unbindNodeListeners(widget.focusNodes);
+    _unbind(widget.focusNodes);
     super.dispose();
   }
 
-  void _bindNodeListeners(List<FocusNode> nodes) {
+  void _bind(List<FocusNode> nodes) {
     for (final node in nodes) {
       node.addListener(_syncExpanded);
     }
   }
 
-  void _unbindNodeListeners(List<FocusNode> nodes) {
+  void _unbind(List<FocusNode> nodes) {
     for (final node in nodes) {
       node.removeListener(_syncExpanded);
     }
@@ -80,9 +81,10 @@ class _TvSideNavState extends State<TvSideNav> {
     if (next != _expanded) setState(() => _expanded = next);
   }
 
-  int _safeIndex(int value) {
-    final max = TvSideNav.items.length - 1;
+  int _safe(int value) {
+    if (widget.focusNodes.isEmpty) return 0;
     if (value < 0) return 0;
+    final max = widget.focusNodes.length - 1;
     if (value > max) return max;
     return value;
   }
@@ -94,38 +96,32 @@ class _TvSideNavState extends State<TvSideNav> {
         key == LogicalKeyboardKey.space;
   }
 
-  KeyEventResult _handleKey(int i, KeyEvent event) {
+  KeyEventResult _handleKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
 
     final key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.arrowDown) {
-      widget.focusNodes[_safeIndex(i + 1)].requestFocus();
-      return KeyEventResult.handled;
-    }
-
     if (key == LogicalKeyboardKey.arrowUp) {
-      widget.focusNodes[_safeIndex(i - 1)].requestFocus();
+      widget.focusNodes[_safe(index - 1)].requestFocus();
       return KeyEventResult.handled;
     }
-
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      widget.focusNodes[_safeIndex(i)].requestFocus();
+    if (key == LogicalKeyboardKey.arrowDown) {
+      widget.focusNodes[_safe(index + 1)].requestFocus();
       return KeyEventResult.handled;
     }
-
     if (key == LogicalKeyboardKey.arrowRight) {
-      widget.onOpenContent(i);
+      widget.onOpenContent(index);
       return KeyEventResult.handled;
     }
-
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      widget.focusNodes[_safe(index)].requestFocus();
+      return KeyEventResult.handled;
+    }
     if (_isSelect(key)) {
-      widget.onChanged(i);
+      widget.onChanged(index);
       return KeyEventResult.handled;
     }
-
     return KeyEventResult.ignored;
   }
 
@@ -142,48 +138,34 @@ class _TvSideNavState extends State<TvSideNav> {
           decoration: BoxDecoration(
             color: const Color(0xFF050D18).withOpacity(0.97),
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: _expanded ? AppTheme.cyan.withOpacity(0.35) : const Color(0xFF172A3E),
-            ),
+            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.35) : const Color(0xFF172A3E)),
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 22)],
           ),
           child: Column(
             children: [
-              _NavButton(
-                focusNode: widget.focusNodes[0],
-                icon: TvSideNav.items[0].icon,
-                label: TvSideNav.items[0].label,
-                active: widget.index == 0,
-                expanded: _expanded,
-                logo: true,
-                onTap: () => widget.onChanged(0),
-                onKey: (node, event) => _handleKey(0, event),
-              ),
-              const SizedBox(height: 10),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: _expanded ? 154 : 38,
-                height: 1,
-                color: Colors.white10,
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(TvSideNav.items.length - 1, (raw) {
-                    final i = raw + 1;
-                    return _NavButton(
-                      focusNode: widget.focusNodes[i],
-                      icon: TvSideNav.items[i].icon,
-                      label: TvSideNav.items[i].label,
-                      active: i == widget.index,
-                      expanded: _expanded,
-                      onTap: () => widget.onChanged(i),
-                      onKey: (node, event) => _handleKey(i, event),
-                    );
-                  }),
+              for (var i = 0; i < TvSideNav.items.length; i++) ...[
+                _NavButton(
+                  focusNode: widget.focusNodes[i],
+                  icon: TvSideNav.items[i].icon,
+                  label: TvSideNav.items[i].label,
+                  active: i == widget.index,
+                  expanded: _expanded,
+                  logo: i == 0,
+                  onTap: () => widget.onChanged(i),
+                  onKey: (node, event) => _handleKey(i, event),
                 ),
-              ),
+                if (i == 0) ...[
+                  const SizedBox(height: 10),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: _expanded ? 154 : 38,
+                    height: 1,
+                    color: Colors.white10,
+                  ),
+                  const SizedBox(height: 10),
+                ] else if (i < TvSideNav.items.length - 1)
+                  const Spacer(),
+              ],
             ],
           ),
         ),
@@ -192,15 +174,15 @@ class _TvSideNavState extends State<TvSideNav> {
   }
 }
 
-class _NavButton extends StatefulWidget {
+class _NavButton extends StatelessWidget {
   final FocusNode focusNode;
   final IconData icon;
   final String label;
   final bool active;
   final bool expanded;
   final VoidCallback onTap;
-  final bool logo;
   final FocusOnKeyEventCallback onKey;
+  final bool logo;
 
   const _NavButton({
     required this.focusNode,
@@ -214,92 +196,63 @@ class _NavButton extends StatefulWidget {
   });
 
   @override
-  State<_NavButton> createState() => _NavButtonState();
-}
-
-class _NavButtonState extends State<_NavButton> {
-  bool focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    final selected = focused || widget.active;
-    final height = widget.logo ? 60.0 : 54.0;
-    final collapsedWidth = widget.logo ? 58.0 : 54.0;
-
-    return Tooltip(
-      message: widget.label,
-      child: Focus(
-        focusNode: widget.focusNode,
-        skipTraversal: true,
-        autofocus: false,
-        onKeyEvent: widget.onKey,
-        onFocusChange: (v) => setState(() => focused = v),
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(18),
-          focusColor: Colors.transparent,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            width: widget.expanded ? 182 : collapsedWidth,
-            height: height,
-            padding: EdgeInsets.symmetric(horizontal: widget.expanded ? 12 : 0),
-            decoration: BoxDecoration(
-              gradient: selected
-                  ? const LinearGradient(
-                      colors: [Color(0xFF123B54), Color(0xFF3C207E)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    )
-                  : null,
-              color: selected ? null : const Color(0xFF0A1422),
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        final selected = focused || active;
+        final height = logo ? 60.0 : 54.0;
+        final collapsedWidth = logo ? 58.0 : 54.0;
+        return Tooltip(
+          message: label,
+          child: Focus(
+            focusNode: focusNode,
+            skipTraversal: true,
+            autofocus: false,
+            onKeyEvent: onKey,
+            child: InkWell(
+              onTap: onTap,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: focused
-                    ? AppTheme.cyan
-                    : (widget.active ? AppTheme.cyan.withOpacity(0.62) : Colors.white10),
-                width: focused ? 2.2 : 1,
-              ),
-              boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 18)] : null,
-            ),
-            child: Row(
-              mainAxisAlignment: widget.expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  width: focused ? 4 : 0,
-                  height: 28,
-                  margin: EdgeInsets.only(right: focused && widget.expanded ? 10 : 0),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cyan,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+              focusColor: Colors.transparent,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 130),
+                height: height,
+                width: expanded ? 178 : collapsedWidth,
+                padding: const EdgeInsets.symmetric(horizontal: 13),
+                decoration: BoxDecoration(
+                  color: selected ? AppTheme.cyan.withOpacity(focused ? 0.22 : 0.12) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2 : 0),
+                  boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null,
                 ),
-                Icon(
-                  widget.icon,
-                  color: selected ? Colors.white : Colors.white54,
-                  size: widget.logo ? 28 : 23,
-                ),
-                if (widget.expanded) ...[
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Text(
-                      widget.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: selected ? Colors.white : Colors.white54,
-                        fontSize: widget.logo ? 13 : 12.2,
-                        fontWeight: FontWeight.w900,
-                        decoration: TextDecoration.none,
+                child: Row(
+                  mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: selected ? AppTheme.cyan : Colors.white70, size: logo ? 30 : 27),
+                    if (expanded) ...[
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: selected ? Colors.white : Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ],
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

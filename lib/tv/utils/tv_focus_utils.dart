@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 
-void focusAndReveal(
+void tvFocus(
   FocusNode node, {
-  double alignment = 0.28,
-  Duration duration = const Duration(milliseconds: 180),
+  double alignment = 0.30,
+  Duration duration = const Duration(milliseconds: 160),
 }) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (!node.canRequestFocus) return;

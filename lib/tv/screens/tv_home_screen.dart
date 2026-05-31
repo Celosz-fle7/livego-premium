@@ -1,42 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../models/tv_zone.dart';
+import '../utils/tv_focus_utils.dart';
 import 'tv_player_screen.dart';
-import '../focus/tv_focus_memory.dart';
-import '../focus/tv_focus_zone.dart';
-import '../focus/tv_scroll_engine.dart';
 
 class TvHomeScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final int focusTicket;
 
-  const TvHomeScreen({super.key, this.onMoveToNav, this.focusTicket = 0});
+  const TvHomeScreen({
+    super.key,
+    this.onMoveToNav,
+    this.focusTicket = 0,
+  });
 
   @override
   State<TvHomeScreen> createState() => _TvHomeScreenState();
 }
 
-
 class _TvHomeScreenState extends State<TvHomeScreen> {
+  static const int _gridColumns = 7;
+
   int source = 0;
   int category = 0;
   late Future<_TvHomeState> _future;
 
   final ScrollController _pageScroll = ScrollController();
-  final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-banner');
+  final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
   final List<FocusNode> _platformNodes = [];
   final List<FocusNode> _categoryNodes = [];
   final List<FocusNode> _gridNodes = [];
+
+  TvZone _zone = TvZone.banner;
+  int _lastPlatform = 0;
+  int _lastCategory = 0;
+  int _lastGrid = 0;
+  bool _entryPending = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
-
-  late final TvFocusMemory _focusMemory;
-
-  static const int _gridColumns = 7;
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms;
@@ -48,7 +55,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _focusMemory = TvFocusMemory();
     _future = _load();
   }
 
@@ -56,7 +62,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void didUpdateWidget(covariant TvHomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusTicket != widget.focusTicket) {
-      _returnToLastContent();
+      _focusEntry();
     }
   }
 
@@ -106,143 +112,130 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
   }
 
-  void _rememberRightFocus(FocusNode node, TvFocusZone zone, {int? platform, int? category, int? grid}) {
-    _focusMemory.rememberRight(
-      node,
-      zone,
-      platformIndex: platform,
-      categoryIndex: category,
-      gridIndex: grid,
-    );
-  }
-
-  void _moveToNavFrom(FocusNode node, TvFocusZone zone, {int? platform, int? category, int? grid}) {
-    _rememberRightFocus(node, zone, platform: platform, category: category, grid: grid);
-    widget.onMoveToNav?.call();
-  }
-
-  void _focus(FocusNode node, {double alignment = 0.15}) {
-    _focusMemory.lastRightFocus = node;
-    focusAndReveal(node, alignment: alignment);
-  }
-
   int _safe(int value, int length) {
     if (length <= 0) return 0;
-    return value.clamp(0, length - 1);
+    if (value < 0) return 0;
+    if (value >= length) return length - 1;
+    return value;
+  }
+
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space;
+  }
+
+  void _focus(FocusNode node, {double alignment = 0.22}) {
+    tvFocus(node, alignment: alignment);
+  }
+
+  void _focusEntry() {
+    _entryPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+  }
+
+  void _tryFocusEntry() {
+    if (!mounted || !_entryPending) return;
+    final focused = _focusByZone(_zone);
+    if (focused) _entryPending = false;
+  }
+
+  bool _focusByZone(TvZone zone) {
+    if (zone == TvZone.grid && _gridNodes.isNotEmpty) {
+      _zone = TvZone.grid;
+      _lastGrid = _safe(_lastGrid, _gridNodes.length);
+      _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      return true;
+    }
+    if (zone == TvZone.category && _categoryNodes.isNotEmpty) {
+      _zone = TvZone.category;
+      _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+      _focus(_categoryNodes[_lastCategory], alignment: 0.12);
+      return true;
+    }
+    if (zone == TvZone.platform && _platformNodes.isNotEmpty) {
+      _zone = TvZone.platform;
+      _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+      _focus(_platformNodes[_lastPlatform], alignment: 0.08);
+      return true;
+    }
+    _zone = TvZone.banner;
+    _focus(_bannerNode, alignment: 0.02);
+    return true;
+  }
+
+  void _moveToNav(TvZone fromZone, {int? platform, int? category, int? grid}) {
+    _zone = fromZone;
+    if (platform != null) _lastPlatform = platform;
+    if (category != null) _lastCategory = category;
+    if (grid != null) _lastGrid = grid;
+    widget.onMoveToNav?.call();
   }
 
   void _open(ContentItem item) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item)));
   }
 
-  bool _isSelect(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.space;
+  void _selectPlatform(int index) {
+    if (index == source) {
+      _zone = TvZone.platform;
+      _lastPlatform = index;
+      _focus(_platformNodes[_safe(index, _platformNodes.length)], alignment: 0.08);
+      return;
+    }
+    setState(() {
+      source = index;
+      category = 0;
+      _zone = TvZone.platform;
+      _lastPlatform = index;
+      _lastCategory = 0;
+      _lastGrid = 0;
+      _future = _load();
+    });
   }
 
-  void _returnToLastContent() {
-    // Entry point from the left navbar back into the right territory.
-    // Restore exact FocusNode first, then fall back to zone/index.
-    final remembered = _focusMemory.lastRightFocus;
-    if (remembered != null && remembered.canRequestFocus && remembered.context != null) {
-      _focus(remembered, alignment: _focusMemory.lastRightZone == TvFocusZone.grid ? 0.35 : 0.15);
+  void _selectCategory(int index) {
+    if (index == category) {
+      _zone = TvZone.category;
+      _lastCategory = index;
+      _focus(_categoryNodes[_safe(index, _categoryNodes.length)], alignment: 0.12);
       return;
     }
-    if (_focusMemory.lastRightZone == TvFocusZone.grid && _gridNodes.isNotEmpty) {
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.category && _categoryNodes.isNotEmpty) {
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.platform && _platformNodes.isNotEmpty) {
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.banner && _bannerNode.canRequestFocus) {
-      _focus(_bannerNode);
-      return;
-    }
-
-    // Safe fallback: enter the real content area first, not the banner trap.
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
-    if (_categoryNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.category;
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_platformNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.platform;
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    _focusMemory.lastRightZone = TvFocusZone.banner;
-    _focus(_bannerNode);
-  }
-
-  void _focusRightFallback() {
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
-    if (_categoryNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.category;
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_platformNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.platform;
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    _focusMemory.lastRightZone = TvFocusZone.banner;
-    _focus(_bannerNode);
+    setState(() {
+      category = index;
+      _zone = TvZone.category;
+      _lastCategory = index;
+      _lastGrid = 0;
+      _future = _load();
+    });
   }
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNavFrom(_bannerNode, TvFocusZone.banner);
+      _moveToNav(TvZone.banner);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+      if (_platformNodes.isNotEmpty) {
+        _zone = TvZone.platform;
+        _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+        _focus(_platformNodes[_lastPlatform], alignment: 0.08);
+      } else if (_categoryNodes.isNotEmpty) {
+        _zone = TvZone.category;
+        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+        _focus(_categoryNodes[_lastCategory], alignment: 0.12);
+      } else if (_gridNodes.isNotEmpty) {
+        _zone = TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _focusRightFallback();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (_platformNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      } else if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      }
       return KeyEventResult.handled;
     }
     if (_isSelect(key) && hero != null) {
@@ -252,119 +245,99 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return KeyEventResult.ignored;
   }
 
-  KeyEventResult _platformKey(int i, KeyEvent event) {
+  KeyEventResult _platformKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (i == 0) {
-        _moveToNavFrom(_platformNodes[i], TvFocusZone.platform, platform: i);
+      if (index == 0) {
+        _moveToNav(TvZone.platform, platform: index);
       } else {
-        _focusMemory.lastPlatformIndex = i - 1;
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+        _zone = TvZone.platform;
+        _lastPlatform = index - 1;
+        _focus(_platformNodes[_lastPlatform], alignment: 0.08);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (i < _platformNodes.length - 1) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = i + 1;
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      } else if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else {
-        _focusRightFallback();
+      if (index < _platformNodes.length - 1) {
+        _zone = TvZone.platform;
+        _lastPlatform = index + 1;
+        _focus(_platformNodes[_lastPlatform], alignment: 0.08);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
+      _zone = TvZone.banner;
+      _lastPlatform = index;
+      _focus(_bannerNode, alignment: 0.02);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
+      _lastPlatform = index;
       if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+        _zone = TvZone.category;
+        _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+        _focus(_categoryNodes[_lastCategory], alignment: 0.12);
       } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      setState(() {
-        source = i;
-        category = 0;
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = i;
-        _focusMemory.lastCategoryIndex = 0;
-        _focusMemory.lastGridIndex = 0;
-        _focusMemory.clearRightNode();
-      });
-      _reload();
+      _selectPlatform(index);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
-  KeyEventResult _categoryKey(int i, KeyEvent event) {
+  KeyEventResult _categoryKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (i == 0) {
-        _moveToNavFrom(_categoryNodes[i], TvFocusZone.category, category: i);
+      if (index == 0) {
+        _moveToNav(TvZone.category, category: index);
       } else {
-        _focusMemory.lastCategoryIndex = i - 1;
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+        _zone = TvZone.category;
+        _lastCategory = index - 1;
+        _focus(_categoryNodes[_lastCategory], alignment: 0.12);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (i < _categoryNodes.length - 1) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = i + 1;
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      } else {
-        _focusRightFallback();
+      if (index < _categoryNodes.length - 1) {
+        _zone = TvZone.category;
+        _lastCategory = index + 1;
+        _focus(_categoryNodes[_lastCategory], alignment: 0.12);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
+      _lastCategory = index;
       if (_platformNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+        _zone = TvZone.platform;
+        _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+        _focus(_platformNodes[_lastPlatform], alignment: 0.08);
       } else {
-        _focusMemory.lastRightZone = TvFocusZone.banner;
-        _focus(_bannerNode);
+        _zone = TvZone.banner;
+        _focus(_bannerNode, alignment: 0.02);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
+      _lastCategory = index;
       if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = _safe(_lastGrid, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      setState(() {
-        category = i;
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = i;
-        _focusMemory.lastGridIndex = 0;
-        _focusMemory.clearRightNode();
-      });
-      _reload();
+      _selectCategory(index);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -375,60 +348,57 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final key = event.logicalKey;
     final col = index % _gridColumns;
     final row = index ~/ _gridColumns;
+
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
-        _moveToNavFrom(_gridNodes[index], TvFocusZone.grid, grid: index);
+        _moveToNav(TvZone.grid, grid: index);
       } else {
-        _focusMemory.lastGridIndex = index - 1;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = index - 1;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (col < _gridColumns - 1 && index < _gridNodes.length - 1) {
-        _focusMemory.lastGridIndex = index + 1;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      } else {
-        _focusMemory.lastGridIndex = index;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = index + 1;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
         if (_categoryNodes.isNotEmpty) {
-          _focusMemory.lastRightZone = TvFocusZone.category;
-          _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-          _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+          _zone = TvZone.category;
+          _lastCategory = _safe(_lastCategory, _categoryNodes.length);
+          _focus(_categoryNodes[_lastCategory], alignment: 0.12);
         } else if (_platformNodes.isNotEmpty) {
-          _focusMemory.lastRightZone = TvFocusZone.platform;
-          _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-          _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+          _zone = TvZone.platform;
+          _lastPlatform = _safe(_lastPlatform, _platformNodes.length);
+          _focus(_platformNodes[_lastPlatform], alignment: 0.08);
         } else {
-          _focusMemory.lastRightZone = TvFocusZone.banner;
-          _focus(_bannerNode);
+          _zone = TvZone.banner;
+          _focus(_bannerNode, alignment: 0.02);
         }
       } else {
-        _focusMemory.lastGridIndex = _safe(index - _gridColumns, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = _safe(index - _gridColumns, _gridNodes.length);
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = index + _gridColumns;
       if (next < _gridNodes.length) {
-        _focusMemory.lastGridIndex = next;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      } else {
-        _focusMemory.lastGridIndex = index;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _zone = TvZone.grid;
+        _lastGrid = next;
+        _focus(_gridNodes[_lastGrid], alignment: 0.35);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      if (index >= 0 && index < _visibleGridItems.length) {
-        _open(_visibleGridItems[index]);
-      }
+      if (index >= 0 && index < _visibleGridItems.length) _open(_visibleGridItems[index]);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -442,15 +412,19 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final loading = snap.connectionState != ConnectionState.done;
         final hero = snap.data?.hero;
         final items = snap.data?.items ?? const <ContentItem>[];
+        final platforms = LiveGoCatalog.platformLabels;
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
-        final platforms = LiveGoCatalog.platformLabels;
         final gridItems = items.take(42).toList();
         _visibleGridItems = gridItems;
 
         _syncNodes(_platformNodes, platforms.length, 'tv-platform');
         _syncNodes(_categoryNodes, categories.length, 'tv-category');
         _syncNodes(_gridNodes, gridItems.length, 'tv-grid');
+
+        if (_entryPending) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+        }
 
         return ListView(
           controller: _pageScroll,
@@ -459,7 +433,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             _FocusableBanner(
               item: hero,
               focusNode: _bannerNode,
-              onFocus: () => _rememberRightFocus(_bannerNode, TvFocusZone.banner),
+              onFocus: () => _zone = TvZone.banner,
               onTap: hero == null ? null : () => _open(hero),
               onKey: (node, event) => _bannerKey(hero, event),
             ),
@@ -470,8 +444,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 labels: platforms,
                 selected: source,
                 nodes: _platformNodes,
-                onFocus: (i) => _rememberRightFocus(_platformNodes[i], TvFocusZone.platform, platform: i),
-                onTap: (i) { setState(() { source = i; category = 0; _focusMemory.lastPlatformIndex = i; _focusMemory.lastCategoryIndex = 0; _focusMemory.lastGridIndex = 0; _focusMemory.clearRightNode(); }); _reload(); },
+                onFocus: (i) {
+                  _zone = TvZone.platform;
+                  _lastPlatform = i;
+                },
+                onTap: _selectPlatform,
                 onKey: _platformKey,
               ),
             ),
@@ -482,8 +459,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 labels: categories,
                 selected: category,
                 nodes: _categoryNodes,
-                onFocus: (i) => _rememberRightFocus(_categoryNodes[i], TvFocusZone.category, category: i),
-                onTap: (i) { setState(() { category = i; _focusMemory.lastCategoryIndex = i; _focusMemory.lastGridIndex = 0; _focusMemory.clearRightNode(); }); _reload(); },
+                onFocus: (i) {
+                  _zone = TvZone.category;
+                  _lastCategory = i;
+                },
+                onTap: _selectCategory,
                 onKey: _categoryKey,
               ),
             ),
@@ -495,7 +475,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 title: 'Popular',
                 items: gridItems,
                 nodes: _gridNodes,
-                onFocus: (i) => _rememberRightFocus(_gridNodes[i], TvFocusZone.grid, grid: i),
+                onFocus: (i) {
+                  _zone = TvZone.grid;
+                  _lastGrid = i;
+                },
                 onKey: _gridKey,
                 onTap: _open,
               ),
@@ -512,47 +495,52 @@ class _TvHomeState {
   const _TvHomeState({required this.hero, required this.items});
 }
 
-class _FocusableBanner extends StatefulWidget {
+class _FocusableBanner extends StatelessWidget {
   final ContentItem? item;
   final FocusNode focusNode;
   final VoidCallback onFocus;
   final VoidCallback? onTap;
   final FocusOnKeyEventCallback onKey;
 
-  const _FocusableBanner({required this.item, required this.focusNode, required this.onFocus, required this.onTap, required this.onKey});
-
-  @override
-  State<_FocusableBanner> createState() => _FocusableBannerState();
-}
-
-class _FocusableBannerState extends State<_FocusableBanner> {
-  bool focused = false;
+  const _FocusableBanner({
+    required this.item,
+    required this.focusNode,
+    required this.onFocus,
+    required this.onTap,
+    required this.onKey,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) {
-        setState(() => focused = v);
-        if (v) widget.onFocus();
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(26),
-        focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          height: 238,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
-            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.32), blurRadius: 24)] : null,
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return Focus(
+          focusNode: focusNode,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          onFocusChange: (v) {
+            if (v) onFocus();
+          },
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(26),
+            focusColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              height: 238,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
+                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.32), blurRadius: 24)] : null,
+              ),
+              child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 238),
+            ),
           ),
-          child: widget.item != null ? HeroBanner(item: widget.item!, tv: true) : const _TvSkeleton(height: 238),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -573,10 +561,8 @@ class _HeaderBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF1D3147)),
       ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: child,
-      ),
+      alignment: Alignment.centerLeft,
+      child: child,
     );
   }
 }
@@ -585,7 +571,6 @@ class _ChipRow extends StatelessWidget {
   final List<String> labels;
   final int selected;
   final List<FocusNode> nodes;
-  final bool autofocusFirst;
   final ValueChanged<int> onTap;
   final ValueChanged<int> onFocus;
   final KeyEventResult Function(int, KeyEvent) onKey;
@@ -597,11 +582,11 @@ class _ChipRow extends StatelessWidget {
     required this.onTap,
     required this.onFocus,
     required this.onKey,
-    this.autofocusFirst = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (labels.isEmpty || nodes.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -612,7 +597,6 @@ class _ChipRow extends StatelessWidget {
               text: labels[i],
               active: i == selected,
               focusNode: nodes[i],
-              autofocus: autofocusFirst && i == 0,
               onTap: () => onTap(i),
               onFocus: () => onFocus(i),
               onKey: (node, event) => onKey(i, event),
@@ -624,53 +608,65 @@ class _ChipRow extends StatelessWidget {
   }
 }
 
-class _TvChip extends StatefulWidget {
+class _TvChip extends StatelessWidget {
   final String text;
   final bool active;
   final FocusNode focusNode;
-  final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onFocus;
   final FocusOnKeyEventCallback onKey;
 
-  const _TvChip({required this.text, required this.active, required this.focusNode, required this.onTap, required this.onFocus, required this.onKey, this.autofocus = false});
-
-  @override
-  State<_TvChip> createState() => _TvChipState();
-}
-
-class _TvChipState extends State<_TvChip> {
-  bool focused = false;
+  const _TvChip({
+    required this.text,
+    required this.active,
+    required this.focusNode,
+    required this.onTap,
+    required this.onFocus,
+    required this.onKey,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final selected = widget.active || focused;
-    return Focus(
-      focusNode: widget.focusNode,
-      skipTraversal: true,
-      autofocus: widget.autofocus,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) {
-        setState(() => focused = v);
-        if (v) widget.onFocus();
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(999),
-        focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: widget.active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
-            color: widget.active ? null : AppTheme.surface.withOpacity(0.82),
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        final selected = active || focused;
+        return Focus(
+          focusNode: focusNode,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          onFocusChange: (v) {
+            if (v) onFocus();
+          },
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.3 : 1),
-            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 20)] : null,
+            focusColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 130),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
+                color: active ? null : AppTheme.surface.withOpacity(0.82),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: focused ? AppTheme.cyan : (active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.3 : 1),
+                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 20)] : null,
+              ),
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppTheme.textSoft,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
           ),
-          child: Text(widget.text, style: TextStyle(color: selected ? Colors.white : AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -683,16 +679,26 @@ class _ContentGrid extends StatelessWidget {
   final KeyEventResult Function(int, KeyEvent) onKey;
   final ValueChanged<ContentItem> onTap;
 
-  const _ContentGrid({required this.title, required this.items, required this.nodes, required this.onFocus, required this.onKey, required this.onTap});
+  const _ContentGrid({
+    required this.title,
+    required this.items,
+    required this.nodes,
+    required this.onFocus,
+    required this.onKey,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
+    if (items.isEmpty || nodes.isEmpty) return const SizedBox.shrink();
     return RepaintBoundary(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none)),
+          Text(
+            title.toUpperCase(),
+            style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none),
+          ),
           const SizedBox(height: 12),
           GridView.builder(
             shrinkWrap: true,
@@ -718,72 +724,87 @@ class _ContentGrid extends StatelessWidget {
   }
 }
 
-class _TvPosterTile extends StatefulWidget {
+class _TvPosterTile extends StatelessWidget {
   final ContentItem item;
   final FocusNode focusNode;
   final VoidCallback onFocus;
   final VoidCallback onTap;
   final FocusOnKeyEventCallback onKey;
 
-  const _TvPosterTile({required this.item, required this.focusNode, required this.onFocus, required this.onTap, required this.onKey});
-
-  @override
-  State<_TvPosterTile> createState() => _TvPosterTileState();
-}
-
-class _TvPosterTileState extends State<_TvPosterTile> {
-  bool focused = false;
+  const _TvPosterTile({
+    required this.item,
+    required this.focusNode,
+    required this.onFocus,
+    required this.onTap,
+    required this.onKey,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) {
-        setState(() => focused = v);
-        if (v) widget.onFocus();
-      },
-      child: AnimatedScale(
-        scale: focused ? 1.045 : 1.0,
-        duration: const Duration(milliseconds: 140),
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(18),
-          focusColor: Colors.transparent,
-          child: Column(
-            children: [
-              Expanded(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 140),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
-                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.38), blurRadius: 24)] : null,
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        widget.item.posterUrl.isEmpty
-                            ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
-                            : LiveGoCachedImage(url: widget.item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
-                        const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]))),
-                        Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
-                        if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
-                        Positioned(right: 8, bottom: 12, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
-                      ],
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return Focus(
+          focusNode: focusNode,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          onFocusChange: (v) {
+            if (v) onFocus();
+          },
+          child: AnimatedScale(
+            scale: focused ? 1.045 : 1.0,
+            duration: const Duration(milliseconds: 140),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(18),
+              focusColor: Colors.transparent,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
+                        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.38), blurRadius: 24)] : null,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            item.posterUrl.isEmpty
+                                ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
+                                : LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
+                            const DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]),
+                              ),
+                            ),
+                            Positioned(top: 8, left: 8, child: _Badge(text: '${item.episodes} Ep')),
+                            if (item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
+                            Positioned(right: 8, bottom: 12, child: _Badge(text: item.rating.toStringAsFixed(1))),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(widget.item.title, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none)),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -791,6 +812,7 @@ class _TvPosterTileState extends State<_TvPosterTile> {
 class _Badge extends StatelessWidget {
   final String text;
   const _Badge({required this.text});
+
   @override
   Widget build(BuildContext context) {
     return Container(

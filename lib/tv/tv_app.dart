@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../shared/widgets/premium_shell.dart';
-import 'focus/tv_focus_memory.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_home_screen.dart';
 import 'screens/tv_placeholder_screen.dart';
@@ -16,14 +15,12 @@ class TvApp extends StatefulWidget {
 }
 
 class _TvAppState extends State<TvApp> {
-  int index = 0;
-
-  int _homeFocusTicket = 0;
-  int _placeholderFocusTicket = 0;
-  int _accountFocusTicket = 0;
+  int _index = 0;
+  int _homeTicket = 0;
+  int _accountTicket = 0;
+  int _placeholderTicket = 0;
 
   late final List<FocusNode> _navNodes;
-  final TvFocusMemory _accountMemory = TvFocusMemory();
 
   @override
   void initState() {
@@ -34,8 +31,7 @@ class _TvAppState extends State<TvApp> {
     );
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _navNodes.first.requestFocus();
+      if (mounted && _navNodes.isNotEmpty) _navNodes[0].requestFocus();
     });
   }
 
@@ -47,100 +43,98 @@ class _TvAppState extends State<TvApp> {
     super.dispose();
   }
 
-  int _safeNavIndex(int value) {
-    final max = _navNodes.length - 1;
+  int _safeNav(int value) {
+    if (_navNodes.isEmpty) return 0;
     if (value < 0) return 0;
+    final max = _navNodes.length - 1;
     if (value > max) return max;
     return value;
   }
 
+  bool get _navHasFocus => _navNodes.any((node) => node.hasFocus);
+
   void _focusCurrentNav() {
-    _navNodes[_safeNavIndex(index)].requestFocus();
+    if (_navNodes.isEmpty) return;
+    _navNodes[_safeNav(_index)].requestFocus();
   }
 
-  void _focusRightZone() {
-    if (!mounted) return;
-    setState(() {
-      if (index == 0) {
-        _homeFocusTicket++;
-      } else if (index == 5) {
-        _accountFocusTicket++;
-      } else {
-        _placeholderFocusTicket++;
-      }
+  void _openNavPage(int navIndex) {
+    final safe = _safeNav(navIndex);
+    setState(() => _index = safe);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _navNodes[safe].requestFocus();
     });
   }
 
-  void _moveFromNavToContent(int navIndex) {
-    final safe = _safeNavIndex(navIndex);
-    if (safe != index) {
-      setState(() => index = safe);
+  void _enterContent(int navIndex) {
+    final safe = _safeNav(navIndex);
+    if (safe != _index) {
+      setState(() => _index = safe);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusRightZone();
+        if (mounted) _bumpContentTicket();
       });
       return;
     }
-    _focusRightZone();
+    _bumpContentTicket();
   }
 
-  void _selectPage(int value, {bool moveToContent = false}) {
-    final safe = _safeNavIndex(value);
-    setState(() => index = safe);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (moveToContent) {
-        _focusRightZone();
+  void _bumpContentTicket() {
+    if (!mounted) return;
+    setState(() {
+      if (_index == 0) {
+        _homeTicket++;
+      } else if (_index == 5) {
+        _accountTicket++;
       } else {
-        _navNodes[safe].requestFocus();
+        _placeholderTicket++;
       }
     });
   }
 
   Widget _page() {
-    switch (index) {
+    switch (_index) {
       case 0:
         return TvHomeScreen(
+          focusTicket: _homeTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _homeFocusTicket,
         );
       case 1:
         return TvPlaceholderScreen(
           title: 'Histori',
           icon: Icons.history_rounded,
+          focusTicket: _placeholderTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _placeholderFocusTicket,
         );
       case 2:
         return TvPlaceholderScreen(
           title: 'Cari',
           icon: Icons.search_rounded,
+          focusTicket: _placeholderTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _placeholderFocusTicket,
         );
       case 3:
         return TvPlaceholderScreen(
           title: 'Favorit',
           icon: Icons.favorite_rounded,
+          focusTicket: _placeholderTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _placeholderFocusTicket,
         );
       case 4:
         return TvPlaceholderScreen(
           title: 'Unduhan',
           icon: Icons.download_rounded,
+          focusTicket: _placeholderTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _placeholderFocusTicket,
         );
       case 5:
         return TvAccountScreen(
-          memory: _accountMemory,
+          focusTicket: _accountTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _accountFocusTicket,
         );
       default:
         return TvHomeScreen(
+          focusTicket: _homeTicket,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _homeFocusTicket,
         );
     }
   }
@@ -177,8 +171,12 @@ class _TvAppState extends State<TvApp> {
       Navigator.of(context).maybePop();
       return;
     }
-    if (index != 0) {
-      _selectPage(0);
+    if (!_navHasFocus) {
+      _focusCurrentNav();
+      return;
+    }
+    if (_index != 0) {
+      _openNavPage(0);
       return;
     }
     if (await _confirmExit()) SystemNavigator.pop();
@@ -213,16 +211,16 @@ class _TvAppState extends State<TvApp> {
                 child: Row(
                   children: [
                     TvSideNav(
-                      index: index,
+                      index: _index,
                       focusNodes: _navNodes,
-                      onChanged: (v) => _selectPage(v, moveToContent: true),
-                      onOpenContent: _moveFromNavToContent,
+                      onChanged: _openNavPage,
+                      onOpenContent: _enterContent,
                     ),
                     Expanded(
                       child: RepaintBoundary(
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 150),
-                          child: KeyedSubtree(key: ValueKey(index), child: _page()),
+                          duration: const Duration(milliseconds: 120),
+                          child: KeyedSubtree(key: ValueKey(_index), child: _page()),
                         ),
                       ),
                     ),

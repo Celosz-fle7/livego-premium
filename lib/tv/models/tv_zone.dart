@@ -1,12 +1,11 @@
-enum TvFocusZone {
-  navbar,
+enum TvZone {
+  nav,
   banner,
   platform,
   category,
   grid,
-  account,
+  list,
   settings,
   placeholder,
-  overlay,
   player,
 }

@@ -3,19 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
-import '../focus/tv_focus_memory.dart';
-import '../focus/tv_focus_zone.dart';
-import '../focus/tv_scroll_engine.dart';
+import '../models/tv_zone.dart';
+import '../utils/tv_focus_utils.dart';
 
 class TvSettingsScreen extends StatefulWidget {
-  final TvFocusMemory? memory;
   final bool showBackButton;
   final VoidCallback? onMoveToNav;
   final int focusTicket;
 
   const TvSettingsScreen({
     super.key,
-    this.memory,
     this.showBackButton = true,
     this.onMoveToNav,
     this.focusTicket = 0,
@@ -29,30 +26,19 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   final ScrollController _scrollController = ScrollController();
   final List<FocusNode> _rowNodes = [];
   late final FocusNode _backNode;
-  late final TvFocusMemory _localMemory;
 
-  TvFocusMemory get _memory => widget.memory ?? _localMemory;
+  TvZone _zone = TvZone.settings;
+  int _lastRow = 0;
+  bool _entryPending = false;
 
   List<_SettingsSection> get _sections => [
         _SettingsSection(
           title: 'Tampilan & Navigasi',
           description: 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
           items: [
-            _SettingItem.radio(
-              kind: _SettingKind.layoutAuto,
-              title: 'Otomatis (Ikuti Hardware)',
-              active: LiveGoSettings.layoutMode == 'Auto',
-            ),
-            _SettingItem.radio(
-              kind: _SettingKind.layoutMobile,
-              title: 'Smartphone / Tablet (Android)',
-              active: LiveGoSettings.layoutMode == 'Mobile',
-            ),
-            _SettingItem.radio(
-              kind: _SettingKind.layoutTv,
-              title: 'Android TV (Leanback Style)',
-              active: LiveGoSettings.layoutMode == 'TV',
-            ),
+            _SettingItem.radio(kind: _SettingKind.layoutAuto, title: 'Otomatis (Ikuti Hardware)', active: LiveGoSettings.layoutMode == 'Auto'),
+            _SettingItem.radio(kind: _SettingKind.layoutMobile, title: 'Smartphone / Tablet (Android)', active: LiveGoSettings.layoutMode == 'Mobile'),
+            _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: LiveGoSettings.layoutMode == 'TV'),
           ],
         ),
         _SettingsSection(
@@ -97,7 +83,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             _SettingItem.tile(
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
-              title: 'Jumlah Grid Home',
+              title: 'Jumlah Grid Home TV',
               subtitle: 'Tekan OK atau kanan untuk mengatur jumlah poster TV. Batas TV sampai 10 grid.',
               value: '${LiveGoSettings.tvHomeGrid}',
               showGridBar: true,
@@ -110,16 +96,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             _SettingItem.tile(
               kind: _SettingKind.defaultPlatform,
               icon: Icons.layers_rounded,
-              title: 'Kelola Sumber Data',
-              subtitle: 'Pilih platform Home, kategori, dan cek status server.',
+              title: 'Sumber Default Home',
+              subtitle: 'Pilih platform awal yang digunakan aplikasi.',
               value: LiveGoSettings.defaultPlatform.toUpperCase(),
             ),
             _SettingItem.tile(
               kind: _SettingKind.downloadNotice,
               icon: Icons.info_rounded,
-              title: 'Kelola Notifikasi Unduhan',
-              subtitle: 'Belum aktif. Aktifkan lagi agar progress unduhan mudah dipantau.',
-              value: LiveGoSettings.downloadWifiOnly ? 'AKTIFKAN' : 'AKTIF',
+              title: 'Notifikasi Unduhan',
+              subtitle: 'Toggle preferensi unduhan melalui remote.',
+              value: LiveGoSettings.downloadWifiOnly ? 'Wi-Fi' : 'Bebas',
             ),
           ],
         ),
@@ -143,7 +129,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _localMemory = TvFocusMemory();
     _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusEntry();
@@ -153,9 +138,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   @override
   void didUpdateWidget(covariant TvSettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusTicket != widget.focusTicket) {
-      _focusEntry();
-    }
+    if (oldWidget.focusTicket != widget.focusTicket) _focusEntry();
   }
 
   @override
@@ -175,15 +158,12 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     while (_rowNodes.length > count) {
       _rowNodes.removeLast().dispose();
     }
-    if (_rowNodes.isNotEmpty) {
-      _memory.lastSettingsIndex = _safeIndex(_memory.lastSettingsIndex);
-    }
   }
 
-  int _safeIndex(int value) {
+  int _safe(int value) {
     if (_rowNodes.isEmpty) return 0;
-    final max = _rowNodes.length - 1;
     if (value < 0) return 0;
+    final max = _rowNodes.length - 1;
     if (value > max) return max;
     return value;
   }
@@ -202,46 +182,46 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   void _focusEntry() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncRowNodes(_itemCount);
-      if (_rowNodes.isEmpty) return;
-      _focusRow(_memory.lastSettingsIndex);
-    });
+    _entryPending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+  }
+
+  void _tryFocusEntry() {
+    if (!mounted || !_entryPending || _rowNodes.isEmpty) return;
+    _entryPending = false;
+    _focusRow(_lastRow);
   }
 
   void _focusBack() {
     if (!widget.showBackButton) return;
-    _memory.lastRightZone = TvFocusZone.settings;
-    _memory.lastRightFocus = _backNode;
-    focusAndReveal(_backNode, alignment: 0.05);
+    _zone = TvZone.nav;
+    tvFocus(_backNode, alignment: 0.05);
   }
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
-    final safe = _safeIndex(index);
-    _memory.rememberRight(_rowNodes[safe], TvFocusZone.settings, settingsIndex: safe);
-    focusAndReveal(_rowNodes[safe], alignment: 0.28);
+    _zone = TvZone.settings;
+    _lastRow = _safe(index);
+    tvFocus(_rowNodes[_lastRow], alignment: 0.28);
   }
 
-  void _moveToNav() {
-    widget.onMoveToNav?.call();
+  void _goBack() {
+    if (Navigator.of(context).canPop()) Navigator.of(context).maybePop();
   }
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-      _focusRow(_memory.lastSettingsIndex);
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+      _focusRow(_lastRow);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft && widget.onMoveToNav != null) {
-      _moveToNav();
+      widget.onMoveToNav?.call();
       return KeyEventResult.handled;
     }
     if (_isSelect(key) || _isBack(key)) {
-      Navigator.of(context).maybePop();
+      _goBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -252,50 +232,37 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (index == 0) {
-        if (widget.showBackButton) {
-          _focusBack();
-        } else {
-          _focusRow(0);
-        }
+      if (index == 0 && widget.showBackButton) {
+        _focusBack();
       } else {
-        _focusRow(index - 1);
+        _focusRow(index == 0 ? 0 : index - 1);
       }
       return KeyEventResult.handled;
     }
-
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (index < _rowNodes.length - 1) {
-        _focusRow(index + 1);
-      } else {
-        _focusRow(index);
-      }
+      _focusRow(index < _rowNodes.length - 1 ? index + 1 : index);
       return KeyEventResult.handled;
     }
-
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (widget.onMoveToNav != null) {
-        _moveToNav();
+        _lastRow = index;
+        widget.onMoveToNav?.call();
       } else if (widget.showBackButton) {
+        _lastRow = index;
         _focusBack();
       }
       return KeyEventResult.handled;
     }
-
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      _lastRow = index;
       _activate(item.kind);
       _focusRow(index);
       return KeyEventResult.handled;
     }
-
     if (_isBack(key)) {
-      if (widget.showBackButton) {
-        Navigator.of(context).maybePop();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
+      _goBack();
+      return KeyEventResult.handled;
     }
-
     return KeyEventResult.ignored;
   }
 
@@ -354,27 +321,28 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     _syncRowNodes(_itemCount);
+    if (_entryPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+    }
+
     final sectionWidgets = <Widget>[];
     var cursor = 0;
-
     for (final section in _sections) {
       final rows = <Widget>[];
       for (final item in section.items) {
         final rowIndex = cursor++;
-        rows.add(
-          _FocusedSettingRow(
-            node: _rowNodes[rowIndex],
-            item: item,
-            onKey: (node, event) => _rowKey(rowIndex, item, event),
-            onTap: () {
-              _activate(item.kind);
-              _focusRow(rowIndex);
-            },
-            isLast: item == section.items.last,
-          ),
-        );
+        rows.add(_FocusedSettingRow(
+          node: _rowNodes[rowIndex],
+          item: item,
+          onKey: (node, event) => _rowKey(rowIndex, item, event),
+          onTap: () {
+            _lastRow = rowIndex;
+            _activate(item.kind);
+            _focusRow(rowIndex);
+          },
+          isLast: item == section.items.last,
+        ));
       }
-
       sectionWidgets.addAll([
         _SectionTitle(section.title),
         const SizedBox(height: 10),
@@ -383,43 +351,60 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       ]);
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF050914),
-      body: DefaultTextStyle.merge(
-        style: const TextStyle(decoration: TextDecoration.none),
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
-          children: [
-            _Header(
-              showBackButton: widget.showBackButton,
-              backNode: _backNode,
-              onBackKey: _backKey,
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: const [
-                _HeaderPill('Display'),
-                SizedBox(width: 10),
-                _HeaderPill('Player'),
-                SizedBox(width: 10),
-                _HeaderPill('Source'),
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.goBack): _SettingsBackIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): _SettingsBackIntent(),
+        SingleActivator(LogicalKeyboardKey.browserBack): _SettingsBackIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _SettingsBackIntent: CallbackAction<_SettingsBackIntent>(onInvoke: (_) {
+            _goBack();
+            return null;
+          }),
+        },
+        child: Scaffold(
+          backgroundColor: const Color(0xFF050914),
+          body: DefaultTextStyle.merge(
+            style: const TextStyle(decoration: TextDecoration.none),
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
+              children: [
+                _Header(
+                  showBackButton: widget.showBackButton,
+                  backNode: _backNode,
+                  onBackKey: _backKey,
+                  onBackTap: _goBack,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: const [
+                    _HeaderPill('Display'),
+                    SizedBox(width: 10),
+                    _HeaderPill('Player'),
+                    SizedBox(width: 10),
+                    _HeaderPill('Source'),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ...sectionWidgets,
+                Text(
+                  _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali' : '',
+                  style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
-            ...sectionWidgets,
-            Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 10),
-              child: Text(
-                'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
-                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _SettingsBackIntent extends Intent {
+  const _SettingsBackIntent();
 }
 
 class _SettingsSection {
@@ -511,8 +496,9 @@ class _Header extends StatelessWidget {
   final bool showBackButton;
   final FocusNode backNode;
   final FocusOnKeyEventCallback onBackKey;
+  final VoidCallback onBackTap;
 
-  const _Header({required this.showBackButton, required this.backNode, required this.onBackKey});
+  const _Header({required this.showBackButton, required this.backNode, required this.onBackKey, required this.onBackTap});
 
   @override
   Widget build(BuildContext context) {
@@ -527,7 +513,7 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           if (showBackButton) ...[
-            _BackButton(node: backNode, onKey: onBackKey),
+            _BackButton(node: backNode, onKey: onBackKey, onTap: onBackTap),
             const SizedBox(width: 18),
           ],
           Container(
@@ -558,42 +544,42 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _BackButton extends StatefulWidget {
+class _BackButton extends StatelessWidget {
   final FocusNode node;
   final FocusOnKeyEventCallback onKey;
+  final VoidCallback onTap;
 
-  const _BackButton({required this.node, required this.onKey});
-
-  @override
-  State<_BackButton> createState() => _BackButtonState();
-}
-
-class _BackButtonState extends State<_BackButton> {
-  bool _focused = false;
+  const _BackButton({required this.node, required this.onKey, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.node,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => _focused = v),
-      child: InkWell(
-        onTap: () => Navigator.of(context).maybePop(),
-        borderRadius: BorderRadius.circular(16),
-        focusColor: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: _focused ? const Color(0xFF12314A) : const Color(0xFF0A1422),
+    return ListenableBuilder(
+      listenable: node,
+      builder: (context, _) {
+        final focused = node.hasFocus;
+        return Focus(
+          focusNode: node,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _focused ? AppTheme.cyan : Colors.white10, width: _focused ? 2 : 1),
+            focusColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 130),
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: focused ? const Color(0xFF12314A) : const Color(0xFF0A1422),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
+              ),
+              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            ),
           ),
-          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -612,6 +598,19 @@ class _HeaderPill extends StatelessWidget {
         border: Border.all(color: Colors.white10),
       ),
       child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String text;
+  const _SectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
     );
   }
 }
@@ -648,7 +647,7 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-class _FocusedSettingRow extends StatefulWidget {
+class _FocusedSettingRow extends StatelessWidget {
   final FocusNode node;
   final _SettingItem item;
   final FocusOnKeyEventCallback onKey;
@@ -664,45 +663,42 @@ class _FocusedSettingRow extends StatefulWidget {
   });
 
   @override
-  State<_FocusedSettingRow> createState() => _FocusedSettingRowState();
-}
-
-class _FocusedSettingRowState extends State<_FocusedSettingRow> {
-  bool _focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    final item = widget.item;
-    final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
-    final isRadio = item.style == _SettingItemStyle.radio;
-
-    return Focus(
-      focusNode: widget.node,
-      skipTraversal: true,
-      onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => _focused = v),
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(20),
-        focusColor: Colors.transparent,
-        child: Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              margin: const EdgeInsets.symmetric(vertical: 5),
-              padding: EdgeInsets.symmetric(horizontal: isRadio ? 14 : 16, vertical: isRadio ? 15 : 12),
-              decoration: BoxDecoration(
-                color: _focused ? const Color(0xFF102F45) : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _focused ? accent : Colors.transparent, width: 2),
-                boxShadow: _focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
-              ),
-              child: isRadio ? _RadioContent(item: item, focused: _focused) : _TileContent(item: item, focused: _focused, accent: accent),
+    return ListenableBuilder(
+      listenable: node,
+      builder: (context, _) {
+        final focused = node.hasFocus;
+        final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
+        final isRadio = item.style == _SettingItemStyle.radio;
+        return Focus(
+          focusNode: node,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            focusColor: Colors.transparent,
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  padding: EdgeInsets.symmetric(horizontal: isRadio ? 14 : 16, vertical: isRadio ? 15 : 12),
+                  decoration: BoxDecoration(
+                    color: focused ? const Color(0xFF102F45) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
+                    boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
+                  ),
+                  child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
+                ),
+                if (!isLast) const Divider(color: Color(0xFF24344A), height: 1),
+              ],
             ),
-            if (!widget.isLast) const Divider(color: Color(0xFF24344A), height: 1),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -717,20 +713,12 @@ class _RadioContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-          color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft,
-          size: 28,
-        ),
+        Icon(item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft, size: 28),
         const SizedBox(width: 18),
         Expanded(
-          child: Text(
-            item.title,
-            style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17, decoration: TextDecoration.none),
-          ),
+          child: Text(item.title, style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17, decoration: TextDecoration.none)),
         ),
-        if (item.active)
-          const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
       ],
     );
   }
@@ -762,17 +750,9 @@ class _TileContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.title,
-                style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-              ),
+              Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               const SizedBox(height: 5),
-              Text(
-                item.subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
-              ),
+              Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               if (item.showGridBar) ...[
                 const SizedBox(height: 12),
                 _GridPreview(value: LiveGoSettings.tvHomeGrid),
@@ -784,10 +764,7 @@ class _TileContent extends StatelessWidget {
         if (item.switchValue != null)
           _SwitchPill(value: item.switchValue!, focused: focused)
         else
-          Text(
-            item.value,
-            style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14, decoration: TextDecoration.none),
-          ),
+          Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14, decoration: TextDecoration.none)),
         const SizedBox(width: 12),
         Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 30),
       ],
@@ -814,58 +791,31 @@ class _SwitchPill extends StatelessWidget {
         border: Border.all(color: focused ? Colors.white70 : Colors.transparent),
       ),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-      ),
+      child: Container(width: 28, height: 28, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
     );
   }
 }
 
 class _GridPreview extends StatelessWidget {
   final int value;
-
   const _GridPreview({required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final normalized = ((value - 4) / 6).clamp(0.0, 1.0);
     return Row(
-      children: [
-        const Text('Grid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
-        const SizedBox(width: 14),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: normalized,
-              minHeight: 5,
-              backgroundColor: const Color(0xFF24344A),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.cyan),
+      children: List.generate(10, (i) {
+        final active = i < value;
+        return Expanded(
+          child: Container(
+            height: 7,
+            margin: EdgeInsets.only(right: i == 9 ? 0 : 5),
+            decoration: BoxDecoration(
+              color: active ? AppTheme.cyan : const Color(0xFF26364B),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none)),
-      ],
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String text;
-
-  const _SectionTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 2),
-      child: Text(
-        text.toUpperCase(),
-        style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2, decoration: TextDecoration.none),
-      ),
+        );
+      }),
     );
   }
 }
