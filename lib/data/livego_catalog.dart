@@ -306,6 +306,28 @@ class LiveGoCatalog {
     }
   }
 
+  static Future<StreamInfo> directStreamInfo(ContentItem item, {String? chapterId}) async {
+    try {
+      return await AnichinApiClient.directVideoInfo(item, chapterId: chapterId ?? item.chapterId);
+    } catch (e) {
+      print('LIVEGO DIRECT STREAM ERROR: $e');
+      return StreamInfo.empty;
+    }
+  }
+
+  static Future<AnichinEpisodeBundle> episodeBundle(ContentItem item, {required int episode}) async {
+    try {
+      final bundle = await AnichinApiClient.episodeBundle(item, ep: episode);
+      if (bundle.episodes.length > 1) {
+        await LiveGoContentCache.writeEpisodes(item, bundle.episodes);
+      }
+      return bundle;
+    } catch (e) {
+      print('LIVEGO EPISODE BUNDLE ERROR: $e');
+      return AnichinEpisodeBundle.empty;
+    }
+  }
+
   static Future<String> videoUrl(ContentItem item) async {
     final info = await streamInfo(item, chapterId: item.chapterId);
     return info.url;
