@@ -454,7 +454,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
         return ListView(
           controller: _pageScroll,
-          padding: const EdgeInsets.fromLTRB(16, 22, 30, 38),
+          padding: const EdgeInsets.fromLTRB(14, 14, 24, 34),
           children: [
             _FocusableBanner(
               item: hero,
@@ -463,9 +463,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               onTap: hero == null ? null : () => _open(hero),
               onKey: (node, event) => _bannerKey(hero, event),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             _HeaderBox(
-              height: 74,
+              height: 56,
               child: _ChipRow(
                 labels: platforms,
                 selected: source,
@@ -475,9 +475,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 onKey: _platformKey,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _HeaderBox(
-              height: 64,
+              height: 50,
               child: _ChipRow(
                 labels: categories,
                 selected: category,
@@ -487,9 +487,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 onKey: _categoryKey,
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 14),
             if (loading)
-              const _TvSkeleton(height: 260)
+              const _TvSkeleton(height: 220)
             else
               _ContentGrid(
                 title: 'Popular',
@@ -544,13 +544,13 @@ class _FocusableBannerState extends State<_FocusableBanner> {
         focusColor: Colors.transparent,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          height: 238,
+          height: 198,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
             boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.32), blurRadius: 24)] : null,
           ),
-          child: widget.item != null ? HeroBanner(item: widget.item!, tv: true) : const _TvSkeleton(height: 238),
+          child: widget.item != null ? HeroBanner(item: widget.item!, tv: true) : const _TvSkeleton(height: 198),
         ),
       ),
     );
@@ -567,10 +567,10 @@ class _HeaderBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: const Color(0xFF0B1523).withOpacity(0.92),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFF1D3147)),
       ),
       child: Align(
@@ -602,24 +602,37 @@ class _ChipRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(labels.length, (i) {
-          return Padding(
-            padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 10),
+    if (labels.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fitToWidth = labels.length <= 6 && constraints.maxWidth >= 520;
+        final children = List.generate(labels.length, (i) {
+          final child = Padding(
+            padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 8),
             child: _TvChip(
               text: labels[i],
               active: i == selected,
               focusNode: nodes[i],
               autofocus: autofocusFirst && i == 0,
+              fillWidth: fitToWidth,
               onTap: () => onTap(i),
               onFocus: () => onFocus(i),
               onKey: (node, event) => onKey(i, event),
             ),
           );
-        }),
-      ),
+          return fitToWidth ? Expanded(child: child) : child;
+        });
+
+        if (fitToWidth) {
+          return Row(children: children);
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: children),
+        );
+      },
     );
   }
 }
@@ -629,11 +642,21 @@ class _TvChip extends StatefulWidget {
   final bool active;
   final FocusNode focusNode;
   final bool autofocus;
+  final bool fillWidth;
   final VoidCallback onTap;
   final VoidCallback onFocus;
   final FocusOnKeyEventCallback onKey;
 
-  const _TvChip({required this.text, required this.active, required this.focusNode, required this.onTap, required this.onFocus, required this.onKey, this.autofocus = false});
+  const _TvChip({
+    required this.text,
+    required this.active,
+    required this.focusNode,
+    required this.onTap,
+    required this.onFocus,
+    required this.onKey,
+    this.autofocus = false,
+    this.fillWidth = false,
+  });
 
   @override
   State<_TvChip> createState() => _TvChipState();
@@ -660,15 +683,25 @@ class _TvChipState extends State<_TvChip> {
         focusColor: Colors.transparent,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          width: widget.fillWidth ? double.infinity : null,
+          height: 36,
+          alignment: Alignment.center,
+          constraints: widget.fillWidth ? const BoxConstraints() : const BoxConstraints(minWidth: 116),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             gradient: widget.active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
             color: widget.active ? null : AppTheme.surface.withOpacity(0.82),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.3 : 1),
-            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 20)] : null,
+            border: Border.all(color: focused ? AppTheme.cyan : (widget.active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.2 : 1),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.35), blurRadius: 18)] : null,
           ),
-          child: Text(widget.text, style: TextStyle(color: selected ? Colors.white : AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          child: Text(
+            widget.text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: selected ? Colors.white : AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+          ),
         ),
       ),
     );
@@ -689,30 +722,39 @@ class _ContentGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox.shrink();
     return RepaintBoundary(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.5, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none)),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _TvHomeScreenState._gridColumns,
-              crossAxisSpacing: 14,
-              mainAxisSpacing: 18,
-              childAspectRatio: 0.57,
-            ),
-            itemBuilder: (_, i) => _TvPosterTile(
-              item: items[i],
-              focusNode: nodes[i],
-              onFocus: () => onFocus(i),
-              onKey: (node, event) => onKey(i, event),
-              onTap: () => onTap(items[i]),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const columns = _TvHomeScreenState._gridColumns;
+          const spacing = 10.0;
+          final itemWidth = (constraints.maxWidth - (spacing * (columns - 1))) / columns;
+          final itemExtent = (itemWidth * 1.55 + 24).clamp(196.0, 258.0).toDouble();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title.toUpperCase(), style: const TextStyle(color: Colors.white70, letterSpacing: 1.4, fontWeight: FontWeight.w900, fontSize: 16, decoration: TextDecoration.none)),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: 14,
+                  mainAxisExtent: itemExtent,
+                ),
+                itemBuilder: (_, i) => _TvPosterTile(
+                  item: items[i],
+                  focusNode: nodes[i],
+                  onFocus: () => onFocus(i),
+                  onKey: (node, event) => onKey(i, event),
+                  onTap: () => onTap(items[i]),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -745,11 +787,11 @@ class _TvPosterTileState extends State<_TvPosterTile> {
         if (v) widget.onFocus();
       },
       child: AnimatedScale(
-        scale: focused ? 1.045 : 1.0,
+        scale: focused ? 1.032 : 1.0,
         duration: const Duration(milliseconds: 140),
         child: InkWell(
           onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           focusColor: Colors.transparent,
           child: Column(
             children: [
@@ -757,12 +799,12 @@ class _TvPosterTileState extends State<_TvPosterTile> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 140),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(17),
                     border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 3 : 0),
                     boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.38), blurRadius: 24)] : null,
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(15),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -770,16 +812,16 @@ class _TvPosterTileState extends State<_TvPosterTile> {
                             ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
                             : LiveGoCachedImage(url: widget.item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
                         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]))),
-                        Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
-                        if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
-                        Positioned(right: 8, bottom: 12, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
+                        Positioned(top: 7, left: 7, child: _Badge(text: '${widget.item.episodes} Ep')),
+                        if (widget.item.updated) const Positioned(top: 7, right: 7, child: _Badge(text: 'UPDATE')),
+                        Positioned(right: 7, bottom: 9, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
                       ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(widget.item.title, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none)),
+              const SizedBox(height: 6),
+              Text(widget.item.title, maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.08, decoration: TextDecoration.none)),
             ],
           ),
         ),
@@ -794,9 +836,9 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(color: const Color(0xFF0F172A).withOpacity(0.82), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }
 }

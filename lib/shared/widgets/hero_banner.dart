@@ -12,15 +12,15 @@ class HeroBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: tv ? 218 : 335,
-      padding: const EdgeInsets.all(10),
+      height: tv ? 188 : 335,
+      padding: EdgeInsets.all(tv ? 8 : 10),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(tv ? 28 : 34),
+        borderRadius: BorderRadius.circular(tv ? 24 : 34),
         border: Border.all(color: const Color(0xFF26415D)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(tv ? 22 : 26),
+        borderRadius: BorderRadius.circular(tv ? 20 : 26),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -35,50 +35,50 @@ class HeroBanner extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: tv ? 32 : 28,
-              bottom: tv ? 30 : 32,
-              right: tv ? 230 : 128,
+              left: tv ? 28 : 28,
+              bottom: tv ? 22 : 32,
+              right: tv ? 202 : 128,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _SourcePill(text: item.source),
-                  const SizedBox(height: 13),
+                  SizedBox(height: tv ? 9 : 13),
                   Text(
                     item.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 29 : 28,
+                      fontSize: tv ? 25 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: tv ? 6 : 10),
                   Text(
                     item.description,
-                    maxLines: tv ? 2 : 3,
+                    maxLines: tv ? 1 : 3,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 13.5 : 13),
+                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 12.5 : 13),
                   ),
                 ],
               ),
             ),
             Positioned(
-              right: tv ? 36 : 24,
-              bottom: tv ? 26 : 40,
+              right: tv ? 30 : 24,
+              bottom: tv ? 22 : 40,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child: LiveGoCachedImage(
                   url: item.posterUrl,
-                  width: tv ? 104 : 92,
-                  height: tv ? 146 : 132,
+                  width: tv ? 88 : 92,
+                  height: tv ? 124 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,
                 ),
               ),
             ),
-            const Positioned(left: 24, top: 20, child: _AccentLine()),
+            Positioned(left: tv ? 22 : 24, top: tv ? 18 : 20, child: _AccentLine(tv: tv)),
           ],
         ),
       ),
@@ -105,13 +105,14 @@ class _SourcePill extends StatelessWidget {
 }
 
 class _AccentLine extends StatelessWidget {
-  const _AccentLine();
+  final bool tv;
+  const _AccentLine({this.tv = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 76,
-      height: 6,
+      width: tv ? 70 : 76,
+      height: tv ? 5 : 6,
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
         borderRadius: BorderRadius.circular(99),
