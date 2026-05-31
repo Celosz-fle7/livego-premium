@@ -131,15 +131,22 @@ class _TvSideNavState extends State<TvSideNav> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        width: _expanded ? 168 : 68,
+        width: _expanded ? 176 : 72,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(6, 12, 6, 12),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
+          margin: const EdgeInsets.fromLTRB(7, 12, 7, 12),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF050D18).withOpacity(0.97),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.24) : const Color(0xFF152338)),
-            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 16)],
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xF2070C16), Color(0xF2040810)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.34) : const Color(0xFF12233A)),
+            boxShadow: [
+              const BoxShadow(color: Colors.black87, blurRadius: 18),
+              if (_expanded) BoxShadow(color: AppTheme.cyan.withOpacity(0.13), blurRadius: 28, spreadRadius: 1),
+            ],
           ),
           child: Column(
             children: [
@@ -202,8 +209,8 @@ class _NavButton extends StatelessWidget {
       builder: (context, _) {
         final focused = focusNode.hasFocus;
         final selected = focused || active;
-        final height = logo ? 50.0 : 46.0;
-        final collapsedWidth = logo ? 48.0 : 44.0;
+        final height = logo ? 51.0 : 47.0;
+        final collapsedWidth = logo ? 50.0 : 46.0;
         return Tooltip(
           message: label,
           child: Focus(
@@ -222,15 +229,32 @@ class _NavButton extends StatelessWidget {
                 width: expanded ? 142 : collapsedWidth,
                 padding: const EdgeInsets.symmetric(horizontal: 9),
                 decoration: BoxDecoration(
-                  color: selected ? AppTheme.cyan.withOpacity(focused ? 0.17 : 0.08) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 1.8 : 0),
-                  boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 14)] : null,
+                  gradient: selected
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: focused
+                              ? [AppTheme.cyan.withOpacity(0.24), AppTheme.purple.withOpacity(0.18)]
+                              : [const Color(0xFF0C1B2A), const Color(0xFF07101D)],
+                        )
+                      : null,
+                  color: selected ? null : Colors.transparent,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: focused ? AppTheme.cyan.withOpacity(0.98) : (active ? AppTheme.cyan.withOpacity(0.22) : Colors.transparent),
+                    width: focused ? 1.9 : 1,
+                  ),
+                  boxShadow: focused
+                      ? [
+                          BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 18, spreadRadius: 1),
+                          BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 28),
+                        ]
+                      : null,
                 ),
                 child: Row(
                   mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: selected ? AppTheme.cyan : Colors.white70, size: logo ? 24 : 22),
+                    Icon(icon, color: selected ? const Color(0xFFE8FBFF) : Colors.white70, size: logo ? 24 : 22),
                     if (expanded) ...[
                       const SizedBox(width: 9),
                       Expanded(

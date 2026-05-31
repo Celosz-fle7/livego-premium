@@ -30,11 +30,14 @@ class TvFocusedBorder extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(
-              color: focused ? color : Colors.transparent,
+              color: focused ? color.withOpacity(0.95) : Colors.transparent,
               width: focused ? width : 0,
             ),
             boxShadow: focused
-                ? [BoxShadow(color: color.withOpacity(0.25), blurRadius: 18)]
+                ? [
+                    BoxShadow(color: color.withOpacity(0.26), blurRadius: 22, spreadRadius: 1),
+                    BoxShadow(color: const Color(0xFF8B4DFF).withOpacity(0.10), blurRadius: 34, spreadRadius: 2),
+                  ]
                 : null,
           ),
           child: child,

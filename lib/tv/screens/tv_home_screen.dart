@@ -588,7 +588,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             },
             child: ListView(
               controller: _pageScroll,
-              padding: const EdgeInsets.fromLTRB(14, 14, 26, 34),
+              padding: const EdgeInsets.fromLTRB(16, 16, 28, 34),
               children: [
             _FocusableBanner(
               item: hero,
@@ -599,7 +599,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             ),
             const SizedBox(height: 10),
             _HeaderBox(
-              height: 58,
+              label: 'Platform',
+              height: 66,
               child: _ChipRow(
                 labels: platforms,
                 selected: source,
@@ -614,7 +615,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             ),
             const SizedBox(height: 8),
             _HeaderBox(
-              height: 52,
+              label: 'Kategori',
+              height: 60,
               child: _ChipRow(
                 labels: categories,
                 selected: category,
@@ -694,17 +696,38 @@ class _FocusableBanner extends StatelessWidget {
           child: InkWell(
             canRequestFocus: false,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(30),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              height: 204,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              height: 216,
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : Colors.transparent, width: focused ? 2.2 : 0),
-                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF07101C), Color(0xFF03070F)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: focused ? AppTheme.cyan.withOpacity(0.96) : const Color(0xFF17283D),
+                  width: focused ? 2.1 : 1.1,
+                ),
+                boxShadow: [
+                  const BoxShadow(color: Colors.black87, blurRadius: 20),
+                  if (focused) BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 28, spreadRadius: 1),
+                  if (focused) BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 38, spreadRadius: 2),
+                ],
               ),
-              child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 204),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: focused ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.04)),
+                ),
+                child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 204),
+              ),
             ),
           ),
         );
@@ -714,23 +737,49 @@ class _FocusableBanner extends StatelessWidget {
 }
 
 class _HeaderBox extends StatelessWidget {
+  final String label;
   final double height;
   final Widget child;
 
-  const _HeaderBox({required this.height, required this.child});
+  const _HeaderBox({required this.label, required this.height, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+      padding: const EdgeInsets.fromLTRB(13, 6, 13, 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF08111E).withOpacity(0.92),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF17283D)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF20A1321), Color(0xEE050A13)],
+        ),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: const Color(0xFF193451), width: 1.1),
+        boxShadow: [
+          const BoxShadow(color: Colors.black54, blurRadius: 14),
+          BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 20, spreadRadius: 1),
+        ],
       ),
-      alignment: Alignment.centerLeft,
-      child: child,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 5),
+            child: Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: AppTheme.cyan.withOpacity(0.62),
+                fontSize: 9.2,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2.2,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+          Expanded(child: Align(alignment: Alignment.centerLeft, child: child)),
+        ],
+      ),
     );
   }
 }
@@ -815,13 +864,25 @@ class _TvChip extends StatelessWidget {
             focusColor: Colors.transparent,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 130),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
               decoration: BoxDecoration(
-                gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
-                color: active ? null : const Color(0xFF101B2B).withOpacity(0.88),
+                gradient: active
+                    ? const LinearGradient(colors: [Color(0xFF20D7F8), Color(0xFF794CFF)])
+                    : (focused
+                        ? LinearGradient(colors: [AppTheme.cyan.withOpacity(0.18), AppTheme.purple.withOpacity(0.10)])
+                        : null),
+                color: active || focused ? null : const Color(0xFF0C1726).withOpacity(0.92),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: focused ? AppTheme.cyan : (active ? Colors.transparent : const Color(0xFF26364B)), width: focused ? 2.0 : 1),
-                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 16)] : null,
+                border: Border.all(
+                  color: focused ? const Color(0xFF7DEBFF) : (active ? Colors.white.withOpacity(0.18) : const Color(0xFF223755)),
+                  width: focused ? 2.0 : 1.0,
+                ),
+                boxShadow: focused
+                    ? [
+                        BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 20, spreadRadius: 1),
+                        BoxShadow(color: AppTheme.purple.withOpacity(0.13), blurRadius: 28),
+                      ]
+                    : null,
               ),
               child: Text(
                 text,
@@ -876,7 +937,7 @@ class _ContentGrid extends StatelessWidget {
         children: [
           Text(
             title.toUpperCase(),
-            style: const TextStyle(color: Colors.white70, letterSpacing: 1.3, fontWeight: FontWeight.w900, fontSize: 15.5, decoration: TextDecoration.none),
+            style: TextStyle(color: AppTheme.cyan.withOpacity(0.58), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.8, decoration: TextDecoration.none),
           ),
           const SizedBox(height: 8),
           GridView.builder(
@@ -933,7 +994,7 @@ class _TvPosterTile extends StatelessWidget {
             if (v) onFocus();
           },
           child: AnimatedScale(
-            scale: focused ? 1.035 : 1.0,
+            scale: focused ? 1.045 : 1.0,
             duration: const Duration(milliseconds: 140),
             child: InkWell(
               canRequestFocus: false,
@@ -946,9 +1007,17 @@ class _TvPosterTile extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 140),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(17),
-                        border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : Colors.transparent, width: focused ? 2.2 : 0),
-                        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.25), blurRadius: 18)] : null,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: focused ? const Color(0xFF7DEBFF) : const Color(0xFF15263B),
+                          width: focused ? 2.2 : 0.8,
+                        ),
+                        boxShadow: focused
+                            ? [
+                                BoxShadow(color: AppTheme.cyan.withOpacity(0.28), blurRadius: 22, spreadRadius: 1),
+                                BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 30),
+                              ]
+                            : [const BoxShadow(color: Colors.black54, blurRadius: 8)],
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
@@ -997,7 +1066,12 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(color: const Color(0xFF0F172A).withOpacity(0.82), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF07101D).withOpacity(0.86),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 6)],
+      ),
       child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 8.4, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }

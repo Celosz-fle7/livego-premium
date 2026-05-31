@@ -15,9 +15,22 @@ class HeroBanner extends StatelessWidget {
       height: tv ? double.infinity : 335,
       padding: EdgeInsets.all(tv ? 6 : 10),
       decoration: BoxDecoration(
-        color: tv ? const Color(0xFF08111E).withOpacity(0.88) : AppTheme.surface.withOpacity(0.75),
+        gradient: tv
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0A1321), Color(0xFF050A13)],
+              )
+            : null,
+        color: tv ? null : AppTheme.surface.withOpacity(0.75),
         borderRadius: BorderRadius.circular(tv ? 22 : 34),
-        border: Border.all(color: tv ? const Color(0xFF1A2D44) : const Color(0xFF26415D)),
+        border: Border.all(color: tv ? const Color(0xFF1D3550) : const Color(0xFF26415D)),
+        boxShadow: tv
+            ? [
+                BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 22, spreadRadius: 1),
+                const BoxShadow(color: Colors.black87, blurRadius: 18),
+              ]
+            : null,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(tv ? 18 : 26),
@@ -25,12 +38,22 @@ class HeroBanner extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             LiveGoCachedImage(url: item.backdropUrl, fit: BoxFit.cover, role: LiveGoImageRole.banner, tv: tv),
+            if (tv)
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment(0.64, -0.22),
+                    radius: 0.72,
+                    colors: [Color(0x2239D9FF), Color(0x00000000)],
+                  ),
+                ),
+              ),
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xEE040914), Color(0x7A081323), Color(0xD8040914)],
+                  colors: [Color(0xF2040810), Color(0x8A0A1321), Color(0xDA030711)],
                 ),
               ),
             ),
@@ -61,7 +84,7 @@ class HeroBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 21 : 28,
+                      fontSize: tv ? 22 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -78,15 +101,23 @@ class HeroBanner extends StatelessWidget {
             Positioned(
               right: tv ? 22 : 24,
               bottom: tv ? 18 : 40,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: LiveGoCachedImage(
+              child: Container(
+                padding: EdgeInsets.all(tv ? 2.5 : 0),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(19),
+                  border: tv ? Border.all(color: AppTheme.cyan.withOpacity(0.18)) : null,
+                  boxShadow: tv ? [BoxShadow(color: AppTheme.purple.withOpacity(0.18), blurRadius: 18)] : null,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: LiveGoCachedImage(
                   url: item.posterUrl,
                   width: tv ? 74 : 92,
                   height: tv ? 104 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,
+                  ),
                 ),
               ),
             ),
