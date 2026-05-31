@@ -61,7 +61,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   @override
   void didUpdateWidget(covariant TvHomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusTicket != widget.focusTicket) {
+    if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
       _focusEntry();
     }
   }
@@ -126,6 +126,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         key == LogicalKeyboardKey.space;
   }
 
+  void _handleBack() {
+    _moveToNav(_zone);
+  }
+
   void _focus(FocusNode node, {double alignment = 0.22}) {
     tvFocus(node, alignment: alignment);
   }
@@ -186,7 +190,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _open(ContentItem item) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item)));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusByZone(_zone));
+    });
   }
 
   void _selectPlatform(int index) {
@@ -453,10 +460,23 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
         }
 
-        return ListView(
-          controller: _pageScroll,
-          padding: const EdgeInsets.fromLTRB(16, 22, 30, 38),
-          children: [
+        return Shortcuts(
+          shortcuts: const <ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.goBack): _HomeBackIntent(),
+            SingleActivator(LogicalKeyboardKey.escape): _HomeBackIntent(),
+            SingleActivator(LogicalKeyboardKey.browserBack): _HomeBackIntent(),
+          },
+          child: Actions(
+            actions: <Type, Action<Intent>>{
+              _HomeBackIntent: CallbackAction<_HomeBackIntent>(onInvoke: (_) {
+                _handleBack();
+                return null;
+              }),
+            },
+            child: ListView(
+              controller: _pageScroll,
+              padding: const EdgeInsets.fromLTRB(16, 22, 30, 38),
+              children: [
             _FocusableBanner(
               item: hero,
               focusNode: _bannerNode,
@@ -509,11 +529,17 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 onKey: _gridKey,
                 onTap: _open,
               ),
-          ],
+              ],
+            ),
+          ),
         );
       },
     );
   }
+}
+
+class _HomeBackIntent extends Intent {
+  const _HomeBackIntent();
 }
 
 class _TvHomeState {

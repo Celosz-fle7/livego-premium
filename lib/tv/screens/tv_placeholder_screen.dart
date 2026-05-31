@@ -28,7 +28,7 @@ class _TvPlaceholderScreenState extends State<TvPlaceholderScreen> {
   @override
   void didUpdateWidget(covariant TvPlaceholderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusTicket != widget.focusTicket) {
+    if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
       tvFocus(_node, alignment: 0.5);
     }
   }
@@ -49,21 +49,44 @@ class _TvPlaceholderScreenState extends State<TvPlaceholderScreen> {
     if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack) {
+      widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Focus(
-        focusNode: _node,
-        skipTraversal: true,
-        autofocus: false,
-        onKeyEvent: _key,
-        child: _FocusedPlaceholderCard(title: widget.title, icon: widget.icon, node: _node),
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.goBack): _PlaceholderBackIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): _PlaceholderBackIntent(),
+        SingleActivator(LogicalKeyboardKey.browserBack): _PlaceholderBackIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _PlaceholderBackIntent: CallbackAction<_PlaceholderBackIntent>(onInvoke: (_) {
+            widget.onMoveToNav?.call();
+            return null;
+          }),
+        },
+        child: Center(
+          child: Focus(
+            focusNode: _node,
+            skipTraversal: true,
+            autofocus: false,
+            onKeyEvent: _key,
+            child: _FocusedPlaceholderCard(title: widget.title, icon: widget.icon, node: _node),
+          ),
+        ),
       ),
     );
   }
+}
+
+class _PlaceholderBackIntent extends Intent {
+  const _PlaceholderBackIntent();
 }
 
 class _FocusedPlaceholderCard extends StatelessWidget {

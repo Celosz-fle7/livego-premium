@@ -138,7 +138,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   @override
   void didUpdateWidget(covariant TvSettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusTicket != widget.focusTicket) _focusEntry();
+    if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) _focusEntry();
   }
 
   @override
@@ -209,6 +209,19 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (Navigator.of(context).canPop()) Navigator.of(context).maybePop();
   }
 
+  void _handleBack() {
+    if (_zone == TvZone.settings && widget.showBackButton) {
+      _focusBack();
+      return;
+    }
+    if (_zone == TvZone.settings && widget.onMoveToNav != null) {
+      _zone = TvZone.nav;
+      widget.onMoveToNav?.call();
+      return;
+    }
+    _goBack();
+  }
+
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
@@ -260,7 +273,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _goBack();
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -360,7 +373,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       child: Actions(
         actions: <Type, Action<Intent>>{
           _SettingsBackIntent: CallbackAction<_SettingsBackIntent>(onInvoke: (_) {
-            _goBack();
+            _handleBack();
             return null;
           }),
         },
@@ -391,7 +404,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                 const SizedBox(height: 20),
                 ...sectionWidgets,
                 Text(
-                  _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali' : '',
+                  _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ←/Back kembali' : '',
                   style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                 ),
               ],

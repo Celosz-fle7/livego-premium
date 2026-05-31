@@ -41,7 +41,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               title: 'Pengaturan',
               subtitle: 'Atur tampilan, player, subtitle, dan source aktif.',
               onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen()));
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen())).then((_) {
+                  if (!mounted) return;
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
+                });
               },
             ),
           ],
@@ -67,7 +70,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   void didUpdateWidget(covariant TvAccountScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusTicket != widget.focusTicket) {
+    if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
       _focusEntry();
     }
   }
@@ -103,6 +106,17 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space;
+  }
+
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
+  }
+
+  void _handleBack() {
+    _zone = TvZone.nav;
+    widget.onMoveToNav?.call();
   }
 
   void _focusEntry() {
@@ -146,6 +160,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       item.onTap();
       return KeyEventResult.handled;
     }
+    if (_isBack(key)) {
+      _lastRow = index;
+      _handleBack();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
   }
 
@@ -182,20 +201,39 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       ]);
     }
 
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(18, 24, 30, 30),
-      children: [
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.goBack): _AccountBackIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): _AccountBackIntent(),
+        SingleActivator(LogicalKeyboardKey.browserBack): _AccountBackIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _AccountBackIntent: CallbackAction<_AccountBackIntent>(onInvoke: (_) {
+            _handleBack();
+            return null;
+          }),
+        },
+        child: ListView(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(18, 24, 30, 30),
+          children: [
         const _ProfileHeader(),
         const SizedBox(height: 18),
         ...sectionWidgets,
-        Text(
-          _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← kembali ke navbar' : '',
-          style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+            Text(
+              _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ←/Back kembali ke navbar' : '',
+              style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+}
+
+class _AccountBackIntent extends Intent {
+  const _AccountBackIntent();
 }
 
 class _AccountSection {
