@@ -733,8 +733,7 @@ class _FocusableBanner extends StatelessWidget {
                 child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 182),
               ),
             ),
-          ),
-        );
+          );
       },
     );
   }
@@ -914,8 +913,7 @@ class _TvChip extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        );
+          );
       },
     );
   }
@@ -1070,8 +1068,7 @@ class _TvPosterTile extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        );
+          );
       },
     );
   }
