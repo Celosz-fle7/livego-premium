@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
@@ -26,7 +27,7 @@ class TvHomeScreen extends StatefulWidget {
 }
 
 class _TvHomeScreenState extends State<TvHomeScreen> {
-  static const int _gridColumns = 7;
+  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(4, 10);
 
   int source = 0;
   int category = 0;
@@ -547,6 +548,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return KeyEventResult.ignored;
   }
 
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_TvHomeState>(
@@ -631,6 +633,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             else
               _ContentGrid(
                 title: 'Popular',
+                columns: _gridColumns,
                 items: gridItems,
                 nodes: _gridNodes,
                 onFocus: (i) {
@@ -837,8 +840,17 @@ class _TvChip extends StatelessWidget {
   }
 }
 
+
+double _tvPosterAspectFor(int count) {
+  if (count >= 9) return 0.58;
+  if (count >= 7) return 0.60;
+  if (count <= 4) return 0.66;
+  return 0.62;
+}
+
 class _ContentGrid extends StatelessWidget {
   final String title;
+  final int columns;
   final List<ContentItem> items;
   final List<FocusNode> nodes;
   final ValueChanged<int> onFocus;
@@ -847,6 +859,7 @@ class _ContentGrid extends StatelessWidget {
 
   const _ContentGrid({
     required this.title,
+    required this.columns,
     required this.items,
     required this.nodes,
     required this.onFocus,
@@ -870,11 +883,11 @@ class _ContentGrid extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: items.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _TvHomeScreenState._gridColumns,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns.clamp(4, 10),
               crossAxisSpacing: 12,
               mainAxisSpacing: 13,
-              childAspectRatio: 0.61,
+              childAspectRatio: _tvPosterAspectFor(columns),
             ),
             itemBuilder: (_, i) => _TvPosterTile(
               item: items[i],
