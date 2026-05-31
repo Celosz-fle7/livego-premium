@@ -306,6 +306,11 @@ class _TvAppState extends State<TvApp> {
                           onChanged: _openNavPage,
                           onOpenContent: _enterContent,
                         ),
+                        Container(
+                          width: 1,
+                          margin: const EdgeInsets.symmetric(vertical: 18),
+                          color: Colors.white.withOpacity(0.055),
+                        ),
                         Expanded(
                           child: RepaintBoundary(
                             child: IndexedStack(index: _index, children: _pages()),

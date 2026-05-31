@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/app_theme.dart';
 
 class PremiumShell extends StatelessWidget {
   final Widget child;
@@ -12,7 +11,7 @@ class PremiumShell extends StatelessWidget {
         gradient: RadialGradient(
           center: Alignment.topCenter,
           radius: 1.2,
-          colors: [Color(0xFF142235), AppTheme.bg],
+          colors: [Color(0xFF0D1828), Color(0xFF050914)],
         ),
       ),
       child: child,
