@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -292,6 +293,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_episodePanelOpen) {
       final total = _episodeTotal(item);
+      const episodeColumns = 5;
       if (key == LogicalKeyboardKey.arrowLeft) {
         setState(() => _episodeCursor = _episodeCursor <= 1 ? 1 : _episodeCursor - 1);
         return KeyEventResult.handled;
@@ -301,10 +303,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _episodePanelOpen = false);
+        setState(() => _episodeCursor = _episodeCursor - episodeColumns >= 1 ? _episodeCursor - episodeColumns : _episodeCursor);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() => _episodeCursor = _episodeCursor + episodeColumns <= total ? _episodeCursor + episodeColumns : _episodeCursor);
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -386,6 +389,51 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _load();
   }
 
+  Widget _buildVideoSurface(VideoPlayerController controller) {
+    final size = controller.value.size;
+    final portrait = size.height > size.width;
+    final video = FittedBox(
+      fit: BoxFit.contain,
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: VideoPlayer(controller),
+      ),
+    );
+
+    if (!portrait) return video;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Opacity(
+            opacity: 0.34,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: VideoPlayer(controller),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xEE020713), Color(0x22020713), Color(0xEE020713)],
+            ),
+          ),
+        ),
+        Center(child: video),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _controller?.dispose();
@@ -408,14 +456,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           fit: StackFit.expand,
           children: [
             if (ready)
-              FittedBox(
-                fit: BoxFit.contain,
-                child: SizedBox(
-                  width: controller.value.size.width,
-                  height: controller.value.size.height,
-                  child: VideoPlayer(controller),
-                ),
-              )
+              _buildVideoSurface(controller)
             else if (item.backdropUrl.isNotEmpty || item.posterUrl.isNotEmpty)
               LiveGoCachedImage(
                 url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
@@ -440,34 +481,33 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               _TvPlayerOverlay(
                 item: item,
                 ready: ready,
-                playing: ready && controller.value.isPlaying,
+                playing: controller?.value.isPlaying ?? false,
                 episode: _episode,
                 total: _episodeTotal(item),
                 speed: _speed,
                 audioTrack: _audioTrack,
                 apiText: _url.isEmpty ? 'Video API: belum ada stream' : 'Video API: OK • ${item.platformSlug} • Ep $_episode',
               ),
-            if (ready)
+            if (ready && (_showControls || _episodePanelOpen || _qualityPanelOpen))
               Positioned(
-                left: 36,
-                right: 36,
-                bottom: _episodePanelOpen || _qualityPanelOpen ? 180 : 34,
-                child: VideoProgressIndicator(
-                  controller,
-                  allowScrubbing: false,
-                  colors: const VideoProgressColors(
-                    playedColor: AppTheme.cyan,
-                    bufferedColor: Colors.white30,
-                    backgroundColor: Colors.white12,
-                  ),
+                left: 46,
+                right: _episodePanelOpen ? 430 : 46,
+                bottom: 30,
+                child: _PlayerControlDock(
+                  controller: controller!,
+                  playing: controller!.value.isPlaying,
+                  speed: _speed,
+                  quality: LiveGoSettings.quality,
+                  audioTrack: _audioTrack,
                 ),
               ),
             if (_episodePanelOpen)
               Positioned(
-                left: 36,
-                right: 36,
-                bottom: 26,
-                child: _EpisodeStrip(
+                right: 28,
+                top: 28,
+                bottom: 28,
+                width: 390,
+                child: _EpisodeSidePanel(
                   total: _episodeTotal(item),
                   selected: _episode,
                   cursor: _episodeCursor,
@@ -550,6 +590,200 @@ class _TvPlayerOverlay extends StatelessWidget {
             bottom: 54,
             child: Text(apiText, style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerControlDock extends StatelessWidget {
+  final VideoPlayerController controller;
+  final bool playing;
+  final double speed;
+  final String quality;
+  final String audioTrack;
+
+  const _PlayerControlDock({required this.controller, required this.playing, required this.speed, required this.quality, required this.audioTrack});
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = d.inHours;
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = controller.value;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+      decoration: BoxDecoration(
+        color: const Color(0xDD07101E),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.34)),
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 28), const BoxShadow(color: Colors.black87, blurRadius: 18)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Text(_fmt(value.position), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              const SizedBox(width: 18),
+              Expanded(
+                child: VideoProgressIndicator(
+                  controller,
+                  allowScrubbing: false,
+                  colors: const VideoProgressColors(
+                    playedColor: AppTheme.purple,
+                    bufferedColor: Colors.white30,
+                    backgroundColor: Colors.white12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 18),
+              Text(_fmt(value.duration), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _DockButton(icon: Icons.replay_10_rounded, label: '10'),
+              _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'OK', active: true),
+              _DockButton(icon: Icons.video_library_rounded, label: 'EP'),
+              _DockButton(icon: Icons.subtitles_rounded, label: 'SUB'),
+              _DockTextButton(text: quality.toUpperCase()),
+              _DockButton(icon: Icons.fit_screen_rounded, label: 'FULL'),
+              _DockTextButton(text: '${speed.toStringAsFixed(2)}x'),
+              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack),
+              _DockButton(icon: Icons.menu_rounded, label: 'MENU'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DockButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  const _DockButton({required this.icon, required this.label, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 54,
+      height: 48,
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: active ? AppTheme.cyan.withOpacity(0.16) : Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: active ? AppTheme.cyan : Colors.white12, width: active ? 2 : 1),
+      ),
+      child: Icon(icon, color: active ? Colors.white : Colors.white70, size: 24),
+    );
+  }
+}
+
+class _DockTextButton extends StatelessWidget {
+  final String text;
+  const _DockTextButton({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 48,
+      constraints: const BoxConstraints(minWidth: 68),
+      alignment: Alignment.center,
+      margin: const EdgeInsets.symmetric(horizontal: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+    );
+  }
+}
+
+class _EpisodeSidePanel extends StatelessWidget {
+  final int total;
+  final int selected;
+  final int cursor;
+
+  const _EpisodeSidePanel({required this.total, required this.selected, required this.cursor});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalSafe = total.clamp(1, 120).toInt();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xF207101E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.7), blurRadius: 28), BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 30)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Daftar Episode', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.white.withOpacity(0.06), border: Border.all(color: Colors.white12)),
+            child: Text('$totalSafe Ep', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: totalSafe,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1.32,
+              ),
+              itemBuilder: (context, index) {
+                final ep = index + 1;
+                return _EpisodeBox(ep: ep, selected: ep == selected, focused: ep == cursor);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EpisodeBox extends StatelessWidget {
+  final int ep;
+  final bool selected;
+  final bool focused;
+  const _EpisodeBox({required this.ep, required this.selected, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 14)] : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(selected ? 'DIPUTAR' : 'EPISODE', style: TextStyle(color: focused ? Colors.white : AppTheme.textSoft, fontSize: 8.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          const SizedBox(height: 3),
+          Text('$ep', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );

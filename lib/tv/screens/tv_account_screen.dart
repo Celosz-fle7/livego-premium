@@ -7,6 +7,7 @@ import '../../core/livego_settings.dart';
 import '../models/tv_zone.dart';
 import '../utils/tv_focus_utils.dart';
 import 'tv_settings_screen.dart';
+import 'tv_player_settings_screen.dart';
 import 'tv_source_manager_screen.dart';
 
 class TvAccountScreen extends StatefulWidget {
@@ -45,9 +46,9 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             _AccountItem(
               icon: Icons.play_circle_rounded,
               title: 'Pengaturan Player',
-              subtitle: 'Atur playback, cache, rotasi, DRM, subtitle, dan audio.',
+              subtitle: 'Atur playback, cache, DRM, kualitas, speed, dan auto next.',
               badge: 'PLAYER',
-              onTap: () => _openSettings(),
+              onTap: () => _pushScreen(const TvPlayerSettingsScreen()),
             ),
             _AccountItem(
               icon: Icons.layers_rounded,

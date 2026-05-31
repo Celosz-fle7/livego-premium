@@ -59,8 +59,8 @@ class HeroBanner extends StatelessWidget {
             ),
             Positioned(
               left: tv ? 20 : 28,
-              bottom: tv ? 16 : 32,
-              right: tv ? 150 : 128,
+              bottom: tv ? 14 : 32,
+              right: tv ? 130 : 128,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -84,7 +84,7 @@ class HeroBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 22 : 28,
+                      fontSize: tv ? 21 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -99,8 +99,8 @@ class HeroBanner extends StatelessWidget {
               ),
             ),
             Positioned(
-              right: tv ? 22 : 24,
-              bottom: tv ? 18 : 40,
+              right: tv ? 18 : 24,
+              bottom: tv ? 16 : 40,
               child: Container(
                 padding: EdgeInsets.all(tv ? 2.5 : 0),
                 decoration: BoxDecoration(
@@ -112,8 +112,8 @@ class HeroBanner extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: LiveGoCachedImage(
                   url: item.posterUrl,
-                  width: tv ? 74 : 92,
-                  height: tv ? 104 : 132,
+                  width: tv ? 68 : 92,
+                  height: tv ? 96 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,

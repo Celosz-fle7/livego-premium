@@ -49,7 +49,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
               title: 'Jumlah Grid Home TV',
-              subtitle: 'Tekan OK atau kanan untuk mengatur jumlah poster TV. Batas TV sampai 10 grid.',
+              subtitle: 'LEFT kurang, RIGHT/OK tambah. Nilai ini langsung mengatur jumlah kolom poster Home TV.',
               value: '${LiveGoSettings.tvHomeGrid}',
               showGridBar: true,
             ),
@@ -58,13 +58,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         _SettingsSection(
           title: 'Sumber & Izin',
           items: [
-            _SettingItem.tile(
-              kind: _SettingKind.sourceManager,
-              icon: Icons.layers_rounded,
-              title: 'Kelola Sumber Data',
-              subtitle: 'Pilih platform Home, aktif/nonaktif source, dan cek status server.',
-              value: 'ATUR',
-            ),
             _SettingItem.tile(
               kind: _SettingKind.downloadNotice,
               icon: Icons.info_rounded,
