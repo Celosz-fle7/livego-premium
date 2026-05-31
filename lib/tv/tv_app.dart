@@ -21,8 +21,8 @@ class _TvAppState extends State<TvApp> {
   int _homeFocusTicket = 0;
   int _placeholderFocusTicket = 0;
   int _accountFocusTicket = 0;
+
   late final List<FocusNode> _navNodes;
-  final TvFocusMemory _homeMemory = TvFocusMemory();
   final TvFocusMemory _accountMemory = TvFocusMemory();
 
   @override
@@ -55,23 +55,18 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _focusCurrentNav() {
-    final target = _safeNavIndex(index);
-    _navNodes[target].requestFocus();
+    _navNodes[_safeNavIndex(index)].requestFocus();
   }
 
   void _focusRightZone() {
     if (!mounted) return;
     setState(() {
-      switch (index) {
-        case 0:
-          _homeFocusTicket++;
-          break;
-        case 5:
-          _accountFocusTicket++;
-          break;
-        default:
-          _placeholderFocusTicket++;
-          break;
+      if (index == 0) {
+        _homeFocusTicket++;
+      } else if (index == 5) {
+        _accountFocusTicket++;
+      } else {
+        _placeholderFocusTicket++;
       }
     });
   }
@@ -105,7 +100,6 @@ class _TvAppState extends State<TvApp> {
     switch (index) {
       case 0:
         return TvHomeScreen(
-          memory: _homeMemory,
           onMoveToNav: _focusCurrentNav,
           focusTicket: _homeFocusTicket,
         );
@@ -145,7 +139,6 @@ class _TvAppState extends State<TvApp> {
         );
       default:
         return TvHomeScreen(
-          memory: _homeMemory,
           onMoveToNav: _focusCurrentNav,
           focusTicket: _homeFocusTicket,
         );
