@@ -883,7 +883,7 @@ class _TvChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 130),
+              duration: const Duration(milliseconds: 100),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 gradient: active
@@ -1015,19 +1015,16 @@ class _TvPosterTile extends StatelessWidget {
           onFocusChange: (v) {
             if (v) onFocus();
           },
-          child: AnimatedScale(
-            scale: focused ? 1.045 : 1.0,
-            duration: const Duration(milliseconds: 140),
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
-              focusColor: Colors.transparent,
-              child: Column(
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            focusColor: Colors.transparent,
+            child: Column(
                 children: [
                   Expanded(
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 140),
+                      duration: const Duration(milliseconds: 100),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(

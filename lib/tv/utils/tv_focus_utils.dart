@@ -8,7 +8,7 @@ import 'package:flutter/widgets.dart';
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
-  Duration duration = const Duration(milliseconds: 160),
+  Duration duration = const Duration(milliseconds: 120),
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 

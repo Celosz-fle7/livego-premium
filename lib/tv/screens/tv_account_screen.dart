@@ -26,9 +26,11 @@ class TvAccountScreen extends StatefulWidget {
 
 class _TvAccountScreenState extends State<TvAccountScreen> {
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _topNode = FocusNode(skipTraversal: true, debugLabel: 'tv-account-community');
   final List<FocusNode> _rowNodes = [];
 
   TvZone _zone = TvZone.list;
+  bool _topFocused = true;
   int _lastRow = 0;
   bool _entryPending = false;
 
@@ -92,6 +94,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   @override
   void dispose() {
+    _topNode.dispose();
     for (final node in _rowNodes) {
       node.dispose();
     }
@@ -140,16 +143,23 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _tryFocusEntry() {
-    if (!mounted || !_entryPending || _rowNodes.isEmpty) return;
+    if (!mounted || !_entryPending) return;
     _entryPending = false;
-    _focusRow(_lastRow);
+    _focusTop();
+  }
+
+  void _focusTop() {
+    _zone = TvZone.list;
+    _topFocused = true;
+    tvFocus(_topNode, alignment: 0.04, duration: const Duration(milliseconds: 100));
   }
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.list;
+    _topFocused = false;
     _lastRow = _safe(index);
-    tvFocus(_rowNodes[_lastRow], alignment: 0.30);
+    tvFocus(_rowNodes[_lastRow], alignment: 0.22, duration: const Duration(milliseconds: 100));
   }
 
   void _openSettings() => _pushScreen(const TvSettingsScreen());
@@ -163,6 +173,27 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
   }
 
+  KeyEventResult _topKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft || _isBack(key)) {
+      _zone = TvZone.nav;
+      widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+      _focusRow(_lastRow);
+      return KeyEventResult.handled;
+    }
+    if (_isSelect(key)) {
+      _showMessage('Area komunitas: Telegram, grup update, dan info channel akan ditempatkan di sini.');
+      _focusTop();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) return KeyEventResult.handled;
+    return KeyEventResult.ignored;
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -174,7 +205,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
-    _restoreFocusAfterPop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_topFocused) {
+        _focusTop();
+      } else {
+        _focusRow(_lastRow);
+      }
+    });
   }
 
   KeyEventResult _rowKey(int index, _AccountItem item, KeyEvent event) {
@@ -188,7 +226,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(index == 0 ? 0 : index - 1);
+      if (index == 0) {
+        _focusTop();
+      } else {
+        _focusRow(index - 1);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -262,7 +304,24 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 16, 26, 26),
               children: [
-                const _CommunityBanner(),
+                ListenableBuilder(
+                  listenable: _topNode,
+                  builder: (context, _) {
+                    return Focus(
+                      focusNode: _topNode,
+                      skipTraversal: true,
+                      autofocus: false,
+                      onKeyEvent: _topKey,
+                      child: InkWell(
+                        canRequestFocus: false,
+                        borderRadius: BorderRadius.circular(22),
+                        focusColor: Colors.transparent,
+                        onTap: () => _showMessage('Area komunitas: Telegram, grup update, dan info channel akan ditempatkan di sini.'),
+                        child: _CommunityBanner(focused: _topNode.hasFocus),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 10),
                 const _ProfileHeader(),
                 const SizedBox(height: 10),
@@ -309,7 +368,8 @@ class _AccountItem {
 
 
 class _CommunityBanner extends StatelessWidget {
-  const _CommunityBanner();
+  final bool focused;
+  const _CommunityBanner({this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -323,8 +383,13 @@ class _CommunityBanner extends StatelessWidget {
           colors: [Color(0xFF071A2B), Color(0xFF050914)],
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF173654)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 28)],
+        border: Border.all(color: focused ? const Color(0xFF7DEBFF) : const Color(0xFF173654), width: focused ? 2 : 1),
+        boxShadow: focused
+            ? [
+                BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 24),
+                BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 32),
+              ]
+            : [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 28)],
       ),
       child: Row(
         children: [
@@ -525,7 +590,7 @@ class _ActionRow extends StatelessWidget {
             child: Column(
               children: [
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
+                  duration: const Duration(milliseconds: 100),
                   height: 58,
                   margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   padding: const EdgeInsets.symmetric(horizontal: 12),

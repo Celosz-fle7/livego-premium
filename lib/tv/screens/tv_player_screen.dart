@@ -436,11 +436,19 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final item = _detail ?? widget.item;
 
     if (_isBack(key)) {
+      // TV player back is layered:
+      // options/episodes -> controls -> clean playback -> exit.
+      final controlsVisible = _showControls ||
+          _mode == _TvPlayerMode.controls ||
+          _mode == _TvPlayerMode.episodes ||
+          _mode == _TvPlayerMode.options ||
+          _episodePanelOpen ||
+          _qualityPanelOpen;
       if (_episodePanelOpen || _qualityPanelOpen ||
           _mode == _TvPlayerMode.episodes ||
           _mode == _TvPlayerMode.options) {
         _closePanelToControls();
-      } else if (_mode == _TvPlayerMode.controls || _showControls) {
+      } else if (controlsVisible) {
         _hideAllOverlays();
       } else if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -853,9 +861,9 @@ class _DockButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 110),
-      width: focused ? 62 : 54,
-      height: focused ? 54 : 48,
+      duration: const Duration(milliseconds: 90),
+      width: 58,
+      height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         color: focused
@@ -885,8 +893,8 @@ class _DockTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 110),
-      height: focused ? 54 : 48,
+      duration: const Duration(milliseconds: 90),
+      height: 50,
       constraints: const BoxConstraints(minWidth: 76),
       alignment: Alignment.center,
       margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -1096,7 +1104,7 @@ class _QualityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 110),
+      duration: const Duration(milliseconds: 90),
       margin: const EdgeInsets.symmetric(vertical: 5),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
