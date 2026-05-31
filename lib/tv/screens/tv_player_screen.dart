@@ -292,7 +292,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_episodePanelOpen) {
       final total = _episodeTotal(item);
-      const cols = 5;
       if (key == LogicalKeyboardKey.arrowLeft) {
         setState(() => _episodeCursor = _episodeCursor <= 1 ? 1 : _episodeCursor - 1);
         return KeyEventResult.handled;
@@ -302,15 +301,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
-        if (_episodeCursor <= cols) {
-          setState(() => _episodePanelOpen = false);
-        } else {
-          setState(() => _episodeCursor = (_episodeCursor - cols).clamp(1, total).toInt());
-        }
+        setState(() => _episodePanelOpen = false);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _episodeCursor = (_episodeCursor + cols).clamp(1, total).toInt());
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -403,7 +397,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final item = _detail ?? widget.item;
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
-    final showOverlay = _showControls || _episodePanelOpen || _qualityPanelOpen || !ready;
 
     return Focus(
       autofocus: true,
@@ -416,7 +409,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           children: [
             if (ready)
               FittedBox(
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 child: SizedBox(
                   width: controller.value.size.width,
                   height: controller.value.size.height,
@@ -430,21 +423,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 role: LiveGoImageRole.banner,
                 tv: true,
               ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(showOverlay ? 0.58 : 0.12),
-                    Colors.black.withOpacity(showOverlay ? 0.18 : 0.05),
-                    Colors.black.withOpacity(showOverlay ? 0.72 : 0.20),
-                  ],
-                ),
-              ),
-            ),
-            if (_loading)
-              const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+            Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
+            if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
             if (!_loading && !ready)
               Center(
                 child: Padding(
@@ -456,34 +436,38 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   ),
                 ),
               ),
-            if (showOverlay)
-              _PlayerTopInfo(
+            if (_showControls || _episodePanelOpen || _qualityPanelOpen)
+              _TvPlayerOverlay(
                 item: item,
+                ready: ready,
+                playing: ready && controller.value.isPlaying,
                 episode: _episode,
                 total: _episodeTotal(item),
+                speed: _speed,
+                audioTrack: _audioTrack,
+                apiText: _url.isEmpty ? 'Video API: belum ada stream' : 'Video API: OK • ${item.platformSlug} • Ep $_episode',
               ),
-            if (showOverlay && ready)
+            if (ready)
               Positioned(
-                left: 72,
-                right: _episodePanelOpen ? 500 : 72,
-                bottom: 34,
-                child: _PlayerControlDock(
-                  controller: controller,
-                  playing: controller.value.isPlaying,
-                  episode: _episode,
-                  total: _episodeTotal(item),
-                  speed: _speed,
-                  audioTrack: _audioTrack,
-                  quality: LiveGoSettings.quality,
+                left: 36,
+                right: 36,
+                bottom: _episodePanelOpen || _qualityPanelOpen ? 180 : 34,
+                child: VideoProgressIndicator(
+                  controller,
+                  allowScrubbing: false,
+                  colors: const VideoProgressColors(
+                    playedColor: AppTheme.cyan,
+                    bufferedColor: Colors.white30,
+                    backgroundColor: Colors.white12,
+                  ),
                 ),
               ),
             if (_episodePanelOpen)
               Positioned(
-                top: 32,
-                right: 34,
-                bottom: 32,
-                width: 456,
-                child: _EpisodeSidePanel(
+                left: 36,
+                right: 36,
+                bottom: 26,
+                child: _EpisodeStrip(
                   total: _episodeTotal(item),
                   selected: _episode,
                   cursor: _episodeCursor,
@@ -491,8 +475,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               ),
             if (_qualityPanelOpen)
               Positioned(
-                right: 52,
-                bottom: 132,
+                right: 38,
+                bottom: 72,
                 child: _QualityPanel(speed: _speed, audioTrack: _audioTrack),
               ),
           ],
@@ -502,180 +486,69 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 }
 
-String _tvDuration(Duration value) {
-  final total = value.inSeconds < 0 ? 0 : value.inSeconds;
-  final hours = total ~/ 3600;
-  final minutes = (total % 3600) ~/ 60;
-  final seconds = total % 60;
-  if (hours > 0) {
-    return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-  return '$minutes:${seconds.toString().padLeft(2, '0')}';
-}
-
-class _PlayerTopInfo extends StatelessWidget {
+class _TvPlayerOverlay extends StatelessWidget {
   final ContentItem item;
-  final int episode;
-  final int total;
-
-  const _PlayerTopInfo({required this.item, required this.episode, required this.total});
-
-  @override
-  Widget build(BuildContext context) {
-    final description = item.description.trim();
-    return Positioned(
-      left: 70,
-      right: 520,
-      top: 42,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.42),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppTheme.cyan.withOpacity(0.32)),
-                ),
-                child: Text(
-                  item.platformSlug.isEmpty ? item.source.toUpperCase() : item.platformSlug.toUpperCase(),
-                  style: const TextStyle(color: AppTheme.cyan, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.8),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('EP $episode / $total', style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w800)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900, letterSpacing: 0.2),
-          ),
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 14.5, height: 1.45, fontWeight: FontWeight.w700),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _InfoPill(text: item.category.isEmpty ? 'Drama' : item.category),
-              _InfoPill(text: item.lang.isEmpty ? 'ID' : item.lang.toUpperCase()),
-              const _InfoPill(text: 'Remote TV'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  final String text;
-  const _InfoPill({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800)),
-    );
-  }
-}
-
-class _PlayerControlDock extends StatelessWidget {
-  final VideoPlayerController controller;
+  final bool ready;
   final bool playing;
   final int episode;
   final int total;
   final double speed;
   final String audioTrack;
-  final String quality;
+  final String apiText;
 
-  const _PlayerControlDock({
-    required this.controller,
+  const _TvPlayerOverlay({
+    required this.item,
+    required this.ready,
     required this.playing,
     required this.episode,
     required this.total,
     required this.speed,
     required this.audioTrack,
-    required this.quality,
+    required this.apiText,
   });
 
   @override
   Widget build(BuildContext context) {
-    final position = controller.value.position;
-    final duration = controller.value.duration;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(28, 20, 28, 22),
-      decoration: BoxDecoration(
-        color: const Color(0xE607101E),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.40), blurRadius: 30, offset: const Offset(0, 16))],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return IgnorePointer(
+      child: Stack(
         children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 68,
-                child: Text(_tvDuration(position), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: VideoProgressIndicator(
-                    controller,
-                    allowScrubbing: false,
-                    colors: const VideoProgressColors(
-                      playedColor: AppTheme.cyan,
-                      bufferedColor: Colors.white38,
-                      backgroundColor: Colors.white18,
-                    ),
+          Positioned(
+            left: 32,
+            top: 26,
+            right: 32,
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 4),
+                      Text('EP $episode / $total • ${speed.toStringAsFixed(2)}x • Audio: $audioTrack', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800)),
+                    ],
                   ),
                 ),
-              ),
-              SizedBox(
-                width: 68,
-                child: Text(_tvDuration(duration), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-              ),
-            ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white12)),
+                  child: const Text('OK Play/Pause • ←/→ Seek • ↓ Episode • MENU Quality', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const _ControlButton(icon: Icons.replay_10_rounded, label: '-10'),
-              _ControlButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: playing ? 'Pause' : 'Play', active: true),
-              _ControlButton(icon: Icons.view_list_rounded, label: 'EP $episode/$total'),
-              _ControlButton(icon: Icons.closed_caption_rounded, label: 'Subtitle'),
-              _ControlBadge(text: quality),
-              _ControlButton(icon: Icons.speed_rounded, label: '${speed.toStringAsFixed(2)}x'),
-              _ControlButton(icon: Icons.volume_up_rounded, label: audioTrack),
-              const _ControlButton(icon: Icons.forward_10_rounded, label: '+10'),
-            ],
+          Center(
+            child: Icon(
+              playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+              color: Colors.white.withOpacity(playing ? 0.18 : 0.88),
+              size: 96,
+            ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'OK Play/Pause • ←/→ Seek • ↓ Episode • MENU Quality • BACK tutup overlay/keluar',
-            style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800),
+          Positioned(
+            left: 36,
+            bottom: 54,
+            child: Text(apiText, style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -683,146 +556,64 @@ class _PlayerControlDock extends StatelessWidget {
   }
 }
 
-class _ControlButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-
-  const _ControlButton({required this.icon, required this.label, this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-      decoration: BoxDecoration(
-        color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: active ? AppTheme.cyan.withOpacity(0.75) : Colors.white.withOpacity(0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: active ? Colors.white : Colors.white70, size: 22),
-          const SizedBox(width: 7),
-          Text(label, style: TextStyle(color: active ? Colors.white : Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ControlBadge extends StatelessWidget {
-  final String text;
-  const _ControlBadge({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.22)),
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
-    );
-  }
-}
-
-class _EpisodeSidePanel extends StatelessWidget {
+class _EpisodeStrip extends StatelessWidget {
   final int total;
   final int selected;
   final int cursor;
 
-  const _EpisodeSidePanel({required this.total, required this.selected, required this.cursor});
+  const _EpisodeStrip({required this.total, required this.selected, required this.cursor});
 
   @override
   Widget build(BuildContext context) {
-    const cols = 5;
-    final rows = (total / cols).ceil();
-    final cursorRow = ((cursor - 1) ~/ cols).clamp(0, rows - 1).toInt();
-    final startRow = (cursorRow - 3).clamp(0, rows - 1).toInt();
-    final start = startRow * cols + 1;
-    final end = (start + (cols * 8) - 1).clamp(1, total).toInt();
+    final start = (cursor - 4).clamp(1, total).toInt();
+    final end = (start + 8).clamp(1, total).toInt();
     final episodes = [for (var i = start; i <= end; i++) i];
-
     return Container(
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xF007101E),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.28)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.45), blurRadius: 32, offset: const Offset(-12, 18))],
+        color: const Color(0xDD07101E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
+          const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
           Row(
             children: [
-              const Expanded(child: Text('Daftar Episode', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.07), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white12)),
-                child: Text('$total Ep', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w900)),
-              ),
+              for (final ep in episodes) ...[
+                _EpisodeChip(ep: ep, selected: ep == selected, focused: ep == cursor),
+                const SizedBox(width: 10),
+              ],
             ],
           ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: GridView.builder(
-              padding: EdgeInsets.zero,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: cols,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.35,
-              ),
-              itemCount: episodes.length,
-              itemBuilder: (context, index) {
-                final ep = episodes[index];
-                return _EpisodeTile(ep: ep, selected: ep == selected, focused: ep == cursor);
-              },
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text('↑/↓/←/→ pilih episode • OK putar • BACK tutup', style: TextStyle(color: Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800)),
         ],
       ),
     );
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
+class _EpisodeChip extends StatelessWidget {
   final int ep;
   final bool selected;
   final bool focused;
 
-  const _EpisodeTile({required this.ep, required this.selected, required this.focused});
+  const _EpisodeChip({required this.ep, required this.selected, required this.focused});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+    return Container(
+      width: 62,
+      height: 46,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: selected ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(
-          color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white.withOpacity(0.10)),
-          width: focused ? 2.2 : 1,
-        ),
+        color: selected ? AppTheme.cyan.withOpacity(0.25) : Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.6) : Colors.white12), width: focused ? 2 : 1),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(selected ? 'DIPUTAR' : 'EPISODE', style: TextStyle(color: focused ? AppTheme.cyan : Colors.white54, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-          const SizedBox(height: 3),
-          Text('$ep', style: TextStyle(color: focused || selected ? Colors.white : Colors.white70, fontSize: 20, fontWeight: FontWeight.w900)),
-        ],
-      ),
+      child: Text('$ep', style: TextStyle(color: focused || selected ? Colors.white : Colors.white54, fontWeight: FontWeight.w900)),
     );
   }
 }
@@ -836,13 +627,12 @@ class _QualityPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 310,
-      padding: const EdgeInsets.all(20),
+      width: 280,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xF007101E),
+        color: const Color(0xEE07101E),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.42), blurRadius: 28, offset: const Offset(-8, 12))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

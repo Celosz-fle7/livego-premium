@@ -43,42 +43,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           ],
         ),
         _SettingsSection(
-          title: 'Player',
-          items: [
-            _SettingItem.tile(
-              kind: _SettingKind.backgroundPoster,
-              icon: Icons.image_rounded,
-              title: 'Tampilkan Background Poster',
-              subtitle: 'Poster menjadi ambience di halaman detail dan player.',
-              value: LiveGoSettings.backgroundPoster ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.backgroundPoster,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.cachePlayback,
-              icon: Icons.sync_rounded,
-              title: 'Gunakan Cache Playback',
-              subtitle: 'Simpan potongan stream sementara agar perpindahan lebih stabil.',
-              value: LiveGoSettings.cachePlayback ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.cachePlayback,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.manualRotate,
-              icon: Icons.screen_rotation_rounded,
-              title: 'Tampilkan Tombol Rotasi Manual',
-              subtitle: 'Tampilkan kontrol rotasi manual saat menonton.',
-              value: LiveGoSettings.manualRotateButton ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.manualRotateButton,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.drmMode,
-              icon: Icons.lock_rounded,
-              title: 'Kompatibilitas Widevine DRM',
-              subtitle: 'Mode saat ini: ${LiveGoSettings.drmMode}',
-              value: 'ATUR',
-            ),
-          ],
-        ),
-        _SettingsSection(
           title: 'Tampilan Home',
           items: [
             _SettingItem.tile(
@@ -431,8 +395,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                   children: const [
                     _HeaderPill('Display'),
                     SizedBox(width: 10),
-                    _HeaderPill('Player'),
-                    SizedBox(width: 10),
                     _HeaderPill('Source'),
                   ],
                 ),
@@ -582,7 +544,7 @@ class _Header extends StatelessWidget {
                 SizedBox(height: 10),
                 Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 SizedBox(height: 8),
-                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                Text('Rapikan mode tampilan, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               ],
             ),
           ),
