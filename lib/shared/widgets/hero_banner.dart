@@ -44,7 +44,8 @@ class HeroBanner extends StatelessWidget {
                   gradient: RadialGradient(
                     center: Alignment(0.64, -0.22),
                     radius: 0.72,
-                    colors: [Color(0x2239D9FF), Color(0x00000000)],
+                    colors: [Color(0x3039D9FF), Color(0x10FFFFFF), Color(0x00000000)],
+                    stops: [0.0, 0.38, 1.0],
                   ),
                 ),
               ),
@@ -60,7 +61,7 @@ class HeroBanner extends StatelessWidget {
             Positioned(
               left: tv ? 20 : 28,
               bottom: tv ? 14 : 32,
-              right: tv ? 130 : 128,
+              right: tv ? 118 : 128,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -84,7 +85,7 @@ class HeroBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 21 : 28,
+                      fontSize: tv ? 20 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -112,8 +113,8 @@ class HeroBanner extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: LiveGoCachedImage(
                   url: item.posterUrl,
-                  width: tv ? 68 : 92,
-                  height: tv ? 96 : 132,
+                  width: tv ? 64 : 92,
+                  height: tv ? 90 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,
@@ -175,8 +176,8 @@ class _AccentLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: tv ? 52 : 76,
-      height: tv ? 4 : 6,
+      width: tv ? 58 : 76,
+      height: tv ? 3.5 : 6,
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
         borderRadius: BorderRadius.circular(99),

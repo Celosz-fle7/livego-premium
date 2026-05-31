@@ -39,8 +39,11 @@ class _TvAppState extends State<TvApp> {
     _exitCancelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-cancel');
     _exitConfirmNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-confirm');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Start TV directly on the Home banner. The navbar is still one LEFT away,
+    // but the first remote action does not wait on API/image loading.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _navNodes.isNotEmpty) tvFocus(_navNodes[0], alignment: 0.10);
+      if (!mounted) return;
+      setState(() => _homeTicket++);
     });
   }
 

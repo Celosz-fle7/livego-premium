@@ -12,8 +12,8 @@ class PremiumShell extends StatelessWidget {
         gradient: RadialGradient(
           center: Alignment.topCenter,
           radius: 1.35,
-          colors: [Color(0xFF101A2D), Color(0xFF050914), Color(0xFF02050B)],
-          stops: [0.0, 0.56, 1.0],
+          colors: [Color(0xFF0D1729), Color(0xFF050914), Color(0xFF010309)],
+          stops: [0.0, 0.50, 1.0],
         ),
       ),
       child: Stack(
@@ -28,7 +28,7 @@ class PremiumShell extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [Color(0x5525D7FF), Color(0x0018D6F5)],
+                    colors: [Color(0x4425D7FF), Color(0x14FFFFFF), Color(0x0018D6F5)],
                   ),
                 ),
               ),
@@ -44,7 +44,7 @@ class PremiumShell extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [Color(0x338B4DFF), Color(0x00000000)],
+                    colors: [Color(0x2E8B4DFF), Color(0x0FFFFFFF), Color(0x00000000)],
                   ),
                 ),
               ),

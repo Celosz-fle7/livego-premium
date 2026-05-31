@@ -316,22 +316,26 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _cancelPendingFocus();
     final categories = LiveGoCatalog.categoriesFor(_platform);
     final targetCategory = _safe(index, categories.length);
+
+    // On TV, selecting a category must not make the remote wait for the API.
+    // Keep focus on the category chip, reload the grid in the background,
+    // and let DOWN enter the grid only when the new data is ready.
     if (targetCategory == category) {
       _lastCategory = targetCategory;
-      _zone = TvZone.grid;
-      _queueFocusEntry(TvZone.grid, index: _lastGrid);
+      _zone = TvZone.category;
+      _queueFocusEntry(TvZone.category, index: targetCategory);
       return;
     }
 
     setState(() {
       category = targetCategory;
-      _zone = TvZone.grid;
+      _zone = TvZone.category;
       _lastCategory = targetCategory;
       _lastGrid = 0;
       _gridDataReady = false;
       _future = _load();
     });
-    _queueFocusEntry(TvZone.grid, index: 0);
+    _queueFocusEntry(TvZone.category, index: targetCategory);
   }
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
@@ -588,7 +592,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             },
             child: ListView(
               controller: _pageScroll,
-              padding: const EdgeInsets.fromLTRB(14, 12, 24, 30),
+              padding: const EdgeInsets.fromLTRB(12, 10, 22, 30),
               children: [
             _FocusableBanner(
               item: hero,
@@ -597,10 +601,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               onTap: hero == null ? null : () => _open(hero),
               onKey: (node, event) => _bannerKey(hero, event),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _HeaderBox(
               label: 'Platform',
-              height: 66,
+              height: 72,
               child: _ChipRow(
                 labels: platforms,
                 selected: source,
@@ -616,7 +620,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             const SizedBox(height: 8),
             _HeaderBox(
               label: 'Kategori',
-              height: 66,
+              height: 72,
               child: _ChipRow(
                 labels: categories,
                 selected: category,
@@ -696,12 +700,12 @@ class _FocusableBanner extends StatelessWidget {
           child: InkWell(
             canRequestFocus: false,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(28),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOutCubic,
-              height: 194,
+              height: 178,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -709,7 +713,7 @@ class _FocusableBanner extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [Color(0xFF07101C), Color(0xFF03070F)],
                 ),
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(28),
                 border: Border.all(
                   color: focused ? AppTheme.cyan.withOpacity(0.96) : const Color(0xFF17283D),
                   width: focused ? 2.1 : 1.1,
@@ -723,7 +727,7 @@ class _FocusableBanner extends StatelessWidget {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: focused ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.04)),
                 ),
                 child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 182),
@@ -747,7 +751,7 @@ class _HeaderBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: const EdgeInsets.fromLTRB(12, 5, 12, 6),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 7),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -770,7 +774,7 @@ class _HeaderBox extends StatelessWidget {
               label.toUpperCase(),
               style: TextStyle(
                 color: AppTheme.cyan.withOpacity(0.62),
-                fontSize: 8.8,
+                fontSize: 9.2,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.2,
                 decoration: TextDecoration.none,
@@ -880,7 +884,7 @@ class _TvChip extends StatelessWidget {
             focusColor: Colors.transparent,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 130),
-              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 gradient: active
                     ? const LinearGradient(colors: [Color(0xFF20D7F8), Color(0xFF794CFF)])
@@ -904,7 +908,7 @@ class _TvChip extends StatelessWidget {
                 text,
                 style: TextStyle(
                   color: selected ? Colors.white : AppTheme.textSoft,
-                  fontSize: 13,
+                  fontSize: 12.6,
                   fontWeight: FontWeight.w900,
                   decoration: TextDecoration.none,
                 ),
@@ -964,8 +968,8 @@ class _ContentGrid extends StatelessWidget {
             itemCount: items.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columns.clamp(4, 10),
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 13,
+              crossAxisSpacing: 11,
+              mainAxisSpacing: 12,
               childAspectRatio: _tvPosterAspectFor(columns),
             ),
             itemBuilder: (_, i) => _TvPosterTile(
@@ -1105,7 +1109,7 @@ class _TvSkeleton extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: const Color(0xFF0B1523),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF17283D)),
       ),
     );
