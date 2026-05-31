@@ -30,7 +30,6 @@ class TvSideNav extends StatefulWidget {
     TvNavItem(Icons.favorite_rounded, 'Favorit'),
     TvNavItem(Icons.download_rounded, 'Unduhan'),
     TvNavItem(Icons.person_rounded, 'Akun'),
-    TvNavItem(Icons.settings_rounded, 'Pengaturan'),
   ];
 
   @override

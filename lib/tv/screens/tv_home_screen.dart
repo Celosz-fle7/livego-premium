@@ -148,41 +148,89 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _returnToLastContent() {
-    // Entry point from the left navbar back into the right territory.
-    // Restore exact FocusNode first, then fall back to zone/index.
-    final remembered = _focusMemory.lastRightFocus;
-    if (remembered != null && remembered.canRequestFocus && remembered.context != null) {
-      _focus(remembered, alignment: _focusMemory.lastRightZone == TvFocusZone.grid ? 0.35 : 0.15);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.grid && _gridNodes.isNotEmpty) {
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.category && _categoryNodes.isNotEmpty) {
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.platform && _platformNodes.isNotEmpty) {
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    if (_focusMemory.lastRightZone == TvFocusZone.banner && _bannerNode.canRequestFocus) {
-      _focus(_bannerNode);
-      return;
-    }
+    // Entry point from the left navbar back into Home. Do not restore a raw
+    // FocusNode here; after loading/rebuild it can point to a stale widget and
+    // make the remote feel stuck. Restore by zone + safe index only.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_focusMemory.lastRightZone == TvFocusZone.grid && _gridNodes.isNotEmpty) {
+        _focusGrid(_focusMemory.lastGridIndex);
+        return;
+      }
+      if (_focusMemory.lastRightZone == TvFocusZone.category && _categoryNodes.isNotEmpty) {
+        _focusCategory(_focusMemory.lastCategoryIndex);
+        return;
+      }
+      if (_focusMemory.lastRightZone == TvFocusZone.platform && _platformNodes.isNotEmpty) {
+        _focusPlatform(_focusMemory.lastPlatformIndex);
+        return;
+      }
+      _focusBanner();
+    });
+  }
 
-    // First entry from the navbar should start at the top of Home.
+  void _focusBanner() {
     _focusMemory.lastRightZone = TvFocusZone.banner;
-    _focus(_bannerNode);
+    _rememberRightFocus(_bannerNode, TvFocusZone.banner);
+    _focus(_bannerNode, alignment: 0.05);
+  }
+
+  void _focusPlatform(int index) {
+    if (_platformNodes.isEmpty) {
+      _focusBelowPlatform();
+      return;
+    }
+    final safe = _safe(index, _platformNodes.length);
+    _focusMemory.lastRightZone = TvFocusZone.platform;
+    _focusMemory.lastPlatformIndex = safe;
+    _rememberRightFocus(_platformNodes[safe], TvFocusZone.platform, platform: safe);
+    _focus(_platformNodes[safe], alignment: 0.12);
+  }
+
+  void _focusCategory(int index) {
+    if (_categoryNodes.isEmpty) {
+      _focusGrid(_focusMemory.lastGridIndex);
+      return;
+    }
+    final safe = _safe(index, _categoryNodes.length);
+    _focusMemory.lastRightZone = TvFocusZone.category;
+    _focusMemory.lastCategoryIndex = safe;
+    _rememberRightFocus(_categoryNodes[safe], TvFocusZone.category, category: safe);
+    _focus(_categoryNodes[safe], alignment: 0.16);
+  }
+
+  void _focusGrid(int index) {
+    if (_gridNodes.isEmpty) {
+      _focusBanner();
+      return;
+    }
+    final safe = _safe(index, _gridNodes.length);
+    _focusMemory.lastRightZone = TvFocusZone.grid;
+    _focusMemory.lastGridIndex = safe;
+    _rememberRightFocus(_gridNodes[safe], TvFocusZone.grid, grid: safe);
+    _focus(_gridNodes[safe], alignment: 0.35);
+  }
+
+  void _focusBelowBanner() {
+    if (_platformNodes.isNotEmpty) {
+      _focusPlatform(_focusMemory.lastPlatformIndex);
+    } else {
+      _focusBelowPlatform();
+    }
+  }
+
+  void _focusBelowPlatform() {
+    if (_categoryNodes.isNotEmpty) {
+      _focusCategory(_focusMemory.lastCategoryIndex);
+    } else if (_gridNodes.isNotEmpty) {
+      _focusGrid(_focusMemory.lastGridIndex);
+    } else {
+      _focusBanner();
+    }
   }
 
   void _focusRightFallback() {
-    _focusMemory.lastRightZone = TvFocusZone.banner;
-    _focus(_bannerNode);
+    _focusBanner();
   }
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
@@ -193,29 +241,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
+      _focusBanner();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (_platformNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      } else if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      }
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+      _focusBelowBanner();
       return KeyEventResult.handled;
     }
     if (_isSelect(key) && hero != null) {
@@ -232,40 +262,24 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (i == 0) {
         _moveToNavFrom(_platformNodes[i], TvFocusZone.platform, platform: i);
       } else {
-        _focusMemory.lastPlatformIndex = i - 1;
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+        _focusPlatform(i - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _platformNodes.length - 1) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = i + 1;
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      } else if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+        _focusPlatform(i + 1);
       } else {
-        _focusRightFallback();
+        _focusBelowPlatform();
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
+      _focusBanner();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_categoryNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      }
+      _focusBelowPlatform();
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
@@ -291,42 +305,28 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (i == 0) {
         _moveToNavFrom(_categoryNodes[i], TvFocusZone.category, category: i);
       } else {
-        _focusMemory.lastCategoryIndex = i - 1;
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+        _focusCategory(i - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (i < _categoryNodes.length - 1) {
-        _focusMemory.lastRightZone = TvFocusZone.category;
-        _focusMemory.lastCategoryIndex = i + 1;
-        _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      } else if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusCategory(i + 1);
       } else {
-        _focusRightFallback();
+        _focusGrid(_focusMemory.lastGridIndex);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (_platformNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.platform;
-        _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-        _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+        _focusPlatform(_focusMemory.lastPlatformIndex);
       } else {
-        _focusMemory.lastRightZone = TvFocusZone.banner;
-        _focus(_bannerNode);
+        _focusBanner();
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_gridNodes.isNotEmpty) {
-        _focusMemory.lastRightZone = TvFocusZone.grid;
-        _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      }
+      _focusGrid(_focusMemory.lastGridIndex);
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
@@ -352,49 +352,38 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (col == 0) {
         _moveToNavFrom(_gridNodes[index], TvFocusZone.grid, grid: index);
       } else {
-        _focusMemory.lastGridIndex = index - 1;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(index - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (col < _gridColumns - 1 && index < _gridNodes.length - 1) {
-        _focusMemory.lastGridIndex = index + 1;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(index + 1);
       } else {
-        _focusMemory.lastGridIndex = index;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(index);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
         if (_categoryNodes.isNotEmpty) {
-          _focusMemory.lastRightZone = TvFocusZone.category;
-          _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-          _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+          _focusCategory(_focusMemory.lastCategoryIndex);
         } else if (_platformNodes.isNotEmpty) {
-          _focusMemory.lastRightZone = TvFocusZone.platform;
-          _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-          _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+          _focusPlatform(_focusMemory.lastPlatformIndex);
         } else {
-          _focusMemory.lastRightZone = TvFocusZone.banner;
-          _focus(_bannerNode);
+          _focusBanner();
         }
       } else {
-        _focusMemory.lastGridIndex = _safe(index - _gridColumns, _gridNodes.length);
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(index - _gridColumns);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = index + _gridColumns;
       if (next < _gridNodes.length) {
-        _focusMemory.lastGridIndex = next;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(next);
       } else {
-        _focusMemory.lastGridIndex = index;
-        _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+        _focusGrid(index);
       }
       return KeyEventResult.handled;
     }

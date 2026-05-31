@@ -6,7 +6,6 @@ import 'focus/tv_focus_memory.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_home_screen.dart';
 import 'screens/tv_placeholder_screen.dart';
-import 'screens/tv_settings_screen.dart';
 import 'widgets/tv_side_nav.dart';
 
 class TvApp extends StatefulWidget {
@@ -22,12 +21,10 @@ class _TvAppState extends State<TvApp> {
   int _homeFocusTicket = 0;
   int _placeholderFocusTicket = 0;
   int _accountFocusTicket = 0;
-  int _settingsFocusTicket = 0;
 
   late final List<FocusNode> _navNodes;
   final TvFocusMemory _homeMemory = TvFocusMemory();
   final TvFocusMemory _accountMemory = TvFocusMemory();
-  final TvFocusMemory _settingsMemory = TvFocusMemory();
 
   @override
   void initState() {
@@ -72,9 +69,6 @@ class _TvAppState extends State<TvApp> {
           break;
         case 5:
           _accountFocusTicket++;
-          break;
-        case 6:
-          _settingsFocusTicket++;
           break;
         default:
           _placeholderFocusTicket++;
@@ -151,11 +145,11 @@ class _TvAppState extends State<TvApp> {
           focusTicket: _accountFocusTicket,
         );
       default:
-        return TvSettingsScreen(
-          memory: _settingsMemory,
-          showBackButton: false,
+        return TvPlaceholderScreen(
+          title: 'LiveGo',
+          icon: Icons.tv_rounded,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _settingsFocusTicket,
+          focusTicket: _placeholderFocusTicket,
         );
     }
   }
