@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
+import '../screens/tv_source_manager_screen.dart';
 import '../models/tv_zone.dart';
 import '../utils/tv_focus_utils.dart';
 
@@ -94,11 +95,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           title: 'Sumber & Izin',
           items: [
             _SettingItem.tile(
-              kind: _SettingKind.defaultPlatform,
+              kind: _SettingKind.sourceManager,
               icon: Icons.layers_rounded,
-              title: 'Sumber Default Home',
-              subtitle: 'Pilih platform awal yang digunakan aplikasi.',
-              value: LiveGoSettings.defaultPlatform.toUpperCase(),
+              title: 'Kelola Sumber Data',
+              subtitle: 'Pilih platform Home, aktif/nonaktif source, dan cek status server.',
+              value: 'ATUR',
             ),
             _SettingItem.tile(
               kind: _SettingKind.downloadNotice,
@@ -280,6 +281,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   void _activate(_SettingKind kind) {
+    if (kind == _SettingKind.sourceManager) {
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const TvSourceManagerScreen()))
+          .then((_) {
+        if (mounted) setState(() {});
+        _focusRow(_lastRow);
+      });
+      return;
+    }
+
     setState(() {
       switch (kind) {
         case _SettingKind.layoutAuto:
@@ -310,11 +321,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         case _SettingKind.tvGrid:
           LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 4 : LiveGoSettings.tvHomeGrid + 1);
           break;
-        case _SettingKind.defaultPlatform:
-          final values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
-          if (values.isEmpty) return;
-          final currentIndex = values.indexOf(LiveGoSettings.defaultPlatform);
-          LiveGoSettings.defaultPlatform = values[currentIndex < 0 ? 0 : (currentIndex + 1) % values.length];
+        case _SettingKind.sourceManager:
           break;
         case _SettingKind.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
@@ -360,7 +367,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         _SectionTitle(section.title),
         const SizedBox(height: 10),
         _SettingsCard(description: section.description, children: rows),
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
       ]);
     }
 
@@ -383,7 +390,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             style: const TextStyle(decoration: TextDecoration.none),
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
+              padding: const EdgeInsets.fromLTRB(16, 18, 28, 28),
               children: [
                 _Header(
                   showBackButton: widget.showBackButton,
@@ -391,7 +398,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                   onBackKey: _backKey,
                   onBackTap: _goBack,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 Row(
                   children: const [
                     _HeaderPill('Display'),
@@ -401,7 +408,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                     _HeaderPill('Source'),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 ...sectionWidgets,
                 Text(
                   _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ←/Back kembali' : '',
@@ -437,7 +444,7 @@ enum _SettingKind {
   manualRotate,
   drmMode,
   tvGrid,
-  defaultPlatform,
+  sourceManager,
   downloadNotice,
   reset,
 }
@@ -516,10 +523,10 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF09111E).withOpacity(0.96),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF1C3148)),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
       ),
@@ -527,27 +534,27 @@ class _Header extends StatelessWidget {
         children: [
           if (showBackButton) ...[
             _BackButton(node: backNode, onKey: onBackKey, onTap: onBackTap),
-            const SizedBox(width: 18),
+            const SizedBox(width: 14),
           ],
           Container(
-            width: 86,
-            height: 86,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.settings_rounded, color: Colors.white, size: 42),
+            child: const Icon(Icons.settings_rounded, color: Colors.white, size: 32),
           ),
-          const SizedBox(width: 22),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2, decoration: TextDecoration.none)),
                 SizedBox(height: 10),
-                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 SizedBox(height: 8),
-                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 14, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               ],
             ),
           ),
@@ -589,7 +596,7 @@ class _BackButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
               ),
-              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
             ),
           ),
         );
@@ -605,13 +612,13 @@ class _HeaderPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF111B2A),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white10),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5, decoration: TextDecoration.none)),
     );
   }
 }
@@ -624,7 +631,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
-      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
+      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 12.5, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
     );
   }
 }
@@ -638,10 +645,10 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFF09111E).withOpacity(0.96),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF1C3148)),
       ),
       child: Column(
@@ -650,7 +657,7 @@ class _SettingsCard extends StatelessWidget {
           if (description != null) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
             ),
             const SizedBox(height: 4),
           ],
@@ -692,17 +699,17 @@ class _FocusedSettingRow extends StatelessWidget {
           child: InkWell(
               canRequestFocus: false,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             focusColor: Colors.transparent,
             child: Column(
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
-                  margin: const EdgeInsets.symmetric(vertical: 5),
-                  padding: EdgeInsets.symmetric(horizontal: isRadio ? 14 : 16, vertical: isRadio ? 15 : 12),
+                  margin: const EdgeInsets.symmetric(vertical: 3),
+                  padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
                   decoration: BoxDecoration(
                     color: focused ? const Color(0xFF102F45) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
                     boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
                   ),
@@ -728,12 +735,12 @@ class _RadioContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft, size: 28),
-        const SizedBox(width: 18),
+        Icon(item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft, size: 24),
+        const SizedBox(width: 14),
         Expanded(
-          child: Text(item.title, style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17, decoration: TextDecoration.none)),
+          child: Text(item.title, style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 15.5, decoration: TextDecoration.none)),
         ),
-        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11.5, decoration: TextDecoration.none)),
       ],
     );
   }
@@ -751,23 +758,23 @@ class _TileContent extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 56,
-          height: 56,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
             color: const Color(0xFF142338),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: focused ? accent.withOpacity(0.85) : const Color(0xFF2B4058)),
           ),
-          child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 27),
+          child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 23),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               const SizedBox(height: 5),
-              Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               if (item.showGridBar) ...[
                 const SizedBox(height: 12),
                 _GridPreview(value: LiveGoSettings.tvHomeGrid),
@@ -775,13 +782,13 @@ class _TileContent extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         if (item.switchValue != null)
           _SwitchPill(value: item.switchValue!, focused: focused)
         else
-          Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14, decoration: TextDecoration.none)),
+          Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 12.5, decoration: TextDecoration.none)),
         const SizedBox(width: 12),
-        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 30),
+        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 26),
       ],
     );
   }
@@ -797,16 +804,16 @@ class _SwitchPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
-      width: 70,
-      height: 36,
-      padding: const EdgeInsets.all(4),
+      width: 58,
+      height: 30,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : const Color(0xFF233048),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: focused ? Colors.white70 : Colors.transparent),
       ),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(width: 28, height: 28, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+      child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
     );
   }
 }
@@ -822,8 +829,8 @@ class _GridPreview extends StatelessWidget {
         final active = i < value;
         return Expanded(
           child: Container(
-            height: 7,
-            margin: EdgeInsets.only(right: i == 9 ? 0 : 5),
+            height: 6,
+            margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
             decoration: BoxDecoration(
               color: active ? AppTheme.cyan : const Color(0xFF26364B),
               borderRadius: BorderRadius.circular(999),

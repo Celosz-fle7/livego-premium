@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
+import '../../shared/widgets/premium_shell.dart';
 import '../models/tv_zone.dart';
 import '../utils/tv_focus_utils.dart';
+import 'tv_downloads_screen.dart';
+import 'tv_library_screen.dart';
 import 'tv_settings_screen.dart';
 
 class TvAccountScreen extends StatefulWidget {
@@ -33,18 +37,15 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _AccountSection(
           title: 'Koleksi Cepat',
           items: [
-            _AccountItem(icon: Icons.history_rounded, title: 'Riwayat', subtitle: 'Lanjutkan tontonan terakhir yang sudah dibuka.', onTap: () {}),
-            _AccountItem(icon: Icons.favorite_border_rounded, title: 'Favorit', subtitle: 'Buka daftar judul yang Anda simpan.', onTap: () {}),
-            _AccountItem(icon: Icons.download_rounded, title: 'Download', subtitle: 'Lihat antrean dan episode yang tersimpan.', onTap: () {}),
+            _AccountItem(icon: Icons.history_rounded, title: 'Riwayat', subtitle: 'Lanjutkan tontonan terakhir yang sudah dibuka.', onTap: () => _pushTvPage(const TvLibraryScreen(title: 'Histori', icon: Icons.history_rounded, favorites: false))),
+            _AccountItem(icon: Icons.favorite_border_rounded, title: 'Favorit', subtitle: 'Buka daftar judul yang Anda simpan.', onTap: () => _pushTvPage(const TvLibraryScreen(title: 'Favorit', icon: Icons.favorite_rounded, favorites: true))),
+            _AccountItem(icon: Icons.download_rounded, title: 'Download', subtitle: 'Lihat antrean dan episode yang tersimpan.', onTap: () => _pushTvPage(const TvDownloadsScreen())),
             _AccountItem(
               icon: Icons.settings_rounded,
               title: 'Pengaturan',
               subtitle: 'Atur tampilan, player, subtitle, dan source aktif.',
               onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen())).then((_) {
-                  if (!mounted) return;
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
-                });
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvSettingsScreen())).then((_) => _restoreFocusAfterPop());
               },
             ),
           ],
@@ -59,6 +60,25 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           ],
         ),
       ];
+
+
+  void _restoreFocusAfterPop() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
+  }
+
+  void _pushTvPage(Widget screen) {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              backgroundColor: const Color(0xFF050914),
+              body: PremiumShell(child: screen),
+            ),
+          ),
+        )
+        .then((_) => _restoreFocusAfterPop());
+  }
 
   int get _itemCount => _sections.fold<int>(0, (sum, section) => sum + section.items.length);
 
@@ -214,18 +234,29 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             return null;
           }),
         },
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(18, 24, 30, 30),
-          children: [
-        const _ProfileHeader(),
-        const SizedBox(height: 18),
-        ...sectionWidgets,
-            Text(
-              _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ←/Back kembali ke navbar' : '',
-              style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
-            ),
-          ],
+        child: ValueListenableBuilder<int>(
+          valueListenable: LiveGoLocalStore.version,
+          builder: (context, _, __) {
+            return ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 18, 28, 28),
+              children: [
+                const _ProfileHeader(),
+                const SizedBox(height: 12),
+                _StatsRow(
+                  history: LiveGoLocalStore.history.length,
+                  favorites: LiveGoLocalStore.favorites.length,
+                  downloads: LiveGoLocalStore.downloads.length,
+                ),
+                const SizedBox(height: 16),
+                ...sectionWidgets,
+                Text(
+                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ←/Back kembali ke navbar' : '',
+                  style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -258,42 +289,86 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 116,
-      padding: const EdgeInsets.all(18),
+      height: 92,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Color(0xFF0B2634), Color(0xFF080D17)], begin: Alignment.centerLeft, end: Alignment.centerRight),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF1E3850)),
       ),
       child: Row(
         children: [
           Container(
-            width: 72,
-            height: 72,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
               gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
               border: Border.all(color: AppTheme.cyan.withOpacity(0.65)),
             ),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 40),
+            child: const Icon(Icons.person_rounded, color: Colors.white, size: 32),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Penggemar LiveGO', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                const Text('Penggemar LiveGO', style: TextStyle(color: Colors.white, fontSize: 17.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 const SizedBox(height: 5),
                 Text(
                   'Default: ${LiveGoSettings.defaultPlatform} • Bahasa: ${LiveGoSettings.language.toUpperCase()}',
-                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+
+class _StatsRow extends StatelessWidget {
+  final int history;
+  final int favorites;
+  final int downloads;
+
+  const _StatsRow({required this.history, required this.favorites, required this.downloads});
+
+  Widget _stat(String value, String label) {
+    return Expanded(
+      child: Container(
+        height: 66,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF09111E).withOpacity(0.92),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF1A2D43)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+            const SizedBox(height: 3),
+            Text(label, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: .4, decoration: TextDecoration.none)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _stat('$history', 'HISTORI'),
+        const SizedBox(width: 10),
+        _stat('$favorites', 'FAVORIT'),
+        const SizedBox(width: 10),
+        _stat('$downloads', 'DOWNLOAD'),
+      ],
     );
   }
 }
@@ -307,7 +382,7 @@ class _Panel extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF09111E).withOpacity(0.94),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF1A2D43)),
       ),
       child: Column(children: children),
@@ -354,36 +429,36 @@ class _ActionRow extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 130),
-                  height: 74,
-                  margin: const EdgeInsets.all(6),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  height: 62,
+                  margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
                     color: focused ? const Color(0xFF102F45) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(19),
+                    borderRadius: BorderRadius.circular(17),
                     border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
                     boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 16)] : null,
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
-                        child: Icon(icon, color: Colors.white, size: 25),
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white10)),
+                        child: Icon(icon, color: Colors.white, size: 22),
                       ),
-                      const SizedBox(width: 18),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(title, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                            Text(title, style: const TextStyle(color: Colors.white, fontSize: 17.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                             const SizedBox(height: 3),
-                            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
+                            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
                           ],
                         ),
                       ),
-                      Icon(Icons.arrow_forward_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 27),
+                      Icon(Icons.arrow_forward_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 24),
                     ],
                   ),
                 ),
@@ -405,7 +480,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
+      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
     );
   }
 }

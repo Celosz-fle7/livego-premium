@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
+import 'screens/tv_downloads_screen.dart';
 import 'screens/tv_home_screen.dart';
-import 'screens/tv_placeholder_screen.dart';
+import 'screens/tv_library_screen.dart';
+import 'screens/tv_search_screen.dart';
 import 'utils/tv_focus_utils.dart';
 import 'widgets/tv_focused_border.dart';
 import 'widgets/tv_side_nav.dart';
@@ -180,27 +182,25 @@ class _TvAppState extends State<TvApp> {
         focusTicket: _index == 0 ? _homeTicket : 0,
         onMoveToNav: _focusCurrentNav,
       ),
-      TvPlaceholderScreen(
+      TvLibraryScreen(
         title: 'Histori',
         icon: Icons.history_rounded,
+        favorites: false,
         focusTicket: _index == 1 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
       ),
-      TvPlaceholderScreen(
-        title: 'Cari',
-        icon: Icons.search_rounded,
+      TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
       ),
-      TvPlaceholderScreen(
+      TvLibraryScreen(
         title: 'Favorit',
         icon: Icons.favorite_rounded,
+        favorites: true,
         focusTicket: _index == 3 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
       ),
-      TvPlaceholderScreen(
-        title: 'Unduhan',
-        icon: Icons.download_rounded,
+      TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
       ),

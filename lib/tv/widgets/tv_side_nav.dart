@@ -131,13 +131,13 @@ class _TvSideNavState extends State<TvSideNav> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        width: _expanded ? 214 : 88,
+        width: _expanded ? 190 : 76,
         child: Container(
-          margin: const EdgeInsets.fromLTRB(10, 18, 10, 18),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          margin: const EdgeInsets.fromLTRB(8, 14, 8, 14),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
           decoration: BoxDecoration(
             color: const Color(0xFF050D18).withOpacity(0.97),
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.35) : const Color(0xFF172A3E)),
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 22)],
           ),
@@ -155,14 +155,14 @@ class _TvSideNavState extends State<TvSideNav> {
                   onKey: (node, event) => _handleKey(i, event),
                 ),
                 if (i == 0) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    width: _expanded ? 154 : 38,
+                    width: _expanded ? 138 : 34,
                     height: 1,
                     color: Colors.white10,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                 ] else if (i < TvSideNav.items.length - 1)
                   const Spacer(),
               ],
@@ -202,8 +202,8 @@ class _NavButton extends StatelessWidget {
       builder: (context, _) {
         final focused = focusNode.hasFocus;
         final selected = focused || active;
-        final height = logo ? 60.0 : 54.0;
-        final collapsedWidth = logo ? 58.0 : 54.0;
+        final height = logo ? 56.0 : 50.0;
+        final collapsedWidth = logo ? 54.0 : 50.0;
         return Tooltip(
           message: label,
           child: Focus(
@@ -214,25 +214,25 @@ class _NavButton extends StatelessWidget {
             child: InkWell(
               canRequestFocus: false,
               onTap: onTap,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
               focusColor: Colors.transparent,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 130),
                 height: height,
-                width: expanded ? 178 : collapsedWidth,
-                padding: const EdgeInsets.symmetric(horizontal: 13),
+                width: expanded ? 160 : collapsedWidth,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
                 decoration: BoxDecoration(
                   color: selected ? AppTheme.cyan.withOpacity(focused ? 0.22 : 0.12) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2 : 0),
                   boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null,
                 ),
                 child: Row(
                   mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: selected ? AppTheme.cyan : Colors.white70, size: logo ? 30 : 27),
+                    Icon(icon, color: selected ? AppTheme.cyan : Colors.white70, size: logo ? 27 : 24),
                     if (expanded) ...[
-                      const SizedBox(width: 13),
+                      const SizedBox(width: 11),
                       Expanded(
                         child: Text(
                           label,
@@ -240,7 +240,7 @@ class _NavButton extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: selected ? Colors.white : Colors.white70,
-                            fontSize: 14,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w900,
                             decoration: TextDecoration.none,
                           ),
