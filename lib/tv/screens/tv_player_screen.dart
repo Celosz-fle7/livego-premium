@@ -44,6 +44,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   _TvPlayerMode _mode = _TvPlayerMode.controls;
   Timer? _controlHideTimer;
   int _loadTicket = 0;
+  final Map<String, String> _debugTiming = <String, String>{};
 
   static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
   static const int _controlCount = 8;
@@ -58,6 +59,20 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _load();
   }
 
+  void _markDebug(String label, Stopwatch watch, {String extra = ''}) {
+    final value = '${watch.elapsedMilliseconds}ms${extra.isEmpty ? '' : ' • $extra'}';
+    debugPrint('LIVEGO TV TIMING $label $value');
+    if (!mounted) return;
+    setState(() {
+      _debugTiming[label] = value;
+    });
+  }
+
+  void _resetDebugTiming() {
+    _debugTiming
+      ..clear()
+      ..['OPEN'] = '0ms';
+  }
 
   Future<void> _loadPreferences() async {
     await PlayerPreferences.load();
@@ -88,14 +103,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<void> _load() async {
     final ticket = ++_loadTicket;
+    final watch = Stopwatch()..start();
     _cancelControlAutoHide();
     setState(() {
       _loading = true;
       _error = '';
       _url = '';
+      _resetDebugTiming();
     });
 
-    final watch = Stopwatch()..start();
     try {
       final requestedEpisode = _episode <= 0 ? 1 : _episode;
       final fastPlayable = ContentItem(
@@ -157,6 +173,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             lang: resolved.lang,
           );
         });
+        _markDebug('DETAIL', watch, extra: 'count=$count');
         debugPrint('LIVEGO TV DETAIL DONE ${watch.elapsedMilliseconds}ms count=$count');
       });
 
@@ -166,6 +183,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         if (count > 1 && count != _knownEpisodeCount) {
           setState(() => _knownEpisodeCount = count);
         }
+        _markDebug('ALLEPISODE', watch, extra: 'count=$count stream=${bundle.stream.url.isNotEmpty}');
         debugPrint('LIVEGO TV ALLEPISODE DONE ${watch.elapsedMilliseconds}ms count=$count stream=${bundle.stream.url.isNotEmpty}');
       }).catchError((e) {
         debugPrint('LIVEGO TV ALLEPISODE BACKGROUND ERROR: $e');
@@ -182,8 +200,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       }
 
       void offerPlayable(String source, StreamInfo stream) {
+        _markDebug(source, watch, extra: 'ok=${stream.url.isNotEmpty}');
         debugPrint('LIVEGO TV PLAYABLE $source ${watch.elapsedMilliseconds}ms ok=${stream.url.isNotEmpty}');
         if (!playableCompleter.isCompleted && stream.url.isNotEmpty) {
+          if (mounted) {
+            setState(() => _debugTiming['SOURCE'] = source);
+          }
           playableCompleter.complete(stream);
         }
       }
@@ -210,6 +232,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (stream.url.isEmpty) {
         _error = 'Stream belum tersedia dari API';
         _loading = false;
+        _markDebug('ERROR', watch, extra: 'no playable stream');
         if (mounted) setState(() {});
         return;
       }
@@ -238,6 +261,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         lang: base.lang.trim().isNotEmpty ? base.lang : widget.item.lang,
       );
 
+      _markDebug('INIT START', watch);
       debugPrint('LIVEGO TV VIDEO INIT START ${watch.elapsedMilliseconds}ms url=${stream.url.substring(0, stream.url.length > 80 ? 80 : stream.url.length)}');
 
       await _controller?.dispose();
@@ -271,6 +295,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         }
       });
       await controller.initialize();
+      _markDebug('INIT DONE', watch);
       if (!mounted || ticket != _loadTicket) return;
       await controller.setPlaybackSpeed(_speed);
       await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
@@ -283,12 +308,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _loading = false;
       _error = '';
       setState(() {});
+      _markDebug('PLAY', watch, extra: 'total=$total');
       debugPrint('LIVEGO TV VIDEO PLAY ${watch.elapsedMilliseconds}ms total=$total');
       _showInitialControls();
     } catch (e) {
       if (!mounted || ticket != _loadTicket) return;
       _error = '$e';
       _loading = false;
+      _markDebug('ERROR', watch, extra: '$e');
       setState(() {});
     }
   }
@@ -721,6 +748,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 tv: true,
               ),
             Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
+            if (_debugTiming.isNotEmpty)
+              Positioned(
+                right: 18,
+                top: 18,
+                child: _PlayerTimingOverlay(entries: Map<String, String>.from(_debugTiming)),
+              ),
             if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
             if (!_loading && !ready)
               Center(
@@ -776,6 +809,75 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 child: _QualityPanel(speed: _speed, audioTrack: _audioTrack, quality: LiveGoSettings.quality, subtitlesEnabled: LiveGoSettings.subtitlesEnabled, cursor: _optionCursor),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerTimingOverlay extends StatelessWidget {
+  final Map<String, String> entries;
+
+  const _PlayerTimingOverlay({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = <String>[
+      'OPEN',
+      '/episode',
+      '/allepisode',
+      'SOURCE',
+      'INIT START',
+      'INIT DONE',
+      'PLAY',
+      'ALLEPISODE',
+      'DETAIL',
+      'ERROR',
+    ];
+    final rows = <MapEntry<String, String>>[
+      for (final key in ordered)
+        if (entries.containsKey(key)) MapEntry(key, entries[key]!),
+      for (final e in entries.entries)
+        if (!ordered.contains(e.key)) e,
+    ];
+
+    return IgnorePointer(
+      child: Container(
+        width: 300,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xE6040A16),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.cyan.withOpacity(0.42)),
+          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 18)],
+        ),
+        child: DefaultTextStyle(
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            decoration: TextDecoration.none,
+            height: 1.25,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('PLAYER DEBUG TIMING', style: TextStyle(color: AppTheme.cyan, fontSize: 11.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              const SizedBox(height: 6),
+              for (final row in rows.take(10))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 92, child: Text(row.key, style: const TextStyle(color: AppTheme.textSoft, decoration: TextDecoration.none))),
+                      Expanded(child: Text(row.value, style: const TextStyle(color: Colors.white, decoration: TextDecoration.none))),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
