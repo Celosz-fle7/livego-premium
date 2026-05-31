@@ -3,15 +3,19 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
+import '../focus/tv_focus_memory.dart';
+import '../focus/tv_focus_zone.dart';
 import '../focus/tv_scroll_engine.dart';
 
 class TvSettingsScreen extends StatefulWidget {
+  final TvFocusMemory? memory;
   final bool showBackButton;
   final VoidCallback? onMoveToNav;
   final int focusTicket;
 
   const TvSettingsScreen({
     super.key,
+    this.memory,
     this.showBackButton = true,
     this.onMoveToNav,
     this.focusTicket = 0,
@@ -23,17 +27,17 @@ class TvSettingsScreen extends StatefulWidget {
 
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _panelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-panel');
-  final FocusNode _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
-  final List<FocusNode> _rowNodes = <FocusNode>[];
+  final List<FocusNode> _rowNodes = [];
+  late final FocusNode _backNode;
+  late final TvFocusMemory _localMemory;
 
-  int _row = 0;
+  TvFocusMemory get _memory => widget.memory ?? _localMemory;
 
-  List<_SettingsSection> get _sections => <_SettingsSection>[
+  List<_SettingsSection> get _sections => [
         _SettingsSection(
           title: 'Tampilan & Navigasi',
           description: 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
-          items: <_SettingItem>[
+          items: [
             _SettingItem.radio(
               kind: _SettingKind.layoutAuto,
               title: 'Otomatis (Ikuti Hardware)',
@@ -53,7 +57,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Player',
-          items: <_SettingItem>[
+          items: [
             _SettingItem.tile(
               kind: _SettingKind.backgroundPoster,
               icon: Icons.image_rounded,
@@ -89,7 +93,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Tampilan Home',
-          items: <_SettingItem>[
+          items: [
             _SettingItem.tile(
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
@@ -102,7 +106,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Sumber & Izin',
-          items: <_SettingItem>[
+          items: [
             _SettingItem.tile(
               kind: _SettingKind.defaultPlatform,
               icon: Icons.layers_rounded,
@@ -121,7 +125,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Perawatan',
-          items: <_SettingItem>[
+          items: [
             _SettingItem.tile(
               kind: _SettingKind.reset,
               icon: Icons.delete_rounded,
@@ -134,30 +138,33 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
       ];
 
-  int get _itemCount => _sections.fold<int>(0, (int sum, _SettingsSection section) => sum + section.items.length);
+  int get _itemCount => _sections.fold<int>(0, (sum, section) => sum + section.items.length);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _enterRightPanel(resetIfEmpty: true));
+    _localMemory = TvFocusMemory();
+    _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusEntry();
+    });
   }
 
   @override
   void didUpdateWidget(covariant TvSettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusTicket != widget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _enterRightPanel());
+      _focusEntry();
     }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
-    _panelNode.dispose();
-    _backNode.dispose();
-    for (final FocusNode node in _rowNodes) {
+    for (final node in _rowNodes) {
       node.dispose();
     }
+    _backNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -169,10 +176,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       _rowNodes.removeLast().dispose();
     }
     if (_rowNodes.isNotEmpty) {
-      _row = _row.clamp(0, _rowNodes.length - 1);
-    } else {
-      _row = 0;
+      _memory.lastSettingsIndex = _safeIndex(_memory.lastSettingsIndex);
     }
+  }
+
+  int _safeIndex(int value) {
+    if (_rowNodes.isEmpty) return 0;
+    final max = _rowNodes.length - 1;
+    if (value < 0) return 0;
+    if (value > max) return max;
+    return value;
   }
 
   bool _isSelect(LogicalKeyboardKey key) {
@@ -188,93 +201,62 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         key == LogicalKeyboardKey.browserBack;
   }
 
-  void _enterRightPanel({bool resetIfEmpty = false}) {
-    if (!mounted) return;
-    _syncRowNodes(_itemCount);
-    if (_rowNodes.isEmpty) {
-      _panelNode.requestFocus();
-      return;
-    }
-    if (resetIfEmpty && _rowNodes.every((FocusNode node) => !node.hasFocus)) {
-      _row = 0;
-    }
-    _focusRow(_row, alignment: 0.22);
+  void _focusEntry() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncRowNodes(_itemCount);
+      if (_rowNodes.isEmpty) return;
+      _focusRow(_memory.lastSettingsIndex);
+    });
   }
 
   void _focusBack() {
     if (!widget.showBackButton) return;
-    focusAndReveal(_backNode, alignment: 0.06);
+    _memory.lastRightZone = TvFocusZone.settings;
+    _memory.lastRightFocus = _backNode;
+    focusAndReveal(_backNode, alignment: 0.05);
   }
 
-  void _focusRow(int index, {double alignment = 0.26}) {
+  void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
-    final int safe = index.clamp(0, _rowNodes.length - 1);
-    _row = safe;
-    focusAndReveal(_rowNodes[safe], alignment: alignment);
+    final safe = _safeIndex(index);
+    _memory.rememberRight(_rowNodes[safe], TvFocusZone.settings, settingsIndex: safe);
+    focusAndReveal(_rowNodes[safe], alignment: 0.28);
   }
 
   void _moveToNav() {
-    if (widget.onMoveToNav != null) {
-      widget.onMoveToNav!.call();
-      return;
-    }
-    if (widget.showBackButton) {
-      _focusBack();
-    }
-  }
-
-  KeyEventResult _panelKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final LogicalKeyboardKey key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
-      return KeyEventResult.handled;
-    }
-
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || _isSelect(key)) {
-      _enterRightPanel();
-      return KeyEventResult.handled;
-    }
-
-    if (_isBack(key)) {
-      if (widget.showBackButton) {
-        Navigator.of(context).maybePop();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    return KeyEventResult.ignored;
+    widget.onMoveToNav?.call();
   }
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final LogicalKeyboardKey key = event.logicalKey;
+    final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-      _focusRow(0, alignment: 0.18);
+      _focusRow(_memory.lastSettingsIndex);
       return KeyEventResult.handled;
     }
-
+    if (key == LogicalKeyboardKey.arrowLeft && widget.onMoveToNav != null) {
+      _moveToNav();
+      return KeyEventResult.handled;
+    }
     if (_isSelect(key) || _isBack(key)) {
       Navigator.of(context).maybePop();
       return KeyEventResult.handled;
     }
-
     return KeyEventResult.ignored;
   }
 
   KeyEventResult _rowKey(int index, _SettingItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final LogicalKeyboardKey key = event.logicalKey;
+    final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
       if (index == 0) {
         if (widget.showBackButton) {
           _focusBack();
         } else {
-          _focusRow(0, alignment: 0.18);
+          _focusRow(0);
         }
       } else {
         _focusRow(index - 1);
@@ -292,12 +274,17 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
+      if (widget.onMoveToNav != null) {
+        _moveToNav();
+      } else if (widget.showBackButton) {
+        _focusBack();
+      }
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
       _activate(item.kind);
+      _focusRow(index);
       return KeyEventResult.handled;
     }
 
@@ -336,18 +323,18 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         case _SettingKind.drmMode:
           _cycleString(
             current: LiveGoSettings.drmMode,
-            values: const <String>['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'],
-            setter: (String value) => LiveGoSettings.drmMode = value,
+            values: const ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'],
+            setter: (value) => LiveGoSettings.drmMode = value,
           );
           break;
         case _SettingKind.tvGrid:
           LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 4 : LiveGoSettings.tvHomeGrid + 1);
           break;
         case _SettingKind.defaultPlatform:
-          final List<String> values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
+          final values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
           if (values.isEmpty) return;
-          final int current = values.indexOf(LiveGoSettings.defaultPlatform);
-          LiveGoSettings.defaultPlatform = values[current < 0 ? 0 : (current + 1) % values.length];
+          final currentIndex = values.indexOf(LiveGoSettings.defaultPlatform);
+          LiveGoSettings.defaultPlatform = values[currentIndex < 0 ? 0 : (currentIndex + 1) % values.length];
           break;
         case _SettingKind.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
@@ -357,39 +344,38 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusRow(_row);
-    });
   }
 
   void _cycleString({required String current, required List<String> values, required ValueChanged<String> setter}) {
-    final int index = values.indexOf(current);
+    final index = values.indexOf(current);
     setter(values[index < 0 ? 0 : (index + 1) % values.length]);
   }
 
   @override
   Widget build(BuildContext context) {
     _syncRowNodes(_itemCount);
+    final sectionWidgets = <Widget>[];
+    var cursor = 0;
 
-    final List<Widget> sectionWidgets = <Widget>[];
-    int cursor = 0;
-    for (final _SettingsSection section in _sections) {
-      final List<Widget> rows = <Widget>[];
-      for (final _SettingItem item in section.items) {
-        final int index = cursor++;
+    for (final section in _sections) {
+      final rows = <Widget>[];
+      for (final item in section.items) {
+        final rowIndex = cursor++;
         rows.add(
           _FocusedSettingRow(
-            node: _rowNodes[index],
+            node: _rowNodes[rowIndex],
             item: item,
-            onKey: (FocusNode node, KeyEvent event) => _rowKey(index, item, event),
-            onTap: () => _activate(item.kind),
-            onFocused: () => _row = index,
+            onKey: (node, event) => _rowKey(rowIndex, item, event),
+            onTap: () {
+              _activate(item.kind);
+              _focusRow(rowIndex);
+            },
             isLast: item == section.items.last,
           ),
         );
       }
 
-      sectionWidgets.addAll(<Widget>[
+      sectionWidgets.addAll([
         _SectionTitle(section.title),
         const SizedBox(height: 10),
         _SettingsCard(description: section.description, children: rows),
@@ -397,44 +383,39 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       ]);
     }
 
-    return Focus(
-      focusNode: _panelNode,
-      skipTraversal: true,
-      onKeyEvent: _panelKey,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF050914),
-        body: DefaultTextStyle.merge(
-          style: const TextStyle(decoration: TextDecoration.none),
-          child: ListView(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
-            children: <Widget>[
-              _Header(
-                showBackButton: widget.showBackButton,
-                backNode: _backNode,
-                onBackKey: _backKey,
+    return Scaffold(
+      backgroundColor: const Color(0xFF050914),
+      body: DefaultTextStyle.merge(
+        style: const TextStyle(decoration: TextDecoration.none),
+        child: ListView(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
+          children: [
+            _Header(
+              showBackButton: widget.showBackButton,
+              backNode: _backNode,
+              onBackKey: _backKey,
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: const [
+                _HeaderPill('Display'),
+                SizedBox(width: 10),
+                _HeaderPill('Player'),
+                SizedBox(width: 10),
+                _HeaderPill('Source'),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...sectionWidgets,
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 10),
+              child: Text(
+                'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
+                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: const <Widget>[
-                  _HeaderPill('Display'),
-                  SizedBox(width: 10),
-                  _HeaderPill('Player'),
-                  SizedBox(width: 10),
-                  _HeaderPill('Source'),
-                ],
-              ),
-              const SizedBox(height: 20),
-              ...sectionWidgets,
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 10),
-                child: Text(
-                  'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
-                  style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -541,11 +522,11 @@ class _Header extends StatelessWidget {
         color: const Color(0xFF09111E).withOpacity(0.96),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFF1C3148)),
-        boxShadow: const <BoxShadow>[BoxShadow(color: Colors.black45, blurRadius: 22)],
+        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
       ),
       child: Row(
-        children: <Widget>[
-          if (showBackButton) ...<Widget>[
+        children: [
+          if (showBackButton) ...[
             _BackButton(node: backNode, onKey: onBackKey),
             const SizedBox(width: 18),
           ],
@@ -553,7 +534,7 @@ class _Header extends StatelessWidget {
             width: 86,
             height: 86,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: <Color>[AppTheme.cyan, AppTheme.purple]),
+              gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
               borderRadius: BorderRadius.circular(24),
             ),
             child: const Icon(Icons.settings_rounded, color: Colors.white, size: 42),
@@ -562,12 +543,12 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const <Widget>[
-                Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
+              children: const [
+                Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2, decoration: TextDecoration.none)),
                 SizedBox(height: 10),
-                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 SizedBox(height: 8),
-                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 14, height: 1.35, fontWeight: FontWeight.w700)),
+                Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 14, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               ],
             ),
           ),
@@ -596,7 +577,7 @@ class _BackButtonState extends State<_BackButton> {
       focusNode: widget.node,
       skipTraversal: true,
       onKeyEvent: widget.onKey,
-      onFocusChange: (bool value) => setState(() => _focused = value),
+      onFocusChange: (v) => setState(() => _focused = v),
       child: InkWell(
         onTap: () => Navigator.of(context).maybePop(),
         borderRadius: BorderRadius.circular(16),
@@ -630,7 +611,7 @@ class _HeaderPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white10),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
     );
   }
 }
@@ -652,11 +633,11 @@ class _SettingsCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (description != null) ...<Widget>[
+        children: [
+          if (description != null) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.35, fontWeight: FontWeight.w700)),
+              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
             ),
             const SizedBox(height: 4),
           ],
@@ -672,7 +653,6 @@ class _FocusedSettingRow extends StatefulWidget {
   final _SettingItem item;
   final FocusOnKeyEventCallback onKey;
   final VoidCallback onTap;
-  final VoidCallback onFocused;
   final bool isLast;
 
   const _FocusedSettingRow({
@@ -680,7 +660,6 @@ class _FocusedSettingRow extends StatefulWidget {
     required this.item,
     required this.onKey,
     required this.onTap,
-    required this.onFocused,
     required this.isLast,
   });
 
@@ -693,24 +672,21 @@ class _FocusedSettingRowState extends State<_FocusedSettingRow> {
 
   @override
   Widget build(BuildContext context) {
-    final _SettingItem item = widget.item;
-    final Color accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
-    final bool isRadio = item.style == _SettingItemStyle.radio;
+    final item = widget.item;
+    final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
+    final isRadio = item.style == _SettingItemStyle.radio;
 
     return Focus(
       focusNode: widget.node,
       skipTraversal: true,
       onKeyEvent: widget.onKey,
-      onFocusChange: (bool value) {
-        setState(() => _focused = value);
-        if (value) widget.onFocused();
-      },
+      onFocusChange: (v) => setState(() => _focused = v),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(20),
         focusColor: Colors.transparent,
         child: Column(
-          children: <Widget>[
+          children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 120),
               margin: const EdgeInsets.symmetric(vertical: 5),
@@ -719,7 +695,7 @@ class _FocusedSettingRowState extends State<_FocusedSettingRow> {
                 color: _focused ? const Color(0xFF102F45) : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _focused ? accent : Colors.transparent, width: 2),
-                boxShadow: _focused ? <BoxShadow>[BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
+                boxShadow: _focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
               ),
               child: isRadio ? _RadioContent(item: item, focused: _focused) : _TileContent(item: item, focused: _focused, accent: accent),
             ),
@@ -740,7 +716,7 @@ class _RadioContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: <Widget>[
+      children: [
         Icon(
           item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
           color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft,
@@ -750,10 +726,11 @@ class _RadioContent extends StatelessWidget {
         Expanded(
           child: Text(
             item.title,
-            style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17),
+            style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17, decoration: TextDecoration.none),
           ),
         ),
-        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12)),
+        if (item.active)
+          const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
       ],
     );
   }
@@ -769,7 +746,7 @@ class _TileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: <Widget>[
+      children: [
         Container(
           width: 56,
           height: 56,
@@ -784,19 +761,19 @@ class _TileContent extends StatelessWidget {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
+            children: [
               Text(
                 item.title,
-                style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
               ),
               const SizedBox(height: 5),
               Text(
                 item.subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700),
+                style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
               ),
-              if (item.showGridBar) ...<Widget>[
+              if (item.showGridBar) ...[
                 const SizedBox(height: 12),
                 _GridPreview(value: LiveGoSettings.tvHomeGrid),
               ],
@@ -809,7 +786,7 @@ class _TileContent extends StatelessWidget {
         else
           Text(
             item.value,
-            style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14),
+            style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 14, decoration: TextDecoration.none),
           ),
         const SizedBox(width: 12),
         Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 30),
@@ -853,10 +830,10 @@ class _GridPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double normalized = ((value - 4) / 6).clamp(0.0, 1.0).toDouble();
+    final normalized = ((value - 4) / 6).clamp(0.0, 1.0);
     return Row(
-      children: <Widget>[
-        const Text('Grid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+      children: [
+        const Text('Grid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
         const SizedBox(width: 14),
         Expanded(
           child: ClipRRect(
@@ -870,7 +847,7 @@ class _GridPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 14),
-        Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
+        Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18, decoration: TextDecoration.none)),
       ],
     );
   }
@@ -887,7 +864,7 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(left: 2),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+        style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2, decoration: TextDecoration.none),
       ),
     );
   }

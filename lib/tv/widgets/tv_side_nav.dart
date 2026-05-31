@@ -81,7 +81,12 @@ class _TvSideNavState extends State<TvSideNav> {
     if (next != _expanded) setState(() => _expanded = next);
   }
 
-  int _safeIndex(int value) => value.clamp(0, TvSideNav.items.length - 1);
+  int _safeIndex(int value) {
+    final max = TvSideNav.items.length - 1;
+    if (value < 0) return 0;
+    if (value > max) return max;
+    return value;
+  }
 
   bool _isSelect(LogicalKeyboardKey key) {
     return key == LogicalKeyboardKey.select ||

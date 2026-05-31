@@ -4,7 +4,9 @@ enum TvFocusZone {
   platform,
   category,
   grid,
+  account,
+  settings,
+  placeholder,
   overlay,
   player,
-  settings,
 }

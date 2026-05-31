@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 void focusAndReveal(
   FocusNode node, {
-  double alignment = 0.15,
+  double alignment = 0.28,
   Duration duration = const Duration(milliseconds: 180),
 }) {
   WidgetsBinding.instance.addPostFrameCallback((_) {

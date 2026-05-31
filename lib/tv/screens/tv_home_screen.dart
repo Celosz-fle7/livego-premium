@@ -12,10 +12,16 @@ import '../focus/tv_focus_zone.dart';
 import '../focus/tv_scroll_engine.dart';
 
 class TvHomeScreen extends StatefulWidget {
+  final TvFocusMemory memory;
   final VoidCallback? onMoveToNav;
   final int focusTicket;
 
-  const TvHomeScreen({super.key, this.onMoveToNav, this.focusTicket = 0});
+  const TvHomeScreen({
+    super.key,
+    required this.memory,
+    this.onMoveToNav,
+    this.focusTicket = 0,
+  });
 
   @override
   State<TvHomeScreen> createState() => _TvHomeScreenState();
@@ -34,7 +40,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   final List<FocusNode> _gridNodes = [];
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
 
-  late final TvFocusMemory _focusMemory;
+  TvFocusMemory get _focusMemory => widget.memory;
 
   static const int _gridColumns = 7;
 
@@ -48,7 +54,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _focusMemory = TvFocusMemory();
     _future = _load();
   }
 
@@ -128,7 +133,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   int _safe(int value, int length) {
     if (length <= 0) return 0;
-    return value.clamp(0, length - 1);
+    final max = length - 1;
+    if (value < 0) return 0;
+    if (value > max) return max;
+    return value;
   }
 
   void _open(ContentItem item) {
@@ -167,50 +175,12 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return;
     }
 
-    // Safe fallback: enter from the top of the TV content, then move down with remote.
-    if (_bannerNode.canRequestFocus) {
-      _focusMemory.lastRightZone = TvFocusZone.banner;
-      _focus(_bannerNode);
-      return;
-    }
-    if (_platformNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.platform;
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    if (_categoryNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.category;
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-    }
+    // First entry from the navbar should start at the top of Home.
+    _focusMemory.lastRightZone = TvFocusZone.banner;
+    _focus(_bannerNode);
   }
 
   void _focusRightFallback() {
-    if (_platformNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.platform;
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
-      return;
-    }
-    if (_categoryNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.category;
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
-      return;
-    }
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
     _focusMemory.lastRightZone = TvFocusZone.banner;
     _focus(_bannerNode);
   }
@@ -228,7 +198,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _focusRightFallback();
+      _focusMemory.lastRightZone = TvFocusZone.banner;
+      _focus(_bannerNode);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
