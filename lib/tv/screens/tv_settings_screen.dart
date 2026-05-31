@@ -213,7 +213,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   void _focusBack() {
     if (!widget.showBackButton) return;
     _memory.lastRightZone = TvFocusZone.settings;
-    _memory.lastRightFocus = _backNode;
     focusAndReveal(_backNode, alignment: 0.05);
   }
 

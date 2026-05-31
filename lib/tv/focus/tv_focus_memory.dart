@@ -10,10 +10,8 @@ class TvFocusMemory {
   int lastSettingsIndex = 0;
   int lastAccountIndex = 0;
   TvFocusZone lastRightZone = TvFocusZone.banner;
-  FocusNode? lastRightFocus;
-
   void rememberRight(
-    FocusNode node,
+    FocusNode _,
     TvFocusZone zone, {
     int? platformIndex,
     int? categoryIndex,
@@ -21,7 +19,6 @@ class TvFocusMemory {
     int? settingsIndex,
     int? accountIndex,
   }) {
-    lastRightFocus = node;
     lastRightZone = zone;
     if (platformIndex != null) lastPlatformIndex = platformIndex;
     if (categoryIndex != null) lastCategoryIndex = categoryIndex;
@@ -30,7 +27,5 @@ class TvFocusMemory {
     if (accountIndex != null) lastAccountIndex = accountIndex;
   }
 
-  void clearRightNode() {
-    lastRightFocus = null;
-  }
+  void clearRightNode() {}
 }

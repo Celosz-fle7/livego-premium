@@ -21,7 +21,6 @@ class _TvAppState extends State<TvApp> {
   int _homeFocusTicket = 0;
   int _placeholderFocusTicket = 0;
   int _accountFocusTicket = 0;
-
   late final List<FocusNode> _navNodes;
   final TvFocusMemory _homeMemory = TvFocusMemory();
   final TvFocusMemory _accountMemory = TvFocusMemory();
@@ -145,11 +144,10 @@ class _TvAppState extends State<TvApp> {
           focusTicket: _accountFocusTicket,
         );
       default:
-        return TvPlaceholderScreen(
-          title: 'LiveGo',
-          icon: Icons.tv_rounded,
+        return TvHomeScreen(
+          memory: _homeMemory,
           onMoveToNav: _focusCurrentNav,
-          focusTicket: _placeholderFocusTicket,
+          focusTicket: _homeFocusTicket,
         );
     }
   }
