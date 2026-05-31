@@ -5,7 +5,7 @@ class TvFocusMemory {
   int lastPlatformIndex = 0;
   int lastCategoryIndex = 0;
   int lastGridIndex = 0;
-  TvFocusZone lastRightZone = TvFocusZone.grid;
+  TvFocusZone lastRightZone = TvFocusZone.banner;
   FocusNode? lastRightFocus;
 
 

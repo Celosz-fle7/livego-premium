@@ -22,15 +22,18 @@ class TvSettingsScreen extends StatefulWidget {
 }
 
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
-  final List<FocusNode> _rowNodes = [];
-  late final FocusNode _backNode;
+  final ScrollController _scrollController = ScrollController();
+  final FocusNode _panelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-panel');
+  final FocusNode _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
+  final List<FocusNode> _rowNodes = <FocusNode>[];
+
   int _row = 0;
 
-  List<_SettingsSection> get _sections => [
+  List<_SettingsSection> get _sections => <_SettingsSection>[
         _SettingsSection(
           title: 'Tampilan & Navigasi',
           description: 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
-          items: [
+          items: <_SettingItem>[
             _SettingItem.radio(
               kind: _SettingKind.layoutAuto,
               title: 'Otomatis (Ikuti Hardware)',
@@ -50,7 +53,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Player',
-          items: [
+          items: <_SettingItem>[
             _SettingItem.tile(
               kind: _SettingKind.backgroundPoster,
               icon: Icons.image_rounded,
@@ -86,7 +89,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Tampilan Home',
-          items: [
+          items: <_SettingItem>[
             _SettingItem.tile(
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
@@ -99,7 +102,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Sumber & Izin',
-          items: [
+          items: <_SettingItem>[
             _SettingItem.tile(
               kind: _SettingKind.defaultPlatform,
               icon: Icons.layers_rounded,
@@ -118,7 +121,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
         _SettingsSection(
           title: 'Perawatan',
-          items: [
+          items: <_SettingItem>[
             _SettingItem.tile(
               kind: _SettingKind.reset,
               icon: Icons.delete_rounded,
@@ -131,37 +134,30 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ),
       ];
 
-  int get _itemCount => _sections.fold<int>(0, (sum, section) => sum + section.items.length);
+  int get _itemCount => _sections.fold<int>(0, (int sum, _SettingsSection section) => sum + section.items.length);
 
   @override
   void initState() {
     super.initState();
-    _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-back');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncRowNodes(_itemCount);
-      _focusRow(0);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _enterRightPanel(resetIfEmpty: true));
   }
 
   @override
   void didUpdateWidget(covariant TvSettingsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusTicket != widget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _syncRowNodes(_itemCount);
-        _focusRow(_row);
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _enterRightPanel());
     }
   }
 
   @override
   void dispose() {
-    for (final node in _rowNodes) {
+    _scrollController.dispose();
+    _panelNode.dispose();
+    _backNode.dispose();
+    for (final FocusNode node in _rowNodes) {
       node.dispose();
     }
-    _backNode.dispose();
     super.dispose();
   }
 
@@ -172,7 +168,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     while (_rowNodes.length > count) {
       _rowNodes.removeLast().dispose();
     }
-    if (_rowNodes.isNotEmpty) _row = _row.clamp(0, _rowNodes.length - 1);
+    if (_rowNodes.isNotEmpty) {
+      _row = _row.clamp(0, _rowNodes.length - 1);
+    } else {
+      _row = 0;
+    }
   }
 
   bool _isSelect(LogicalKeyboardKey key) {
@@ -188,16 +188,29 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         key == LogicalKeyboardKey.browserBack;
   }
 
-  void _focusBack() {
-    if (!widget.showBackButton) return;
-    focusAndReveal(_backNode, alignment: 0.05);
+  void _enterRightPanel({bool resetIfEmpty = false}) {
+    if (!mounted) return;
+    _syncRowNodes(_itemCount);
+    if (_rowNodes.isEmpty) {
+      _panelNode.requestFocus();
+      return;
+    }
+    if (resetIfEmpty && _rowNodes.every((FocusNode node) => !node.hasFocus)) {
+      _row = 0;
+    }
+    _focusRow(_row, alignment: 0.22);
   }
 
-  void _focusRow(int index) {
+  void _focusBack() {
+    if (!widget.showBackButton) return;
+    focusAndReveal(_backNode, alignment: 0.06);
+  }
+
+  void _focusRow(int index, {double alignment = 0.26}) {
     if (_rowNodes.isEmpty) return;
-    final safe = index.clamp(0, _rowNodes.length - 1);
+    final int safe = index.clamp(0, _rowNodes.length - 1);
     _row = safe;
-    focusAndReveal(_rowNodes[safe], alignment: 0.30);
+    focusAndReveal(_rowNodes[safe], alignment: alignment);
   }
 
   void _moveToNav() {
@@ -205,15 +218,42 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       widget.onMoveToNav!.call();
       return;
     }
-    _focusBack();
+    if (widget.showBackButton) {
+      _focusBack();
+    }
+  }
+
+  KeyEventResult _panelKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    final LogicalKeyboardKey key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveToNav();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown || _isSelect(key)) {
+      _enterRightPanel();
+      return KeyEventResult.handled;
+    }
+
+    if (_isBack(key)) {
+      if (widget.showBackButton) {
+        Navigator.of(context).maybePop();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+
+    return KeyEventResult.ignored;
   }
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
+    final LogicalKeyboardKey key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-      _focusRow(0);
+      _focusRow(0, alignment: 0.18);
       return KeyEventResult.handled;
     }
 
@@ -227,11 +267,15 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   KeyEventResult _rowKey(int index, _SettingItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
+    final LogicalKeyboardKey key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
       if (index == 0) {
-        if (widget.showBackButton) _focusBack();
+        if (widget.showBackButton) {
+          _focusBack();
+        } else {
+          _focusRow(0, alignment: 0.18);
+        }
       } else {
         _focusRow(index - 1);
       }
@@ -239,7 +283,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (index < _rowNodes.length - 1) _focusRow(index + 1);
+      if (index < _rowNodes.length - 1) {
+        _focusRow(index + 1);
+      } else {
+        _focusRow(index);
+      }
       return KeyEventResult.handled;
     }
 
@@ -288,18 +336,18 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         case _SettingKind.drmMode:
           _cycleString(
             current: LiveGoSettings.drmMode,
-            values: const ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'],
-            setter: (value) => LiveGoSettings.drmMode = value,
+            values: const <String>['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'],
+            setter: (String value) => LiveGoSettings.drmMode = value,
           );
           break;
         case _SettingKind.tvGrid:
           LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid >= 10 ? 4 : LiveGoSettings.tvHomeGrid + 1);
           break;
         case _SettingKind.defaultPlatform:
-          final values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
+          final List<String> values = LiveGoSettings.homePlatforms.isNotEmpty ? LiveGoSettings.homePlatforms : LiveGoSettings.defaultPlatforms;
           if (values.isEmpty) return;
-          final index = values.indexOf(LiveGoSettings.defaultPlatform);
-          LiveGoSettings.defaultPlatform = values[index < 0 ? 0 : (index + 1) % values.length];
+          final int current = values.indexOf(LiveGoSettings.defaultPlatform);
+          LiveGoSettings.defaultPlatform = values[current < 0 ? 0 : (current + 1) % values.length];
           break;
         case _SettingKind.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
@@ -309,35 +357,39 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusRow(_row);
+    });
   }
 
   void _cycleString({required String current, required List<String> values, required ValueChanged<String> setter}) {
-    final index = values.indexOf(current);
+    final int index = values.indexOf(current);
     setter(values[index < 0 ? 0 : (index + 1) % values.length]);
   }
 
   @override
   Widget build(BuildContext context) {
     _syncRowNodes(_itemCount);
-    final sectionWidgets = <Widget>[];
-    var cursor = 0;
 
-    for (final section in _sections) {
-      final rows = <Widget>[];
-      for (final item in section.items) {
-        final index = cursor++;
+    final List<Widget> sectionWidgets = <Widget>[];
+    int cursor = 0;
+    for (final _SettingsSection section in _sections) {
+      final List<Widget> rows = <Widget>[];
+      for (final _SettingItem item in section.items) {
+        final int index = cursor++;
         rows.add(
           _FocusedSettingRow(
             node: _rowNodes[index],
             item: item,
-            onKey: (node, event) => _rowKey(index, item, event),
+            onKey: (FocusNode node, KeyEvent event) => _rowKey(index, item, event),
             onTap: () => _activate(item.kind),
+            onFocused: () => _row = index,
             isLast: item == section.items.last,
           ),
         );
       }
 
-      sectionWidgets.addAll([
+      sectionWidgets.addAll(<Widget>[
         _SectionTitle(section.title),
         const SizedBox(height: 10),
         _SettingsCard(description: section.description, children: rows),
@@ -345,38 +397,44 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       ]);
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF050914),
-      body: DefaultTextStyle.merge(
-        style: const TextStyle(decoration: TextDecoration.none),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
-          children: [
-            _Header(
-              showBackButton: widget.showBackButton,
-              backNode: _backNode,
-              onBackKey: _backKey,
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: const [
-                _HeaderPill('Display'),
-                SizedBox(width: 10),
-                _HeaderPill('Player'),
-                SizedBox(width: 10),
-                _HeaderPill('Source'),
-              ],
-            ),
-            const SizedBox(height: 20),
-            ...sectionWidgets,
-            Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 10),
-              child: Text(
-                'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
-                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
+    return Focus(
+      focusNode: _panelNode,
+      skipTraversal: true,
+      onKeyEvent: _panelKey,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF050914),
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(decoration: TextDecoration.none),
+          child: ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(22, 22, 34, 34),
+            children: <Widget>[
+              _Header(
+                showBackButton: widget.showBackButton,
+                backNode: _backNode,
+                onBackKey: _backKey,
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              Row(
+                children: const <Widget>[
+                  _HeaderPill('Display'),
+                  SizedBox(width: 10),
+                  _HeaderPill('Player'),
+                  SizedBox(width: 10),
+                  _HeaderPill('Source'),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ...sectionWidgets,
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 10),
+                child: Text(
+                  'Remote: ↑↓ pilih item • OK/→ ubah nilai • ← kembali ke navbar',
+                  style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -483,11 +541,11 @@ class _Header extends StatelessWidget {
         color: const Color(0xFF09111E).withOpacity(0.96),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFF1C3148)),
-        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
+        boxShadow: const <BoxShadow>[BoxShadow(color: Colors.black45, blurRadius: 22)],
       ),
       child: Row(
-        children: [
-          if (showBackButton) ...[
+        children: <Widget>[
+          if (showBackButton) ...<Widget>[
             _BackButton(node: backNode, onKey: onBackKey),
             const SizedBox(width: 18),
           ],
@@ -495,7 +553,7 @@ class _Header extends StatelessWidget {
             width: 86,
             height: 86,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
+              gradient: const LinearGradient(colors: <Color>[AppTheme.cyan, AppTheme.purple]),
               borderRadius: BorderRadius.circular(24),
             ),
             child: const Icon(Icons.settings_rounded, color: Colors.white, size: 42),
@@ -504,7 +562,7 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: const <Widget>[
                 Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2)),
                 SizedBox(height: 10),
                 Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
@@ -538,7 +596,7 @@ class _BackButtonState extends State<_BackButton> {
       focusNode: widget.node,
       skipTraversal: true,
       onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => _focused = v),
+      onFocusChange: (bool value) => setState(() => _focused = value),
       child: InkWell(
         onTap: () => Navigator.of(context).maybePop(),
         borderRadius: BorderRadius.circular(16),
@@ -594,8 +652,8 @@ class _SettingsCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (description != null) ...[
+        children: <Widget>[
+          if (description != null) ...<Widget>[
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
               child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.35, fontWeight: FontWeight.w700)),
@@ -614,6 +672,7 @@ class _FocusedSettingRow extends StatefulWidget {
   final _SettingItem item;
   final FocusOnKeyEventCallback onKey;
   final VoidCallback onTap;
+  final VoidCallback onFocused;
   final bool isLast;
 
   const _FocusedSettingRow({
@@ -621,6 +680,7 @@ class _FocusedSettingRow extends StatefulWidget {
     required this.item,
     required this.onKey,
     required this.onTap,
+    required this.onFocused,
     required this.isLast,
   });
 
@@ -633,21 +693,24 @@ class _FocusedSettingRowState extends State<_FocusedSettingRow> {
 
   @override
   Widget build(BuildContext context) {
-    final item = widget.item;
-    final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
-    final isRadio = item.style == _SettingItemStyle.radio;
+    final _SettingItem item = widget.item;
+    final Color accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
+    final bool isRadio = item.style == _SettingItemStyle.radio;
 
     return Focus(
       focusNode: widget.node,
       skipTraversal: true,
       onKeyEvent: widget.onKey,
-      onFocusChange: (v) => setState(() => _focused = v),
+      onFocusChange: (bool value) {
+        setState(() => _focused = value);
+        if (value) widget.onFocused();
+      },
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(20),
         focusColor: Colors.transparent,
         child: Column(
-          children: [
+          children: <Widget>[
             AnimatedContainer(
               duration: const Duration(milliseconds: 120),
               margin: const EdgeInsets.symmetric(vertical: 5),
@@ -656,7 +719,7 @@ class _FocusedSettingRowState extends State<_FocusedSettingRow> {
                 color: _focused ? const Color(0xFF102F45) : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: _focused ? accent : Colors.transparent, width: 2),
-                boxShadow: _focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
+                boxShadow: _focused ? <BoxShadow>[BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
               ),
               child: isRadio ? _RadioContent(item: item, focused: _focused) : _TileContent(item: item, focused: _focused, accent: accent),
             ),
@@ -677,7 +740,7 @@ class _RadioContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
+      children: <Widget>[
         Icon(
           item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
           color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft,
@@ -690,8 +753,7 @@ class _RadioContent extends StatelessWidget {
             style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 17),
           ),
         ),
-        if (item.active)
-          const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12)),
+        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12)),
       ],
     );
   }
@@ -707,7 +769,7 @@ class _TileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
+      children: <Widget>[
         Container(
           width: 56,
           height: 56,
@@ -722,7 +784,7 @@ class _TileContent extends StatelessWidget {
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children: <Widget>[
               Text(
                 item.title,
                 style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
@@ -734,7 +796,7 @@ class _TileContent extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, height: 1.25, fontWeight: FontWeight.w700),
               ),
-              if (item.showGridBar) ...[
+              if (item.showGridBar) ...<Widget>[
                 const SizedBox(height: 12),
                 _GridPreview(value: LiveGoSettings.tvHomeGrid),
               ],
@@ -791,9 +853,9 @@ class _GridPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalized = ((value - 4) / 6).clamp(0.0, 1.0);
+    final double normalized = ((value - 4) / 6).clamp(0.0, 1.0).toDouble();
     return Row(
-      children: [
+      children: <Widget>[
         const Text('Grid', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
         const SizedBox(width: 14),
         Expanded(

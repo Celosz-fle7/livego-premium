@@ -167,17 +167,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return;
     }
 
-    // Safe fallback: enter the real content area first, not the banner trap.
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
-      return;
-    }
-    if (_categoryNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.category;
-      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
-      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+    // Safe fallback: enter from the top of the TV content, then move down with remote.
+    if (_bannerNode.canRequestFocus) {
+      _focusMemory.lastRightZone = TvFocusZone.banner;
+      _focus(_bannerNode);
       return;
     }
     if (_platformNodes.isNotEmpty) {
@@ -186,15 +179,24 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
       return;
     }
-    _focusMemory.lastRightZone = TvFocusZone.banner;
-    _focus(_bannerNode);
+    if (_categoryNodes.isNotEmpty) {
+      _focusMemory.lastRightZone = TvFocusZone.category;
+      _focusMemory.lastCategoryIndex = _safe(_focusMemory.lastCategoryIndex, _categoryNodes.length);
+      _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
+      return;
+    }
+    if (_gridNodes.isNotEmpty) {
+      _focusMemory.lastRightZone = TvFocusZone.grid;
+      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
+      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+    }
   }
 
   void _focusRightFallback() {
-    if (_gridNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.grid;
-      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
-      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
+    if (_platformNodes.isNotEmpty) {
+      _focusMemory.lastRightZone = TvFocusZone.platform;
+      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
+      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
       return;
     }
     if (_categoryNodes.isNotEmpty) {
@@ -203,10 +205,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _focus(_categoryNodes[_focusMemory.lastCategoryIndex]);
       return;
     }
-    if (_platformNodes.isNotEmpty) {
-      _focusMemory.lastRightZone = TvFocusZone.platform;
-      _focusMemory.lastPlatformIndex = _safe(_focusMemory.lastPlatformIndex, _platformNodes.length);
-      _focus(_platformNodes[_focusMemory.lastPlatformIndex]);
+    if (_gridNodes.isNotEmpty) {
+      _focusMemory.lastRightZone = TvFocusZone.grid;
+      _focusMemory.lastGridIndex = _safe(_focusMemory.lastGridIndex, _gridNodes.length);
+      _focus(_gridNodes[_focusMemory.lastGridIndex], alignment: 0.35);
       return;
     }
     _focusMemory.lastRightZone = TvFocusZone.banner;
