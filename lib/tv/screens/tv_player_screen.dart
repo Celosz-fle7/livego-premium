@@ -8,6 +8,7 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
+import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
@@ -27,6 +28,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   String _error = '';
   bool _loading = true;
   int _episode = 1;
+  int _knownEpisodeCount = 0;
   double _speed = 1.0;
   String _audioTrack = 'Source';
 
@@ -49,34 +51,102 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
   }
 
+  ContentItem _keepPlayableIdentity(ContentItem detail) {
+    return ContentItem(
+      id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
+      title: detail.title.trim().isNotEmpty ? detail.title : widget.item.title,
+      source: detail.source.trim().isNotEmpty ? detail.source : widget.item.source,
+      category: detail.category.trim().isNotEmpty ? detail.category : widget.item.category,
+      description: detail.description.trim().isNotEmpty ? detail.description : widget.item.description,
+      posterUrl: detail.posterUrl.trim().isNotEmpty ? detail.posterUrl : widget.item.posterUrl,
+      backdropUrl: detail.backdropUrl.trim().isNotEmpty ? detail.backdropUrl : widget.item.backdropUrl,
+      rating: detail.rating,
+      episodes: detail.episodes > 0 ? detail.episodes : widget.item.episodes,
+      updated: detail.updated || widget.item.updated,
+      platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
+      chapterId: detail.chapterId.trim().isNotEmpty ? detail.chapterId : widget.item.chapterId,
+      lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
+    );
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = '';
+      _url = '';
     });
 
     try {
-      final detail = await LiveGoCatalog.detail(widget.item);
-      final realEpisodes = await LiveGoCatalog.episodes(detail);
-      final safeIndex = _episode.clamp(1, realEpisodes.isEmpty ? (detail.episodes <= 0 ? 1 : detail.episodes) : realEpisodes.length);
+      final requestedEpisode = _episode <= 0 ? 1 : _episode;
+      final fastPlayable = ContentItem(
+        id: widget.item.id,
+        title: widget.item.title,
+        source: widget.item.source,
+        category: widget.item.category,
+        description: widget.item.description,
+        posterUrl: widget.item.posterUrl,
+        backdropUrl: widget.item.backdropUrl,
+        rating: widget.item.rating,
+        episodes: widget.item.episodes,
+        updated: widget.item.updated,
+        platformSlug: widget.item.platformSlug,
+        chapterId: '$requestedEpisode',
+        lang: widget.item.lang,
+      );
+
+      // TV API test path: hit the playable /episode route first, like mobile.
+      // Detail + episode metadata is slower and must not block first playback.
+      final streamFuture = LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode');
+      final detailFuture = LiveGoCatalog.detail(widget.item);
+
+      var stream = await streamFuture.timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => StreamInfo.empty,
+      );
+
+      ContentItem detail = widget.item;
+      List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
+      try {
+        detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(seconds: 4)));
+        realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 5));
+        final count = realEpisodes.length > 1 ? realEpisodes.length : detail.episodes;
+        if (mounted && count > 1 && count != _knownEpisodeCount) {
+          setState(() => _knownEpisodeCount = count);
+        }
+      } catch (e) {
+        debugPrint('LIVEGO TV PLAYER metadata skipped: $e');
+      }
+
+      final fallbackTotal = widget.item.episodes > 0
+          ? widget.item.episodes
+          : (detail.episodes > 0 ? detail.episodes : (stream.totalEpisodes > 1 ? stream.totalEpisodes : 1));
+      final safeIndex = requestedEpisode.clamp(1, realEpisodes.isEmpty ? fallbackTotal : realEpisodes.length);
       final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
       final selected = ContentItem(
-        id: detail.id,
-        title: detail.title,
-        source: detail.source,
-        category: detail.category,
-        description: detail.description,
-        posterUrl: detail.posterUrl,
-        backdropUrl: detail.backdropUrl,
+        id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
+        title: detail.title.trim().isNotEmpty ? detail.title : widget.item.title,
+        source: detail.source.trim().isNotEmpty ? detail.source : widget.item.source,
+        category: detail.category.trim().isNotEmpty ? detail.category : widget.item.category,
+        description: detail.description.trim().isNotEmpty ? detail.description : widget.item.description,
+        posterUrl: detail.posterUrl.trim().isNotEmpty ? detail.posterUrl : widget.item.posterUrl,
+        backdropUrl: detail.backdropUrl.trim().isNotEmpty ? detail.backdropUrl : widget.item.backdropUrl,
         rating: detail.rating,
-        episodes: realEpisodes.isEmpty ? detail.episodes : realEpisodes.length,
-        updated: detail.updated,
-        platformSlug: detail.platformSlug,
+        episodes: realEpisodes.isEmpty ? fallbackTotal : realEpisodes.length,
+        updated: detail.updated || widget.item.updated,
+        platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
         chapterId: episodeId,
-        lang: detail.lang,
+        lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
       );
-      final stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId);
-      final total = realEpisodes.isNotEmpty ? realEpisodes.length : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
+
+      // Retry with resolved detail/episode id only if the fast video API path failed.
+      if (stream.url.isEmpty) {
+        stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId)
+            .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
+      }
+
+      final total = realEpisodes.isNotEmpty
+          ? realEpisodes.length
+          : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
       final playable = ContentItem(
         id: selected.id,
         title: selected.title,
@@ -92,6 +162,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         chapterId: episodeId,
         lang: selected.lang,
       );
+
+      debugPrint('LIVEGO TV VIDEO API ${playable.platformSlug} id=${playable.id} ep=$episodeId stream=${stream.url.isNotEmpty} qualities=${stream.qualities.length} total=${playable.episodes}');
+
       await _controller?.dispose();
       _controller = null;
       _detail = playable;
@@ -331,6 +404,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(item.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.45)),
+                    const SizedBox(height: 8),
+                    Text(
+                      _url.isEmpty ? 'Video API: belum ada stream' : 'Video API: OK • ${item.platformSlug} • Ep $_episode',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w800),
+                    ),
                   ],
                 ),
               ),
@@ -338,7 +418,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               SizedBox(
                 width: 290,
                 child: _EpisodePanel(
-                  total: item.episodes.clamp(1, 120).toInt(),
+                  total: ((_knownEpisodeCount > item.episodes ? _knownEpisodeCount : item.episodes).clamp(1, 120)).toInt(),
                   selected: _episode,
                   onSelect: _selectEpisode,
                 ),

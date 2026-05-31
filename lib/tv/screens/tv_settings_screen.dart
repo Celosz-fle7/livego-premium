@@ -85,7 +85,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
               title: 'Jumlah Grid Home TV',
-              subtitle: 'Gunakan kiri/kanan untuk mengatur jumlah poster. Batas TV 4 sampai 10 grid.',
+              subtitle: 'Tekan OK atau kanan untuk mengatur jumlah poster TV. Batas TV sampai 10 grid.',
               value: '${LiveGoSettings.tvHomeGrid}',
               showGridBar: true,
             ),
@@ -258,28 +258,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _lastRow = index;
-      if (item.kind == _SettingKind.tvGrid) {
-        _changeTvGrid(-1);
-        _focusRow(index);
-      } else if (widget.onMoveToNav != null) {
+      if (widget.onMoveToNav != null) {
+        _lastRow = index;
         widget.onMoveToNav?.call();
       } else if (widget.showBackButton) {
+        _lastRow = index;
         _focusBack();
       }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _lastRow = index;
-      if (item.kind == _SettingKind.tvGrid) {
-        _changeTvGrid(1);
-      } else {
-        _activate(item.kind);
-      }
-      _focusRow(index);
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
+    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
       _lastRow = index;
       _activate(item.kind);
       _focusRow(index);
@@ -290,12 +278,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
-  }
-
-  void _changeTvGrid(int delta) {
-    setState(() {
-      LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta);
-    });
   }
 
   void _activate(_SettingKind kind) {
@@ -795,7 +777,7 @@ class _TileContent extends StatelessWidget {
               Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               if (item.showGridBar) ...[
                 const SizedBox(height: 12),
-                _GridStepper(value: LiveGoSettings.tvHomeGrid),
+                _GridPreview(value: LiveGoSettings.tvHomeGrid),
               ],
             ],
           ),
@@ -836,67 +818,26 @@ class _SwitchPill extends StatelessWidget {
   }
 }
 
-class _GridStepper extends StatelessWidget {
+class _GridPreview extends StatelessWidget {
   final int value;
-  const _GridStepper({required this.value});
+  const _GridPreview({required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
-        const _GridStepBox(text: '−'),
-        Container(
-          width: 64,
-          height: 34,
-          alignment: Alignment.center,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111B2A),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
+      children: List.generate(10, (i) {
+        final active = i < value;
+        return Expanded(
+          child: Container(
+            height: 6,
+            margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
+            decoration: BoxDecoration(
+              color: active ? AppTheme.cyan : const Color(0xFF26364B),
+              borderRadius: BorderRadius.circular(999),
+            ),
           ),
-          child: Text('$value', style: const TextStyle(color: AppTheme.cyan, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-        ),
-        const _GridStepBox(text: '+'),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Row(
-            children: List.generate(10, (i) {
-              final active = i < value;
-              return Expanded(
-                child: Container(
-                  height: 6,
-                  margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
-                  decoration: BoxDecoration(
-                    color: active ? AppTheme.cyan : const Color(0xFF26364B),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _GridStepBox extends StatelessWidget {
-  final String text;
-  const _GridStepBox({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 38,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFF111B2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+        );
+      }),
     );
   }
 }
