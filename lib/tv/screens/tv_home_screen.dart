@@ -137,6 +137,18 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _tryFocusEntry() {
     if (!mounted || !_entryPending) return;
+    // Guard: kalau node zona target masih kosong (build belum selesai sync),
+    // jadwal ulang satu frame lagi.
+    final zoneReady = switch (_zone) {
+      TvZone.platform  => _platformNodes.isNotEmpty,
+      TvZone.category  => _categoryNodes.isNotEmpty,
+      TvZone.grid      => _gridNodes.isNotEmpty,
+      _                => true,
+    };
+    if (!zoneReady) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
+      return;
+    }
     final focused = _focusByZone(_zone);
     if (focused) _entryPending = false;
   }
@@ -179,18 +191,27 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _selectPlatform(int index) {
     if (index == source) {
+      // Platform sama, cukup pastikan fokus kembali ke chip ini
       _zone = TvZone.platform;
       _lastPlatform = index;
-      _focus(_platformNodes[_safe(index, _platformNodes.length)], alignment: 0.08);
+      final safe = _safe(index, _platformNodes.length);
+      if (safe < _platformNodes.length) {
+        _focus(_platformNodes[safe], alignment: 0.08);
+      }
       return;
     }
+    // Platform beda — reset semua posisi, muat ulang data.
+    // JANGAN panggil _focus() di sini: _categoryNodes belum di-sync
+    // dengan kategori platform baru. Biarkan _tryFocusEntry() yang
+    // panggil setelah build() selesai me-rebuild dan sync node.
     setState(() {
       source = index;
       category = 0;
-      _zone = TvZone.platform;
       _lastPlatform = index;
       _lastCategory = 0;
       _lastGrid = 0;
+      _zone = TvZone.platform;   // entry point setelah load = platform row
+      _entryPending = true;       // trigger fokus setelah build selesai
       _future = _load();
     });
   }
@@ -199,14 +220,20 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (index == category) {
       _zone = TvZone.category;
       _lastCategory = index;
-      _focus(_categoryNodes[_safe(index, _categoryNodes.length)], alignment: 0.12);
+      final safe = _safe(index, _categoryNodes.length);
+      if (safe < _categoryNodes.length) {
+        _focus(_categoryNodes[safe], alignment: 0.12);
+      }
       return;
     }
+    // Kategori beda — grid akan berubah isinya.
+    // Biarkan _tryFocusEntry() urus fokus setelah build selesai.
     setState(() {
       category = index;
-      _zone = TvZone.category;
       _lastCategory = index;
       _lastGrid = 0;
+      _zone = TvZone.category;   // kembali ke category row setelah load
+      _entryPending = true;
       _future = _load();
     });
   }
