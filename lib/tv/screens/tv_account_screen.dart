@@ -34,26 +34,26 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   List<_AccountSection> get _sections => [
         _AccountSection(
-          title: 'Pusat Pengaturan',
+          title: 'Control Center',
           items: [
             _AccountItem(
               icon: Icons.tune_rounded,
               title: 'Pengaturan Tampilan',
-              subtitle: 'Atur mode tampilan, grid Home TV, poster, dan navigasi.',
+              subtitle: 'Mode tampilan, jumlah grid Home TV, dan navigasi layar besar.',
               badge: 'DISPLAY',
               onTap: () => _openSettings(),
             ),
             _AccountItem(
               icon: Icons.play_circle_rounded,
               title: 'Pengaturan Player',
-              subtitle: 'Atur playback, cache, DRM, kualitas, speed, dan auto next.',
+              subtitle: 'Cache, DRM, kualitas default, speed, dan auto next player TV.',
               badge: 'PLAYER',
               onTap: () => _pushScreen(const TvPlayerSettingsScreen()),
             ),
             _AccountItem(
               icon: Icons.layers_rounded,
               title: 'Kelola Sumber Data',
-              subtitle: 'Aktifkan platform, pilih kategori Home TV, dan cek status server.',
+              subtitle: 'Platform, kategori Home TV, batas 6 source, dan indikator server.',
               badge: 'SOURCE',
               onTap: () => _pushScreen(const TvSourceManagerScreen()),
             ),
@@ -262,6 +262,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 16, 26, 26),
               children: [
+                const _CommunityBanner(),
+                const SizedBox(height: 10),
                 const _ProfileHeader(),
                 const SizedBox(height: 10),
                 _StatsRow(
@@ -303,6 +305,64 @@ class _AccountItem {
   final VoidCallback onTap;
 
   const _AccountItem({required this.icon, required this.title, required this.subtitle, required this.badge, required this.onTap});
+}
+
+
+class _CommunityBanner extends StatelessWidget {
+  const _CommunityBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      minHeight: 84,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF071A2B), Color(0xFF050914)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF173654)),
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 28)],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: const Color(0xFF0E2438),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.30)),
+            ),
+            child: const Icon(Icons.groups_rounded, color: Color(0xFF9EEBFF), size: 29),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('Komunitas LiveGo', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                SizedBox(height: 4),
+                Text('Area banner untuk Telegram, grup update, alamat channel, dan info komunitas.', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF102437),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.30)),
+            ),
+            child: const Text('SOON', style: TextStyle(color: AppTheme.cyan, fontSize: 11, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProfileHeader extends StatelessWidget {
