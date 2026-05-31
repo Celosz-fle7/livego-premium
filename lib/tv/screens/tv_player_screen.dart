@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -40,7 +41,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _episodeCursor = 1;
   int _controlCursor = 1;
   int _optionCursor = 0;
-  _TvPlayerMode _mode = _TvPlayerMode.playback;
+  _TvPlayerMode _mode = _TvPlayerMode.controls;
+  Timer? _controlHideTimer;
 
   static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
   static const int _controlCount = 8;
@@ -216,6 +218,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           await controller.seekTo(saved.position);
         }
         await controller.play();
+        _showInitialControls();
       }
     } catch (e) {
       _error = '$e';
@@ -260,7 +263,38 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         key == LogicalKeyboardKey.f10;
   }
 
+  void _cancelControlAutoHide() {
+    _controlHideTimer?.cancel();
+    _controlHideTimer = null;
+  }
+
+  void _scheduleControlAutoHide() {
+    _cancelControlAutoHide();
+    _controlHideTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      if (_mode == _TvPlayerMode.controls &&
+          _showControls &&
+          !_episodePanelOpen &&
+          !_qualityPanelOpen) {
+        _hideAllOverlays();
+      }
+    });
+  }
+
+  void _showInitialControls() {
+    if (!mounted) return;
+    setState(() {
+      _mode = _TvPlayerMode.controls;
+      _showControls = true;
+      _episodePanelOpen = false;
+      _qualityPanelOpen = false;
+      _controlCursor = 1;
+    });
+    _scheduleControlAutoHide();
+  }
+
   void _openEpisodePanel() {
+    _cancelControlAutoHide();
     setState(() {
       _mode = _TvPlayerMode.episodes;
       _episodePanelOpen = true;
@@ -271,6 +305,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _openQualityPanel() {
+    _cancelControlAutoHide();
     setState(() {
       _mode = _TvPlayerMode.options;
       _qualityPanelOpen = true;
@@ -286,14 +321,26 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _episodePanelOpen = false;
       _qualityPanelOpen = false;
     });
+    _scheduleControlAutoHide();
   }
 
-  void _hidePanels({bool hideControls = false}) {
+  void _closePanelToControls() {
+    setState(() {
+      _mode = _TvPlayerMode.controls;
+      _episodePanelOpen = false;
+      _qualityPanelOpen = false;
+      _showControls = true;
+    });
+    _scheduleControlAutoHide();
+  }
+
+  void _hideAllOverlays() {
+    _cancelControlAutoHide();
     setState(() {
       _mode = _TvPlayerMode.playback;
       _episodePanelOpen = false;
       _qualityPanelOpen = false;
-      _showControls = !hideControls;
+      _showControls = false;
     });
   }
 
@@ -303,6 +350,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showControls = true;
       _controlCursor = (_controlCursor + delta).clamp(0, _controlCount - 1).toInt();
     });
+    _scheduleControlAutoHide();
   }
 
   void _cycleQuality(int delta) {
@@ -346,13 +394,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         break;
       case 2:
         _openEpisodePanel();
-        break;
+        return;
       case 3:
         _toggleSubtitle();
         break;
       case 4:
         _openQualityPanel();
-        break;
+        return;
       case 5:
         _changeSpeed(0.25);
         break;
@@ -361,7 +409,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         break;
       case 7:
         _openQualityPanel();
-        break;
+        return;
+    }
+    if (_mode == _TvPlayerMode.controls) {
+      _scheduleControlAutoHide();
     }
   }
 
@@ -385,10 +436,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final item = _detail ?? widget.item;
 
     if (_isBack(key)) {
-      if (_episodePanelOpen || _qualityPanelOpen) {
-        _hidePanels();
+      if (_episodePanelOpen || _qualityPanelOpen ||
+          _mode == _TvPlayerMode.episodes ||
+          _mode == _TvPlayerMode.options) {
+        _closePanelToControls();
       } else if (_mode == _TvPlayerMode.controls || _showControls) {
-        _hidePanels(hideControls: true);
+        _hideAllOverlays();
       } else if (Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -416,7 +469,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       }
       if (_isSelect(key)) {
         _selectEpisode(_episodeCursor);
-        _hidePanels();
+        _hideAllOverlays();
         return KeyEventResult.handled;
       }
       if (_isMenu(key)) {
@@ -466,6 +519,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       }
       if (key == LogicalKeyboardKey.arrowUp) {
         setState(() => _showControls = true);
+        _scheduleControlAutoHide();
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -478,19 +532,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     // Playback mode: arrows are direct media actions unless UP enters the control bar.
     if (_isSelect(key)) {
       _toggle();
-      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowRight) {
       _seekRelative(const Duration(seconds: 10));
-      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       _seekRelative(const Duration(seconds: -10));
-      setState(() => _showControls = true);
       return KeyEventResult.handled;
     }
 
@@ -567,6 +618,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   @override
   void dispose() {
+    _cancelControlAutoHide();
     _controller?.dispose();
     super.dispose();
   }
@@ -618,7 +670,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 speed: _speed,
                 audioTrack: _audioTrack
               ),
-            if (ready && (_showControls || _episodePanelOpen || _qualityPanelOpen))
+            if (ready && (_mode == _TvPlayerMode.controls || _episodePanelOpen || _qualityPanelOpen))
               Positioned(
                 left: 46,
                 right: _episodePanelOpen ? 430 : 46,
