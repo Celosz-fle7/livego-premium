@@ -858,119 +858,127 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
           builder: (context, box) {
             final screenW = box.maxWidth;
             final screenH = box.maxHeight;
-            final videoRatio = ready && c.value.aspectRatio > 0 ? c.value.aspectRatio : 9 / 16;
+            final controller = c;
+            final videoRatio = ready && controller != null && controller.value.aspectRatio > 0
+                ? controller.value.aspectRatio
+                : 9 / 16;
             final isPortraitVideo = videoRatio < 1.0;
+            final fullSurface = _fitCover || _landscape;
 
-            // Mode container LiveGO:
-            // - Normal portrait video: 75-80% tinggi layar, rasio asli tetap aman.
-            // - Normal landscape video: lebar dominan, tidak dipaksa gepeng.
-            // - Full portrait / landscape: seluruh layar, controls ikut lebar layar.
-            double playerW;
-            double playerH;
-            if (_fitCover || _landscape) {
-              playerW = screenW;
-              playerH = screenH;
-            } else if (isPortraitVideo) {
-              playerH = screenH * 0.80;
-              playerW = playerH * videoRatio;
-              final maxW = screenW * 0.96;
-              if (playerW > maxW) {
-                playerW = maxW;
-                playerH = playerW / videoRatio;
-              }
-            } else {
-              playerW = screenW * 0.94;
-              playerH = playerW / videoRatio;
-              final maxH = screenH * (_landscape ? 1.0 : 0.72);
-              if (playerH > maxH) {
-                playerH = maxH;
+            double playerW = screenW;
+            double playerH = screenH;
+            if (!fullSurface) {
+              if (isPortraitVideo) {
+                playerH = screenH * 0.80;
                 playerW = playerH * videoRatio;
+                final maxW = screenW * 0.96;
+                if (playerW > maxW) {
+                  playerW = maxW;
+                  playerH = playerW / videoRatio;
+                }
+              } else {
+                playerW = screenW * 0.94;
+                playerH = playerW / videoRatio;
+                final maxH = screenH * 0.72;
+                if (playerH > maxH) {
+                  playerH = maxH;
+                  playerW = playerH * videoRatio;
+                }
               }
             }
 
-            final BoxFit videoFit = _fitCover
-                ? BoxFit.cover
-                : (_landscape && isPortraitVideo ? BoxFit.fitHeight : BoxFit.contain);
-
-            return Center(
-              child: SizedBox(
-                width: playerW,
-                height: playerH,
-                child: Container(
-                  color: Colors.black,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (ready)
-                        Center(
-                          child: FittedBox(
-                            fit: videoFit,
+            final videoLayer = ready && controller != null
+                ? ClipRect(
+                    child: _fitCover
+                        ? FittedBox(
+                            fit: BoxFit.cover,
                             child: SizedBox(
-                              width: c.value.size.width,
-                              height: c.value.size.height,
-                              child: VideoPlayer(c),
+                              width: controller.value.size.width,
+                              height: controller.value.size.height,
+                              child: VideoPlayer(controller),
+                            ),
+                          )
+                        : Center(
+                            child: AspectRatio(
+                              aspectRatio: videoRatio,
+                              child: VideoPlayer(controller),
                             ),
                           ),
-                        )
-                      else if (image.isNotEmpty)
-                        LiveGoCachedImage(url: image, fit: BoxFit.cover, role: LiveGoImageRole.thumbnail)
-                      else
-                        const ColoredBox(color: Color(0xFF101010)),
-                      if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
-                      Row(
-                children: [
-                  Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
-                  Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
-                  Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(true), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
-                ],
-              ),
-              if (widget.loading || _buffering) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
-              if (_error.isNotEmpty) Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)))),
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 220),
-                top: _controls ? 0 : -95,
-                left: 0,
-                right: 0,
-                child: _TopOverlay(title: '${widget.item.title} - Eps ${widget.episode}', onBack: widget.onBack),
-              ),
-              if (_controls)
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _CenterButton(icon: Icons.skip_previous_rounded, enabled: widget.episode > 1, onTap: () => widget.onEpisode(widget.episode - 1)),
-                      const SizedBox(width: 30),
-                      _MainPlayButton(playing: ready && c.value.isPlaying, onTap: _togglePlay),
-                      const SizedBox(width: 30),
-                      _CenterButton(icon: Icons.skip_next_rounded, enabled: widget.episode < widget.item.episodes, onTap: () => widget.onEpisode(widget.episode + 1)),
-                    ],
+                  )
+                : image.isNotEmpty
+                    ? LiveGoCachedImage(url: image, fit: BoxFit.cover, role: LiveGoImageRole.thumbnail)
+                    : const ColoredBox(color: Color(0xFF101010));
+
+            final playerStack = Stack(
+              fit: StackFit.expand,
+              children: [
+                videoLayer,
+                if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
+                Row(
+                  children: [
+                    Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                    Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
+                    Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(true), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                  ],
+                ),
+                if (widget.loading || _buffering) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+                if (_error.isNotEmpty) Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)))),
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  top: _controls ? 0 : -95,
+                  left: 0,
+                  right: 0,
+                  child: _TopOverlay(title: '${widget.item.title} - Eps ${widget.episode}', onBack: widget.onBack),
+                ),
+                if (_controls)
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _CenterButton(icon: Icons.skip_previous_rounded, enabled: widget.episode > 1, onTap: () => widget.onEpisode(widget.episode - 1)),
+                        const SizedBox(width: 30),
+                        _MainPlayButton(playing: ready && controller != null && controller.value.isPlaying, onTap: _togglePlay),
+                        const SizedBox(width: 30),
+                        _CenterButton(icon: Icons.skip_next_rounded, enabled: widget.episode < widget.item.episodes, onTap: () => widget.onEpisode(widget.episode + 1)),
+                      ],
+                    ),
+                  ),
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  bottom: _controls ? 22 : -190,
+                  left: 0,
+                  right: 0,
+                  child: _BottomOverlay(
+                    controller: controller,
+                    episode: widget.episode,
+                    total: widget.item.episodes,
+                    quality: _quality,
+                    muted: _muted,
+                    fitCover: _fitCover,
+                    landscape: _landscape,
+                    onEpisodes: _showEpisodes,
+                    onDownload: _downloadCurrentEpisode,
+                    onSettings: _openPlayerSettings,
+                    onQuality: _qualityMenu,
+                    onRotate: _toggleLandscape,
+                    onFit: _togglePortraitFull,
                   ),
                 ),
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 220),
-                bottom: _controls ? 22 : -190,
-                left: 0,
-                right: 0,
-                child: _BottomOverlay(
-                  controller: c,
-                  episode: widget.episode,
-                  total: widget.item.episodes,
-                  quality: _quality,
-                  muted: _muted,
-                  fitCover: _fitCover,
-                  landscape: _landscape,
-                  onEpisodes: _showEpisodes,
-                  onDownload: _downloadCurrentEpisode,
-                  onSettings: _openPlayerSettings,
-                  onQuality: _qualityMenu,
-                  onRotate: _toggleLandscape,
-                  onFit: _togglePortraitFull,
-                ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              ],
+            );
+
+            return Container(
+              width: screenW,
+              height: screenH,
+              color: Colors.black,
+              alignment: Alignment.center,
+              child: fullSurface
+                  ? playerStack
+                  : SizedBox(
+                      width: playerW,
+                      height: playerH,
+                      child: playerStack,
+                    ),
             );
           },
         ),
