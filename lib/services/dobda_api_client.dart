@@ -81,7 +81,7 @@ class DobdaApiClient {
     final apiLang = _providerLang(config.slug, lang);
     final json = await _getJson(DobdaEndpoints.search, {
       'category_p': config.apiSlug,
-      'q': clean,
+      'query': clean,
       'lang': apiLang,
       'page': '$page',
     });
@@ -297,16 +297,28 @@ class DobdaApiClient {
     final total = _parseInt(data['total_episodes'] ?? data['totalEpisodes'] ?? item.episodes, fallback: item.episodes);
     final episodeIndex = _parseInt(data['episode_index'] ?? data['episodeIndex'] ?? fallbackEpisode, fallback: fallbackEpisode);
 
+    final headers = <String, String>{
+      'User-Agent': 'okhttp/4.12.0',
+      'Accept': '*/*',
+    };
+    final streamHeaders = data['streamHeaders'] ?? data['headers'];
+    if (streamHeaders is Map) {
+      for (final entry in streamHeaders.entries) {
+        final key = '${entry.key}'.trim();
+        final value = '${entry.value}'.trim();
+        if (key.isNotEmpty && value.isNotEmpty && value != 'null') {
+          headers[key] = value;
+        }
+      }
+    }
+
     return StreamInfo(
       url: url,
       episodeIndex: episodeIndex,
       totalEpisodes: total <= 0 ? item.episodes : total,
       nextEpisodeId: '${data['next_video_id'] ?? data['nextVideoId'] ?? (episodeIndex < total ? episodeIndex + 1 : 0)}',
       prevEpisodeId: '${data['prev_video_id'] ?? data['prevVideoId'] ?? (episodeIndex > 1 ? episodeIndex - 1 : 0)}',
-      headers: const <String, String>{
-        'User-Agent': 'okhttp/4.12.0',
-        'Accept': '*/*',
-      },
+      headers: headers,
       subtitles: subtitles,
       qualities: qualities,
     );
