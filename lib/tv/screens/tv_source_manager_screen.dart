@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
+import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../utils/tv_focus_utils.dart';
 import '../widgets/tv_focused_border.dart';
@@ -273,11 +274,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     });
   }
 
-  void _saveAndExit() {
+  Future<void> _saveAndExit() async {
     _markBackHandled();
     _dirty = false;
     _confirmOpen = false;
-    Navigator.of(context).pop();
+    await LiveGoLocalStore.saveSettings();
+    if (mounted) Navigator.of(context).pop();
   }
 
   KeyEventResult _confirmKey(FocusNode node, KeyEvent event) {

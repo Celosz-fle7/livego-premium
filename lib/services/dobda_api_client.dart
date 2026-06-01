@@ -12,8 +12,6 @@ import 'api/dobda_hmac_signer.dart';
 class DobdaApiClient {
   const DobdaApiClient._();
 
-  static final Map<String, List<LiveGoEpisode>> _episodeMemory = <String, List<LiveGoEpisode>>{};
-
   static String get baseUrl => ApiEnv.dobdaBaseUrl;
 
   static Future<List<ContentItem>> home({
@@ -107,10 +105,6 @@ class DobdaApiClient {
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
     final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final apiLang = _providerLang(config.slug, item.lang);
-    final cacheKey = '${config.slug}:${item.id}:$apiLang';
-    final cachedRows = _episodeMemory[cacheKey];
-    if (cachedRows != null && cachedRows.isNotEmpty) return cachedRows;
-
     final json = await _getJson(DobdaEndpoints.detail, {
       'category_p': config.apiSlug,
       'id': item.id,
@@ -118,7 +112,7 @@ class DobdaApiClient {
     });
     final rows = _episodeList(json);
     if (rows.isNotEmpty) {
-      final parsed = rows.asMap().entries.map((entry) {
+      return rows.asMap().entries.map((entry) {
         final idx = entry.key + 1;
         final row = entry.value;
         final index = _parseInt(row['index'] ?? row['episode_index'] ?? row['episode'] ?? row['id'], fallback: idx);
@@ -126,61 +120,25 @@ class DobdaApiClient {
         final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name'], fallback: 'Episode $index');
         return LiveGoEpisode(id: id, index: index <= 0 ? idx : index, title: title);
       }).toList();
-      if (parsed.isNotEmpty) _episodeMemory[cacheKey] = parsed;
-      return parsed;
     }
     final total = _episodes(_dataMap(json));
-    final fallback = List.generate(total <= 0 ? item.episodes : total, (i) {
+    return List.generate(total <= 0 ? item.episodes : total, (i) {
       return LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}');
     });
-    if (fallback.isNotEmpty) _episodeMemory[cacheKey] = fallback;
-    return fallback;
   }
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
     final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final apiLang = _providerLang(config.slug, item.lang);
-    final requested = (chapterId ?? item.chapterId).trim();
-    final ep = _episodeNumber(requested);
-    final firstChapter = requested.isEmpty ? '$ep' : requested;
-
-    Exception? lastError;
-    try {
-      final direct = await _videoInfoDirect(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapter: firstChapter,
-        fallbackEpisode: ep,
-      );
-      if (direct.url.trim().isNotEmpty) return direct;
-    } catch (e) {
-      lastError = e is Exception ? e : Exception('$e');
-      print('DOBDA VIDEO DIRECT MISS ${config.slug} chapter=$firstChapter: $e');
-    }
-
-    final mappedChapter = await _chapterIdForEpisode(
-      item,
-      episodeIndex: ep,
-      requested: firstChapter,
-    );
-    if (mappedChapter.isNotEmpty && mappedChapter != firstChapter) {
-      try {
-        return await _videoInfoDirect(
-          item,
-          config: config,
-          apiLang: apiLang,
-          chapter: mappedChapter,
-          fallbackEpisode: ep,
-        );
-      } catch (e) {
-        lastError = e is Exception ? e : Exception('$e');
-        print('DOBDA VIDEO MAPPED MISS ${config.slug} chapter=$mappedChapter: $e');
-      }
-    }
-
-    if (lastError != null) throw lastError;
-    return StreamInfo.empty;
+    final ep = _episodeNumber(chapterId ?? item.chapterId);
+    final chapter = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
+    final json = await _getJson(DobdaEndpoints.video, {
+      'category_p': config.apiSlug,
+      'id': item.id,
+      'chapterId': chapter,
+      'lang': apiLang,
+    });
+    return _parseStream(json, item: item, fallbackEpisode: ep, lang: apiLang);
   }
 
   static Future<StreamInfo> fastEpisodeStream(
@@ -188,82 +146,12 @@ class DobdaApiClient {
     String? chapterId,
     Duration timeout = const Duration(seconds: 7),
   }) async {
-    final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
-    final apiLang = _providerLang(config.slug, item.lang);
-    final requested = (chapterId ?? item.chapterId).trim();
-    final ep = _episodeNumber(requested);
-    final firstChapter = requested.isEmpty ? '$ep' : requested;
-
     try {
-      final direct = await _videoInfoDirect(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapter: firstChapter,
-        fallbackEpisode: ep,
-      ).timeout(timeout);
-      if (direct.url.trim().isNotEmpty) return direct;
-    } catch (e) {
-      print('DOBDA FAST DIRECT MISS ${item.platformSlug} chapter=$firstChapter: $e');
-    }
-
-    try {
-      final mappedChapter = await _chapterIdForEpisode(
-        item,
-        episodeIndex: ep,
-        requested: firstChapter,
-      ).timeout(const Duration(seconds: 5));
-      if (mappedChapter.isEmpty || mappedChapter == firstChapter) return StreamInfo.empty;
-      return await _videoInfoDirect(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapter: mappedChapter,
-        fallbackEpisode: ep,
-      ).timeout(timeout);
+      return await videoInfo(item, chapterId: chapterId).timeout(timeout);
     } catch (e) {
       print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
       return StreamInfo.empty;
     }
-  }
-
-  static Future<StreamInfo> _videoInfoDirect(
-    ContentItem item, {
-    required LiveGoApiPlatform config,
-    required String apiLang,
-    required String chapter,
-    required int fallbackEpisode,
-  }) async {
-    final json = await _getJson(DobdaEndpoints.video, {
-      'category_p': config.apiSlug,
-      'id': item.id,
-      'chapterId': chapter,
-      'lang': apiLang,
-    });
-    return _parseStream(json, item: item, fallbackEpisode: fallbackEpisode, lang: apiLang);
-  }
-
-  static Future<String> _chapterIdForEpisode(
-    ContentItem item, {
-    required int episodeIndex,
-    required String requested,
-  }) async {
-    final rows = await episodes(item);
-    if (rows.isEmpty) return requested;
-
-    for (final row in rows) {
-      if (row.index == episodeIndex && row.id.trim().isNotEmpty) {
-        return row.id.trim();
-      }
-    }
-
-    final offset = episodeIndex - 1;
-    if (offset >= 0 && offset < rows.length) {
-      final id = rows[offset].id.trim();
-      if (id.isNotEmpty) return id;
-    }
-
-    return requested;
   }
 
   static Future<String> ping(String platform, String lang) async {
@@ -336,8 +224,6 @@ class DobdaApiClient {
     final source = _first(json, const ['platform', 'source', 'author'], fallback: config.name);
     final episodes = _episodes(json);
 
-    final firstChapter = _firstChapterId(json);
-
     return ContentItem(
       id: id,
       title: title,
@@ -350,7 +236,7 @@ class DobdaApiClient {
       episodes: episodes <= 0 ? 1 : episodes,
       updated: true,
       platformSlug: config.slug,
-      chapterId: firstChapter.isEmpty ? '1' : firstChapter,
+      chapterId: '1',
       lang: lang,
     );
   }
@@ -517,14 +403,6 @@ class DobdaApiClient {
     if (raw is List) return raw.length;
     final parsed = _parseInt(raw, fallback: 1);
     return parsed <= 0 ? 1 : parsed;
-  }
-
-  static String _firstChapterId(Map<String, dynamic> json) {
-    final rows = json['chapters'] ?? json['episodes'] ?? json['episodeList'] ?? json['chapterList'];
-    if (rows is List && rows.isNotEmpty && rows.first is Map) {
-      return _first(Map<String, dynamic>.from(rows.first as Map), const ['id', 'chapterId', 'chapter_id']);
-    }
-    return '';
   }
 
   static String _providerLang(String slug, String requested) {

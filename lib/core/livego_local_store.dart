@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/content_item.dart';
+import 'livego_settings.dart';
 
 class WatchProgress {
   final ContentItem item;
@@ -130,6 +131,7 @@ class LiveGoLocalStore {
   static const _favoritesKey = 'livego.favorites.v2';
   static const _progressKey = 'livego.progress.v2';
   static const _downloadsKey = 'livego.downloads.v2';
+  static const _settingsKey = 'livego.settings.v3';
 
   static final ValueNotifier<int> version = ValueNotifier<int>(0);
   static final List<ContentItem> _history = <ContentItem>[];
@@ -149,6 +151,7 @@ class LiveGoLocalStore {
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    _loadSettings();
     _history
       ..clear()
       ..addAll(_decodeList(_prefs?.getString(_historyKey)).map(itemFromJson));
@@ -257,6 +260,131 @@ class LiveGoLocalStore {
     await _persistDownloads();
     await _persistProgress();
     _bump();
+  }
+
+
+  static Future<void> saveSettings() async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    _prefs = prefs;
+    final payload = <String, dynamic>{
+      'language': LiveGoSettings.language,
+      'defaultPlatform': LiveGoSettings.defaultPlatform,
+      'quality': LiveGoSettings.quality,
+      'layoutMode': LiveGoSettings.layoutMode,
+      'drmMode': LiveGoSettings.drmMode,
+      'subtitlesEnabled': LiveGoSettings.subtitlesEnabled,
+      'autoNextEnabled': LiveGoSettings.autoNextEnabled,
+      'downloadWifiOnly': LiveGoSettings.downloadWifiOnly,
+      'lowEndTvMode': LiveGoSettings.lowEndTvMode,
+      'backgroundPoster': LiveGoSettings.backgroundPoster,
+      'cachePlayback': LiveGoSettings.cachePlayback,
+      'manualRotateButton': LiveGoSettings.manualRotateButton,
+      'mobileHomeGrid': LiveGoSettings.mobileHomeGrid,
+      'tvHomeGrid': LiveGoSettings.tvHomeGrid,
+      'activePlatforms': LiveGoSettings.activePlatforms.toList(),
+      'homePlatforms': LiveGoSettings.homePlatforms.toList(),
+      'platformLanguages': LiveGoSettings.platformLanguages,
+      'homeCategories': LiveGoSettings.homeCategories,
+    };
+    await prefs.setString(_settingsKey, jsonEncode(payload));
+    _bump();
+  }
+
+  static Future<void> clearSavedSettings() async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    _prefs = prefs;
+    await prefs.remove(_settingsKey);
+    LiveGoSettings.reset();
+    _bump();
+  }
+
+  static void _loadSettings() {
+    final raw = _prefs?.getString(_settingsKey);
+    if (raw == null || raw.trim().isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final json = Map<String, dynamic>.from(decoded);
+      final supported = LiveGoSettings.supportedPlatforms.toSet();
+
+      LiveGoSettings.language = _string(json['language'], LiveGoSettings.language);
+      LiveGoSettings.quality = _string(json['quality'], LiveGoSettings.quality);
+      LiveGoSettings.layoutMode = _string(json['layoutMode'], LiveGoSettings.layoutMode);
+      LiveGoSettings.drmMode = _string(json['drmMode'], LiveGoSettings.drmMode);
+      LiveGoSettings.subtitlesEnabled = _bool(json['subtitlesEnabled'], LiveGoSettings.subtitlesEnabled);
+      LiveGoSettings.autoNextEnabled = _bool(json['autoNextEnabled'], LiveGoSettings.autoNextEnabled);
+      LiveGoSettings.downloadWifiOnly = _bool(json['downloadWifiOnly'], LiveGoSettings.downloadWifiOnly);
+      LiveGoSettings.lowEndTvMode = _bool(json['lowEndTvMode'], LiveGoSettings.lowEndTvMode);
+      LiveGoSettings.backgroundPoster = _bool(json['backgroundPoster'], LiveGoSettings.backgroundPoster);
+      LiveGoSettings.cachePlayback = _bool(json['cachePlayback'], LiveGoSettings.cachePlayback);
+      LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
+      LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 6).toInt();
+      LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(4, 10).toInt();
+
+      final active = _stringList(json['activePlatforms']).where(supported.contains).toList();
+      final home = _stringList(json['homePlatforms']).where(supported.contains).toList();
+      if (active.isNotEmpty) {
+        LiveGoSettings.activePlatforms
+          ..clear()
+          ..addAll(active);
+      }
+      if (home.isNotEmpty) {
+        LiveGoSettings.homePlatforms
+          ..clear()
+          ..addAll(home.where(LiveGoSettings.activePlatforms.contains).take(6));
+      }
+      if (LiveGoSettings.homePlatforms.isEmpty) {
+        LiveGoSettings.homePlatforms.add(LiveGoSettings.activePlatforms.isNotEmpty
+            ? LiveGoSettings.activePlatforms.first
+            : LiveGoSettings.defaultPlatforms.first);
+      }
+
+      final savedDefault = _string(json['defaultPlatform'], LiveGoSettings.homePlatforms.first);
+      LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.contains(savedDefault)
+          ? savedDefault
+          : LiveGoSettings.homePlatforms.first;
+
+      final languages = json['platformLanguages'];
+      if (languages is Map) {
+        for (final entry in languages.entries) {
+          final slug = '${entry.key}';
+          if (supported.contains(slug)) {
+            LiveGoSettings.setLanguageForPlatform(slug, '${entry.value}');
+          }
+        }
+      }
+
+      final categories = json['homeCategories'];
+      if (categories is Map) {
+        for (final entry in categories.entries) {
+          final slug = '${entry.key}';
+          if (!supported.contains(slug)) continue;
+          LiveGoSettings.setCategoriesFor(slug, _stringList(entry.value));
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('LIVEGO SETTINGS LOAD ERROR: $e');
+    }
+  }
+
+  static String _string(Object? value, String fallback) {
+    final text = '${value ?? ''}'.trim();
+    return text.isEmpty ? fallback : text;
+  }
+
+  static bool _bool(Object? value, bool fallback) {
+    if (value is bool) return value;
+    final text = '${value ?? ''}'.toLowerCase();
+    if (text == 'true') return true;
+    if (text == 'false') return false;
+    return fallback;
+  }
+
+  static List<String> _stringList(Object? value) {
+    if (value is List) {
+      return value.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    return const <String>[];
   }
 
   static Map<String, dynamic> itemToJson(ContentItem item) => {

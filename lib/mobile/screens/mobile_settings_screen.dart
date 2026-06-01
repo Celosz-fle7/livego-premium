@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
+import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../../shared/widgets/glow_container.dart';
 
@@ -329,7 +330,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     LiveGoSettings.activePlatforms
       ..clear()
       ..addAll(_active);
@@ -347,7 +348,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     for (final entry in _categoryDrafts.entries) {
       LiveGoSettings.setCategoriesFor(entry.key, entry.value);
     }
-    Navigator.pop(context);
+    await LiveGoLocalStore.saveSettings();
+    if (mounted) Navigator.pop(context);
   }
 
   Color _statusColor(String slug) {
