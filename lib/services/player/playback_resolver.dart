@@ -1,7 +1,7 @@
 import '../../core/livego_settings.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
-import '../anichin_api_client.dart';
+import '../livego_api_gateway.dart';
 import '../api/api_platform.dart';
 import 'player_preferences.dart';
 import 'playback_source.dart';
@@ -17,7 +17,8 @@ class PlaybackResolver {
     _syncPlayerSettings();
 
     final platform = LiveGoApiPlatforms.bySlug(item.platformSlug);
-    final ep = _episodeNumber(chapterId ?? item.chapterId);
+    final requestedChapter = chapterId ?? item.chapterId;
+    final ep = _episodeNumber(requestedChapter);
     if (platform.isEncrypted) {
       return PlaybackSource.empty(
         platform: platform.slug,
@@ -28,7 +29,10 @@ class PlaybackResolver {
       );
     }
 
-    final stream = await AnichinApiClient.videoInfo(item, chapterId: '$ep');
+    final stream = await LiveGoApiGateway.videoInfo(
+      item,
+      chapterId: platform.isDobda ? requestedChapter : '$ep',
+    );
     return _sourceFromStream(item, stream, platform: platform, ep: ep);
   }
 
@@ -41,7 +45,8 @@ class PlaybackResolver {
     _syncPlayerSettings();
 
     final platform = LiveGoApiPlatforms.bySlug(item.platformSlug);
-    final ep = _episodeNumber(chapterId ?? item.chapterId);
+    final requestedChapter = chapterId ?? item.chapterId;
+    final ep = _episodeNumber(requestedChapter);
     if (platform.isEncrypted) {
       return PlaybackSource.empty(
         platform: platform.slug,
@@ -52,9 +57,9 @@ class PlaybackResolver {
       );
     }
 
-    final stream = await AnichinApiClient.fastEpisodeStream(
+    final stream = await LiveGoApiGateway.fastEpisodeStream(
       item,
-      chapterId: '$ep',
+      chapterId: platform.isDobda ? requestedChapter : '$ep',
       timeout: timeout,
     );
     return _sourceFromStream(item, stream, platform: platform, ep: ep);

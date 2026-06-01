@@ -1,0 +1,430 @@
+import 'dart:convert';
+import 'dart:io';
+
+import '../models/content_item.dart';
+import '../models/livego_episode.dart';
+import '../models/stream_info.dart';
+import 'api/api_env.dart';
+import 'api/api_platform.dart';
+import 'api/dobda_endpoints.dart';
+import 'api/dobda_hmac_signer.dart';
+
+class DobdaApiClient {
+  const DobdaApiClient._();
+
+  static String get baseUrl => ApiEnv.dobdaBaseUrl;
+
+  static Future<List<ContentItem>> home({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final json = await _getJson(DobdaEndpoints.home, {
+      'category_p': config.apiSlug,
+      'lang': _providerLang(config.slug, lang),
+    });
+    return _parseItems(json, platform: config.slug, lang: _providerLang(config.slug, lang));
+  }
+
+  static Future<List<ContentItem>> discover({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final json = await _getJson(DobdaEndpoints.discover, {
+      'category_p': config.apiSlug,
+      'lang': _providerLang(config.slug, lang),
+      'page': '$page',
+    });
+    return _parseItems(json, platform: config.slug, lang: _providerLang(config.slug, lang));
+  }
+
+  static Future<List<ContentItem>> collection({
+    String platform = 'dobda_freereels',
+    required String collection,
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final key = collection.toLowerCase().replaceAll(' ', '');
+    if (key == 'discover' || key == 'foryou' || key == 'latest') {
+      return discover(platform: platform, lang: lang, page: page);
+    }
+    if (key == 'banner') {
+      return banner(platform: platform, lang: lang);
+    }
+    return home(platform: platform, lang: lang);
+  }
+
+  static Future<List<ContentItem>> banner({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final apiLang = _providerLang(config.slug, lang);
+    final json = await _getJson(DobdaEndpoints.banner, {
+      'category_p': config.apiSlug,
+      'lang': apiLang,
+    });
+    return _parseItems(json, platform: config.slug, lang: apiLang);
+  }
+
+  static Future<List<ContentItem>> search({
+    required String query,
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final clean = query.trim();
+    if (clean.isEmpty) return const <ContentItem>[];
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final apiLang = _providerLang(config.slug, lang);
+    final json = await _getJson(DobdaEndpoints.search, {
+      'category_p': config.apiSlug,
+      'q': clean,
+      'lang': apiLang,
+      'page': '$page',
+    });
+    return _parseItems(json, platform: config.slug, lang: apiLang);
+  }
+
+  static Future<ContentItem?> detail(ContentItem item) async {
+    final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
+    final apiLang = _providerLang(config.slug, item.lang);
+    final json = await _getJson(DobdaEndpoints.detail, {
+      'category_p': config.apiSlug,
+      'id': item.id,
+      'lang': apiLang,
+    });
+    final data = _dataMap(json);
+    if (data.isEmpty) return item;
+    final parsed = _parseItem(data, platform: config.slug, lang: apiLang);
+    return _preserveIdentity(parsed, fallback: item, lang: apiLang);
+  }
+
+  static Future<List<LiveGoEpisode>> episodes(ContentItem item) async {
+    final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
+    final apiLang = _providerLang(config.slug, item.lang);
+    final json = await _getJson(DobdaEndpoints.detail, {
+      'category_p': config.apiSlug,
+      'id': item.id,
+      'lang': apiLang,
+    });
+    final rows = _episodeList(json);
+    if (rows.isNotEmpty) {
+      return rows.asMap().entries.map((entry) {
+        final idx = entry.key + 1;
+        final row = entry.value;
+        final index = _parseInt(row['index'] ?? row['episode_index'] ?? row['episode'] ?? row['id'], fallback: idx);
+        final id = _first(row, const ['id', 'chapterId', 'chapter_id'], fallback: '$index');
+        final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name'], fallback: 'Episode $index');
+        return LiveGoEpisode(id: id, index: index <= 0 ? idx : index, title: title);
+      }).toList();
+    }
+    final total = _episodes(_dataMap(json));
+    return List.generate(total <= 0 ? item.episodes : total, (i) {
+      return LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}');
+    });
+  }
+
+  static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
+    final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
+    final apiLang = _providerLang(config.slug, item.lang);
+    final ep = _episodeNumber(chapterId ?? item.chapterId);
+    final chapter = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
+    final json = await _getJson(DobdaEndpoints.video, {
+      'category_p': config.apiSlug,
+      'id': item.id,
+      'chapterId': chapter,
+      'lang': apiLang,
+    });
+    return _parseStream(json, item: item, fallbackEpisode: ep, lang: apiLang);
+  }
+
+  static Future<StreamInfo> fastEpisodeStream(
+    ContentItem item, {
+    String? chapterId,
+    Duration timeout = const Duration(seconds: 7),
+  }) async {
+    try {
+      return await videoInfo(item, chapterId: chapterId).timeout(timeout);
+    } catch (e) {
+      print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
+      return StreamInfo.empty;
+    }
+  }
+
+  static Future<String> ping(String platform, String lang) async {
+    final start = DateTime.now();
+    try {
+      final rows = await home(platform: platform, lang: lang).timeout(const Duration(seconds: 8));
+      if (rows.isEmpty) return 'offline';
+      final ms = DateTime.now().difference(start).inMilliseconds;
+      return ms > 2500 ? 'slow' : 'online';
+    } catch (_) {
+      return 'offline';
+    }
+  }
+
+  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
+    final uri = Uri.parse(baseUrl).replace(
+      path: path,
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri).timeout(ApiEnv.timeout);
+      final headers = DobdaHmacSigner.headers(
+        method: 'GET',
+        uri: uri,
+        secret: ApiEnv.dobdaSecret,
+      );
+      for (final entry in headers.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+
+      final response = await request.close().timeout(ApiEnv.timeout);
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('DOBDA API ${response.statusCode} ${uri.path}: $body');
+      }
+      if (body.trim().isEmpty) return <String, dynamic>{};
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return <String, dynamic>{'success': true, 'data': decoded};
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  static List<ContentItem> _parseItems(
+    Map<String, dynamic> json, {
+    required String platform,
+    required String lang,
+  }) {
+    final raw = _dataList(json);
+    return raw
+        .map((e) => _parseItem(e, platform: platform, lang: lang))
+        .where((e) => e.id.isNotEmpty)
+        .toList();
+  }
+
+  static ContentItem _parseItem(
+    Map<String, dynamic> json, {
+    required String platform,
+    required String lang,
+  }) {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final id = _first(json, const ['id', 'bookId', 'book_id', 'dramaId', 'seriesId']);
+    final title = _first(json, const ['title', 'name', 'bookName', 'dramaName'], fallback: 'Untitled');
+    final cover = _first(json, const ['cover', 'poster', 'posterUrl', 'coverUrl', 'image', 'thumbnail']);
+    final backdrop = _first(json, const ['backdrop', 'banner', 'cover', 'poster', 'image']);
+    final description = _first(json, const ['synopsis', 'description', 'desc', 'summary']);
+    final source = _first(json, const ['platform', 'source', 'author'], fallback: config.name);
+    final episodes = _episodes(json);
+
+    return ContentItem(
+      id: id,
+      title: title,
+      source: source.isEmpty ? config.name : source,
+      category: _category(json),
+      description: description,
+      posterUrl: cover,
+      backdropUrl: backdrop.isEmpty ? cover : backdrop,
+      rating: 8.0,
+      episodes: episodes <= 0 ? 1 : episodes,
+      updated: true,
+      platformSlug: config.slug,
+      chapterId: '1',
+      lang: lang,
+    );
+  }
+
+  static ContentItem _preserveIdentity(
+    ContentItem parsed, {
+    required ContentItem fallback,
+    required String lang,
+  }) {
+    return ContentItem(
+      id: parsed.id.isNotEmpty ? parsed.id : fallback.id,
+      title: parsed.title.trim().isNotEmpty && parsed.title != 'Untitled' ? parsed.title : fallback.title,
+      source: parsed.source.trim().isNotEmpty ? parsed.source : fallback.source,
+      category: parsed.category.trim().isNotEmpty ? parsed.category : fallback.category,
+      description: parsed.description.trim().isNotEmpty ? parsed.description : fallback.description,
+      posterUrl: parsed.posterUrl.trim().isNotEmpty ? parsed.posterUrl : fallback.posterUrl,
+      backdropUrl: parsed.backdropUrl.trim().isNotEmpty ? parsed.backdropUrl : fallback.backdropUrl,
+      rating: parsed.rating,
+      episodes: parsed.episodes > 0 ? parsed.episodes : fallback.episodes,
+      updated: parsed.updated || fallback.updated,
+      platformSlug: parsed.platformSlug.trim().isNotEmpty ? parsed.platformSlug : fallback.platformSlug,
+      chapterId: parsed.chapterId.trim().isNotEmpty ? parsed.chapterId : fallback.chapterId,
+      lang: lang,
+    );
+  }
+
+  static StreamInfo _parseStream(
+    Map<String, dynamic> json, {
+    required ContentItem item,
+    required int fallbackEpisode,
+    required String lang,
+  }) {
+    final data = _dataMap(json);
+    final streams = data['streams'];
+    final qualities = <StreamQuality>[];
+    String url = '';
+
+    if (streams is List) {
+      for (final row in streams) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        final rawUrl = _first(map, const ['url', 'src', 'videoUrl', 'hlsUrl', 'streamUrl']);
+        if (rawUrl.isEmpty) continue;
+        final label = _first(map, const ['quality', 'resolution', 'label', 'name'], fallback: 'Auto');
+        qualities.add(StreamQuality(label: label.isEmpty ? 'Auto' : label, url: _normalizeUrl(rawUrl)));
+      }
+      if (qualities.isNotEmpty) url = qualities.first.url;
+    }
+
+    if (url.isEmpty) {
+      final direct = _first(data, const ['url', 'src', 'videoUrl', 'hlsUrl', 'streamUrl']);
+      if (direct.isNotEmpty) url = _normalizeUrl(direct);
+    }
+
+    final subtitles = <SubtitleTrack>[];
+    _appendSubtitles(subtitles, data['subtitles'] ?? data['subtitle'], fallbackLang: lang);
+
+    final total = _parseInt(data['total_episodes'] ?? data['totalEpisodes'] ?? item.episodes, fallback: item.episodes);
+    final episodeIndex = _parseInt(data['episode_index'] ?? data['episodeIndex'] ?? fallbackEpisode, fallback: fallbackEpisode);
+
+    return StreamInfo(
+      url: url,
+      episodeIndex: episodeIndex,
+      totalEpisodes: total <= 0 ? item.episodes : total,
+      nextEpisodeId: '${data['next_video_id'] ?? data['nextVideoId'] ?? (episodeIndex < total ? episodeIndex + 1 : 0)}',
+      prevEpisodeId: '${data['prev_video_id'] ?? data['prevVideoId'] ?? (episodeIndex > 1 ? episodeIndex - 1 : 0)}',
+      headers: const <String, String>{
+        'User-Agent': 'okhttp/4.12.0',
+        'Accept': '*/*',
+      },
+      subtitles: subtitles,
+      qualities: qualities,
+    );
+  }
+
+  static List<Map<String, dynamic>> _dataList(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is List) return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (data is Map) {
+      final nested = data['items'] ?? data['list'] ?? data['results'] ?? data['rows'] ?? data['data'];
+      if (nested is List) return nested.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    for (final key in const ['items', 'list', 'results', 'rows']) {
+      final value = json[key];
+      if (value is List) return value.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  static Map<String, dynamic> _dataMap(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return json;
+  }
+
+  static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
+    Object? data = _dataMap(json);
+    while (data is Map) {
+      final next = data['chapters'] ?? data['episodes'] ?? data['episodeList'] ?? data['chapterList'];
+      if (next == null || identical(next, data)) break;
+      data = next;
+    }
+    if (data is List) return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return const <Map<String, dynamic>>[];
+  }
+
+  static void _appendSubtitles(List<SubtitleTrack> out, Object? raw, {required String fallbackLang}) {
+    if (raw is Map) {
+      final known = raw['data'] ?? raw['items'] ?? raw['list'] ?? raw['tracks'] ?? raw['subtitles'];
+      if (known != null) {
+        _appendSubtitles(out, known, fallbackLang: fallbackLang);
+        return;
+      }
+      for (final entry in raw.entries) {
+        final value = entry.value;
+        if (value is String && value.trim().isNotEmpty) {
+          out.add(SubtitleTrack(
+            language: '${entry.key}'.trim().isEmpty ? fallbackLang : '${entry.key}',
+            format: value.toLowerCase().contains('.srt') ? 'srt' : 'webvtt',
+            url: _normalizeUrl(value),
+          ));
+        }
+      }
+      return;
+    }
+    if (raw is! List) return;
+    for (final row in raw) {
+      if (row is! Map) continue;
+      final map = Map<String, dynamic>.from(row);
+      final subUrl = _first(map, const ['url', 'vttUrl', 'subtitleUrl', 'src', 'file']);
+      if (subUrl.isEmpty) continue;
+      out.add(SubtitleTrack(
+        language: _first(map, const ['language', 'lang', 'label', 'name'], fallback: fallbackLang),
+        format: _first(map, const ['format'], fallback: subUrl.toLowerCase().contains('.srt') ? 'srt' : 'webvtt'),
+        url: _normalizeUrl(subUrl),
+      ));
+    }
+  }
+
+  static String _category(Map<String, dynamic> json) {
+    final genres = json['genres'] ?? json['genre'] ?? json['categories'] ?? json['tags'];
+    if (genres is List && genres.isNotEmpty) {
+      final first = '${genres.first}'.trim();
+      if (first.isNotEmpty) return first;
+    }
+    if (genres is String && genres.trim().isNotEmpty) return genres.trim();
+    return 'Drama';
+  }
+
+  static int _episodes(Map<String, dynamic> json) {
+    final raw = json['chapters'] ?? json['total_episodes'] ?? json['totalEpisodes'] ?? json['episodes'];
+    if (raw is List) return raw.length;
+    final parsed = _parseInt(raw, fallback: 1);
+    return parsed <= 0 ? 1 : parsed;
+  }
+
+  static String _providerLang(String slug, String requested) {
+    return LiveGoApiPlatforms.langFor(slug, requested);
+  }
+
+  static int _episodeNumber(String chapter) {
+    final direct = int.tryParse(chapter);
+    if (direct != null && direct > 0) return direct;
+    final match = RegExp(r'\d+').firstMatch(chapter);
+    final parsed = match == null ? null : int.tryParse(match.group(0)!);
+    return parsed == null || parsed <= 0 ? 1 : parsed;
+  }
+
+  static String _normalizeUrl(String raw) {
+    final url = raw.trim();
+    if (url.isEmpty) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '$baseUrl$url';
+    return url;
+  }
+
+  static String _first(Map<String, dynamic> json, List<String> keys, {String fallback = ''}) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value == null) continue;
+      final text = '$value'.trim();
+      if (text.isNotEmpty && text != 'null') return text;
+    }
+    return fallback;
+  }
+
+  static int _parseInt(Object? value, {required int fallback}) {
+    if (value is int) return value;
+    return int.tryParse('$value') ?? fallback;
+  }
+}

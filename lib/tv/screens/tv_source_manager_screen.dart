@@ -484,13 +484,16 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'MP4 multi-quality. Aman untuk player native.',
-      'netshort': 'Direct CDN + subtitle VTT. Aktif, bahasa default IN.',
-      'pinedrama': 'Direct MP4. Aman untuk player native.',
-      'dramabox': 'HLS signed dari all episode. Aktif, list bisa lebih lambat.',
-      'flickreels': 'HLS signed dari episode/all episode. Aktif.',
-      'melolo': 'Opsional. Catalog/search jalan, video CENC belum dipasang di player native.',
+      'shortmax': 'Anichin • MP4 multi-quality. Aman untuk player native.',
+      'netshort': 'Anichin • Direct CDN + subtitle VTT. Aktif, bahasa default IN.',
+      'pinedrama': 'Anichin • Direct MP4. Aman untuk player native.',
+      'dramabox': 'Anichin • HLS signed dari all episode. Aktif, list bisa lebih lambat.',
+      'flickreels': 'Anichin • HLS signed dari episode/all episode. Aktif.',
+      'melolo': 'Anichin • Opsional. Video CENC belum dipasang di player native.',
     };
+    if (LiveGoCatalog.isDobdaPlatform(slug)) {
+      return 'Dobda • Home/Discover/Search/Detail/Video HMAC. Stream + subtitle dari /api/v2/video.';
+    }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 
@@ -548,7 +551,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                       ),
                       child: Column(
                         children: [
-                          for (var i = 0; i < _platforms.length; i++)
+                          for (var i = 0; i < _platforms.length; i++) ...[
+                            if (i == 0 || LiveGoCatalog.backendLabel(_platforms[i]) != LiveGoCatalog.backendLabel(_platforms[i - 1]))
+                              _SourceGroupHeader(text: LiveGoCatalog.backendLabel(_platforms[i])),
                             _SourceRow(
                               node: _sourceNodes[i],
                               slug: _platforms[i],
@@ -568,6 +573,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                               onTap: () => _isExpanded(i) ? _collapseSource(i) : _expandSource(i),
                               isLast: i == _platforms.length - 1,
                             ),
+                          ],
                         ],
                       ),
                     ),
@@ -675,6 +681,29 @@ class _SourceHeader extends StatelessWidget {
             child: Text('$activeCount/6 AKTIF', style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SourceGroupHeader extends StatelessWidget {
+  final String text;
+  const _SourceGroupHeader({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppTheme.cyan,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }

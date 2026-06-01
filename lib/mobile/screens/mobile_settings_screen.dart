@@ -387,45 +387,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
                 children: [
                   const Text('Atur platform, bahasa, dan kategori Home HP. Perubahan aktif setelah tombol Simpan ditekan.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
                   const SizedBox(height: 14),
-                  for (final slug in platforms) ...[
-                    _SourceCard(
-                      title: LiveGoCatalog.label(slug),
-                      subtitle: _sourceDescription(slug),
-                      active: _active.contains(slug),
-                      home: _home.contains(slug),
-                      selected: _selectedPlatform == slug,
-                      statusColor: _statusColor(slug),
-                      language: (_languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug)).toUpperCase(),
-                      categoryCount: (_categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug)).length,
-                      onTap: () {
-                        if (_selectedPlatform == slug) {
-                          setState(() => _selectedPlatform = '');
-                        } else {
-                          _loadCategories(slug);
-                        }
-                      },
-                      onToggleActive: () => _toggleActive(slug),
-                      onToggleHome: () => _toggleHome(slug),
-                    ),
-                    if (_selectedPlatform == slug)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: GlowContainer(
-                          padding: const EdgeInsets.all(14),
-                          child: _loadingCategories
-                              ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                              : _SourcePlatformEditor(
-                                  slug: slug,
-                                  languages: LiveGoCatalog.languagesFor(slug),
-                                  selectedLanguage: _languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug),
-                                  availableCategories: _availableCategories,
-                                  selectedCategories: _categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug),
-                                  onLanguage: (v) => _setLanguage(slug, v),
-                                  onCategory: (v) => _toggleCategory(slug, v),
-                                ),
-                        ),
-                      ),
-                  ],
+                  ..._sourceWidgets(platforms),
                 ],
               ),
             ),
@@ -446,15 +408,82 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     );
   }
 
+  List<Widget> _sourceWidgets(List<String> platforms) {
+    final widgets = <Widget>[];
+    var lastBackend = '';
+    for (final slug in platforms) {
+      final backend = LiveGoCatalog.backendLabel(slug);
+      if (backend != lastBackend) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.fromLTRB(4, 18, 4, 10),
+          child: Text(
+            backend,
+            style: const TextStyle(
+              color: AppTheme.cyan,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ));
+        lastBackend = backend;
+      }
+
+      widgets.add(_SourceCard(
+        title: LiveGoCatalog.label(slug),
+        subtitle: _sourceDescription(slug),
+        active: _active.contains(slug),
+        home: _home.contains(slug),
+        selected: _selectedPlatform == slug,
+        statusColor: _statusColor(slug),
+        language: (_languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug)).toUpperCase(),
+        categoryCount: (_categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug)).length,
+        onTap: () {
+          if (_selectedPlatform == slug) {
+            setState(() => _selectedPlatform = '');
+          } else {
+            _loadCategories(slug);
+          }
+        },
+        onToggleActive: () => _toggleActive(slug),
+        onToggleHome: () => _toggleHome(slug),
+      ));
+
+      if (_selectedPlatform == slug) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: GlowContainer(
+            padding: const EdgeInsets.all(14),
+            child: _loadingCategories
+                ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                : _SourcePlatformEditor(
+                    slug: slug,
+                    languages: LiveGoCatalog.languagesFor(slug),
+                    selectedLanguage: _languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug),
+                    availableCategories: _availableCategories,
+                    selectedCategories: _categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug),
+                    onLanguage: (v) => _setLanguage(slug, v),
+                    onCategory: (v) => _toggleCategory(slug, v),
+                  ),
+          ),
+        ));
+      }
+    }
+    return widgets;
+  }
+
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'MP4 multi-quality. Bahasa ID/EN.',
-      'netshort': 'Direct CDN + subtitle VTT. Bahasa default IN.',
-      'pinedrama': 'Direct MP4. Kategori genre dari API.',
-      'dramabox': 'HLS signed + subtitle. Ada Latest, VIP, Dub Indo.',
-      'flickreels': 'HLS signed. Banyak bahasa termasuk ID.',
-      'melolo': 'Catalog jalan. Video CENC belum dipasang native.',
+      'shortmax': 'Anichin • MP4 multi-quality. Bahasa ID/EN.',
+      'netshort': 'Anichin • Direct CDN + subtitle VTT. Bahasa default IN.',
+      'pinedrama': 'Anichin • Direct MP4. Kategori genre dari API.',
+      'dramabox': 'Anichin • HLS signed + subtitle. Ada Latest, VIP, Dub Indo.',
+      'flickreels': 'Anichin • HLS signed. Banyak bahasa termasuk ID.',
+      'melolo': 'Anichin • Catalog jalan. Video CENC belum dipasang native.',
     };
+    if (LiveGoCatalog.isDobdaPlatform(slug)) {
+      return 'Dobda • Home/Discover/Search/Detail/Video HMAC. Subtitle ikut response video.';
+    }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 }

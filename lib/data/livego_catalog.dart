@@ -1,7 +1,7 @@
 import '../core/livego_settings.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
-import '../services/anichin_api_client.dart';
+import '../services/livego_api_gateway.dart';
 import '../services/api/api_platform.dart';
 import '../services/cache/livego_content_cache.dart';
 import '../services/feed/feed_config.dart';
@@ -16,10 +16,10 @@ class LiveGoCatalog {
     final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).take(6).toList();
     if (chosen.isNotEmpty) return chosen;
     final active = LiveGoSettings.activePlatforms.take(6).toList();
-    return active.isEmpty ? AnichinApiClient.defaultPlatforms : active;
+    return active.isEmpty ? LiveGoApiGateway.defaultPlatforms : active;
   }
 
-  static List<String> get allPlatforms => AnichinApiClient.supportedPlatforms;
+  static List<String> get allPlatforms => LiveGoApiGateway.supportedPlatforms;
   static List<String> get platformLabels => platforms.map(label).toList();
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'shortmax' : platforms.first);
@@ -35,6 +35,12 @@ class LiveGoCatalog {
   static String languageFor(String platform) =>
       LiveGoSettings.languageForPlatform(platform);
 
+  static String backendLabel(String platform) =>
+      LiveGoApiPlatforms.backendLabel(platform);
+
+  static bool isDobdaPlatform(String platform) =>
+      LiveGoApiPlatforms.bySlug(platform).isDobda;
+
   static Future<List<String>> fetchCategoriesFor(String platform) async {
     return availableCategoriesFor(platform);
   }
@@ -42,7 +48,7 @@ class LiveGoCatalog {
   static Future<String> pingPlatform(String platform) async {
     final start = DateTime.now();
     try {
-      final rows = await AnichinApiClient.home(platform: platform, lang: languageFor(platform));
+      final rows = await LiveGoApiGateway.home(platform: platform, lang: languageFor(platform));
       if (rows.isEmpty) {
         LiveGoSettings.setPlatformStatus(platform, 'offline');
         return 'offline';
@@ -67,7 +73,7 @@ class LiveGoCatalog {
     if (cached != null && cached.isNotEmpty) return cached;
 
     try {
-      final rows = await AnichinApiClient.home(platform: platform, lang: languageFor(platform))
+      final rows = await LiveGoApiGateway.home(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
       print('CATALOG HOME $platform -> ${rows.length}');
       if (rows.isNotEmpty) {
@@ -82,7 +88,7 @@ class LiveGoCatalog {
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
-      final rows = await AnichinApiClient.discover(platform: platform, lang: languageFor(platform))
+      final rows = await LiveGoApiGateway.discover(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
       if (rows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
@@ -127,10 +133,10 @@ class LiveGoCatalog {
     try {
       List<ContentItem> rows = const <ContentItem>[];
       if (key == 'trending' || key.isEmpty || key == 'home') {
-        rows = await AnichinApiClient.home(platform: platform, lang: lang)
+        rows = await LiveGoApiGateway.home(platform: platform, lang: lang)
             .timeout(const Duration(seconds: 12));
       } else {
-        rows = await AnichinApiClient.collection(
+        rows = await LiveGoApiGateway.collection(
           platform: platform,
           collection: key,
           lang: lang,
@@ -204,7 +210,7 @@ class LiveGoCatalog {
     );
     if (cached != null) return cached;
     try {
-      final rows = await AnichinApiClient.search(query: clean, platform: platform, lang: languageFor(platform));
+      final rows = await LiveGoApiGateway.search(query: clean, platform: platform, lang: languageFor(platform));
       await LiveGoContentCache.writeItems(
         platform: platform,
         endpoint: 'search',
@@ -241,7 +247,7 @@ class LiveGoCatalog {
       if (resolvedCached.id.isNotEmpty) return resolvedCached;
     }
     try {
-      final detail = await AnichinApiClient.detail(item);
+      final detail = await LiveGoApiGateway.detail(item);
       final resolved = _preservePlayableIdentity(detail ?? item, item);
       await LiveGoContentCache.writeDetail(resolved);
       return resolved;
@@ -280,7 +286,7 @@ class LiveGoCatalog {
     if (cached != null && cached.length > 1) return cached;
 
     try {
-      final rows = await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 22));
+      final rows = await LiveGoApiGateway.episodes(item).timeout(const Duration(seconds: 22));
       if (rows.length > 1) {
         await LiveGoContentCache.writeEpisodes(item, rows);
         return rows;
@@ -337,6 +343,8 @@ class LiveGoCatalog {
   }
 
   static String label(String slug) {
+    final config = LiveGoApiPlatforms.bySlugOrNull(slug);
+    if (config != null) return config.name;
     return slug
         .split(RegExp(r'[_-]'))
         .map((e) => e.isEmpty ? e : '${e[0].toUpperCase()}${e.substring(1)}')
