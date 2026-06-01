@@ -250,6 +250,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _handleBack() {
+    if (!_backRouter.consumeBackPress()) return;
+
     final action = _backRouter.resolveSourceManagerBack(
       confirmOpen: _confirmOpen,
       panelOpen: _expandedIndex >= 0,

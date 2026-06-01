@@ -16,10 +16,14 @@ class TvBackRouter {
   const TvBackRouter();
 
   static const int homeIndex = 0;
-  static const int duplicateGuardMs = 240;
+  static const int duplicateGuardMs = 420;
+  static int _lastBackHandledMs = 0;
 
-  bool isDuplicatePress(int nowMs, int lastHandledMs) {
-    return nowMs - lastHandledMs < duplicateGuardMs;
+  bool consumeBackPress() {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastBackHandledMs < duplicateGuardMs) return false;
+    _lastBackHandledMs = nowMs;
+    return true;
   }
 
   TvBackAction resolveRootBack({

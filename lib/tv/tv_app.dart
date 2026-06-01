@@ -30,7 +30,6 @@ class _TvAppState extends State<TvApp> {
 
   bool _exitDialogOpen = false;
   bool _restoreHomeBannerAfterExitDialog = false;
-  int _lastBackHandledMs = 0;
   final TvBackRouter _backRouter = const TvBackRouter();
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
@@ -108,6 +107,7 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _handleChildBackToHome() {
+    if (!_backRouter.consumeBackPress()) return;
     _applyBackAction(_backRouter.resolveChildContentBack());
   }
 
@@ -189,11 +189,10 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _handleBack() {
-    // Android TV can deliver the same Back press through both Shortcuts
-    // and PopScope. Guard it so one physical press produces one action.
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (_backRouter.isDuplicatePress(now, _lastBackHandledMs)) return;
-    _lastBackHandledMs = now;
+    // Android TV can deliver the same Back press through both a child screen
+    // and the root TvApp. Use the shared router guard so one physical press
+    // only creates one navigation step.
+    if (!_backRouter.consumeBackPress()) return;
 
     _applyBackAction(
       _backRouter.resolveRootBack(
