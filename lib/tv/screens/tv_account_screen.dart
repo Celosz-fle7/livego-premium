@@ -11,11 +11,13 @@ import 'tv_source_manager_screen.dart';
 
 class TvAccountScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToHome;
   final int focusTicket;
 
   const TvAccountScreen({
     super.key,
     this.onMoveToNav,
+    this.onBackToHome,
     this.focusTicket = 0,
   });
 
@@ -125,8 +127,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _handleBack() {
-    _zone = TvZone.nav;
-    widget.onMoveToNav?.call();
+    _zone = TvZone.list;
+    widget.onBackToHome?.call();
   }
 
   void _focusEntry() {
@@ -184,9 +186,13 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   KeyEventResult _topKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft || _isBack(key)) {
+    if (key == LogicalKeyboardKey.arrowLeft) {
       _zone = TvZone.nav;
       widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
+      _handleBack();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
@@ -341,7 +347,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                 const SizedBox(height: 14),
                 ...sectionWidgets,
                 Text(
-                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ←/Back kembali ke navbar' : '',
+                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← navbar • Back Home' : '',
                   style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                 ),
               ],

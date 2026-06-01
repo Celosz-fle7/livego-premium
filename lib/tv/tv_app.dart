@@ -249,6 +249,7 @@ class _TvAppState extends State<TvApp> {
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onBackToHome: _backToHomeBanner,
       ),
     ];
   }

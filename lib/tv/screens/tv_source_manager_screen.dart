@@ -25,6 +25,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   int _lastIndex = 0;
   int _expandedIndex = 0;
   int _categoryIndex = 0;
+  int _optionIndex = 0;
+  bool _optionMode = false;
   bool _categoryMode = false;
   bool _dirty = false;
   bool _confirmOpen = false;
@@ -98,19 +100,28 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   List<String> _selectedCategoriesFor(String slug) => LiveGoSettings.categoriesFor(slug);
 
   void _focusBack() {
+    _optionMode = false;
     _categoryMode = false;
     tvFocus(_backNode, alignment: 0.04);
   }
 
-  void _focusSource(int index, {bool categoryMode = false}) {
+  void _focusSource(int index, {bool optionMode = false, bool categoryMode = false}) {
     if (_sourceNodes.isEmpty) return;
     _lastIndex = _safeSource(index);
     _expandedIndex = _lastIndex;
-    _categoryMode = categoryMode && LiveGoSettings.isPlatformActive(_platforms[_lastIndex]);
+    final active = LiveGoSettings.isPlatformActive(_platforms[_lastIndex]);
+    _categoryMode = categoryMode && active;
+    _optionMode = optionMode && !_categoryMode;
     final cats = _allCategoriesFor(_platforms[_lastIndex]);
     if (_categoryIndex >= cats.length) _categoryIndex = cats.length - 1;
     if (_categoryIndex < 0) _categoryIndex = 0;
     tvFocus(_sourceNodes[_lastIndex], alignment: 0.22);
+  }
+
+  void _focusOption(int index) {
+    final safe = _safeSource(index);
+    _optionIndex = LiveGoSettings.isPlatformActive(_platforms[safe]) ? 0 : 1;
+    _focusSource(safe, optionMode: true);
   }
 
   Future<void> _autoPingOnce() async {
@@ -178,10 +189,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return true;
   }
 
-  void _togglePlatform(String slug) {
-    final next = !LiveGoSettings.isPlatformActive(slug);
-    _setPlatformActive(slug, next);
-  }
 
   void _toggleCategory(String slug) {
     if (!LiveGoSettings.isPlatformActive(slug)) {
@@ -220,7 +227,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   void _closeConfirm() {
     setState(() => _confirmOpen = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusSource(_lastIndex, categoryMode: _categoryMode);
+      if (mounted) _focusSource(_lastIndex, optionMode: _optionMode, categoryMode: _categoryMode);
     });
   }
 
@@ -275,6 +282,48 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final allCategories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);
 
+    if (_optionMode && _expandedIndex == index) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _optionIndex = 0;
+        setState(() {});
+        _focusSource(index, optionMode: true);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _optionIndex = 1;
+        setState(() {});
+        _focusSource(index, optionMode: true);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _optionMode = false;
+        _focusSource(index);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        if (active) {
+          _categoryIndex = 0;
+          _focusSource(index, categoryMode: true);
+        } else {
+          _optionMode = false;
+          _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+        }
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        final wantActive = _optionIndex == 0;
+        _setPlatformActive(slug, wantActive);
+        _focusSource(index, optionMode: true);
+        return KeyEventResult.handled;
+      }
+      if (_isBack(key)) {
+        _optionMode = false;
+        _focusSource(index);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+
     if (_categoryMode && _expandedIndex == index) {
       if (key == LogicalKeyboardKey.arrowLeft) {
         _categoryIndex = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
@@ -290,7 +339,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       if (key == LogicalKeyboardKey.arrowUp) {
         _categoryMode = false;
-        _focusSource(index);
+        _optionIndex = active ? 0 : 1;
+        _focusSource(index, optionMode: true);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
@@ -305,7 +355,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       if (_isBack(key)) {
         _categoryMode = false;
-        _focusSource(index);
+        _optionIndex = active ? 0 : 1;
+        _focusSource(index, optionMode: true);
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -324,23 +375,11 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _setPlatformActive(slug, false);
-      _focusSource(index);
+      _focusBack();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (!active) {
-        _setPlatformActive(slug, true);
-        _focusSource(index);
-      } else {
-        _categoryIndex = 0;
-        _focusSource(index, categoryMode: true);
-      }
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
-      _togglePlatform(slug);
-      _focusSource(index);
+    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      _focusOption(index);
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
@@ -407,6 +446,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
               _closeConfirm();
             } else if (_categoryMode) {
               _categoryMode = false;
+              _optionIndex = LiveGoSettings.isPlatformActive(_platforms[_lastIndex]) ? 0 : 1;
+              _focusSource(_lastIndex, optionMode: true);
+            } else if (_optionMode) {
+              _optionMode = false;
               _focusSource(_lastIndex);
             } else {
               _requestExit();
@@ -458,10 +501,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                               categories: _allCategoriesFor(_platforms[i]),
                               selectedCategories: _selectedCategoriesFor(_platforms[i]),
                               expanded: _expandedIndex == i,
+                              optionMode: _optionMode && _expandedIndex == i,
+                              optionIndex: _optionIndex,
                               categoryMode: _categoryMode && _expandedIndex == i,
                               categoryIndex: _categoryIndex,
                               onKey: (node, event) => _sourceKey(i, _platforms[i], event),
-                              onTap: () => _togglePlatform(_platforms[i]),
+                              onTap: () => _focusOption(i),
                               isLast: i == _platforms.length - 1,
                             ),
                         ],
@@ -469,7 +514,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'OK platform = ON/OFF • → saat ON masuk kategori • OK kategori = tampil/sembunyi • maksimal 6 platform aktif',
+                      'OK/→ buka ON-OFF • ↓ masuk kategori • OK kategori tampil/sembunyi • Back tutup langkah dulu',
                       style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -586,6 +631,8 @@ class _SourceRow extends StatelessWidget {
   final List<String> categories;
   final List<String> selectedCategories;
   final bool expanded;
+  final bool optionMode;
+  final int optionIndex;
   final bool categoryMode;
   final int categoryIndex;
   final FocusOnKeyEventCallback onKey;
@@ -603,6 +650,8 @@ class _SourceRow extends StatelessWidget {
     required this.categories,
     required this.selectedCategories,
     required this.expanded,
+    required this.optionMode,
+    required this.optionIndex,
     required this.categoryMode,
     required this.categoryIndex,
     required this.onKey,
@@ -631,9 +680,11 @@ class _SourceRow extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    gradient: focused
-                        ? LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
-                        : LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]),
+                    gradient: active
+                        ? (focused
+                            ? LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
+                            : LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]))
+                        : LinearGradient(colors: [Colors.black.withOpacity(0.82), AppTheme.bgDeep]),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : AppTheme.borderSoft, width: focused ? 2 : 1),
                     boxShadow: focused
@@ -654,7 +705,12 @@ class _SourceRow extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                                Row(
+                                  children: [
+                                    Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900))),
+                                    Icon(expanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 26),
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
                                 Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w700)),
                               ],
@@ -662,33 +718,62 @@ class _SourceRow extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           _SwitchPill(active: active),
-                          const SizedBox(width: 10),
-                          Icon(expanded && active ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 26),
                         ],
                       ),
-                      if (expanded && active) ...[
+                      if (expanded) ...[
                         const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                          decoration: BoxDecoration(
-                            color: AppTheme.bgDeep.withOpacity(0.92),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              for (var i = 0; i < categories.length; i++)
-                                _CategoryChip(
-                                  text: categories[i],
-                                  selected: selectedCategories.contains(categories[i]),
-                                  focused: focused && categoryMode && i == categoryIndex,
-                                ),
-                            ],
-                          ),
+                        Divider(color: Colors.white.withOpacity(0.10), height: 1),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const SizedBox(width: 86, child: Text('STATUS', style: TextStyle(color: AppTheme.textSoft, fontSize: 10.5, fontWeight: FontWeight.w900))),
+                            _PowerChoice(text: 'ON', selected: active, focused: focused && optionMode && optionIndex == 0),
+                            const SizedBox(width: 10),
+                            _PowerChoice(text: 'OFF', selected: !active, focused: focused && optionMode && optionIndex == 1),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                active ? 'Tampil di Home TV' : 'Hitam = tidak ditampilkan di Home TV',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: active ? AppTheme.cyan : Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
+                        active
+                            ? Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.bgDeep.withOpacity(0.92),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: AppTheme.border),
+                                ),
+                                child: Wrap(
+                                  spacing: 10,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (var i = 0; i < categories.length; i++)
+                                      _CategoryChip(
+                                        text: categories[i],
+                                        selected: selectedCategories.contains(categories[i]),
+                                        focused: focused && categoryMode && i == categoryIndex,
+                                      ),
+                                  ],
+                                ),
+                              )
+                            : Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.38),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: Colors.white10),
+                                ),
+                                child: const Text('Kategori disembunyikan karena platform OFF.', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w800)),
+                              ),
                       ],
                     ],
                   ),
@@ -763,6 +848,31 @@ class _SwitchPill extends StatelessWidget {
   }
 }
 
+class _PowerChoice extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final bool focused;
+
+  const _PowerChoice({required this.text, required this.selected, required this.focused});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: 76,
+      height: 34,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
+        border: Border.all(color: focused ? Colors.white : (selected ? AppTheme.cyan.withOpacity(0.65) : Colors.white12), width: focused ? 2 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 16)] : null,
+      ),
+      child: Text(text, style: TextStyle(color: selected || focused ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
 class _CategoryChip extends StatelessWidget {
   final String text;
   final bool selected;
@@ -823,7 +933,7 @@ class _ConfirmSaveOverlay extends StatelessWidget {
               children: [
                 _DialogButton(node: stayNode, text: 'Tetap di sini', onKey: onKey, onTap: onStay),
                 const SizedBox(width: 14),
-                _DialogButton(node: saveNode, text: 'Simpan', onKey: onKey, onTap: onSave, filled: true),
+                _DialogButton(node: saveNode, text: 'Simpan & Keluar', onKey: onKey, onTap: onSave, filled: true),
               ],
             ),
           ],
