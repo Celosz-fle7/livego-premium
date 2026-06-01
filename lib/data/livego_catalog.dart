@@ -297,24 +297,6 @@ class LiveGoCatalog {
     return rows.isEmpty ? (item.episodes <= 0 ? 1 : item.episodes) : rows.length;
   }
 
-  static Future<StreamInfo> streamInfoFromEpisode(ContentItem item, {String? chapterId}) async {
-    try {
-      return await AnichinApiClient.videoInfoFromEpisodeOnly(item, chapterId: chapterId ?? item.chapterId);
-    } catch (e) {
-      print('LIVEGO DIRECT EPISODE STREAM ERROR: $e');
-      return StreamInfo.empty;
-    }
-  }
-
-  static Future<StreamInfo> streamInfoFromAllEpisodes(ContentItem item, {String? chapterId}) async {
-    try {
-      return await AnichinApiClient.videoInfoFromAllEpisodesOnly(item, chapterId: chapterId ?? item.chapterId);
-    } catch (e) {
-      print('LIVEGO DIRECT ALLEPISODE STREAM ERROR: $e');
-      return StreamInfo.empty;
-    }
-  }
-
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
       return await AnichinApiClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);

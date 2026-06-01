@@ -14,6 +14,7 @@ import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
+import '../../services/anichin_api_client.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -92,9 +93,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _url = '';
     });
 
-    final startedAt = DateTime.now();
     final requestedEpisode = _episode <= 0 ? 1 : _episode;
-    final fastPlayable = ContentItem(
+    final playable = ContentItem(
       id: widget.item.id,
       title: widget.item.title,
       source: widget.item.source,
@@ -110,203 +110,123 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       lang: widget.item.lang,
     );
 
-    if ((widget.item.episodes) > _knownEpisodeCount) {
-      _knownEpisodeCount = widget.item.episodes;
-    }
+    try {
+      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$requestedEpisode');
+      final started = DateTime.now();
 
-    bool playbackStarted = false;
-    bool metadataStarted = false;
-    final playCompleter = Completer<void>();
-
-    void loadMetadataBackground() {
-      if (metadataStarted) return;
-      metadataStarted = true;
-      final metadataStart = DateTime.now().difference(startedAt).inMilliseconds;
-      debugPrint('LIVEGO TV PLAYER BACKGROUND METADATA START at=${metadataStart}ms');
-
-      LiveGoCatalog.detail(widget.item)
-          .timeout(const Duration(seconds: 18), onTimeout: () => widget.item)
-          .then((detail) {
-        if (!mounted) return;
-        final resolved = _keepPlayableIdentity(detail);
-        final current = _detail ?? widget.item;
-        final merged = ContentItem(
-          id: current.id.trim().isNotEmpty ? current.id : resolved.id,
-          title: resolved.title.trim().isNotEmpty ? resolved.title : current.title,
-          source: resolved.source.trim().isNotEmpty ? resolved.source : current.source,
-          category: resolved.category.trim().isNotEmpty ? resolved.category : current.category,
-          description: resolved.description.trim().isNotEmpty ? resolved.description : current.description,
-          posterUrl: resolved.posterUrl.trim().isNotEmpty ? resolved.posterUrl : current.posterUrl,
-          backdropUrl: resolved.backdropUrl.trim().isNotEmpty ? resolved.backdropUrl : current.backdropUrl,
-          rating: resolved.rating,
-          episodes: resolved.episodes > current.episodes ? resolved.episodes : current.episodes,
-          updated: resolved.updated || current.updated,
-          platformSlug: current.platformSlug.trim().isNotEmpty ? current.platformSlug : resolved.platformSlug,
-          chapterId: current.chapterId.trim().isNotEmpty ? current.chapterId : '$requestedEpisode',
-          lang: current.lang.trim().isNotEmpty ? current.lang : resolved.lang,
-        );
-        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER DETAIL DONE background in=${elapsed}ms episodes=${merged.episodes}');
-        setState(() => _detail = merged);
-      }).catchError((e) {
-        debugPrint('LIVEGO TV PLAYER DETAIL ERROR background: $e');
-      });
-
-      LiveGoCatalog.episodes(widget.item)
-          .timeout(const Duration(seconds: 18), onTimeout: () => <LiveGoEpisode>[])
-          .then((episodes) {
-        if (!mounted || episodes.isEmpty) return;
-        final count = episodes.length;
-        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER ALLEPISODE DONE background in=${elapsed}ms count=$count');
-        if (count > _knownEpisodeCount) {
-          setState(() => _knownEpisodeCount = count);
-        }
-      }).catchError((e) {
-        debugPrint('LIVEGO TV PLAYER ALLEPISODE ERROR background: $e');
-      });
-    }
-
-    Future<void> startPlayback(StreamInfo stream, String source) async {
-      if (!mounted || playbackStarted || stream.url.isEmpty) return;
-      playbackStarted = true;
-      if (!playCompleter.isCompleted) playCompleter.complete();
-
-      final total = stream.totalEpisodes > fastPlayable.episodes
-          ? stream.totalEpisodes
-          : fastPlayable.episodes;
-      final playable = ContentItem(
-        id: fastPlayable.id,
-        title: fastPlayable.title,
-        source: fastPlayable.source,
-        category: fastPlayable.category,
-        description: fastPlayable.description,
-        posterUrl: fastPlayable.posterUrl,
-        backdropUrl: fastPlayable.backdropUrl,
-        rating: fastPlayable.rating,
-        episodes: total <= 0 ? 1 : total,
-        updated: fastPlayable.updated,
-        platformSlug: fastPlayable.platformSlug,
+      // Hard fast path: direct /episode only. No detail, no allepisode, no cache.
+      var stream = await AnichinApiClient.fastEpisodeStream(
+        playable,
         chapterId: '$requestedEpisode',
-        lang: fastPlayable.lang,
+        timeout: const Duration(seconds: 7),
       );
 
-      final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
-      debugPrint('LIVEGO TV PLAYER PLAYABLE $source ep=$requestedEpisode in=${elapsed}ms url=${stream.url.isNotEmpty}');
+      debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty}');
 
-      await _controller?.dispose();
-      _controller = null;
+      // Fallback only if direct /episode fails. This keeps DramaBox/FlickReels safe
+      // without letting slow metadata block providers where /episode works.
+      if (stream.url.isEmpty) {
+        debugPrint('LIVEGO TV DIRECT EP FALLBACK streamInfo');
+        stream = await LiveGoCatalog.streamInfo(playable, chapterId: '$requestedEpisode')
+            .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
+      }
+
       _detail = playable;
       _url = stream.url;
-      _knownEpisodeCount = total > _knownEpisodeCount ? total : _knownEpisodeCount;
+      await _startController(playable, stream);
 
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(stream.url),
-        httpHeaders: stream.headers.isEmpty
-            ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
-            : stream.headers,
-      );
-      _controller = controller;
-      controller.addListener(() {
-        if (!mounted || !controller.value.isInitialized) return;
-        final value = controller.value;
-        if (value.position.inSeconds % 5 == 0) {
-          LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
-        }
-        final duration = value.duration;
-        if (LiveGoSettings.autoNextEnabled && duration.inSeconds > 15 && _episode < (_detail?.episodes ?? widget.item.episodes)) {
-          final remaining = duration - value.position;
-          if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
-            LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
-            _episode += 1;
-            _load();
-          }
-        }
-      });
-
-      try {
-        final initStart = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER INIT START source=$source at=${initStart}ms');
-        await controller.initialize();
-        await controller.setPlaybackSpeed(_speed);
-        await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
-        final saved = LiveGoLocalStore.progressFor(playable);
-        if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
-          await controller.seekTo(saved.position);
-        }
-        await controller.play();
-        final playAt = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER PLAY source=$source at=${playAt}ms');
-        _loading = false;
-        if (mounted) setState(() {});
-        _showInitialControls();
-        loadMetadataBackground();
-      } catch (e) {
-        debugPrint('LIVEGO TV PLAYER INIT ERROR source=$source: $e');
-        if (mounted) {
-          setState(() {
-            _error = '$e';
-            _loading = false;
-          });
-        }
-      }
-    }
-
-    Future<void> tryStream(Future<StreamInfo> future, String source) async {
-      try {
-        final stream = await future;
-        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER STREAM DONE $source in=${elapsed}ms ok=${stream.url.isNotEmpty}');
-        if (stream.url.isNotEmpty) {
-          await startPlayback(stream, source);
-        }
-      } catch (e) {
-        final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
-        debugPrint('LIVEGO TV PLAYER STREAM ERROR $source in=${elapsed}ms: $e');
-      }
-    }
-
-    try {
-      debugPrint('LIVEGO TV PLAYER OPEN platform=${fastPlayable.platformSlug} id=${fastPlayable.id} ep=$requestedEpisode');
-
-      final episodeFuture = LiveGoCatalog.streamInfoFromEpisode(fastPlayable, chapterId: '$requestedEpisode')
-          .timeout(const Duration(seconds: 14), onTimeout: () => StreamInfo.empty);
-
-      // TEST MODE: do not start /detail or /allepisode before video playback.
-      // This isolates whether parallel metadata requests are slowing /episode/video init.
-      await tryStream(episodeFuture, '/episode-only');
-
-      if (!playbackStarted) {
-        debugPrint('LIVEGO TV PLAYER EPISODE-ONLY failed, trying /allepisode playable fallback');
-        final allStream = await LiveGoCatalog.streamInfoFromAllEpisodes(fastPlayable, chapterId: '$requestedEpisode')
-            .timeout(const Duration(seconds: 10), onTimeout: () => StreamInfo.empty);
-        if (allStream.url.isNotEmpty) {
-          await startPlayback(allStream, '/allepisode-fallback');
-        }
-      }
-
-      if (!playbackStarted) {
-        debugPrint('LIVEGO TV PLAYER FALLBACK streamInfo start');
-        final fallback = await LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode')
-            .timeout(const Duration(seconds: 12), onTimeout: () => StreamInfo.empty);
-        if (fallback.url.isNotEmpty) {
-          await startPlayback(fallback, 'fallback');
-        }
-      }
-
-      if (!playbackStarted && mounted) {
-        setState(() {
-          _error = 'Stream belum tersedia dari API';
-          _loading = false;
-        });
-      }
+      // Metadata/list is background only. It must never delay first playback.
+      unawaited(_loadMetadataAfterPlayback(requestedEpisode, stream));
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
+      _error = '$e';
+      _loading = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _startController(ContentItem playable, StreamInfo stream) async {
+    await _controller?.dispose();
+    _controller = null;
+
+    if (stream.url.isEmpty) {
+      _loading = false;
+      _error = 'Stream belum tersedia dari API';
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final initStart = DateTime.now();
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(stream.url),
+      httpHeaders: stream.headers.isEmpty
+          ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+          : stream.headers,
+    );
+    _controller = controller;
+
+    controller.addListener(() {
+      if (!mounted || !controller.value.isInitialized) return;
+      final value = controller.value;
+      if (value.position.inSeconds % 5 == 0) {
+        LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
       }
+      final duration = value.duration;
+      if (LiveGoSettings.autoNextEnabled && duration.inSeconds > 15 && _episode < (_detail?.episodes ?? widget.item.episodes)) {
+        final remaining = duration - value.position;
+        if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
+          LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
+          _episode += 1;
+          _load();
+        }
+      }
+    });
+
+    await controller.initialize();
+    debugPrint('LIVEGO TV VIDEO INIT DONE ${DateTime.now().difference(initStart).inMilliseconds}ms');
+    await controller.setPlaybackSpeed(_speed);
+    await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+
+    final saved = LiveGoLocalStore.progressFor(playable);
+    if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
+      await controller.seekTo(saved.position);
+    }
+
+    await controller.play();
+    _loading = false;
+    if (mounted) setState(() {});
+    _showInitialControls();
+  }
+
+  Future<void> _loadMetadataAfterPlayback(int requestedEpisode, StreamInfo stream) async {
+    try {
+      final detail = _keepPlayableIdentity(await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8)));
+      if (!mounted) return;
+      _detail = ContentItem(
+        id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
+        title: detail.title.trim().isNotEmpty ? detail.title : widget.item.title,
+        source: detail.source.trim().isNotEmpty ? detail.source : widget.item.source,
+        category: detail.category.trim().isNotEmpty ? detail.category : widget.item.category,
+        description: detail.description.trim().isNotEmpty ? detail.description : widget.item.description,
+        posterUrl: detail.posterUrl.trim().isNotEmpty ? detail.posterUrl : widget.item.posterUrl,
+        backdropUrl: detail.backdropUrl.trim().isNotEmpty ? detail.backdropUrl : widget.item.backdropUrl,
+        rating: detail.rating,
+        episodes: detail.episodes > 0 ? detail.episodes : (stream.totalEpisodes > 1 ? stream.totalEpisodes : widget.item.episodes),
+        updated: detail.updated || widget.item.updated,
+        platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
+        chapterId: '$requestedEpisode',
+        lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
+      );
+      if (mounted) setState(() {});
+
+      final realEpisodes = await LiveGoCatalog.episodes(_detail ?? detail).timeout(const Duration(seconds: 18));
+      final count = realEpisodes.length > 1 ? realEpisodes.length : (_detail?.episodes ?? widget.item.episodes);
+      if (!mounted) return;
+      if (count > 1 && count != _knownEpisodeCount) {
+        setState(() => _knownEpisodeCount = count);
+      }
+      debugPrint('LIVEGO TV METADATA DONE episodes=$count');
+    } catch (e) {
+      debugPrint('LIVEGO TV METADATA BACKGROUND SKIP: $e');
     }
   }
 

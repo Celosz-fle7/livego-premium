@@ -210,39 +210,6 @@ class AnichinApiClient {
     return List.generate(safeTotal, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
   }
 
-  static Future<StreamInfo> videoInfoFromEpisodeOnly(ContentItem item, {String? chapterId}) async {
-    final slug = _apiSlug(item.platformSlug);
-    final apiLang = _providerLang(slug, item.lang);
-    final chapter = '${chapterId ?? item.chapterId}';
-    final ep = _episodeNumber(chapter);
-    final playableId = item.id.trim();
-    if (playableId.isEmpty) {
-      print('ANICHIN DIRECT EPISODE EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
-      return StreamInfo.empty;
-    }
-
-    final query = <String, String>{
-      'id': playableId,
-      'ep': '$ep',
-      'lang': apiLang,
-      if (_qualityParam.isNotEmpty) 'q': _qualityParam,
-    };
-
-    return _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang);
-  }
-
-  static Future<StreamInfo> videoInfoFromAllEpisodesOnly(ContentItem item, {String? chapterId}) async {
-    final slug = _apiSlug(item.platformSlug);
-    final apiLang = _providerLang(slug, item.lang);
-    final chapter = '${chapterId ?? item.chapterId}';
-    final ep = _episodeNumber(chapter);
-    if (item.id.trim().isEmpty) {
-      print('ANICHIN DIRECT ALLEPISODE EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
-      return StreamInfo.empty;
-    }
-    return _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
-  }
-
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
     final slug = _apiSlug(item.platformSlug);
     final apiLang = _providerLang(slug, item.lang);
@@ -281,6 +248,76 @@ class AnichinApiClient {
     if (fallback.url.isNotEmpty) return fallback;
 
     return StreamInfo.empty;
+  }
+
+  static Future<StreamInfo> fastEpisodeStream(
+    ContentItem item, {
+    String? chapterId,
+    Duration timeout = const Duration(seconds: 7),
+  }) async {
+    final slug = _apiSlug(item.platformSlug);
+    final apiLang = _providerLang(slug, item.lang);
+    final chapter = '${chapterId ?? item.chapterId}';
+    final ep = _episodeNumber(chapter);
+    final playableId = item.id.trim();
+    if (playableId.isEmpty) {
+      print('ANICHIN FAST EP EMPTY ID ${item.platformSlug} ep=$ep title=${item.title}');
+      return StreamInfo.empty;
+    }
+
+    final query = <String, String>{
+      'id': playableId,
+      'ep': '$ep',
+      'lang': apiLang,
+      if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+    };
+
+    try {
+      final json = await _getJson('/api/$slug/episode', query).timeout(timeout);
+      if (json.isEmpty) return StreamInfo.empty;
+      return _parseFastStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
+    } catch (e) {
+      print('ANICHIN FAST EP STREAM EMPTY $slug ep=$ep: $e');
+      return StreamInfo.empty;
+    }
+  }
+
+  static Future<StreamInfo> _parseFastStream(
+    Map<String, dynamic> json, {
+    required ContentItem item,
+    required int ep,
+    required String slug,
+    required String lang,
+  }) async {
+    final data = _dataMap(json);
+    final streamData = _streamData(data);
+    final url = _normalizePlayableUrl(_extractUrl(streamData));
+    if (url.isEmpty) return StreamInfo.empty;
+
+    final total = _parseInt(
+      streamData['totalEpisodes'] ??
+          streamData['total_episodes'] ??
+          streamData['episodes'] ??
+          item.episodes,
+      fallback: item.episodes <= 0 ? 1 : item.episodes,
+    );
+
+    return StreamInfo(
+      url: url,
+      episodeIndex: _parseInt(
+        streamData['episode_index'] ?? streamData['episodeIndex'] ?? streamData['ep'] ?? ep,
+        fallback: ep,
+      ),
+      totalEpisodes: total <= 0 ? (item.episodes <= 0 ? 1 : item.episodes) : total,
+      nextEpisodeId: ep < (total <= 0 ? item.episodes : total) ? '${ep + 1}' : '0',
+      prevEpisodeId: ep > 1 ? '${ep - 1}' : '0',
+      headers: const <String, String>{
+        'User-Agent': 'okhttp/4.12.0',
+        'Accept': '*/*',
+      },
+      subtitles: const <SubtitleTrack>[],
+      qualities: _extractQualities(streamData),
+    );
   }
 
   static Future<StreamInfo> _streamFromEpisodeEndpoint(
