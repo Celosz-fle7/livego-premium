@@ -107,9 +107,9 @@ class LiveGoCatalog {
 
   static Future<List<ContentItem>> homeByCategory({
     String platform = 'shortmax',
-    String category = 'Trending',
+    String category = 'Populer',
   }) async {
-    final key = category.trim().toLowerCase().replaceAll(' ', '');
+    final key = LiveGoApiPlatforms.categoryKey(platform, category);
     final endpoint = key.isEmpty ? 'home' : key;
     final lang = languageFor(platform);
     final sessionKey = FeedSessionState.key(platform, endpoint, lang: lang);

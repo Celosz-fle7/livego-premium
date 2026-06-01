@@ -51,7 +51,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.mp4,
       supportedLangs: ['id', 'en'],
       enabledByDefault: true,
-      categories: ['Trending', 'For You'],
+      categories: ['Populer', 'Untuk Kamu'],
     ),
     LiveGoApiPlatform(
       slug: 'netshort',
@@ -62,7 +62,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['in', 'en', 'th', 'vi', 'ja', 'ko'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Trending', 'For You'],
+      categories: ['Populer', 'Untuk Kamu'],
     ),
     LiveGoApiPlatform(
       slug: 'pinedrama',
@@ -72,7 +72,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.mp4,
       supportedLangs: ['en', 'id', 'th', 'vi', 'ja', 'ko'],
       enabledByDefault: true,
-      categories: ['Trending', 'For You'],
+      categories: ['Populer', 'Untuk Kamu'],
     ),
     LiveGoApiPlatform(
       slug: 'dramabox',
@@ -84,7 +84,7 @@ class LiveGoApiPlatforms {
       enabledByDefault: true,
       supportsSubtitle: true,
       streamFromAllEpisodes: true,
-      categories: ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
+      categories: ['Populer', 'Terbaru', 'VIP', 'Dub Indo', 'Untuk Kamu'],
     ),
     LiveGoApiPlatform(
       slug: 'flickreels',
@@ -94,7 +94,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['en', 'ar', 'zh', 'de', 'fr', 'id', 'it', 'ja', 'ko', 'es', 'pt', 'th', 'tr'],
       enabledByDefault: true,
-      categories: ['Trending', 'For You'],
+      categories: ['Populer', 'Untuk Kamu'],
     ),
     LiveGoApiPlatform(
       slug: 'melolo',
@@ -103,13 +103,13 @@ class LiveGoApiPlatforms {
       searchParam: 'q',
       videoType: LiveGoVideoType.encrypted,
       supportedLangs: ['id', 'en', 'ar', 'zh', 'de', 'fr', 'it', 'ja', 'ko', 'es', 'pt', 'th', 'tr', 'vi', 'ms', 'in'],
-      categories: ['Trending', 'For You'],
+      categories: ['Populer', 'Untuk Kamu'],
     ),
 
     // Dobda API kedua. Slug internal diberi prefix supaya tidak bentrok dengan
     // platform Anichin yang namanya sama. endpointSlug adalah category_p Dobda.
-    // Plan STARTER Dobda: 20 platform. Kategori Home hanya Home/Discover; Banner
-    // dipakai sebagai banner source saja, bukan tab kategori grid.
+    // Plan STARTER Dobda: 20 platform. Kategori Beranda hanya Beranda/Jelajah; Banner
+    // dipakai sebagai sumber banner saja, bukan tab kategori grid.
     LiveGoApiPlatform(
       slug: 'dobda_melolo',
       endpointSlug: 'melolo',
@@ -120,7 +120,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_pinedrama',
@@ -132,7 +132,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_freereels',
@@ -144,7 +144,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_meloshort',
@@ -156,7 +156,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_reelshort',
@@ -168,7 +168,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_reelife',
@@ -180,7 +180,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramawave',
@@ -192,7 +192,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_stardusttv',
@@ -204,7 +204,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_netshort',
@@ -216,7 +216,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_goodshort',
@@ -228,7 +228,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_shortmax',
@@ -240,7 +240,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_flickreels',
@@ -252,7 +252,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_flextv',
@@ -264,7 +264,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramarush',
@@ -276,7 +276,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_rapidtv',
@@ -288,7 +288,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramanova',
@@ -300,7 +300,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_fundrama',
@@ -312,7 +312,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_starshort',
@@ -324,7 +324,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramapops',
@@ -336,7 +336,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_snackshort',
@@ -348,7 +348,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Home', 'Discover'],
+      categories: ['Beranda', 'Jelajah'],
     ),
   ];
 
@@ -415,4 +415,71 @@ class LiveGoApiPlatforms {
   static List<String> categoriesFor(String platform) {
     return List<String>.from(bySlug(platform).categories);
   }
+
+  static String categoryKey(String platform, String category) {
+    final clean = category.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+    const aliases = <String, String>{
+      '': 'home',
+      'home': 'home',
+      'beranda': 'home',
+      'trending': 'trending',
+      'populer': 'trending',
+      'popular': 'trending',
+      'foryou': 'foryou',
+      'untukkamu': 'foryou',
+      'rekomendasi': 'foryou',
+      'latest': 'latest',
+      'terbaru': 'latest',
+      'vip': 'vip',
+      'dubindo': 'dubindo',
+      'discover': 'discover',
+      'jelajah': 'discover',
+    };
+    return aliases[clean] ?? clean;
+  }
+
+  static String categoryLabel(String platform, String category) {
+    final config = bySlug(platform);
+    final key = categoryKey(config.slug, category);
+    if (config.isDobda) {
+      if (key == 'home') return 'Beranda';
+      if (key == 'discover') return 'Jelajah';
+    }
+    switch (key) {
+      case 'trending':
+        return 'Populer';
+      case 'foryou':
+        return 'Untuk Kamu';
+      case 'latest':
+        return 'Terbaru';
+      case 'vip':
+        return 'VIP';
+      case 'dubindo':
+        return 'Dub Indo';
+      case 'home':
+        return 'Beranda';
+      case 'discover':
+        return 'Jelajah';
+    }
+    return category.trim().isEmpty ? (config.isDobda ? 'Beranda' : 'Populer') : category.trim();
+  }
+
+  static List<String> normalizeCategoriesFor(String platform, Iterable<String> values) {
+    final config = bySlug(platform);
+    final available = categoriesFor(config.slug);
+    final byKey = <String, String>{
+      for (final item in available) categoryKey(config.slug, item): item,
+    };
+    final result = <String>[];
+    for (final raw in values) {
+      final key = categoryKey(config.slug, raw);
+      final label = byKey[key] ?? categoryLabel(config.slug, raw);
+      if (available.contains(label) && !result.contains(label)) {
+        result.add(label);
+      }
+    }
+    if (result.isEmpty) result.addAll(available.take(2));
+    return result.take(6).toList();
+  }
+
 }

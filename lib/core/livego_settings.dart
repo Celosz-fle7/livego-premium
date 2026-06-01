@@ -82,12 +82,14 @@ class LiveGoSettings {
   }
 
   static List<String> categoriesFor(String platform) {
-    return List<String>.from(homeCategories[platform] ?? const ['Trending', 'For You']);
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final saved = homeCategories[config.slug] ?? config.categories;
+    return LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, saved);
   }
 
   static void setCategoriesFor(String platform, List<String> values) {
-    final clean = values.where((e) => e.trim().isNotEmpty).take(6).toList();
-    homeCategories[platform] = clean.isEmpty ? ['Trending'] : clean;
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    homeCategories[config.slug] = LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, values);
   }
 
   static void setPlatformStatus(String slug, String status) {

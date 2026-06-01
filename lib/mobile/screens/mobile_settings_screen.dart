@@ -167,7 +167,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
             ],
           ),
         ),
-        _section('Tampilan Home'),
+        _section('Tampilan Beranda'),
         GlowContainer(
           padding: const EdgeInsets.all(18),
           child: LayoutBuilder(
@@ -180,7 +180,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Jumlah Grid Home', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                  const Text('Jumlah Grid Beranda', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 6),
                   Text('Geser titik untuk mengatur jumlah poster. Perangkat ini dibatasi sampai $max grid.', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
                   const SizedBox(height: 18),
@@ -207,7 +207,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             children: [
-              _tile(Icons.layers_rounded, 'Kelola Sumber Data', 'Pilih 6 platform Home, kategori, dan cek status server.', onTap: () async {
+              _tile(Icons.layers_rounded, 'Kelola Sumber Data', 'Pilih 6 platform Beranda, kategori, dan cek status server.', onTap: () async {
                 await Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagerScreen()));
                 setState(() {});
               }),
@@ -240,7 +240,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
   late Map<String, List<String>> _categoryDrafts;
 
   String _selectedPlatform = LiveGoSettings.defaultPlatform;
-  List<String> _availableCategories = const ['Trending', 'For You'];
+  List<String> _availableCategories = const ['Populer', 'Untuk Kamu'];
   bool _loadingCategories = false;
   bool _pinging = false;
 
@@ -387,7 +387,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                 children: [
-                  const Text('Atur platform, bahasa, dan kategori Home HP. Perubahan aktif setelah tombol Simpan ditekan.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
+                  const Text('Atur platform, bahasa, dan kategori Beranda HP. Perubahan aktif setelah tombol Simpan ditekan.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
                   const SizedBox(height: 14),
                   ..._sourceWidgets(platforms),
                 ],
@@ -479,12 +479,12 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'shortmax': 'Anichin • MP4 multi-quality. Bahasa ID/EN.',
       'netshort': 'Anichin • Direct CDN + subtitle VTT. Bahasa default IN.',
       'pinedrama': 'Anichin • Direct MP4. Kategori genre dari API.',
-      'dramabox': 'Anichin • HLS signed + subtitle. Ada Latest, VIP, Dub Indo.',
+      'dramabox': 'Anichin • HLS signed + subtitle. Ada Terbaru, VIP, Dub Indo.',
       'flickreels': 'Anichin • HLS signed. Banyak bahasa termasuk ID.',
       'melolo': 'Anichin • Catalog jalan. Video CENC belum dipasang native.',
     };
     if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Dobda • Home/Discover/Search/Detail/Video HMAC. Subtitle ikut response video.';
+      return 'Dobda • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
     }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
@@ -553,7 +553,7 @@ class _SourceCard extends StatelessWidget {
                     children: [
                       GestureDetector(
                         onTap: onToggleHome,
-                        child: Text(home ? 'Tampil di Home' : 'Tambahkan ke Home', style: TextStyle(color: home ? AppTheme.cyan : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11)),
+                        child: Text(home ? 'Tampil di Beranda' : 'Tambah ke Beranda', style: TextStyle(color: home ? AppTheme.cyan : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11)),
                       ),
                       Text('• $categoryCount kategori', style: const TextStyle(color: AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w700)),
                     ],
@@ -606,9 +606,9 @@ class _SourcePlatformEditor extends StatelessWidget {
         const SizedBox(height: 16),
         const Divider(color: Color(0xFF24344A), height: 1),
         const SizedBox(height: 14),
-        Text('Kategori Home ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        Text('Kategori Beranda ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
-        const Text('Kategori aktif saja yang dipanggil dan tampil di Home HP.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+        const Text('Kategori aktif saja yang dipanggil dan tampil di Beranda HP.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 9,

@@ -88,16 +88,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   List<String> _allCategoriesFor(String slug) {
-    const defaults = <String, List<String>>{
-      'shortmax': ['Trending', 'For You'],
-      'netshort': ['Trending', 'For You'],
-      'pinedrama': ['Trending', 'For You'],
-      'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
-      'flickreels': ['Trending', 'For You'],
-      'melolo': ['Trending', 'For You'],
-    };
-    final values = defaults[slug] ?? LiveGoCatalog.categoriesFor(slug);
-    return values.isEmpty ? const ['Trending'] : List<String>.from(values);
+    final values = LiveGoCatalog.availableCategoriesFor(slug);
+    return values.isEmpty ? const ['Populer'] : List<String>.from(values);
   }
 
   List<String> _selectedCategoriesFor(String slug) => LiveGoSettings.categoriesFor(slug);
@@ -176,7 +168,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
     if (value) {
       if (LiveGoSettings.activePlatforms.length >= 6) {
-        _showSnack('Maksimal 6 platform aktif di Home TV. Matikan salah satu dulu.');
+        _showSnack('Maksimal 6 platform aktif di Beranda TV. Matikan salah satu dulu.');
         return false;
       }
       LiveGoSettings.activePlatforms.add(slug);
@@ -494,7 +486,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       'melolo': 'Anichin • Opsional. Video CENC belum dipasang di player native.',
     };
     if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Dobda • Home/Discover/Search/Detail/Video HMAC. Stream + subtitle dari /api/v2/video.';
+      return 'Dobda • Beranda/Jelajah/Search/Detail/Video HMAC. Stream + subtitle dari /api/v2/video.';
     }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
@@ -824,7 +816,7 @@ class _SourceRow extends StatelessWidget {
                             const SizedBox(width: 14),
                             Expanded(
                               child: Text(
-                                active ? 'Tampil di Home TV' : 'Hitam = tidak ditampilkan di Home TV',
+                                active ? 'Tampil di Beranda TV' : 'Hitam = tidak ditampilkan di Beranda TV',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: active ? AppTheme.cyan : Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800),
@@ -1017,7 +1009,7 @@ class _ConfirmSaveOverlay extends StatelessWidget {
           children: [
             const Text('Simpan perubahan sumber data?', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             const SizedBox(height: 8),
-            const Text('Perubahan platform dan kategori akan dipakai Home TV setelah kembali.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+            const Text('Perubahan platform dan kategori akan dipakai Beranda TV setelah kembali.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
             const SizedBox(height: 22),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,

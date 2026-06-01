@@ -14,7 +14,7 @@ class MockCatalog {
   ];
 
   static const categories = [
-    'Trending',
+    'Populer',
     'New',
     'Drama',
     'Movies',
@@ -28,7 +28,7 @@ class MockCatalog {
     id: 'hero_1',
     title: 'Pemburu Iblis',
     source: 'YOUKU',
-    category: 'Trending',
+    category: 'Populer',
     description: 'Tonton sekarang dan lanjutkan judul pilihan yang lagi ramai dibuka.',
     posterUrl: 'https://picsum.photos/seed/livegohero/360/520',
     backdropUrl: 'https://picsum.photos/seed/livegobackdrop/1400/620',

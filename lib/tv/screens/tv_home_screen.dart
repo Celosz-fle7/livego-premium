@@ -93,7 +93,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     try {
       final categories = LiveGoCatalog.categoriesFor(_platform);
       if (category >= categories.length) category = 0;
-      final selectedCategory = categories.isEmpty ? 'Trending' : categories[category];
+      final selectedCategory = categories.isEmpty ? 'Populer' : categories[category];
       final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory).timeout(const Duration(seconds: 14));
       final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
       return _TvHomeState(hero: hero, items: items);

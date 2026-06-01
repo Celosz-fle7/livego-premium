@@ -48,7 +48,7 @@ class DobdaApiClient {
     String lang = 'id',
     int page = 1,
   }) async {
-    final key = collection.toLowerCase().replaceAll(' ', '');
+    final key = LiveGoApiPlatforms.categoryKey(platform, collection);
     if (key == 'discover' || key == 'foryou' || key == 'latest') {
       return discover(platform: platform, lang: lang, page: page);
     }

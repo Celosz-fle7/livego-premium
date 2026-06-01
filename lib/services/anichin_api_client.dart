@@ -59,7 +59,7 @@ class AnichinApiClient {
   }) async {
     final slug = _apiSlug(platform);
     final apiLang = _providerLang(slug, lang);
-    final key = collection.toLowerCase().replaceAll(' ', '');
+    final key = LiveGoApiPlatforms.categoryKey(platform, collection);
     final path = _collectionPath(slug, key);
     final json = await _getJson(path, {
       if (path.endsWith('/foryou')) 'page': '$page',
