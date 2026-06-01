@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -24,7 +26,7 @@ class TvPlayerScreen extends StatefulWidget {
   State<TvPlayerScreen> createState() => _TvPlayerScreenState();
 }
 
-enum _PlayerMode { watching, controlsVisible, episodeList, options }
+enum _PlayerMode { watching, controlsVisible, progress, episodeList, qualityPopup, subtitlePopup, options }
 
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
   final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-root');
@@ -35,12 +37,20 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _loading = true;
   bool _fitCover = false;
   bool _autoAdvancing = false;
+  StreamInfo _streamInfo = StreamInfo.empty;
+  String _currentStreamUrl = '';
+  int _selectedSubtitleIndex = -1;
+  List<_SubtitleCue> _subtitleCues = const <_SubtitleCue>[];
+  String _activeSubtitleText = '';
+  String _subtitleStatus = 'Tidak tersedia';
 
   int _episode = 1;
   int _knownEpisodeCount = 0;
   int _episodeCursor = 1;
   int _controlCursor = 1;
   int _optionCursor = 0;
+  int _qualityCursor = 0;
+  int _subtitleCursor = 0;
   int _lastSavedProgressSecond = -1;
   int _lastBackHandledMs = 0;
 
@@ -54,8 +64,43 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _progressFocused = false;
   Timer? _autoHideTimer;
 
-  static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
   static const int _controlCount = 10;
+
+
+  List<String> get _qualityChoices {
+    final labels = <String>['Auto'];
+    for (final q in _streamInfo.qualities) {
+      final label = q.label.trim().isEmpty ? 'Auto' : q.label.trim();
+      if (!labels.any((e) => e.toLowerCase() == label.toLowerCase())) {
+        labels.add(label);
+      }
+    }
+    return labels;
+  }
+
+  List<SubtitleTrack> get _subtitleTracks => _streamInfo.subtitles;
+
+  List<String> get _subtitleChoices {
+    final rows = <String>['OFF'];
+    for (final track in _subtitleTracks) {
+      final lang = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+      final format = track.format.trim().isEmpty ? '' : ' ${track.format.toUpperCase()}';
+      rows.add('$lang$format');
+    }
+    if (rows.length == 1) rows.add('Tidak tersedia');
+    return rows;
+  }
+
+  int _qualityIndexFor(String quality) {
+    final choices = _qualityChoices;
+    final normalized = quality.toLowerCase();
+    final index = choices.indexWhere((e) => e.toLowerCase() == normalized);
+    if (index >= 0) return index;
+    if (normalized.contains('480')) return choices.indexWhere((e) => e.toLowerCase().contains('480')).clamp(0, choices.length - 1).toInt();
+    if (normalized.contains('720')) return choices.indexWhere((e) => e.toLowerCase().contains('720')).clamp(0, choices.length - 1).toInt();
+    if (normalized.contains('1080')) return choices.indexWhere((e) => e.toLowerCase().contains('1080')).clamp(0, choices.length - 1).toInt();
+    return 0;
+  }
 
   @override
   void initState() {
@@ -74,6 +119,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     setState(() {
       _speed = PlayerPreferences.speed;
       _audioTrack = PlayerPreferences.audioTrack;
+      LiveGoSettings.quality = PlayerPreferences.quality;
+      LiveGoSettings.subtitlesEnabled = PlayerPreferences.subtitleEnabled;
+      _qualityCursor = _qualityIndexFor(PlayerPreferences.quality);
     });
     await _controller?.setPlaybackSpeed(_speed);
     await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
@@ -160,10 +208,21 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
   }
 
-  Future<void> _startController(ContentItem playable, StreamInfo stream) async {
+  Future<void> _startController(
+    ContentItem playable,
+    StreamInfo stream, {
+    String? overrideUrl,
+    Duration? resumePosition,
+    bool autoplay = true,
+  }) async {
     await _controller?.dispose();
+    _streamInfo = stream;
+    _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
+    final playUrl = (overrideUrl ?? stream.urlForQuality(LiveGoSettings.quality)).trim();
+    if (playUrl.isEmpty) throw Exception('URL video kosong');
+    _currentStreamUrl = playUrl;
     final controller = VideoPlayerController.networkUrl(
-      Uri.parse(stream.url),
+      Uri.parse(playUrl),
       httpHeaders: stream.headers.isEmpty
           ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
           : stream.headers,
@@ -173,6 +232,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     controller.addListener(() {
       if (!mounted || !controller.value.isInitialized) return;
       final value = controller.value;
+      _syncSubtitleAt(value.position);
       final second = value.position.inSeconds;
       if (second > 0 && second % 5 == 0 && second != _lastSavedProgressSecond) {
         _lastSavedProgressSecond = second;
@@ -199,15 +259,181 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     await controller.setPlaybackSpeed(_speed);
     await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
 
-    final saved = LiveGoLocalStore.progressFor(playable);
-    if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
-      await controller.seekTo(saved.position);
+    if (resumePosition != null && resumePosition.inMilliseconds > 0) {
+      await controller.seekTo(resumePosition);
+    } else {
+      final saved = LiveGoLocalStore.progressFor(playable);
+      if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
+        await controller.seekTo(saved.position);
+      }
     }
 
-    await controller.play();
+    if (autoplay) {
+      await controller.play();
+    }
     if (!mounted) return;
     setState(() => _loading = false);
+    unawaited(_preparePreferredSubtitle(stream));
     _showControlsMode(defaultPlay: true);
+  }
+
+  Future<void> _preparePreferredSubtitle(StreamInfo stream) async {
+    if (!mounted) return;
+    if (!LiveGoSettings.subtitlesEnabled || stream.subtitles.isEmpty) {
+      setState(() {
+        _selectedSubtitleIndex = -1;
+        _subtitleCursor = stream.subtitles.isEmpty ? 1 : 0;
+        _subtitleCues = const <_SubtitleCue>[];
+        _activeSubtitleText = '';
+        _subtitleStatus = stream.subtitles.isEmpty ? 'Tidak tersedia' : 'OFF';
+      });
+      return;
+    }
+
+    var index = 0;
+    final preferred = PlayerPreferences.subtitleLanguage.toLowerCase();
+    if (preferred.isNotEmpty && preferred != 'auto') {
+      final found = stream.subtitles.indexWhere((e) => e.language.toLowerCase().contains(preferred));
+      if (found >= 0) index = found;
+    }
+    await _applySubtitle(index);
+  }
+
+  Future<void> _applySubtitle(int trackIndex) async {
+    if (trackIndex < 0) {
+      setState(() {
+        LiveGoSettings.subtitlesEnabled = false;
+        _selectedSubtitleIndex = -1;
+        _subtitleCursor = 0;
+        _subtitleCues = const <_SubtitleCue>[];
+        _activeSubtitleText = '';
+        _subtitleStatus = 'OFF';
+      });
+      await PlayerPreferences.setSubtitle(enabled: false, language: 'OFF');
+      return;
+    }
+
+    if (trackIndex >= _streamInfo.subtitles.length) {
+      setState(() {
+        _subtitleCursor = 1;
+        _subtitleStatus = 'Tidak tersedia';
+      });
+      return;
+    }
+
+    final track = _streamInfo.subtitles[trackIndex];
+    setState(() {
+      LiveGoSettings.subtitlesEnabled = true;
+      _selectedSubtitleIndex = trackIndex;
+      _subtitleCursor = trackIndex + 1;
+      _subtitleStatus = 'Memuat ${track.language}...';
+      _subtitleCues = const <_SubtitleCue>[];
+      _activeSubtitleText = '';
+    });
+
+    await PlayerPreferences.setSubtitle(enabled: true, language: track.language);
+
+    try {
+      final raw = await _fetchSubtitleText(track.url).timeout(const Duration(seconds: 8));
+      final cues = _parseSubtitle(raw);
+      if (!mounted || _selectedSubtitleIndex != trackIndex) return;
+      setState(() {
+        _subtitleCues = cues;
+        _subtitleStatus = cues.isEmpty ? 'Subtitle kosong' : track.language;
+      });
+      final pos = _controller?.value.position;
+      if (pos != null) _syncSubtitleAt(pos, force: true);
+    } catch (e) {
+      if (!mounted || _selectedSubtitleIndex != trackIndex) return;
+      setState(() => _subtitleStatus = 'Gagal subtitle');
+    }
+  }
+
+  Future<String> _fetchSubtitleText(String url) async {
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(Uri.parse(url));
+      req.headers.set('User-Agent', 'okhttp/4.12.0');
+      req.headers.set('Accept', '*/*');
+      final res = await req.close();
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('HTTP ${res.statusCode}');
+      }
+      return res.transform(utf8.decoder).join();
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  List<_SubtitleCue> _parseSubtitle(String raw) {
+    final normalized = raw
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll(RegExp(r'^WEBVTT.*?\n', dotAll: true), '');
+    final blocks = normalized.split(RegExp(r'\n\s*\n'));
+    final cues = <_SubtitleCue>[];
+    for (final block in blocks) {
+      final lines = block.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (lines.isEmpty) continue;
+      final timeIndex = lines.indexWhere((e) => e.contains('-->'));
+      if (timeIndex < 0) continue;
+      final timeLine = lines[timeIndex];
+      final parts = timeLine.split('-->');
+      if (parts.length < 2) continue;
+      final start = _parseSubtitleTime(parts[0].trim());
+      final end = _parseSubtitleTime(parts[1].split(RegExp(r'\s+')).first.trim());
+      if (start == null || end == null || end <= start) continue;
+      final text = lines.skip(timeIndex + 1).join('\n')
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .replaceAll('&nbsp;', ' ')
+          .trim();
+      if (text.isEmpty) continue;
+      cues.add(_SubtitleCue(start: start, end: end, text: text));
+    }
+    cues.sort((a, b) => a.start.compareTo(b.start));
+    return cues;
+  }
+
+  Duration? _parseSubtitleTime(String raw) {
+    final clean = raw.replaceAll(',', '.').trim();
+    final parts = clean.split(':');
+    if (parts.length < 2) return null;
+    var hours = 0;
+    var minutes = 0;
+    var secondsRaw = '';
+    if (parts.length == 3) {
+      hours = int.tryParse(parts[0]) ?? 0;
+      minutes = int.tryParse(parts[1]) ?? 0;
+      secondsRaw = parts[2];
+    } else {
+      minutes = int.tryParse(parts[0]) ?? 0;
+      secondsRaw = parts[1];
+    }
+    final secParts = secondsRaw.split('.');
+    final seconds = int.tryParse(secParts[0]) ?? 0;
+    final millis = secParts.length > 1
+        ? int.tryParse(secParts[1].padRight(3, '0').substring(0, 3)) ?? 0
+        : 0;
+    return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: millis);
+  }
+
+  void _syncSubtitleAt(Duration position, {bool force = false}) {
+    if (_subtitleCues.isEmpty || !LiveGoSettings.subtitlesEnabled) {
+      if (_activeSubtitleText.isNotEmpty || force) {
+        if (mounted) setState(() => _activeSubtitleText = '');
+      }
+      return;
+    }
+    String next = '';
+    for (final cue in _subtitleCues) {
+      if (position >= cue.start && position <= cue.end) {
+        next = cue.text;
+        break;
+      }
+    }
+    if (next != _activeSubtitleText && mounted) {
+      setState(() => _activeSubtitleText = next);
+    }
   }
 
   Future<void> _loadEpisodeListBackground(int ep, StreamInfo stream) async {
@@ -296,6 +522,34 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     Future.microtask(() => _rootFocus.requestFocus());
   }
 
+  void _showQualityPopup() {
+    _cancelAutoHide();
+    setState(() {
+      _mode = _PlayerMode.qualityPopup;
+      _showControls = true;
+      _showEpisodes = false;
+      _showOptions = false;
+      _progressFocused = false;
+      _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
+    });
+    Future.microtask(() => _rootFocus.requestFocus());
+  }
+
+  void _showSubtitlePopup() {
+    _cancelAutoHide();
+    setState(() {
+      _mode = _PlayerMode.subtitlePopup;
+      _showControls = true;
+      _showEpisodes = false;
+      _showOptions = false;
+      _progressFocused = false;
+      _subtitleCursor = LiveGoSettings.subtitlesEnabled && _selectedSubtitleIndex >= 0
+          ? _selectedSubtitleIndex + 1
+          : 0;
+    });
+    Future.microtask(() => _rootFocus.requestFocus());
+  }
+
   void _showOptionsPanel() {
     _cancelAutoHide();
     setState(() {
@@ -330,7 +584,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _handleBack() {
     if (_backDebounced()) return;
-    if (_mode == _PlayerMode.options || _showOptions) {
+    if (_mode == _PlayerMode.options ||
+        _mode == _PlayerMode.qualityPopup ||
+        _mode == _PlayerMode.subtitlePopup ||
+        _showOptions) {
       _showControlsMode();
       return;
     }
@@ -393,14 +650,48 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _load();
   }
 
-  void _cycleQuality(int delta) {
-    var index = _qualities.indexOf(LiveGoSettings.quality);
-    if (index < 0) index = 0;
-    index = (index + delta) % _qualities.length;
-    if (index < 0) index += _qualities.length;
-    final next = _qualities[index];
-    setState(() => LiveGoSettings.quality = next);
-    PlayerPreferences.setQuality(next);
+  Future<void> _applyQualityChoice(int index) async {
+    final choices = _qualityChoices;
+    if (choices.isEmpty) return;
+    final safe = index.clamp(0, choices.length - 1).toInt();
+    final label = choices[safe];
+    setState(() {
+      _qualityCursor = safe;
+      LiveGoSettings.quality = label;
+    });
+    await PlayerPreferences.setQuality(label);
+
+    if (_streamInfo.url.isEmpty) return;
+    final nextUrl = _streamInfo.urlForQuality(label).trim();
+    if (nextUrl.isEmpty || nextUrl == _currentStreamUrl) return;
+
+    final old = _controller;
+    final resume = old != null && old.value.isInitialized ? old.value.position : Duration.zero;
+    final wasPlaying = old?.value.isPlaying ?? true;
+    setState(() => _loading = true);
+    try {
+      await _startController(
+        _detail ?? _playableItem(_episode),
+        _streamInfo,
+        overrideUrl: nextUrl,
+        resumePosition: resume,
+        autoplay: wasPlaying,
+      );
+      _showControlsMode();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = '$e';
+        });
+      }
+    }
+  }
+
+  void _moveQualityCursor(int delta) {
+    final choices = _qualityChoices;
+    if (choices.isEmpty) return;
+    setState(() => _qualityCursor = (_qualityCursor + delta).clamp(0, choices.length - 1).toInt());
   }
 
   void _changeSpeed(double delta) {
@@ -440,10 +731,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _showEpisodeList();
         return;
       case 3:
-        _toggleSubtitle();
-        break;
+        _showSubtitlePopup();
+        return;
       case 4:
-        _showOptionsPanel();
+        _showQualityPopup();
         return;
       case 5:
         setState(() => _fitCover = !_fitCover);
@@ -466,13 +757,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _changeOption(int delta) {
     if (_optionCursor == 0) {
-      _cycleQuality(delta);
-    } else if (_optionCursor == 1) {
       _changeSpeed(delta > 0 ? 0.25 : -0.25);
-    } else if (_optionCursor == 2) {
-      _toggleSubtitle();
-    } else if (_optionCursor == 3) {
+    } else if (_optionCursor == 1) {
       _toggleAudio();
+    } else if (_optionCursor == 2) {
+      setState(() => _fitCover = !_fitCover);
     }
   }
 
@@ -505,11 +794,42 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
+    if (_mode == _PlayerMode.qualityPopup) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _moveQualityCursor(-1);
+      } else if (key == LogicalKeyboardKey.arrowDown) {
+        _moveQualityCursor(1);
+      } else if (key == LogicalKeyboardKey.arrowLeft) {
+        _showControlsMode();
+      } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+        unawaited(_applyQualityChoice(_qualityCursor));
+      }
+      return KeyEventResult.handled;
+    }
+
+    if (_mode == _PlayerMode.subtitlePopup) {
+      final choices = _subtitleChoices;
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() => _subtitleCursor = (_subtitleCursor - 1).clamp(0, choices.length - 1).toInt());
+      } else if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() => _subtitleCursor = (_subtitleCursor + 1).clamp(0, choices.length - 1).toInt());
+      } else if (key == LogicalKeyboardKey.arrowLeft) {
+        _showControlsMode();
+      } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+        if (_subtitleCursor == 0) {
+          unawaited(_applySubtitle(-1));
+        } else if (_streamInfo.subtitles.isNotEmpty && _subtitleCursor - 1 < _streamInfo.subtitles.length) {
+          unawaited(_applySubtitle(_subtitleCursor - 1));
+        }
+      }
+      return KeyEventResult.handled;
+    }
+
     if (_mode == _PlayerMode.options) {
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 3).toInt());
+        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 2).toInt());
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 3).toInt());
+        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 2).toInt());
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _changeOption(-1);
       } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
@@ -663,6 +983,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   speed: _speed,
                   audioTrack: _audioTrack,
                 ),
+              if (ready && _activeSubtitleText.isNotEmpty)
+                Positioned(
+                  left: 180,
+                  right: 180,
+                  bottom: _showControls ? 180 : 52,
+                  child: _SubtitleOverlay(text: _activeSubtitleText),
+                ),
               if (ready && _showControls)
                 Positioned(
                   left: 46,
@@ -674,6 +1001,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     speed: _speed,
                     quality: LiveGoSettings.quality,
                     audioTrack: _audioTrack,
+                    subtitleStatus: _subtitleStatus,
                     focusedIndex: _controlCursor,
                     progressFocused: _progressFocused,
                     fitCover: _fitCover,
@@ -692,15 +1020,38 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     cursor: _episodeCursor,
                   ),
                 ),
+              if (_mode == _PlayerMode.qualityPopup)
+                Positioned(
+                  right: 38,
+                  bottom: 72,
+                  child: _ChoicePanel(
+                    title: 'Pilih Kualitas',
+                    hint: _qualityChoices.length > 1 ? 'OK pilih kualitas video' : 'Kualitas API tidak tersedia',
+                    choices: _qualityChoices,
+                    cursor: _qualityCursor,
+                    activeIndex: _qualityIndexFor(LiveGoSettings.quality),
+                  ),
+                ),
+              if (_mode == _PlayerMode.subtitlePopup)
+                Positioned(
+                  right: 38,
+                  bottom: 72,
+                  child: _ChoicePanel(
+                    title: 'Pilih Subtitle',
+                    hint: _streamInfo.subtitles.isEmpty ? 'Subtitle API tidak tersedia' : 'OK aktifkan subtitle',
+                    choices: _subtitleChoices,
+                    cursor: _subtitleCursor,
+                    activeIndex: LiveGoSettings.subtitlesEnabled && _selectedSubtitleIndex >= 0 ? _selectedSubtitleIndex + 1 : 0,
+                  ),
+                ),
               if (_showOptions)
                 Positioned(
                   right: 38,
                   bottom: 72,
-                  child: _QualityPanel(
+                  child: _PlayerOptionsPanel(
                     speed: _speed,
                     audioTrack: _audioTrack,
-                    quality: LiveGoSettings.quality,
-                    subtitlesEnabled: LiveGoSettings.subtitlesEnabled,
+                    fitCover: _fitCover,
                     cursor: _optionCursor,
                   ),
                 ),
@@ -774,6 +1125,7 @@ class _PlayerControlDock extends StatelessWidget {
   final double speed;
   final String quality;
   final String audioTrack;
+  final String subtitleStatus;
   final int focusedIndex;
   final bool progressFocused;
   final bool fitCover;
@@ -785,6 +1137,7 @@ class _PlayerControlDock extends StatelessWidget {
     required this.speed,
     required this.quality,
     required this.audioTrack,
+    required this.subtitleStatus,
     required this.focusedIndex,
     required this.progressFocused,
     required this.fitCover,
@@ -847,7 +1200,7 @@ class _PlayerControlDock extends StatelessWidget {
               _DockButton(icon: Icons.skip_previous_rounded, label: 'PREV', focused: focusedIndex == 0),
               _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'PLAY', active: true, focused: focusedIndex == 1),
               _DockButton(icon: Icons.video_library_rounded, label: 'EP', focused: focusedIndex == 2),
-              _DockButton(icon: Icons.subtitles_rounded, label: 'SUB', focused: focusedIndex == 3),
+              _DockButton(icon: Icons.subtitles_rounded, label: subtitleStatus.toUpperCase(), focused: focusedIndex == 3),
               _DockTextButton(text: quality.toUpperCase(), focused: focusedIndex == 4),
               _DockButton(icon: fitCover ? Icons.fit_screen_rounded : Icons.fullscreen_rounded, label: fitCover ? 'COVER' : 'FIT', focused: focusedIndex == 5),
               _DockButton(icon: Icons.skip_next_rounded, label: 'NEXT', focused: focusedIndex == 6),
@@ -1001,18 +1354,99 @@ class _EpisodeListRow extends StatelessWidget {
   }
 }
 
-class _QualityPanel extends StatelessWidget {
+class _ChoicePanel extends StatelessWidget {
+  final String title;
+  final String hint;
+  final List<String> choices;
+  final int cursor;
+  final int activeIndex;
+
+  const _ChoicePanel({
+    required this.title,
+    required this.hint,
+    required this.choices,
+    required this.cursor,
+    required this.activeIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = choices.isEmpty ? const <String>['Tidak tersedia'] : choices;
+    return Container(
+      width: 360,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 24), const BoxShadow(color: Colors.black87, blurRadius: 22)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          const SizedBox(height: 4),
+          Text(hint, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+          const SizedBox(height: 14),
+          ...List.generate(rows.length, (index) {
+            return _ChoiceRow(
+              label: rows[index],
+              focused: index == cursor,
+              active: index == activeIndex,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceRow extends StatelessWidget {
+  final String label;
+  final bool focused;
+  final bool active;
+
+  const _ChoiceRow({required this.label, this.focused = false, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 90),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: focused
+            ? AppTheme.cyan.withOpacity(0.18)
+            : (active ? AppTheme.cyan.withOpacity(0.10) : Colors.white.withOpacity(0.045)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.62) : Colors.white12),
+          width: focused ? 2 : 1,
+        ),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 14)] : null,
+      ),
+      child: Row(
+        children: [
+          Icon(active ? Icons.check_circle_rounded : Icons.circle_outlined, color: focused || active ? Colors.white : AppTheme.textSoft, size: 17),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused || active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlayerOptionsPanel extends StatelessWidget {
   final double speed;
   final String audioTrack;
-  final String quality;
-  final bool subtitlesEnabled;
+  final bool fitCover;
   final int cursor;
 
-  const _QualityPanel({
+  const _PlayerOptionsPanel({
     required this.speed,
     required this.audioTrack,
-    required this.quality,
-    required this.subtitlesEnabled,
+    required this.fitCover,
     required this.cursor,
   });
 
@@ -1033,22 +1467,21 @@ class _QualityPanel extends StatelessWidget {
         children: [
           const Text('Opsi Player', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           const SizedBox(height: 14),
-          _QualityRow(label: 'Quality', value: quality, focused: cursor == 0),
-          _QualityRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 1),
-          _QualityRow(label: 'Subtitle', value: subtitlesEnabled ? 'ON' : 'OFF', focused: cursor == 2),
-          _QualityRow(label: 'Audio', value: audioTrack, focused: cursor == 3),
+          _OptionRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 0),
+          _OptionRow(label: 'Audio', value: audioTrack, focused: cursor == 1),
+          _OptionRow(label: 'Layar', value: fitCover ? 'Cover' : 'Fit', focused: cursor == 2),
         ],
       ),
     );
   }
 }
 
-class _QualityRow extends StatelessWidget {
+class _OptionRow extends StatelessWidget {
   final String label;
   final String value;
   final bool focused;
 
-  const _QualityRow({required this.label, required this.value, this.focused = false});
+  const _OptionRow({required this.label, required this.value, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1069,4 +1502,47 @@ class _QualityRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SubtitleOverlay extends StatelessWidget {
+  final String text;
+  const _SubtitleOverlay({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.62),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.18)),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              height: 1.25,
+              decoration: TextDecoration.none,
+              shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubtitleCue {
+  final Duration start;
+  final Duration end;
+  final String text;
+
+  const _SubtitleCue({required this.start, required this.end, required this.text});
 }
