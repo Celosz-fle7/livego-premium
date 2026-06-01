@@ -107,6 +107,14 @@ class _TvAppState extends State<TvApp> {
     });
   }
 
+  void _backToHomeNav() {
+    _markBackHandled();
+    setState(() => _index = 0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tvFocus(_navNodes[_safeNav(0)], alignment: 0.10);
+    });
+  }
+
   void _backToHomeBanner() {
     _markBackHandled();
     setState(() {
@@ -184,17 +192,22 @@ class _TvAppState extends State<TvApp> {
       return;
     }
 
+    // If a content screen did not handle BACK itself, close it to the
+    // active navbar item first. Do not jump straight to Home/banner.
     if (!_navHasFocus) {
       _focusCurrentNav();
       return;
     }
 
+    // Navbar item other than Home -> Home navbar.
+    // Next BACK from Home navbar -> Home banner.
+    // Next BACK is handled by Home banner -> exit popup.
     if (_index != 0) {
-      _backToHomeBanner();
+      _backToHomeNav();
       return;
     }
 
-    _showExitDialog();
+    _backToHomeBanner();
   }
 
   KeyEventResult _exitDialogKey(FocusNode node, KeyEvent event) {
