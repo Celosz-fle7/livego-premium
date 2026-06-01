@@ -137,7 +137,11 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
       if (!mounted) return;
       _zone = TvZone.grid;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusGrid(_lastGrid));
+      void restore() {
+        if (mounted) _focusGrid(_lastGrid);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+      Future<void>.delayed(const Duration(milliseconds: 120), restore);
     });
   }
 

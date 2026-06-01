@@ -168,11 +168,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   void _handleBack() {
-    if (_zone == TvZone.settings && widget.showBackButton) {
-      _focusBack();
-      return;
-    }
-    if (_zone == TvZone.settings && widget.onMoveToNav != null) {
+    if (widget.onMoveToNav != null) {
       _zone = TvZone.nav;
       widget.onMoveToNav?.call();
       return;
@@ -279,8 +275,13 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const TvSourceManagerScreen()))
           .then((_) {
-        if (mounted) setState(() {});
-        _focusRow(_lastRow);
+        if (!mounted) return;
+        setState(() {});
+        void restore() {
+          if (mounted) _focusRow(_lastRow);
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+        Future<void>.delayed(const Duration(milliseconds: 120), restore);
       });
       return;
     }

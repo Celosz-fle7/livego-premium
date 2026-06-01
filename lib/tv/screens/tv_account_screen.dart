@@ -145,7 +145,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _tryFocusEntry() {
     if (!mounted || !_entryPending) return;
     _entryPending = false;
-    _focusTop();
+    if (_topFocused) {
+      _focusTop();
+    } else {
+      _focusRow(_lastRow);
+    }
   }
 
   void _focusTop() {
@@ -165,12 +169,24 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _openSettings() => _pushScreen(const TvSettingsScreen());
 
   void _pushScreen(Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).then((_) => _restoreFocusAfterPop());
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => screen))
+        .then((_) => _restoreFocusAfterPop());
   }
 
   void _restoreFocusAfterPop() {
     if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
+    _zone = TvZone.list;
+    _topFocused = false;
+
+    void restore() {
+      if (!mounted) return;
+      _focusRow(_lastRow);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+    Future<void>.delayed(const Duration(milliseconds: 120), restore);
+    Future<void>.delayed(const Duration(milliseconds: 260), restore);
   }
 
   KeyEventResult _topKey(FocusNode node, KeyEvent event) {

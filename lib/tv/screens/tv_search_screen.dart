@@ -127,9 +127,11 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
   void _open(ContentItem item) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_resultNodes.isNotEmpty) _focusGrid(_lastGrid);
-      });
+      void restore() {
+        if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+      Future<void>.delayed(const Duration(milliseconds: 120), restore);
     });
   }
 

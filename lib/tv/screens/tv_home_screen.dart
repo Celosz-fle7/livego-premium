@@ -282,11 +282,30 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     widget.onMoveToNav?.call();
   }
 
-  void _open(ContentItem item) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
+  void _restoreAfterRoute(TvZone zone, int index) {
+    if (!mounted) return;
+    _cancelPendingFocus();
+    _zone = zone;
+    if (zone == TvZone.grid) _lastGrid = _safe(index, _gridNodes.length);
+    if (zone == TvZone.category) _lastCategory = _safe(index, _categoryNodes.length);
+    if (zone == TvZone.platform) _lastPlatform = _safe(index, _platformNodes.length);
+
+    void restore() {
       if (!mounted) return;
-      _queueFocusEntry(_zone, index: _indexForZone(_zone));
-    });
+      _queueFocusEntry(zone, index: _indexForZone(zone));
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+    Future<void>.delayed(const Duration(milliseconds: 120), restore);
+    Future<void>.delayed(const Duration(milliseconds: 260), restore);
+  }
+
+  void _open(ContentItem item) {
+    final returnZone = _zone == TvZone.nav ? TvZone.grid : _zone;
+    final returnIndex = _indexForZone(returnZone);
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item)))
+        .then((_) => _restoreAfterRoute(returnZone, returnIndex));
   }
 
   void _selectPlatform(int index) {
@@ -546,6 +565,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
+      _zone = TvZone.grid;
+      _lastGrid = index;
       if (index >= 0 && index < _visibleGridItems.length) _open(_visibleGridItems[index]);
       return KeyEventResult.handled;
     }
@@ -647,7 +668,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                   _lastGrid = i;
                 },
                 onKey: _gridKey,
-                onTap: _open,
+                onTap: (item) {
+                  final idx = gridItems.indexOf(item);
+                  if (idx >= 0) {
+                    _zone = TvZone.grid;
+                    _lastGrid = idx;
+                  }
+                  _open(item);
+                },
               ),
               ],
             ),

@@ -116,7 +116,11 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   void _open(DownloadRecord record) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item))).then((_) {
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_lastRow));
+      void restore() {
+        if (mounted) _focusRow(_lastRow);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+      Future<void>.delayed(const Duration(milliseconds: 120), restore);
     });
   }
 
