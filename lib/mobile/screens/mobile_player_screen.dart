@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -243,6 +245,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Duration _lastProgressSaved = Duration.zero;
   DateTime _lastTapLeft = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastTapRight = DateTime.fromMillisecondsSinceEpoch(0);
+  int _selectedSubtitleIndex = -1;
+  List<_SubtitleCue> _subtitleCues = const <_SubtitleCue>[];
+  String _activeSubtitleText = '';
+  String _subtitleStatus = 'Tidak tersedia';
 
   @override
   void initState() {
@@ -292,6 +298,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     }
 
     await _openResolvedUrl(url, resume: true, autoplay: true);
+    unawaited(_preparePreferredSubtitle());
     _scheduleAutoQualityUpgrade();
   }
 
@@ -361,6 +368,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     if (!mounted || c == null) return;
     final value = c.value;
     if (_buffering != value.isBuffering) setState(() => _buffering = value.isBuffering);
+    if (value.isInitialized) {
+      _syncSubtitleAt(value.position);
+    }
     if (value.isInitialized && (value.position - _lastProgressSaved).inSeconds.abs() >= 5) {
       _lastProgressSaved = value.position;
       LiveGoLocalStore.saveProgress(widget.item, widget.episode, value.position, value.duration);
@@ -496,7 +506,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         final subtitles = widget.stream.subtitles;
         final subtitleText = !_subtitleEnabled
             ? 'Mati'
-            : (subtitles.isEmpty ? 'Tidak tersedia' : _subtitleLanguage);
+            : (subtitles.isEmpty ? 'Tidak tersedia' : (_subtitleStatus.isNotEmpty ? _subtitleStatus : _subtitleLanguage));
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 22),
@@ -597,11 +607,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         labels.add(label);
       }
     }
-    for (final fallback in const ['480p', '720p', '1080p']) {
-      if (!labels.any((e) => e.toLowerCase() == fallback.toLowerCase())) {
-        labels.add(fallback);
-      }
-    }
+    if (labels.length == 1) labels.add('Source');
     return labels;
   }
 
@@ -638,20 +644,170 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       ),
     );
     if (picked != null) {
-      setState(() {
-        if (picked == 'OFF') {
-          _subtitleEnabled = false;
-          LiveGoSettings.subtitlesEnabled = false;
-          PlayerPreferences.setSubtitle(enabled: false);
-        } else {
-          _subtitleEnabled = true;
-          _subtitleLanguage = picked;
-          LiveGoSettings.subtitlesEnabled = true;
-          PlayerPreferences.setSubtitle(enabled: true, language: picked);
-        }
-      });
+      if (picked == 'OFF') {
+        await _applySubtitle(-1);
+      } else {
+        final index = subtitles.indexWhere((e) => e.language.toLowerCase() == picked.toLowerCase());
+        await _applySubtitle(index < 0 ? 0 : index);
+      }
     }
     _showControls();
+  }
+
+  Future<void> _preparePreferredSubtitle() async {
+    if (!mounted) return;
+    final subtitles = widget.stream.subtitles;
+    if (!_subtitleEnabled || subtitles.isEmpty) {
+      setState(() {
+        _selectedSubtitleIndex = -1;
+        _subtitleCues = const <_SubtitleCue>[];
+        _activeSubtitleText = '';
+        _subtitleStatus = subtitles.isEmpty ? 'Tidak tersedia' : 'OFF';
+      });
+      return;
+    }
+
+    var index = 0;
+    final preferred = _subtitleLanguage.toLowerCase();
+    if (preferred.isNotEmpty && preferred != 'auto') {
+      final found = subtitles.indexWhere((e) => e.language.toLowerCase().contains(preferred));
+      if (found >= 0) index = found;
+    }
+    await _applySubtitle(index);
+  }
+
+  Future<void> _applySubtitle(int trackIndex) async {
+    if (trackIndex < 0) {
+      setState(() {
+        _subtitleEnabled = false;
+        _subtitleLanguage = 'OFF';
+        _selectedSubtitleIndex = -1;
+        _subtitleCues = const <_SubtitleCue>[];
+        _activeSubtitleText = '';
+        _subtitleStatus = 'OFF';
+        LiveGoSettings.subtitlesEnabled = false;
+      });
+      await PlayerPreferences.setSubtitle(enabled: false, language: 'OFF');
+      return;
+    }
+
+    if (trackIndex >= widget.stream.subtitles.length) {
+      setState(() => _subtitleStatus = 'Tidak tersedia');
+      return;
+    }
+
+    final track = widget.stream.subtitles[trackIndex];
+    setState(() {
+      _subtitleEnabled = true;
+      _subtitleLanguage = track.language;
+      _selectedSubtitleIndex = trackIndex;
+      _subtitleCues = const <_SubtitleCue>[];
+      _activeSubtitleText = '';
+      _subtitleStatus = 'Memuat ${track.language}...';
+      LiveGoSettings.subtitlesEnabled = true;
+    });
+    await PlayerPreferences.setSubtitle(enabled: true, language: track.language);
+
+    try {
+      final raw = await _fetchSubtitleText(track.url).timeout(PlaybackTimeoutConfig.subtitleFetch);
+      final cues = _parseSubtitle(raw);
+      if (!mounted || _selectedSubtitleIndex != trackIndex) return;
+      setState(() {
+        _subtitleCues = cues;
+        _subtitleStatus = cues.isEmpty ? 'Subtitle kosong' : track.language;
+      });
+      final pos = _controller?.value.position;
+      if (pos != null) _syncSubtitleAt(pos, force: true);
+    } catch (e) {
+      if (!mounted || _selectedSubtitleIndex != trackIndex) return;
+      setState(() => _subtitleStatus = 'Gagal subtitle');
+    }
+  }
+
+  Future<String> _fetchSubtitleText(String url) async {
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(Uri.parse(url));
+      req.headers.set('User-Agent', 'okhttp/4.12.0');
+      req.headers.set('Accept', '*/*');
+      final res = await req.close();
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('HTTP ${res.statusCode}');
+      }
+      return res.transform(utf8.decoder).join();
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  List<_SubtitleCue> _parseSubtitle(String raw) {
+    final normalized = raw
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll(RegExp(r'^WEBVTT.*?\n', dotAll: true), '');
+    final blocks = normalized.split(RegExp(r'\n\s*\n'));
+    final cues = <_SubtitleCue>[];
+    for (final block in blocks) {
+      final lines = block.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      if (lines.isEmpty) continue;
+      final timeIndex = lines.indexWhere((e) => e.contains('-->'));
+      if (timeIndex < 0) continue;
+      final parts = lines[timeIndex].split('-->');
+      if (parts.length < 2) continue;
+      final start = _parseSubtitleTime(parts[0].trim());
+      final end = _parseSubtitleTime(parts[1].split(RegExp(r'\s+')).first.trim());
+      if (start == null || end == null || end <= start) continue;
+      final text = lines.skip(timeIndex + 1).join('\n')
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .replaceAll('&nbsp;', ' ')
+          .trim();
+      if (text.isEmpty) continue;
+      cues.add(_SubtitleCue(start: start, end: end, text: text));
+    }
+    cues.sort((a, b) => a.start.compareTo(b.start));
+    return cues;
+  }
+
+  Duration? _parseSubtitleTime(String raw) {
+    final clean = raw.replaceAll(',', '.').trim();
+    final parts = clean.split(':');
+    if (parts.length < 2) return null;
+    var hours = 0;
+    var minutes = 0;
+    var secondsRaw = '';
+    if (parts.length == 3) {
+      hours = int.tryParse(parts[0]) ?? 0;
+      minutes = int.tryParse(parts[1]) ?? 0;
+      secondsRaw = parts[2];
+    } else {
+      minutes = int.tryParse(parts[0]) ?? 0;
+      secondsRaw = parts[1];
+    }
+    final secParts = secondsRaw.split('.');
+    final seconds = int.tryParse(secParts[0]) ?? 0;
+    final millis = secParts.length > 1
+        ? int.tryParse(secParts[1].padRight(3, '0').substring(0, 3)) ?? 0
+        : 0;
+    return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: millis);
+  }
+
+  void _syncSubtitleAt(Duration position, {bool force = false}) {
+    if (_subtitleCues.isEmpty || !_subtitleEnabled || !LiveGoSettings.subtitlesEnabled) {
+      if (_activeSubtitleText.isNotEmpty || force) {
+        if (mounted) setState(() => _activeSubtitleText = '');
+      }
+      return;
+    }
+    String next = '';
+    for (final cue in _subtitleCues) {
+      if (position >= cue.start && position <= cue.end) {
+        next = cue.text;
+        break;
+      }
+    }
+    if (next != _activeSubtitleText && mounted) {
+      setState(() => _activeSubtitleText = next);
+    }
   }
 
   Future<void> _audioMenu() async {
@@ -883,6 +1039,13 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                 ),
                 if (widget.loading || _buffering) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
                 if (_error.isNotEmpty) Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)))),
+                if (_activeSubtitleText.isNotEmpty)
+                  Positioned(
+                    left: 18,
+                    right: 18,
+                    bottom: _controls ? 184 : 34,
+                    child: _SubtitleOverlay(text: _activeSubtitleText),
+                  ),
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 220),
                   top: _controls ? 0 : -95,
@@ -1195,6 +1358,49 @@ class _MainPlayButton extends StatelessWidget {
   }
 }
 
+
+class _SubtitleOverlay extends StatelessWidget {
+  final String text;
+  const _SubtitleOverlay({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.64),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: Colors.white.withOpacity(0.18)),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              height: 1.25,
+              decoration: TextDecoration.none,
+              shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubtitleCue {
+  final Duration start;
+  final Duration end;
+  final String text;
+
+  const _SubtitleCue({required this.start, required this.end, required this.text});
+}
 
 class _OptionTile extends StatelessWidget {
   final String label;
