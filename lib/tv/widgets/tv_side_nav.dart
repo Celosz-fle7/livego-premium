@@ -119,7 +119,7 @@ class _TvSideNavState extends State<TvSideNav> {
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      widget.onChanged(index);
+      widget.onOpenContent(index);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -158,7 +158,7 @@ class _TvSideNavState extends State<TvSideNav> {
                   active: i == widget.index,
                   expanded: _expanded,
                   logo: i == 0,
-                  onTap: () => widget.onChanged(i),
+                  onTap: () => widget.onOpenContent(i),
                   onKey: (node, event) => _handleKey(i, event),
                 ),
                 if (i == 0) ...[

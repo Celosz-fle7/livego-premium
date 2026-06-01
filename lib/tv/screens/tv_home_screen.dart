@@ -14,12 +14,16 @@ import 'tv_player_screen.dart';
 
 class TvHomeScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onRequestExit;
   final int focusTicket;
+  final int bannerFocusTicket;
 
   const TvHomeScreen({
     super.key,
     this.onMoveToNav,
+    this.onRequestExit,
     this.focusTicket = 0,
+    this.bannerFocusTicket = 0,
   });
 
   @override
@@ -69,6 +73,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
       _focusEntry();
+    }
+    if (widget.bannerFocusTicket > 0 && oldWidget.bannerFocusTicket != widget.bannerFocusTicket) {
+      _focusBannerEntry();
     }
   }
 
@@ -148,9 +155,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _cancelPendingFocus();
 
     // Back on TV must move one logical layer at a time.
-    // Grid -> Category -> Platform -> Navbar.
-    // This keeps the last platform/category/grid position intact so RIGHT
-    // from the navbar can return to the same content area.
+    // Grid -> Category -> Platform -> Banner -> Exit dialog.
+    // LEFT still opens the navbar; BACK exits one content layer at a time.
     if (_zone == TvZone.grid) {
       if (_categoryNodes.isNotEmpty &&
           _focusByZone(TvZone.category, index: _lastCategory)) {
@@ -160,7 +166,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           _focusByZone(TvZone.platform, index: _lastPlatform)) {
         return;
       }
-      _moveToNav(TvZone.grid, grid: _lastGrid);
+      _focusByZone(TvZone.banner);
       return;
     }
 
@@ -169,21 +175,21 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           _focusByZone(TvZone.platform, index: _lastPlatform)) {
         return;
       }
-      _moveToNav(TvZone.category, category: _lastCategory);
+      _focusByZone(TvZone.banner);
       return;
     }
 
     if (_zone == TvZone.platform) {
-      _moveToNav(TvZone.platform, platform: _lastPlatform);
+      _focusByZone(TvZone.banner);
       return;
     }
 
     if (_zone == TvZone.banner) {
-      _moveToNav(TvZone.banner);
+      widget.onRequestExit?.call();
       return;
     }
 
-    _moveToNav(_zone);
+    _focusByZone(TvZone.banner);
   }
 
   void _focus(FocusNode node, {double alignment = 0.22}) {
@@ -192,6 +198,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _focusEntry() {
     _queueFocusEntry(_zone, index: _indexForZone(_zone));
+  }
+
+  void _focusBannerEntry() {
+    _queueFocusEntry(TvZone.banner);
   }
 
   int _indexForZone(TvZone zone) {

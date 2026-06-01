@@ -23,10 +23,12 @@ class TvApp extends StatefulWidget {
 class _TvAppState extends State<TvApp> {
   int _index = 0;
   int _homeTicket = 0;
+  int _homeBannerTicket = 0;
   int _accountTicket = 0;
   int _placeholderTicket = 0;
 
   bool _exitDialogOpen = false;
+  bool _restoreHomeBannerAfterExitDialog = false;
   int _lastBackHandledMs = 0;
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
@@ -96,6 +98,13 @@ class _TvAppState extends State<TvApp> {
     });
   }
 
+  void _backToHomeBanner() {
+    setState(() {
+      _index = 0;
+      _homeBannerTicket++;
+    });
+  }
+
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
     if (safe != _index) {
@@ -121,19 +130,34 @@ class _TvAppState extends State<TvApp> {
     });
   }
 
-  void _showExitDialog() {
+  void _showExitDialog({bool restoreHomeBanner = false}) {
     if (_exitDialogOpen) return;
-    setState(() => _exitDialogOpen = true);
+    setState(() {
+      _exitDialogOpen = true;
+      _restoreHomeBannerAfterExitDialog = restoreHomeBanner;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) tvFocus(_exitCancelNode, alignment: 0.50);
     });
   }
 
+  void _showExitDialogFromHome() {
+    _showExitDialog(restoreHomeBanner: true);
+  }
+
   void _closeExitDialog() {
     if (!_exitDialogOpen) return;
-    setState(() => _exitDialogOpen = false);
+    final restoreHomeBanner = _restoreHomeBannerAfterExitDialog;
+    setState(() {
+      _exitDialogOpen = false;
+      _restoreHomeBannerAfterExitDialog = false;
+      if (restoreHomeBanner && _index == 0) {
+        _homeBannerTicket++;
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusCurrentNav();
+      if (!mounted) return;
+      if (!restoreHomeBanner || _index != 0) _focusCurrentNav();
     });
   }
 
@@ -192,7 +216,9 @@ class _TvAppState extends State<TvApp> {
     return [
       TvHomeScreen(
         focusTicket: _index == 0 ? _homeTicket : 0,
+        bannerFocusTicket: _index == 0 ? _homeBannerTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onRequestExit: _showExitDialogFromHome,
       ),
       TvLibraryScreen(
         title: 'Histori',
@@ -200,10 +226,12 @@ class _TvAppState extends State<TvApp> {
         favorites: false,
         focusTicket: _index == 1 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onBackToHome: _backToHomeBanner,
       ),
       TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onBackToHome: _backToHomeBanner,
       ),
       TvLibraryScreen(
         title: 'Favorit',
@@ -211,10 +239,12 @@ class _TvAppState extends State<TvApp> {
         favorites: true,
         focusTicket: _index == 3 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onBackToHome: _backToHomeBanner,
       ),
       TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
+        onBackToHome: _backToHomeBanner,
       ),
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,

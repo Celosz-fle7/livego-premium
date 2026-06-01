@@ -12,9 +12,10 @@ import 'tv_player_screen.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToHome;
   final int focusTicket;
 
-  const TvDownloadsScreen({super.key, this.onMoveToNav, this.focusTicket = 0});
+  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToHome, this.focusTicket = 0});
 
   @override
   State<TvDownloadsScreen> createState() => _TvDownloadsScreenState();
@@ -76,10 +77,19 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     return key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack;
   }
 
-  void _leaveScreen() {
+  void _moveToNav() {
     _zone = TvZone.nav;
     if (widget.onMoveToNav != null) {
       widget.onMoveToNav?.call();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  void _backToHome() {
+    _zone = TvZone.banner;
+    if (widget.onBackToHome != null) {
+      widget.onBackToHome?.call();
     } else if (Navigator.of(context).canPop()) {
       Navigator.of(context).maybePop();
     }
@@ -127,8 +137,12 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   KeyEventResult _emptyKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft || _isBack(key)) {
-      _leaveScreen();
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveToNav();
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
+      _backToHome();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -139,7 +153,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _lastRow = index;
-      _leaveScreen();
+      _moveToNav();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -157,7 +171,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     }
     if (_isBack(key)) {
       _lastRow = index;
-      _leaveScreen();
+      _backToHome();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -181,7 +195,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
           child: Actions(
             actions: <Type, Action<Intent>>{
               _DownloadsBackIntent: CallbackAction<_DownloadsBackIntent>(onInvoke: (_) {
-                _leaveScreen();
+                _backToHome();
                 return null;
               }),
             },
@@ -204,7 +218,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
                     children: [
                       const Text('Daftar Unduhan', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                       const Spacer(),
-                      Text('Remote: OK buka • ← navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                      Text('Remote: OK buka • ← navbar • Back Home', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                     ],
                   ),
                   const SizedBox(height: 12),

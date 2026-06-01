@@ -15,6 +15,7 @@ class TvLibraryScreen extends StatefulWidget {
   final IconData icon;
   final bool favorites;
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToHome;
   final int focusTicket;
 
   const TvLibraryScreen({
@@ -23,6 +24,7 @@ class TvLibraryScreen extends StatefulWidget {
     required this.icon,
     required this.favorites,
     this.onMoveToNav,
+    this.onBackToHome,
     this.focusTicket = 0,
   });
 
@@ -95,10 +97,19 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
         key == LogicalKeyboardKey.browserBack;
   }
 
-  void _leaveScreen() {
+  void _moveToNav() {
     _zone = TvZone.nav;
     if (widget.onMoveToNav != null) {
       widget.onMoveToNav?.call();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  void _backToHome() {
+    _zone = TvZone.banner;
+    if (widget.onBackToHome != null) {
+      widget.onBackToHome?.call();
     } else if (Navigator.of(context).canPop()) {
       Navigator.of(context).maybePop();
     }
@@ -148,8 +159,12 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
   KeyEventResult _emptyKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft || _isBack(key)) {
-      _leaveScreen();
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveToNav();
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
+      _backToHome();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -164,7 +179,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
         _lastGrid = index;
-        _leaveScreen();
+        _moveToNav();
       } else {
         _focusGrid(index - 1);
       }
@@ -190,7 +205,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     }
     if (_isBack(key)) {
       _lastGrid = index;
-      _leaveScreen();
+      _backToHome();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -216,7 +231,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
           child: Actions(
             actions: <Type, Action<Intent>>{
               _TvLibraryBackIntent: CallbackAction<_TvLibraryBackIntent>(onInvoke: (_) {
-                _leaveScreen();
+                _backToHome();
                 return null;
               }),
             },
@@ -246,7 +261,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            'Remote: OK buka • ← navbar',
+                            'Remote: OK buka • ← navbar • Back Home',
                             style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                           ),
                         ],
