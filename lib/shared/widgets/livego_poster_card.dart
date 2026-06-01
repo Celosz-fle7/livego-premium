@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
+
 import '../../models/livego_content.dart';
 import 'livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
@@ -22,11 +24,11 @@ class LiveGoPosterCard extends StatelessWidget {
         width: 132,
         margin: const EdgeInsets.only(right: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF141927),
+          gradient: AppTheme.panelGradient,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00D8FF).withOpacity(0.10),
+              color: AppTheme.cyan.withOpacity(0.12),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -39,7 +41,7 @@ class LiveGoPosterCard extends StatelessWidget {
             Expanded(
               child: item.cover.isEmpty
                   ? const ColoredBox(
-                      color: Color(0xFF202638),
+                      color: AppTheme.surface2,
                       child: Center(
                         child: Icon(
                           Icons.movie,
@@ -53,7 +55,7 @@ class LiveGoPosterCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       role: LiveGoImageRole.poster,
                       errorWidget: const ColoredBox(
-                        color: Color(0xFF202638),
+                        color: AppTheme.surface2,
                         child: Center(
                           child: Icon(
                             Icons.broken_image,
@@ -70,7 +72,7 @@ class LiveGoPosterCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.text,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                 ),

@@ -19,12 +19,12 @@ class HeroBanner extends StatelessWidget {
             ? const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF0A1321), Color(0xFF050A13)],
+                colors: [AppTheme.surface2, AppTheme.bgDeep],
               )
             : null,
         color: tv ? null : AppTheme.surface.withOpacity(0.75),
         borderRadius: BorderRadius.circular(tv ? 22 : 34),
-        border: Border.all(color: tv ? const Color(0xFF1D3550) : const Color(0xFF26415D)),
+        border: Border.all(color: tv ? AppTheme.border : AppTheme.borderBright.withOpacity(0.32)),
         boxShadow: tv
             ? [
                 BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 22, spreadRadius: 1),
@@ -44,7 +44,7 @@ class HeroBanner extends StatelessWidget {
                   gradient: RadialGradient(
                     center: Alignment(0.64, -0.22),
                     radius: 0.72,
-                    colors: [Color(0x3039D9FF), Color(0x10FFFFFF), Color(0x00000000)],
+                    colors: [Color(0x4058A6FF), Color(0x12E6F6FF), Color(0x00000000)],
                     stops: [0.0, 0.38, 1.0],
                   ),
                 ),
@@ -54,7 +54,7 @@ class HeroBanner extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [Color(0xF2040810), Color(0x8A0A1321), Color(0xDA030711)],
+                  colors: [Color(0xF2010409), Color(0x8A071326), Color(0xDE010409)],
                 ),
               ),
             ),
@@ -139,7 +139,7 @@ class _SourcePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withOpacity(0.8),
+        color: AppTheme.surface.withOpacity(0.82),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.42)),
       ),
@@ -157,13 +157,13 @@ class _MiniInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF07101D).withOpacity(0.76),
+        color: AppTheme.surface.withOpacity(0.78),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withOpacity(0.14)),
       ),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(color: Color(0xFFD6E6F5), fontWeight: FontWeight.w900, fontSize: 9.5),
+        style: const TextStyle(color: AppTheme.whiteGlow, fontWeight: FontWeight.w900, fontSize: 9.5),
       ),
     );
   }
@@ -179,7 +179,7 @@ class _AccentLine extends StatelessWidget {
       width: tv ? 58 : 76,
       height: tv ? 3.5 : 6,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
+        gradient: AppTheme.activeGradient,
         borderRadius: BorderRadius.circular(99),
       ),
     );

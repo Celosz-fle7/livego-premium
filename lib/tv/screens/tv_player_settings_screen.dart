@@ -203,7 +203,7 @@ class _TvPlayerSettingsScreenState extends State<TvPlayerSettingsScreen> {
           }),
         },
         child: Scaffold(
-          backgroundColor: const Color(0xFF050914),
+          backgroundColor: AppTheme.bgDeep,
           body: ListView(
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(24, 18, 36, 28),
@@ -214,9 +214,9 @@ class _TvPlayerSettingsScreenState extends State<TvPlayerSettingsScreen> {
               const SizedBox(height: 10),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF09111E).withOpacity(0.92),
+                  color: AppTheme.surface.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF1C3148)),
+                  border: Border.all(color: AppTheme.border),
                 ),
                 child: Column(
                   children: [
@@ -264,9 +264,9 @@ class _PlayerSettingsHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.96),
+        color: AppTheme.surface.withOpacity(0.96),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF1C3148)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Row(
         children: [
@@ -322,7 +322,7 @@ class _PlayerSettingRow extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    color: focused ? const Color(0xFF102B42) : Colors.transparent,
+                    color: focused ? AppTheme.surface3 : Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
@@ -330,7 +330,7 @@ class _PlayerSettingRow extends StatelessWidget {
                       Container(
                         width: 44,
                         height: 44,
-                        decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white10)),
+                        decoration: BoxDecoration(color: AppTheme.surface2, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white10)),
                         child: Icon(item.icon, color: Colors.white, size: 23),
                       ),
                       const SizedBox(width: 14),
@@ -353,7 +353,7 @@ class _PlayerSettingRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!isLast) const Divider(color: Color(0xFF203246), height: 1),
+              if (!isLast) const Divider(color: AppTheme.border, height: 1),
             ],
           ),
         );

@@ -711,11 +711,11 @@ class _FocusableBanner extends StatelessWidget {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF07101C), Color(0xFF03070F)],
+                  colors: [AppTheme.surface2, AppTheme.bgDeep],
                 ),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: focused ? AppTheme.cyan.withOpacity(0.96) : const Color(0xFF17283D),
+                  color: focused ? AppTheme.cyan.withOpacity(0.96) : AppTheme.border,
                   width: focused ? 2.1 : 1.1,
                 ),
                 boxShadow: [
@@ -756,10 +756,10 @@ class _HeaderBox extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xF20A1321), Color(0xEE050A13)],
+          colors: [Color(0xF2071326), Color(0xEE010409)],
         ),
         borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: const Color(0xFF193451), width: 1.1),
+        border: Border.all(color: AppTheme.border, width: 1.1),
         boxShadow: [
           const BoxShadow(color: Colors.black54, blurRadius: 14),
           BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 20, spreadRadius: 1),
@@ -887,14 +887,14 @@ class _TvChip extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 gradient: active
-                    ? const LinearGradient(colors: [Color(0xFF20D7F8), Color(0xFF794CFF)])
+                    ? AppTheme.activeGradient
                     : (focused
                         ? LinearGradient(colors: [AppTheme.cyan.withOpacity(0.18), AppTheme.purple.withOpacity(0.10)])
                         : null),
-                color: active || focused ? null : const Color(0xFF0C1726).withOpacity(0.92),
+                color: active || focused ? null : AppTheme.surface2.withOpacity(0.92),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: focused ? const Color(0xFF7DEBFF) : (active ? Colors.white.withOpacity(0.18) : const Color(0xFF223755)),
+                  color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.18) : AppTheme.border),
                   width: focused ? 2.0 : 1.0,
                 ),
                 boxShadow: focused
@@ -1028,7 +1028,7 @@ class _TvPosterTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? const Color(0xFF7DEBFF) : const Color(0xFF15263B),
+                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft,
                           width: focused ? 2.2 : 0.8,
                         ),
                         boxShadow: focused
@@ -1048,7 +1048,7 @@ class _TvPosterTile extends StatelessWidget {
                                 : LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
                             const DecoratedBox(
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]),
+                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xCC010409)]),
                               ),
                             ),
                             Positioned(top: 8, left: 8, child: _Badge(text: '${item.episodes} Ep')),
@@ -1085,7 +1085,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFF07101D).withOpacity(0.86),
+        color: AppTheme.surface.withOpacity(0.86),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 6)],
@@ -1104,9 +1104,9 @@ class _TvSkeleton extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1523),
+        color: AppTheme.surface2,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF17283D)),
+        border: Border.all(color: AppTheme.border),
       ),
     );
   }

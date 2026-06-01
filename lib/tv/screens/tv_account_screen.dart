@@ -201,7 +201,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF0D1B2B),
+          backgroundColor: AppTheme.surface2,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -380,10 +380,10 @@ class _CommunityBanner extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF071A2B), Color(0xFF050914)],
+          colors: [AppTheme.surface2, AppTheme.bgDeep],
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: focused ? const Color(0xFF7DEBFF) : const Color(0xFF173654), width: focused ? 2 : 1),
+        border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.border, width: focused ? 2 : 1),
         boxShadow: focused
             ? [
                 BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 24),
@@ -398,10 +398,10 @@ class _CommunityBanner extends StatelessWidget {
             height: 54,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: const Color(0xFF0E2438),
+              color: AppTheme.surface2,
               border: Border.all(color: AppTheme.cyan.withOpacity(0.30)),
             ),
-            child: const Icon(Icons.groups_rounded, color: Color(0xFF9EEBFF), size: 29),
+            child: const Icon(Icons.groups_rounded, color: AppTheme.whiteGlow, size: 29),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -418,7 +418,7 @@ class _CommunityBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: const Color(0xFF102437),
+              color: AppTheme.surface2,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: AppTheme.cyan.withOpacity(0.30)),
             ),
@@ -439,9 +439,9 @@ class _ProfileHeader extends StatelessWidget {
       height: 82,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0B1D2B), Color(0xFF070B14)], begin: Alignment.centerLeft, end: Alignment.centerRight),
+        gradient: AppTheme.panelGradient,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1B3148)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Row(
         children: [
@@ -450,7 +450,7 @@ class _ProfileHeader extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(colors: [Color(0xFF24D6FF), Color(0xFF8364FF)]),
+              gradient: AppTheme.activeGradient,
               border: Border.all(color: Colors.white.withOpacity(0.18)),
             ),
             child: const Icon(Icons.person_rounded, color: Colors.white, size: 29),
@@ -475,11 +475,11 @@ class _ProfileHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF112438),
+              color: AppTheme.surface2,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFF24D6FF).withOpacity(0.35)),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
             ),
-            child: const Text('SYNC DATA', style: TextStyle(color: Color(0xFF9EEBFF), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .6, decoration: TextDecoration.none)),
+            child: const Text('SYNC DATA', style: TextStyle(color: AppTheme.whiteGlow, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .6, decoration: TextDecoration.none)),
           ),
         ],
       ),
@@ -500,13 +500,13 @@ class _StatsRow extends StatelessWidget {
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF09111E).withOpacity(0.88),
+          color: AppTheme.surface.withOpacity(0.88),
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: const Color(0xFF182C42)),
+          border: Border.all(color: AppTheme.border),
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF8FDBFF), size: 20),
+            Icon(icon, color: AppTheme.cyan, size: 20),
             const SizedBox(width: 10),
             Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             const SizedBox(width: 8),
@@ -541,9 +541,9 @@ class _Panel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.88),
+        color: AppTheme.surface.withOpacity(0.88),
         borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: const Color(0xFF192D43)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Column(children: children),
     );
@@ -595,17 +595,17 @@ class _ActionRow extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: focused ? const Color(0xFF102B42) : Colors.transparent,
+                    color: focused ? AppTheme.surface3 : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: focused ? const Color(0xFF24D6FF) : Colors.transparent, width: 2),
-                    boxShadow: focused ? [BoxShadow(color: const Color(0xFF24D6FF).withOpacity(0.14), blurRadius: 14)] : null,
+                    border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
+                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.14), blurRadius: 14)] : null,
                   ),
                   child: Row(
                     children: [
                       Container(
                         width: 38,
                         height: 38,
-                        decoration: BoxDecoration(color: const Color(0xFF102033), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white10)),
+                        decoration: BoxDecoration(color: AppTheme.surface2, borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white10)),
                         child: Icon(icon, color: Colors.white, size: 21),
                       ),
                       const SizedBox(width: 13),
@@ -624,18 +624,18 @@ class _ActionRow extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                         decoration: BoxDecoration(
-                          color: focused ? const Color(0xFF163957) : Colors.white.withOpacity(0.045),
+                          color: focused ? AppTheme.surface3 : Colors.white.withOpacity(0.045),
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: focused ? const Color(0xFF24D6FF).withOpacity(0.55) : Colors.white10),
+                          border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.55) : Colors.white10),
                         ),
-                        child: Text(badge, style: TextStyle(color: focused ? const Color(0xFFBFF5FF) : Colors.white54, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: .4, decoration: TextDecoration.none)),
+                        child: Text(badge, style: TextStyle(color: focused ? AppTheme.whiteGlow : Colors.white54, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: .4, decoration: TextDecoration.none)),
                       ),
                       const SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, color: focused ? const Color(0xFF24D6FF) : Colors.white30, size: 21),
+                      Icon(Icons.arrow_forward_rounded, color: focused ? AppTheme.cyan : Colors.white30, size: 21),
                     ],
                   ),
                 ),
-                if (!isLast) const Divider(color: Color(0xFF203246), height: 1),
+                if (!isLast) const Divider(color: AppTheme.border, height: 1),
               ],
             ),
           ),

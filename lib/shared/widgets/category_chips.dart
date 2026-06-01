@@ -76,13 +76,13 @@ class _FocusableChipState extends State<_FocusableChip> {
           duration: const Duration(milliseconds: 160),
           padding: EdgeInsets.symmetric(horizontal: tv ? 22 : 20, vertical: tv ? 11 : 12),
           decoration: BoxDecoration(
-            gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
+            gradient: active ? AppTheme.activeGradient : null,
             color: active ? null : AppTheme.surface.withOpacity(0.82),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: focused
                   ? AppTheme.cyan
-                  : (active ? Colors.transparent : const Color(0xFF26364B)),
+                  : (active ? Colors.transparent : AppTheme.border),
               width: focused ? 2.2 : 1,
             ),
             boxShadow: focused

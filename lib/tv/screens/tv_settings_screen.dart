@@ -370,7 +370,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           }),
         },
         child: Scaffold(
-          backgroundColor: const Color(0xFF050914),
+          backgroundColor: AppTheme.bgDeep,
           body: DefaultTextStyle.merge(
             style: const TextStyle(decoration: TextDecoration.none),
             child: ListView(
@@ -508,9 +508,9 @@ class _Header extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.96),
+        color: AppTheme.surface.withOpacity(0.96),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF1C3148)),
+        border: Border.all(color: AppTheme.border),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
       ),
       child: Row(
@@ -523,7 +523,7 @@ class _Header extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
+              gradient: AppTheme.activeGradient,
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(Icons.settings_rounded, color: Colors.white, size: 32),
@@ -575,7 +575,7 @@ class _BackButton extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: focused ? const Color(0xFF12314A) : const Color(0xFF0A1422),
+                color: focused ? AppTheme.surface3 : AppTheme.surface2,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
               ),
@@ -597,7 +597,7 @@ class _HeaderPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF111B2A),
+        color: AppTheme.surface3,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white10),
       ),
@@ -630,9 +630,9 @@ class _SettingsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.96),
+        color: AppTheme.surface.withOpacity(0.96),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF1C3148)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,7 +672,7 @@ class _FocusedSettingRow extends StatelessWidget {
       listenable: node,
       builder: (context, _) {
         final focused = node.hasFocus;
-        final accent = item.danger ? const Color(0xFFFF5C6F) : AppTheme.cyan;
+        final accent = item.danger ? AppTheme.danger : AppTheme.cyan;
         final isRadio = item.style == _SettingItemStyle.radio;
         return Focus(
           focusNode: node,
@@ -691,14 +691,14 @@ class _FocusedSettingRow extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 3),
                   padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
                   decoration: BoxDecoration(
-                    color: focused ? const Color(0xFF102F45) : Colors.transparent,
+                    color: focused ? AppTheme.surface3 : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
                     boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
                   ),
                   child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
                 ),
-                if (!isLast) const Divider(color: Color(0xFF24344A), height: 1),
+                if (!isLast) const Divider(color: AppTheme.border, height: 1),
               ],
             ),
           ),
@@ -744,9 +744,9 @@ class _TileContent extends StatelessWidget {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFF142338),
+            color: AppTheme.surface3,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: focused ? accent.withOpacity(0.85) : const Color(0xFF2B4058)),
+            border: Border.all(color: focused ? accent.withOpacity(0.85) : AppTheme.border),
           ),
           child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 23),
         ),
@@ -793,7 +793,7 @@ class _SwitchPill extends StatelessWidget {
       height: 30,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : const Color(0xFF233048),
+        color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : AppTheme.surface3,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: focused ? Colors.white70 : Colors.transparent),
       ),
@@ -854,7 +854,7 @@ class _GridPreview extends StatelessWidget {
             height: 6,
             margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
             decoration: BoxDecoration(
-              color: active ? AppTheme.cyan : const Color(0xFF26364B),
+              color: active ? AppTheme.cyan : AppTheme.border,
               borderRadius: BorderRadius.circular(999),
             ),
           ),

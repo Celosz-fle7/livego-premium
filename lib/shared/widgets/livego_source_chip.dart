@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
+
 class LiveGoSourceChip extends StatelessWidget {
   final String label;
   final bool active;
@@ -20,16 +22,16 @@ class LiveGoSourceChip extends StatelessWidget {
         selected: active,
         label: Text(label),
         onSelected: (_) => onTap(),
-        selectedColor: const Color(0xFF08D9FF),
-        backgroundColor: const Color(0xFF141927),
+        selectedColor: AppTheme.cyan,
+        backgroundColor: AppTheme.surface2,
         labelStyle: TextStyle(
-          color: active ? Colors.black : Colors.white70,
+          color: active ? AppTheme.bg : AppTheme.textSoft,
           fontWeight: FontWeight.bold,
         ),
         side: BorderSide(
           color: active
-              ? const Color(0xFF08D9FF)
-              : Colors.white.withOpacity(0.10),
+              ? AppTheme.cyan
+              : AppTheme.border,
         ),
       ),
     );

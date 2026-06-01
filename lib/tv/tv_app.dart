@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/app_theme.dart';
+
 import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_downloads_screen.dart';
@@ -224,15 +226,15 @@ class _TvAppState extends State<TvApp> {
           width: 470,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1220),
+            color: AppTheme.surface2,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: const Color(0xFF1E3850), width: 1.5),
+            border: Border.all(color: AppTheme.border, width: 1.5),
             boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 34)],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.power_settings_new_rounded, color: Color(0xFF25D7FF), size: 58),
+              const Icon(Icons.power_settings_new_rounded, color: AppTheme.cyan, size: 58),
               const SizedBox(height: 18),
               const Text(
                 'Keluar dari LiveGO?',
@@ -284,7 +286,7 @@ class _TvAppState extends State<TvApp> {
           if (!didPop) _handleBack();
         },
         child: Scaffold(
-          backgroundColor: const Color(0xFF050914),
+          backgroundColor: AppTheme.bgDeep,
           body: PremiumShell(
             child: Shortcuts(
               shortcuts: const <ShortcutActivator, Intent>{
@@ -361,7 +363,7 @@ class _ExitDialogButton extends StatelessWidget {
       onKeyEvent: onKey,
       child: TvFocusedBorder(
         focusNode: node,
-        color: primary ? const Color(0xFF25D7FF) : const Color(0xFFFF6B7C),
+        color: primary ? AppTheme.cyan : AppTheme.danger,
         radius: 16,
         child: InkWell(
               canRequestFocus: false,
@@ -373,13 +375,13 @@ class _ExitDialogButton extends StatelessWidget {
             height: 54,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: primary ? const Color(0xFF12314A) : const Color(0xFF261019),
+              color: primary ? AppTheme.surface3 : AppTheme.danger.withOpacity(0.14),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               label,
               style: TextStyle(
-                color: primary ? const Color(0xFFBFF5FF) : const Color(0xFFFFB4BF),
+                color: primary ? AppTheme.whiteGlow : AppTheme.danger.withOpacity(0.95),
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 decoration: TextDecoration.none,

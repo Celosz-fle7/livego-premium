@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/app_theme.dart';
 
 class TvFocusedBorder extends StatelessWidget {
   final FocusNode focusNode;
@@ -12,9 +13,9 @@ class TvFocusedBorder extends StatelessWidget {
     super.key,
     required this.focusNode,
     required this.child,
-    required this.color,
+    this.color = AppTheme.cyan,
     this.radius = 18,
-    this.width = 2.5,
+    this.width = 2.2,
     this.padding = EdgeInsets.zero,
   });
 
@@ -25,18 +26,20 @@ class TvFocusedBorder extends StatelessWidget {
       builder: (context, _) {
         final focused = focusNode.hasFocus;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 105),
+          curve: Curves.easeOutCubic,
           padding: padding,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(radius),
             border: Border.all(
-              color: focused ? color.withOpacity(0.95) : Colors.transparent,
+              color: focused ? color.withOpacity(0.98) : Colors.transparent,
               width: focused ? width : 0,
             ),
             boxShadow: focused
                 ? [
-                    BoxShadow(color: color.withOpacity(0.26), blurRadius: 22, spreadRadius: 1),
-                    BoxShadow(color: const Color(0xFF8B4DFF).withOpacity(0.10), blurRadius: 34, spreadRadius: 2),
+                    AppTheme.blueGlow(0.25, 22),
+                    AppTheme.violetGlow(0.10, 34),
+                    BoxShadow(color: AppTheme.whiteGlow.withOpacity(0.08), blurRadius: 12),
                   ]
                 : null,
           ),

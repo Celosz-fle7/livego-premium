@@ -139,10 +139,10 @@ class _TvSideNavState extends State<TvSideNav> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xF2070C16), Color(0xF2040810)],
+              colors: [Color(0xF2071326), Color(0xF2010409)],
             ),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.34) : const Color(0xFF12233A)),
+            border: Border.all(color: _expanded ? AppTheme.cyan.withOpacity(0.34) : AppTheme.borderSoft),
             boxShadow: [
               const BoxShadow(color: Colors.black87, blurRadius: 18),
               if (_expanded) BoxShadow(color: AppTheme.cyan.withOpacity(0.13), blurRadius: 28, spreadRadius: 1),
@@ -235,7 +235,7 @@ class _NavButton extends StatelessWidget {
                           end: Alignment.bottomRight,
                           colors: focused
                               ? [AppTheme.cyan.withOpacity(0.24), AppTheme.purple.withOpacity(0.18)]
-                              : [const Color(0xFF0C1B2A), const Color(0xFF07101D)],
+                              : [AppTheme.surface2, AppTheme.surface],
                         )
                       : null,
                   color: selected ? null : Colors.transparent,
@@ -254,7 +254,7 @@ class _NavButton extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: selected ? const Color(0xFFE8FBFF) : Colors.white70, size: logo ? 24 : 22),
+                    Icon(icon, color: selected ? AppTheme.whiteGlow : Colors.white70, size: logo ? 24 : 22),
                     if (expanded) ...[
                       const SizedBox(width: 9),
                       Expanded(

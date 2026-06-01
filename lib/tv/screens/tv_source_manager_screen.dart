@@ -138,7 +138,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFF0C1B2A),
+          backgroundColor: AppTheme.surface2,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -415,7 +415,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           }),
         },
         child: Scaffold(
-          backgroundColor: const Color(0xFF050914),
+          backgroundColor: AppTheme.bgDeep,
           body: Stack(
             children: [
               DefaultTextStyle.merge(
@@ -438,10 +438,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF07111F), Color(0xFF050914)],
+                          colors: [AppTheme.surface, AppTheme.bgDeep],
                         ),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFF17304C)),
+                        border: Border.all(color: AppTheme.border),
                         boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 32)],
                       ),
                       child: Column(
@@ -515,9 +515,9 @@ class _SourceHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0B1D2D), Color(0xFF06101C)]),
+        gradient: AppTheme.panelGradient,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1A3552)),
+        border: Border.all(color: AppTheme.border),
         boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 26)],
       ),
       child: Row(
@@ -538,7 +538,7 @@ class _SourceHeader extends StatelessWidget {
                   width: 44,
                   height: 44,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: const Color(0xFF0E2134), borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(color: AppTheme.surface2, borderRadius: BorderRadius.circular(16)),
                   child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
                 ),
               ),
@@ -563,7 +563,7 @@ class _SourceHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF0E2134),
+              color: AppTheme.surface2,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
             ),
@@ -632,10 +632,10 @@ class _SourceRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     gradient: focused
-                        ? const LinearGradient(colors: [Color(0xFF102C44), Color(0xFF091522)])
-                        : const LinearGradient(colors: [Color(0xFF08111E), Color(0xFF060B14)]),
+                        ? LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
+                        : LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : const Color(0xFF142A42), width: focused ? 2 : 1),
+                    border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : AppTheme.borderSoft, width: focused ? 2 : 1),
                     boxShadow: focused
                         ? [
                             BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 24, spreadRadius: 1),
@@ -672,9 +672,9 @@ class _SourceRow extends StatelessWidget {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF06101C).withOpacity(0.92),
+                            color: AppTheme.bgDeep.withOpacity(0.92),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFF183653)),
+                            border: Border.all(color: AppTheme.border),
                           ),
                           child: Wrap(
                             spacing: 10,
@@ -693,7 +693,7 @@ class _SourceRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (!isLast) const Divider(color: Color(0xFF20344C), height: 1),
+                if (!isLast) const Divider(color: AppTheme.border, height: 1),
               ],
             ),
           ),
@@ -777,7 +777,7 @@ class _CategoryChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        gradient: selected ? const LinearGradient(colors: [Color(0xFF22D9FF), Color(0xFF8068FF)]) : null,
+        gradient: selected ? AppTheme.activeGradient : null,
         color: selected ? null : Colors.white.withOpacity(0.045),
         border: Border.all(color: focused ? Colors.white : (selected ? Colors.transparent : Colors.white12), width: focused ? 2 : 1),
         boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 16)] : null,
@@ -805,7 +805,7 @@ class _ConfirmSaveOverlay extends StatelessWidget {
         width: 520,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF0B1D2D), Color(0xFF060B14)]),
+          gradient: AppTheme.panelGradient,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
           boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 34)],

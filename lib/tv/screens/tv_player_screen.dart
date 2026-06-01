@@ -657,7 +657,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Color(0xEE020713), Color(0x22020713), Color(0xEE020713)],
+              colors: [Color(0xF2010409), Color(0x22071A2D), Color(0xF2010409)],
             ),
           ),
         ),
@@ -684,7 +684,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       skipTraversal: true,
       onKeyEvent: _handleRemoteKey,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppTheme.bg,
         body: Stack(
           fit: StackFit.expand,
           children: [
@@ -846,7 +846,7 @@ class _PlayerControlDock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
       decoration: BoxDecoration(
-        color: const Color(0xDD07101E),
+        color: AppTheme.surface.withOpacity(0.88),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.34)),
         boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 28), const BoxShadow(color: Colors.black87, blurRadius: 18)],
@@ -863,9 +863,9 @@ class _PlayerControlDock extends StatelessWidget {
                   controller,
                   allowScrubbing: false,
                   colors: const VideoProgressColors(
-                    playedColor: AppTheme.purple,
-                    bufferedColor: Colors.white30,
-                    backgroundColor: Colors.white12,
+                    playedColor: AppTheme.cyan,
+                    bufferedColor: AppTheme.whiteGlow,
+                    backgroundColor: AppTheme.borderSoft,
                   ),
                 ),
               ),
@@ -965,7 +965,7 @@ class _EpisodeSidePanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xF207101E),
+        color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.7), blurRadius: 28), BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 30)],
@@ -1047,7 +1047,7 @@ class _EpisodeStrip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xDD07101E),
+        color: AppTheme.surface.withOpacity(0.88),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
       ),
@@ -1115,7 +1115,7 @@ class _QualityPanel extends StatelessWidget {
       width: 310,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xF207101E),
+        color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
         boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 24), const BoxShadow(color: Colors.black87, blurRadius: 22)],

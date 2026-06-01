@@ -13,7 +13,7 @@ class LiveGoSkeleton extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.surface2.withOpacity(0.82),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: const Color(0xFF23364A)),
+        border: Border.all(color: AppTheme.border),
         boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.04), blurRadius: 18)],
       ),
     );

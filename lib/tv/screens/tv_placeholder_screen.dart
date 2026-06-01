@@ -107,9 +107,9 @@ class _FocusedPlaceholderCard extends StatelessWidget {
           width: 430,
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: const Color(0xFF0B1220).withOpacity(0.92),
+            color: AppTheme.surface2.withOpacity(0.92),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: focused ? AppTheme.cyan : const Color(0xFF1F3B55), width: focused ? 2.4 : 1),
+            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2.4 : 1),
             boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 22)] : null,
           ),
           child: Column(

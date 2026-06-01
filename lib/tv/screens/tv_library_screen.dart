@@ -301,9 +301,9 @@ class _LibraryHeader extends StatelessWidget {
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF09111E).withOpacity(0.94),
+        color: AppTheme.surface.withOpacity(0.94),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1A2D43)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Row(
         children: [
@@ -311,7 +311,7 @@ class _LibraryHeader extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
+              gradient: AppTheme.activeGradient,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(icon, color: Colors.white, size: 30),
@@ -385,7 +385,7 @@ class _TvLibraryPoster extends StatelessWidget {
                                 : LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
                             const DecoratedBox(
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xAA020617)]),
+                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xCC010409)]),
                               ),
                             ),
                             Positioned(left: 8, top: 8, child: _MiniBadge(text: '${item.episodes} Ep')),
@@ -421,7 +421,7 @@ class _MiniBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(color: const Color(0xDD0F172A), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)),
+      decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.86), borderRadius: BorderRadius.circular(999), border: Border.all(color: Colors.white24)),
       child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }
@@ -445,9 +445,9 @@ class _EmptyLibrary extends StatelessWidget {
           height: 260,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0xFF09111E).withOpacity(0.92),
+            color: AppTheme.surface.withOpacity(0.92),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: focused ? AppTheme.cyan : const Color(0xFF1A2D43), width: focused ? 2 : 1),
+            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

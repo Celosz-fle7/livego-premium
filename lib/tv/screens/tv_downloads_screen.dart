@@ -229,13 +229,13 @@ class _DownloadHeader extends StatelessWidget {
     return Container(
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(color: const Color(0xFF09111E).withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF1A2D43))),
+      decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.border)),
       child: Row(
         children: [
           Container(
             width: 58,
             height: 58,
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]), borderRadius: BorderRadius.circular(18)),
+            decoration: BoxDecoration(gradient: AppTheme.activeGradient, borderRadius: BorderRadius.circular(18)),
             child: const Icon(Icons.download_done_rounded, color: Colors.white, size: 30),
           ),
           const SizedBox(width: 16),
@@ -286,9 +286,9 @@ class _DownloadRow extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: focused ? const Color(0xFF102F45) : const Color(0xFF09111E).withOpacity(0.92),
+                color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: focused ? AppTheme.cyan : const Color(0xFF1A2D43), width: focused ? 2 : 1),
+                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
               ),
               child: Row(
                 children: [
@@ -351,7 +351,7 @@ class _EmptyDownloads extends StatelessWidget {
           duration: const Duration(milliseconds: 120),
           height: 260,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: const Color(0xFF09111E).withOpacity(0.92), borderRadius: BorderRadius.circular(24), border: Border.all(color: focused ? AppTheme.cyan : const Color(0xFF1A2D43), width: focused ? 2 : 1)),
+          decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.92), borderRadius: BorderRadius.circular(24), border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1)),
           child: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [

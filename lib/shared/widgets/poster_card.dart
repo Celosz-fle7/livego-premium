@@ -81,7 +81,7 @@ class _PosterCardState extends State<PosterCard> {
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
-                                    colors: [Colors.transparent, Color(0xAA020617)],
+                                    colors: [Colors.transparent, Color(0xCC010409)],
                                   ),
                                 ),
                               ),
@@ -139,7 +139,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A).withOpacity(0.82),
+        color: AppTheme.surface.withOpacity(0.84),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white24),
       ),

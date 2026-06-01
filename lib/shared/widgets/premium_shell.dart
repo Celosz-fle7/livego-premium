@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/app_theme.dart';
 
 class PremiumShell extends StatelessWidget {
   final Widget child;
@@ -8,43 +9,65 @@ class PremiumShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: const BoxDecoration(
-        color: Color(0xFF02050B),
-        gradient: RadialGradient(
-          center: Alignment.topCenter,
-          radius: 1.35,
-          colors: [Color(0xFF0D1729), Color(0xFF050914), Color(0xFF010309)],
-          stops: [0.0, 0.50, 1.0],
-        ),
+        color: AppTheme.bg,
+        gradient: AppTheme.screenGradient,
       ),
       child: Stack(
         children: [
           Positioned(
-            left: -90,
-            top: -90,
+            left: -130,
+            top: -120,
             child: IgnorePointer(
               child: Container(
-                width: 360,
-                height: 360,
+                width: 440,
+                height: 440,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [Color(0x4425D7FF), Color(0x14FFFFFF), Color(0x0018D6F5)],
+                    colors: [
+                      AppTheme.cyan.withOpacity(0.22),
+                      AppTheme.whiteGlow.withOpacity(0.055),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
             ),
           ),
           Positioned(
-            right: -120,
-            top: 20,
+            right: -170,
+            top: -30,
             child: IgnorePointer(
               child: Container(
-                width: 420,
-                height: 420,
+                width: 520,
+                height: 520,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [Color(0x2E8B4DFF), Color(0x0FFFFFFF), Color(0x00000000)],
+                    colors: [
+                      AppTheme.purple.withOpacity(0.18),
+                      AppTheme.blue.withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 120,
+            right: 120,
+            bottom: -260,
+            child: IgnorePointer(
+              child: Container(
+                height: 460,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.blue.withOpacity(0.10),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),

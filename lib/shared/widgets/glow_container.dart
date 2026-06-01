@@ -18,22 +18,19 @@ class GlowContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: const Duration(milliseconds: 130),
       padding: padding,
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.86),
+        gradient: AppTheme.panelGradient,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: active ? AppTheme.purple : const Color(0xFF24344A),
-          width: active ? 2.4 : 1,
+          color: active ? AppTheme.cyan.withOpacity(0.95) : AppTheme.border,
+          width: active ? 2 : 1,
         ),
         boxShadow: [
-          if (active)
-            BoxShadow(
-              color: AppTheme.purple.withOpacity(0.4),
-              blurRadius: 24,
-              spreadRadius: 1,
-            ),
+          const BoxShadow(color: Colors.black87, blurRadius: 18),
+          if (active) AppTheme.blueGlow(0.24, 26),
+          if (active) AppTheme.violetGlow(0.11, 36),
         ],
       ),
       child: child,
