@@ -1,3 +1,5 @@
+import '../services/api/api_platform.dart';
+
 class LiveGoSettings {
   static const appName = 'LiveGo';
 
@@ -16,33 +18,16 @@ class LiveGoSettings {
   static int mobileHomeGrid = 3;
   static int tvHomeGrid = 6;
 
-  static final List<String> defaultPlatforms = [
-    'shortmax',
-    'netshort',
-    'pinedrama',
-    'dramabox',
-    'flickreels',
-  ];
+  static final List<String> defaultPlatforms = LiveGoApiPlatforms.defaultSlugs;
 
-  static final List<String> supportedPlatforms = [
-    'shortmax',
-    'netshort',
-    'pinedrama',
-    'dramabox',
-    'flickreels',
-    'melolo',
-  ];
+  static final List<String> supportedPlatforms = LiveGoApiPlatforms.supportedSlugs;
 
   static final Set<String> activePlatforms = defaultPlatforms.toSet();
   static final List<String> homePlatforms = List<String>.from(defaultPlatforms);
 
   static final Map<String, List<String>> homeCategories = {
-    'shortmax': ['Trending', 'For You'],
-    'netshort': ['Trending', 'For You'],
-    'pinedrama': ['Trending', 'For You'],
-    'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
-    'flickreels': ['Trending', 'For You'],
-    'melolo': ['Trending', 'For You'],
+    for (final platform in LiveGoApiPlatforms.all)
+      platform.slug: List<String>.from(platform.categories),
   };
 
   // unknown, online, slow, offline. Disimpan selama sesi aplikasi berjalan.
@@ -128,12 +113,8 @@ class LiveGoSettings {
     homeCategories
       ..clear()
       ..addAll({
-        'shortmax': ['Trending', 'For You'],
-        'netshort': ['Trending', 'For You'],
-        'pinedrama': ['Trending', 'For You'],
-        'dramabox': ['Trending', 'Latest', 'VIP', 'Dub Indo', 'For You'],
-        'flickreels': ['Trending', 'For You'],
-        'melolo': ['Trending', 'For You'],
+        for (final platform in LiveGoApiPlatforms.all)
+          platform.slug: List<String>.from(platform.categories),
       });
   }
 }

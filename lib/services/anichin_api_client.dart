@@ -1,53 +1,22 @@
-import 'dart:convert';
-import 'dart:io';
-
 import '../core/livego_settings.dart';
+import 'api/api_endpoints.dart';
+import 'api/api_env.dart';
+import 'api/api_http_client.dart';
+import 'api/api_platform.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import '../models/livego_episode.dart';
 
 class AnichinApiClient {
-  static const String baseUrl = 'https://priv-api.anichin.bio';
-  static const String apiKey = 'dk_live_c261cb5920f82cf971e29edf0c8183d8';
+  static String get baseUrl => ApiEnv.baseUrl;
+  static String get apiKey => ApiEnv.apiKey;
 
-  static const Map<String, String> _slugs = {
-    'shortmax': 'shortmax',
-    'netshort': 'netshort',
-    'flickreels': 'flickreels',
-    'melolo': 'melolo',
-    'dramabox': 'dramabox',
-    'pinedrama': 'pinedrama',
-  };
+  static List<String> get supportedPlatforms => LiveGoApiPlatforms.supportedSlugs;
+  static List<String> get defaultPlatforms => LiveGoApiPlatforms.defaultSlugs;
 
-  // Contract from API-DRACIN summary:
-  // - ShortMax, NetShort, PineDrama and FlickReels expose playable /episode.
-  // - DramaBox exposes signed HLS primarily from /allepisode.
-  // - Melolo is encrypted CENC; keep it supported for catalog/search, but do
-  //   not send its encrypted MP4 to the native player until decrypt/player work
-  //   is implemented.
-  static const Set<String> _allEpisodeStreamOnly = {'dramabox'};
-  static const Set<String> _encryptedVideoOnly = {'melolo'};
+  static bool supports(String platform) => LiveGoApiPlatforms.supports(platform);
 
-  static const List<String> supportedPlatforms = [
-    'shortmax',
-    'netshort',
-    'pinedrama',
-    'dramabox',
-    'flickreels',
-    'melolo',
-  ];
-
-  static const List<String> defaultPlatforms = [
-    'shortmax',
-    'netshort',
-    'pinedrama',
-    'dramabox',
-    'flickreels',
-  ];
-
-  static bool supports(String platform) => _slugs.containsKey(platform.toLowerCase());
-
-  static String _apiSlug(String platform) => _slugs[platform.toLowerCase()] ?? platform.toLowerCase();
+  static String _apiSlug(String platform) => LiveGoApiPlatforms.normalizeSlug(platform);
 
   static Future<List<ContentItem>> home({
     String platform = 'shortmax',
@@ -55,7 +24,7 @@ class AnichinApiClient {
   }) async {
     final slug = _apiSlug(platform);
     final apiLang = _providerLang(slug, lang);
-    final json = await _getJson('/api/$slug/trending', {
+    final json = await _getJson(ApiEndpoints.trending(slug), {
       'lang': apiLang,
     });
     return _parseItems(json, platform: platform, lang: apiLang);
@@ -75,7 +44,7 @@ class AnichinApiClient {
       return home(platform: platform, lang: apiLang);
     }
 
-    final json = await _getJson('/api/$slug/foryou', {
+    final json = await _getJson(ApiEndpoints.forYou(slug), {
       'page': '$page',
       'lang': apiLang,
     });
@@ -115,7 +84,7 @@ class AnichinApiClient {
     if (query.trim().isEmpty) return [];
     final slug = _apiSlug(platform);
     final apiLang = _providerLang(slug, lang);
-    final json = await _getJson('/api/$slug/search', {
+    final json = await _getJson(ApiEndpoints.search(slug), {
       _searchParam(slug): query.trim(),
       'lang': apiLang,
     });
@@ -125,7 +94,7 @@ class AnichinApiClient {
   static Future<ContentItem?> detail(ContentItem item) async {
     final slug = _apiSlug(item.platformSlug);
     final apiLang = _providerLang(slug, item.lang);
-    final json = await _getJson('/api/$slug/detail', {
+    final json = await _getJson(ApiEndpoints.detail(slug), {
       'id': item.id,
       'lang': apiLang,
     });
@@ -169,7 +138,7 @@ class AnichinApiClient {
 
     Map<String, dynamic> json = <String, dynamic>{};
     try {
-      json = await _getJson('/api/$slug/allepisode', {
+      json = await _getJson(ApiEndpoints.allEpisode(slug), {
         'id': item.id,
         'lang': apiLang,
       });
@@ -185,7 +154,7 @@ class AnichinApiClient {
     // carries the complete episode metadata/count.
     if (rows.length <= 1 && slug == 'shortmax') {
       try {
-        final detailJson = await _getJson('/api/$slug/detail', {
+        final detailJson = await _getJson(ApiEndpoints.detail(slug), {
           'id': item.id,
           'lang': apiLang,
         });
@@ -245,12 +214,12 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    if (_encryptedVideoOnly.contains(slug)) {
+    if (LiveGoApiPlatforms.bySlug(slug).isEncrypted) {
       print('ANICHIN VIDEO UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
       return StreamInfo.empty;
     }
 
-    if (_allEpisodeStreamOnly.contains(slug)) {
+    if (LiveGoApiPlatforms.bySlug(slug).streamFromAllEpisodes) {
       final stream = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
       if (stream.url.isNotEmpty) return stream;
       return StreamInfo.empty;
@@ -288,12 +257,12 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    if (_encryptedVideoOnly.contains(slug)) {
+    if (LiveGoApiPlatforms.bySlug(slug).isEncrypted) {
       print('ANICHIN FAST EP UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
       return StreamInfo.empty;
     }
 
-    if (_allEpisodeStreamOnly.contains(slug)) {
+    if (LiveGoApiPlatforms.bySlug(slug).streamFromAllEpisodes) {
       try {
         return await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang)
             .timeout(timeout, onTimeout: () => StreamInfo.empty);
@@ -304,7 +273,7 @@ class AnichinApiClient {
     }
 
     try {
-      final json = await _getJson('/api/$slug/episode', query).timeout(timeout);
+      final json = await _getJson(ApiEndpoints.episode(slug), query).timeout(timeout);
       if (json.isEmpty) return StreamInfo.empty;
       return _parseFastStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
     } catch (e) {
@@ -331,7 +300,7 @@ class AnichinApiClient {
     required String lang,
   }) async {
     try {
-      final json = await _getJson('/api/$slug/episode', query);
+      final json = await _getJson(ApiEndpoints.episode(slug), query);
       if (json.isEmpty) return StreamInfo.empty;
       return _parseStream(json, item: item, ep: ep, slug: slug, lang: lang);
     } catch (e) {
@@ -347,7 +316,7 @@ class AnichinApiClient {
     required String lang,
   }) async {
     try {
-      final all = await _getJson('/api/$slug/allepisode', {
+      final all = await _getJson(ApiEndpoints.allEpisode(slug), {
         'id': item.id,
         'lang': lang,
       });
@@ -370,47 +339,15 @@ class AnichinApiClient {
 
 
   static String _providerLang(String slug, String requested) {
-    // Use provider-documented defaults. Invalid lang values can make a valid
-    // video endpoint return an empty payload, which appears as "stream unavailable".
-    switch (slug) {
-      case 'shortmax':
-      case 'melolo':
-        return 'id';
-      case 'netshort':
-        return 'in';
-      case 'dramabox':
-      case 'pinedrama':
-      case 'flickreels':
-        return 'en';
-    }
-    return requested.trim().isEmpty ? 'id' : requested.trim();
+    return LiveGoApiPlatforms.langFor(slug, requested);
   }
 
   static String _collectionPath(String slug, String key) {
-    if (key == 'foryou') {
-      if (slug == 'melolo') return '/api/melolo/trending';
-      return '/api/$slug/foryou';
-    }
-
-    if (slug == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
-      return '/api/dramabox/$key';
-    }
-
-    // The remaining named categories in LiveGo are UI filters. API-DRACIN only
-    // documents explicit category IDs for PineDrama, not names, so use trending
-    // instead of constructing invalid routes.
-    return '/api/$slug/trending';
+    return ApiEndpoints.collection(slug, key);
   }
 
   static String _searchParam(String slug) {
-    switch (slug) {
-      case 'melolo':
-      case 'pinedrama':
-      case 'dramabox':
-        return 'q';
-      default:
-        return 'query';
-    }
+    return LiveGoApiPlatforms.bySlug(slug).searchParam;
   }
 
   static String get _qualityParam {
@@ -421,34 +358,8 @@ class AnichinApiClient {
     return '';
   }
 
-  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
-    final uri = Uri.parse(baseUrl).replace(
-      path: path,
-      queryParameters: query.isEmpty ? null : query,
-    );
-
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(uri).timeout(const Duration(seconds: 18));
-      request.headers.set('X-API-Key', apiKey);
-      request.headers.set('Accept', 'application/json');
-      request.headers.set('User-Agent', 'okhttp/4.12.0');
-
-      final response = await request.close().timeout(const Duration(seconds: 18));
-      final body = await response.transform(utf8.decoder).join();
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('ANICHIN API ${response.statusCode} ${uri.path}: $body');
-      }
-
-      if (body.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'success': true, 'data': decoded};
-    } finally {
-      client.close(force: true);
-    }
+  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) {
+    return ApiHttpClient.getJson(path, query);
   }
 
   static List<ContentItem> _parseItems(
@@ -675,7 +586,7 @@ class AnichinApiClient {
 
     if (slug == 'dramabox' && subtitles.isEmpty) {
       try {
-        final subJson = await _getJson('/api/dramabox/subtitles', {
+        final subJson = await _getJson(ApiEndpoints.subtitles('dramabox'), {
           'id': item.id,
           'ep': '$ep',
           'lang': lang,
