@@ -36,6 +36,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   bool _topFocused = true;
   int _lastRow = 0;
   bool _entryPending = false;
+  int _lastBackHandledMs = 0;
 
   List<_AccountSection> get _sections => [
         _AccountSection(
@@ -128,7 +129,22 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         key == LogicalKeyboardKey.browserBack;
   }
 
+  void _markBackHandled() {
+    _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  bool _ignoreRepeatedBack() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < 260) return true;
+    _lastBackHandledMs = now;
+    return false;
+  }
+
   void _handleBack() {
+    // Akun harus mundur satu level saja: konten Akun -> navbar Akun.
+    // Guard ini mencegah event BACK dari child route (Settings/Source)
+    // ikut tembus menjadi Akun -> Home pada satu pencetan remote.
+    if (_ignoreRepeatedBack()) return;
     _zone = TvZone.nav;
     if (widget.onBackToNav != null) {
       widget.onBackToNav?.call();
@@ -176,6 +192,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _restoreFocusAfterPop() {
     if (!mounted) return;
+    _markBackHandled();
     _zone = TvZone.list;
     _topFocused = false;
 
@@ -353,7 +370,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                 const SizedBox(height: 14),
                 ...sectionWidgets,
                 Text(
-                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← navbar • Back navbar' : '',
+                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← navbar • Back ke navbar Akun' : '',
                   style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                 ),
               ],
