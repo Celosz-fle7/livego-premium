@@ -183,10 +183,10 @@ class AnichinApiClient {
       final idx = entry.key + 1;
       final row = entry.value;
       final number = _parseInt(
-        row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['ep'] ?? row['index'],
+        row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['chapterNo'] ?? row['chapter_no'] ?? row['chapterIndex'] ?? row['chapter_index'] ?? row['ep'] ?? row['index'],
         fallback: idx,
       );
-      final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title'], fallback: 'Episode $number');
+      final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title', 'chapterTitle', 'chapter_title'], fallback: 'Episode $number');
       return LiveGoEpisode(id: '$number', index: number, title: title);
     }).toList();
   }
@@ -214,26 +214,33 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    if (LiveGoApiPlatforms.bySlug(slug).isEncrypted) {
+    final config = LiveGoApiPlatforms.bySlug(slug);
+    if (config.isEncrypted) {
       print('ANICHIN VIDEO UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
       return StreamInfo.empty;
     }
 
-    if (LiveGoApiPlatforms.bySlug(slug).streamFromAllEpisodes) {
-      final stream = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
-      if (stream.url.isNotEmpty) return stream;
-      return StreamInfo.empty;
+    // Jangan anggap semua platform sama. DramaBox paling stabil dari
+    // /allepisode karena response-nya memang membawa hlsUrl signed. Platform
+    // lain dicoba dari /episode dulu, lalu fallback ke /allepisode dan /detail.
+    final attempts = <Future<StreamInfo> Function()>[];
+    if (config.streamFromAllEpisodes) {
+      attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang));
+      attempts.add(() => _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang));
+    } else {
+      attempts.add(() => _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang));
+      attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang));
     }
+    attempts.add(() => _streamFromDetailEpisode(item, ep: ep, slug: slug, lang: apiLang));
 
-    final stream = await _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang);
-    if (stream.url.isNotEmpty) return stream;
-
-    // Some providers may include stream fields in /allepisode as a fallback.
-    final fallback = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
-    if (fallback.url.isNotEmpty) return fallback;
+    for (final attempt in attempts) {
+      final stream = await attempt();
+      if (stream.url.isNotEmpty) return stream;
+    }
 
     return StreamInfo.empty;
   }
+
 
   static Future<StreamInfo> fastEpisodeStream(
     ContentItem item, {
@@ -257,12 +264,24 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    if (LiveGoApiPlatforms.bySlug(slug).isEncrypted) {
+    final config = LiveGoApiPlatforms.bySlug(slug);
+    if (config.isEncrypted) {
       print('ANICHIN FAST EP UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
       return StreamInfo.empty;
     }
 
-    if (LiveGoApiPlatforms.bySlug(slug).streamFromAllEpisodes) {
+    Future<StreamInfo> tryEpisode() async {
+      try {
+        final json = await _getJson(ApiEndpoints.episode(slug), query).timeout(timeout);
+        if (json.isEmpty) return StreamInfo.empty;
+        return _parseFastStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
+      } catch (e) {
+        print('ANICHIN FAST EP STREAM EMPTY $slug ep=$ep: $e');
+        return StreamInfo.empty;
+      }
+    }
+
+    Future<StreamInfo> tryAllEpisodes() async {
       try {
         return await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang)
             .timeout(timeout, onTimeout: () => StreamInfo.empty);
@@ -272,15 +291,18 @@ class AnichinApiClient {
       }
     }
 
-    try {
-      final json = await _getJson(ApiEndpoints.episode(slug), query).timeout(timeout);
-      if (json.isEmpty) return StreamInfo.empty;
-      return _parseFastStream(json, item: item, ep: ep, slug: slug, lang: apiLang);
-    } catch (e) {
-      print('ANICHIN FAST EP STREAM EMPTY $slug ep=$ep: $e');
-      return StreamInfo.empty;
+    final attempts = config.streamFromAllEpisodes
+        ? <Future<StreamInfo> Function()>[tryAllEpisodes, tryEpisode]
+        : <Future<StreamInfo> Function()>[tryEpisode, tryAllEpisodes];
+
+    for (final attempt in attempts) {
+      final stream = await attempt();
+      if (stream.url.isNotEmpty) return stream;
     }
+
+    return StreamInfo.empty;
   }
+
 
   static Future<StreamInfo> _parseFastStream(
     Map<String, dynamic> json, {
@@ -321,13 +343,43 @@ class AnichinApiClient {
         'lang': lang,
       });
       final row = _findEpisodeRow(all, ep);
-      if (row == null) return StreamInfo.empty;
+      if (row == null) {
+        final direct = await _parseStream(all, item: item, ep: ep, slug: slug, lang: lang);
+        return direct.url.isNotEmpty ? direct : StreamInfo.empty;
+      }
       return _parseStream(row, item: item, ep: ep, slug: slug, lang: lang);
     } catch (e) {
       print('ANICHIN ALLEPISODE STREAM EMPTY $slug ep=$ep: $e');
       return StreamInfo.empty;
     }
   }
+
+  static Future<StreamInfo> _streamFromDetailEpisode(
+    ContentItem item, {
+    required int ep,
+    required String slug,
+    required String lang,
+  }) async {
+    try {
+      final detail = await _getJson(ApiEndpoints.detail(slug), {
+        'id': item.id,
+        'lang': lang,
+      });
+      final row = _findEpisodeRow(detail, ep);
+      if (row != null) {
+        final parsed = await _parseStream(row, item: item, ep: ep, slug: slug, lang: lang);
+        if (parsed.url.isNotEmpty) return parsed;
+      }
+
+      // Beberapa provider mengembalikan stream episode aktif langsung di detail.
+      final direct = await _parseStream(detail, item: item, ep: ep, slug: slug, lang: lang);
+      return direct.url.isNotEmpty ? direct : StreamInfo.empty;
+    } catch (e) {
+      print('ANICHIN DETAIL STREAM EMPTY $slug ep=$ep: $e');
+      return StreamInfo.empty;
+    }
+  }
+
 
   static int _episodeNumber(String chapter) {
     final direct = int.tryParse(chapter);
@@ -421,30 +473,42 @@ class AnichinApiClient {
 
 
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
-    // Anichin providers do not all wrap episode arrays the same way.
-    // ShortMax returns root-level { episodes: [...] }, while some providers
-    // wrap lists under data/items/rows. Keep this parser broad so the player
-    // episode sheet is filled from /allepisode instead of falling back to a
-    // synthetic single Episode 1.
+    // Provider Anichin beda-beda bungkus episode list. Parser ini sengaja
+    // luas supaya DramaBox/FlickReels/NetShort tidak jatuh ke Episode 1 palsu.
     Object? data = json['episodes'] ??
         json['episodeList'] ??
         json['episode_list'] ??
+        json['episodeInfoList'] ??
+        json['episode_info_list'] ??
         json['chapters'] ??
+        json['chapterList'] ??
+        json['chapter_list'] ??
+        json['playList'] ??
+        json['play_list'] ??
         json['list'] ??
         json['items'] ??
         json['rows'] ??
         json['data'];
 
-    if (data is Map) {
-      data = data['episodes'] ??
+    while (data is Map) {
+      final next = data['episodes'] ??
           data['episodeList'] ??
           data['episode_list'] ??
+          data['episodeInfoList'] ??
+          data['episode_info_list'] ??
           data['chapters'] ??
+          data['chapterList'] ??
+          data['chapter_list'] ??
+          data['playList'] ??
+          data['play_list'] ??
           data['list'] ??
           data['items'] ??
           data['rows'] ??
           data['data'];
+      if (identical(next, data) || next == null) break;
+      data = next;
     }
+
     if (data is List) {
       return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     }
@@ -624,14 +688,33 @@ class AnichinApiClient {
   }
 
   static Map<String, dynamic> _streamData(Map<String, dynamic> data) {
-    final candidates = [
-      data,
-      if (data['data'] is Map) Map<String, dynamic>.from(data['data'] as Map),
-      if (data['episode'] is Map) Map<String, dynamic>.from(data['episode'] as Map),
-      if (data['video'] is Map) Map<String, dynamic>.from(data['video'] as Map),
-      if (data['stream'] is Map) Map<String, dynamic>.from(data['stream'] as Map),
-      if (data['play'] is Map) Map<String, dynamic>.from(data['play'] as Map),
-    ];
+    final candidates = <Map<String, dynamic>>[];
+
+    void addCandidate(Object? value) {
+      if (value is! Map) return;
+      final map = Map<String, dynamic>.from(value);
+      candidates.add(map);
+      for (final key in const [
+        'data',
+        'result',
+        'episode',
+        'episodeInfo',
+        'episode_info',
+        'video',
+        'stream',
+        'play',
+        'playInfo',
+        'play_info',
+        'media',
+        'source',
+        'resource',
+        'chapter',
+      ]) {
+        addCandidate(map[key]);
+      }
+    }
+
+    addCandidate(data);
 
     for (final c in candidates) {
       if (_extractUrl(c).isNotEmpty) return c;
@@ -639,9 +722,86 @@ class AnichinApiClient {
     return data;
   }
 
+  static const List<String> _playableUrlKeys = [
+    'url',
+    'src',
+    'videoUrl',
+    'video_url',
+    'playUrl',
+    'play_url',
+    'mp4Url',
+    'mp4_url',
+    'hlsUrl',
+    'hls_url',
+    'm3u8',
+    'm3u8Url',
+    'm3u8_url',
+    'streamUrl',
+    'stream_url',
+    'cdnUrl',
+    'cdn_url',
+    'mediaUrl',
+    'media_url',
+    'file',
+    'link',
+  ];
+
+  static String _playableUrlFromMap(Map<String, dynamic> data) {
+    return _first(data, _playableUrlKeys);
+  }
+
+  static bool _looksPlayableUrl(String raw) {
+    final url = raw.trim();
+    if (url.isEmpty || url == 'null') return false;
+    final low = url.toLowerCase();
+    return low.startsWith('http://') ||
+        low.startsWith('https://') ||
+        low.startsWith('/') ||
+        low.contains('.mp4') ||
+        low.contains('.m3u8') ||
+        low.contains('/hls') ||
+        low.contains('video') ||
+        low.contains('cdn');
+  }
+
+  static String _deepPlayableUrl(Object? value) {
+    if (value is String) {
+      final clean = value.trim();
+      return _looksPlayableUrl(clean) ? clean : '';
+    }
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      final direct = _playableUrlFromMap(map);
+      if (direct.isNotEmpty) return direct;
+      for (final entry in map.entries) {
+        final key = '${entry.key}'.toLowerCase();
+        if (key.contains('subtitle') || key.contains('cover') || key.contains('poster') || key.contains('image')) {
+          continue;
+        }
+        final nested = _deepPlayableUrl(entry.value);
+        if (nested.isNotEmpty) return nested;
+      }
+    }
+    if (value is List) {
+      for (final row in value) {
+        final nested = _deepPlayableUrl(row);
+        if (nested.isNotEmpty) return nested;
+      }
+    }
+    return '';
+  }
+
   static String _extractUrl(Map<String, dynamic> data) {
     final streams = data['qualityList'] ??
         data['quality_list'] ??
+        data['streamList'] ??
+        data['stream_list'] ??
+        data['sourceList'] ??
+        data['source_list'] ??
+        data['videoList'] ??
+        data['video_list'] ??
+        data['playList'] ??
+        data['play_list'] ??
         data['streams'] ??
         data['qualities'] ??
         data['urls'] ??
@@ -659,20 +819,11 @@ class AnichinApiClient {
         if (map['isDefault'] == true || '${map['default']}'.toLowerCase() == 'true') {
           defaultRow = map;
         }
-        final quality = '${map['quality'] ?? map['resolution'] ?? map['label'] ?? ''}'.toLowerCase();
+        final quality = '${map['quality'] ?? map['resolution'] ?? map['label'] ?? map['name'] ?? ''}'.toLowerCase();
         if (preferred.isNotEmpty && quality.contains(preferred.replaceAll('p', ''))) {
-          final url = _first(map, const [
-            'url',
-            'src',
-            'videoUrl',
-            'video_url',
-            'hlsUrl',
-            'hls_url',
-            'mp4Url',
-            'mp4_url',
-            'playUrl',
-            'play_url',
-          ]);
+          final url = _playableUrlFromMap(map).isNotEmpty
+              ? _playableUrlFromMap(map)
+              : _deepPlayableUrl(map);
           if (url.isNotEmpty) return url;
         }
       }
@@ -681,56 +832,45 @@ class AnichinApiClient {
           ? _lowestQualityRow(streams)
           : (defaultRow ?? firstRow);
       if (selected != null) {
-        final url = _first(selected, const [
-          'url',
-          'src',
-          'videoUrl',
-          'video_url',
-          'hlsUrl',
-          'hls_url',
-          'mp4Url',
-          'mp4_url',
-          'playUrl',
-          'play_url',
-        ]);
+        final url = _playableUrlFromMap(selected).isNotEmpty
+            ? _playableUrlFromMap(selected)
+            : _deepPlayableUrl(selected);
         if (url.isNotEmpty) return url;
       }
     }
 
     if (streams is Map) {
       final preferred = _qualityParam;
-      if (preferred.isNotEmpty && streams[preferred] != null) return '${streams[preferred]}';
-      for (final key in ['auto', 'default', '1080p', '720p', '480p', 'url']) {
-        if (streams[key] != null) return '${streams[key]}';
+      if (preferred.isNotEmpty && streams[preferred] != null) {
+        return _deepPlayableUrl(streams[preferred]);
       }
+      for (final key in const ['auto', 'default', '1080p', '720p', '480p', 'url', 'hlsUrl', 'videoUrl']) {
+        if (streams[key] != null) {
+          final url = _deepPlayableUrl(streams[key]);
+          if (url.isNotEmpty) return url;
+        }
+      }
+      final any = _deepPlayableUrl(streams);
+      if (any.isNotEmpty) return any;
     }
 
-    return _first(data, const [
-      'url',
-      'videoUrl',
-      'video_url',
-      'playUrl',
-      'play_url',
-      'mp4Url',
-      'mp4_url',
-      'hlsUrl',
-      'hls_url',
-      'm3u8',
-      'src',
-      'cdnUrl',
-      'cdn_url',
-      'mediaUrl',
-      'media_url',
-      'file',
-      'link',
-    ]);
+    final direct = _playableUrlFromMap(data);
+    if (direct.isNotEmpty) return direct;
+    return _deepPlayableUrl(data);
   }
-
 
 
   static List<StreamQuality> _extractQualities(Map<String, dynamic> data) {
     final streams = data['qualityList'] ??
         data['quality_list'] ??
+        data['streamList'] ??
+        data['stream_list'] ??
+        data['sourceList'] ??
+        data['source_list'] ??
+        data['videoList'] ??
+        data['video_list'] ??
+        data['playList'] ??
+        data['play_list'] ??
         data['streams'] ??
         data['qualities'] ??
         data['urls'] ??
@@ -740,18 +880,9 @@ class AnichinApiClient {
       for (final row in streams) {
         if (row is! Map) continue;
         final map = Map<String, dynamic>.from(row);
-        final rawUrl = _first(map, const [
-          'url',
-          'src',
-          'videoUrl',
-          'video_url',
-          'hlsUrl',
-          'hls_url',
-          'mp4Url',
-          'mp4_url',
-          'playUrl',
-          'play_url',
-        ]);
+        final rawUrl = _playableUrlFromMap(map).isNotEmpty
+            ? _playableUrlFromMap(map)
+            : _deepPlayableUrl(map);
         if (rawUrl.isEmpty) continue;
         final label = _first(map, const [
           'label',
@@ -768,7 +899,7 @@ class AnichinApiClient {
     }
     if (streams is Map) {
       for (final entry in streams.entries) {
-        final rawUrl = '${entry.value}'.trim();
+        final rawUrl = _deepPlayableUrl(entry.value).trim();
         if (rawUrl.isEmpty || rawUrl == 'null') continue;
         rows.add(StreamQuality(label: '${entry.key}', url: _normalizePlayableUrl(rawUrl)));
       }
@@ -813,6 +944,10 @@ class AnichinApiClient {
             row['episode'] ??
             row['episodeNumber'] ??
             row['episode_number'] ??
+            row['chapterNo'] ??
+            row['chapter_no'] ??
+            row['chapterIndex'] ??
+            row['chapter_index'] ??
             row['ep'] ??
             row['index'],
         fallback: -1,
@@ -831,12 +966,38 @@ class AnichinApiClient {
     required String fallbackLang,
   }) {
     if (raw is Map) {
-      _appendSubtitles(out, raw['data'] ?? raw['items'] ?? raw['list'] ?? raw['tracks'] ?? raw['subtitles'], fallbackLang: fallbackLang);
+      final known = raw['data'] ?? raw['items'] ?? raw['list'] ?? raw['tracks'] ?? raw['subtitles'];
+      if (known != null) {
+        _appendSubtitles(out, known, fallbackLang: fallbackLang);
+        return;
+      }
+      // NetShort/DramaBox kadang bisa berupa {"id": "url", "en": "url"}.
+      for (final entry in raw.entries) {
+        final key = '${entry.key}'.trim();
+        final value = entry.value;
+        if (value is String && value.trim().isNotEmpty && value.trim() != 'null') {
+          out.add(SubtitleTrack(
+            language: key.isEmpty ? fallbackLang : key,
+            format: value.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
+            url: _normalizePlayableUrl(value),
+          ));
+        } else if (value is Map || value is List) {
+          _appendSubtitles(out, value, fallbackLang: key.isEmpty ? fallbackLang : key);
+        }
+      }
       return;
     }
     if (raw is! List) return;
 
     for (final row in raw) {
+      if (row is String && row.trim().isNotEmpty) {
+        out.add(SubtitleTrack(
+          language: fallbackLang,
+          format: row.toLowerCase().contains('.srt') ? 'srt' : 'vtt',
+          url: _normalizePlayableUrl(row),
+        ));
+        continue;
+      }
       if (row is! Map) continue;
       final map = Map<String, dynamic>.from(row);
       final subUrl = _first(map, const [
@@ -845,6 +1006,8 @@ class AnichinApiClient {
         'vtt_url',
         'subtitleUrl',
         'subtitle_url',
+        'subtitlesUrl',
+        'subtitles_url',
         'src',
         'file',
         'link',
@@ -876,12 +1039,20 @@ class AnichinApiClient {
 
   static int _episodes(Map<String, dynamic> json) {
     final raw = json['chapters'] ??
+        json['chapterList'] ??
+        json['chapter_list'] ??
+        json['episodeList'] ??
+        json['episode_list'] ??
+        json['episodeInfoList'] ??
+        json['episode_info_list'] ??
         json['total_episodes'] ??
         json['totalEpisodes'] ??
         json['episodeCount'] ??
         json['episode_count'] ??
         json['episodes'];
     if (raw is List) return raw.length;
+    final rows = _episodeList(json);
+    if (rows.isNotEmpty) return rows.length;
     return _parseInt(raw, fallback: 1);
   }
 
