@@ -272,7 +272,7 @@ class LiveGoCatalog {
     if (cached != null && cached.length > 1) return cached;
 
     try {
-      final rows = await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 12));
+      final rows = await AnichinApiClient.episodes(item).timeout(const Duration(seconds: 22));
       if (rows.length > 1) {
         await LiveGoContentCache.writeEpisodes(item, rows);
         return rows;
