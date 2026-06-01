@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/app_theme.dart';
 
 import '../shared/widgets/premium_shell.dart';
+import 'focus/tv_back_router.dart';
 import 'screens/tv_account_screen.dart';
 import 'screens/tv_downloads_screen.dart';
 import 'screens/tv_home_screen.dart';
@@ -30,6 +31,7 @@ class _TvAppState extends State<TvApp> {
   bool _exitDialogOpen = false;
   bool _restoreHomeBannerAfterExitDialog = false;
   int _lastBackHandledMs = 0;
+  final TvBackRouter _backRouter = const TvBackRouter();
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;
@@ -100,9 +102,34 @@ class _TvAppState extends State<TvApp> {
 
   void _backToHomeBanner() {
     setState(() {
-      _index = 0;
+      _index = TvBackRouter.homeIndex;
       _homeBannerTicket++;
     });
+  }
+
+  void _handleChildBackToHome() {
+    _applyBackAction(_backRouter.resolveChildContentBack());
+  }
+
+  void _applyBackAction(TvBackAction action) {
+    switch (action) {
+      case TvBackAction.closeDialog:
+        _closeExitDialog();
+        return;
+      case TvBackAction.focusNavbar:
+        _focusCurrentNav();
+        return;
+      case TvBackAction.goHomeBanner:
+        _backToHomeBanner();
+        return;
+      case TvBackAction.showExitDialog:
+        _showExitDialog();
+        return;
+      case TvBackAction.none:
+      case TvBackAction.closePanel:
+      case TvBackAction.exitLocalScreen:
+        return;
+    }
   }
 
   void _enterContent(int navIndex) {
@@ -165,25 +192,16 @@ class _TvAppState extends State<TvApp> {
     // Android TV can deliver the same Back press through both Shortcuts
     // and PopScope. Guard it so one physical press produces one action.
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 240) return;
+    if (_backRouter.isDuplicatePress(now, _lastBackHandledMs)) return;
     _lastBackHandledMs = now;
 
-    if (_exitDialogOpen) {
-      _closeExitDialog();
-      return;
-    }
-
-    if (!_navHasFocus) {
-      _focusCurrentNav();
-      return;
-    }
-
-    if (_index != 0) {
-      _openNavPage(0);
-      return;
-    }
-
-    _showExitDialog();
+    _applyBackAction(
+      _backRouter.resolveRootBack(
+        exitDialogOpen: _exitDialogOpen,
+        navHasFocus: _navHasFocus,
+        currentIndex: _index,
+      ),
+    );
   }
 
   KeyEventResult _exitDialogKey(FocusNode node, KeyEvent event) {
@@ -226,12 +244,12 @@ class _TvAppState extends State<TvApp> {
         favorites: false,
         focusTicket: _index == 1 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _handleChildBackToHome,
       ),
       TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _handleChildBackToHome,
       ),
       TvLibraryScreen(
         title: 'Favorit',
@@ -239,17 +257,17 @@ class _TvAppState extends State<TvApp> {
         favorites: true,
         focusTicket: _index == 3 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _handleChildBackToHome,
       ),
       TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
         onMoveToNav: _focusCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _handleChildBackToHome,
       ),
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,
         onMoveToNav: _focusCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _handleChildBackToHome,
       ),
     ];
   }

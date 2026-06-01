@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
+import '../focus/tv_back_router.dart';
 import '../utils/tv_focus_utils.dart';
 import '../widgets/tv_focused_border.dart';
 
@@ -20,7 +21,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   late final FocusNode _backNode;
   late final FocusNode _stayNode;
   late final FocusNode _saveNode;
-
+  final TvBackRouter _backRouter = const TvBackRouter();
 
   int _lastIndex = 0;
   int _expandedIndex = -1;
@@ -248,6 +249,29 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     Navigator.of(context).maybePop();
   }
 
+  void _handleBack() {
+    final action = _backRouter.resolveSourceManagerBack(
+      confirmOpen: _confirmOpen,
+      panelOpen: _expandedIndex >= 0,
+    );
+    switch (action) {
+      case TvBackAction.closeDialog:
+        _closeConfirm();
+        return;
+      case TvBackAction.closePanel:
+        _collapseSource(_expandedIndex);
+        return;
+      case TvBackAction.exitLocalScreen:
+        _requestExit();
+        return;
+      case TvBackAction.none:
+      case TvBackAction.focusNavbar:
+      case TvBackAction.goHomeBanner:
+      case TvBackAction.showExitDialog:
+        return;
+    }
+  }
+
   KeyEventResult _confirmKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
@@ -282,7 +306,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (_isSelect(key) || _isBack(key)) {
-      _requestExit();
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -330,7 +354,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _collapseSource(index);
+        _handleBack();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -366,7 +390,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _collapseSource(index);
+        _handleBack();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -411,11 +435,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      if (expanded) {
-        _collapseSource(index);
-      } else {
-        _requestExit();
-      }
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -474,13 +494,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       child: Actions(
         actions: <Type, Action<Intent>>{
           _TvSourceBackIntent: CallbackAction<_TvSourceBackIntent>(onInvoke: (_) {
-            if (_confirmOpen) {
-              _closeConfirm();
-            } else if (_expandedIndex >= 0) {
-              _collapseSource(_expandedIndex);
-            } else {
-              _requestExit();
-            }
+            _handleBack();
             return null;
           }),
         },
@@ -497,7 +511,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     _SourceHeader(
                       backNode: _backNode,
                       onBackKey: _backKey,
-                      onBack: _requestExit,
+                      onBack: _handleBack,
                       activeCount: LiveGoSettings.activePlatforms.length,
                       pingingSlug: _pingingSlug,
                     ),
