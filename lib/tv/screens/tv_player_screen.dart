@@ -24,7 +24,7 @@ class TvPlayerScreen extends StatefulWidget {
   State<TvPlayerScreen> createState() => _TvPlayerScreenState();
 }
 
-enum _TvPlayerMode { playback, controls, episodes, options }
+enum _TvPlayerMode { playback, controls, progress, episodes, options }
 
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
   VideoPlayerController? _controller;
@@ -39,6 +39,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _showControls = true;
   bool _episodePanelOpen = false;
   bool _qualityPanelOpen = false;
+  bool _returnToControlsAfterPanel = false;
+  bool _fitCover = false;
   int _episodeCursor = 1;
   int _controlCursor = 1;
   int _optionCursor = 0;
@@ -48,7 +50,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _autoAdvancing = false;
 
   static const List<String> _qualities = ['Auto', '480p', '720p', '1080p'];
-  static const int _controlCount = 8;
+  static const int _controlCount = 10;
+  DateTime? _lastBackHandledAt;
 
   @override
   void initState() {
@@ -314,7 +317,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _cancelControlAutoHide();
     _controlHideTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
-      if (_mode == _TvPlayerMode.controls &&
+      if ((_mode == _TvPlayerMode.controls || _mode == _TvPlayerMode.progress) &&
           _showControls &&
           !_episodePanelOpen &&
           !_qualityPanelOpen) {
@@ -335,13 +338,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _scheduleControlAutoHide();
   }
 
-  void _openEpisodePanel() {
+  void _openEpisodePanel({bool returnToControls = false}) {
     _cancelControlAutoHide();
     setState(() {
       _mode = _TvPlayerMode.episodes;
       _episodePanelOpen = true;
       _qualityPanelOpen = false;
-      _showControls = true;
+      _showControls = false;
+      _returnToControlsAfterPanel = returnToControls;
       _episodeCursor = _episode;
     });
   }
@@ -353,12 +357,25 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _qualityPanelOpen = true;
       _episodePanelOpen = false;
       _showControls = true;
+      _returnToControlsAfterPanel = true;
     });
   }
 
-  void _openControls() {
+  void _openControls({int? focusIndex}) {
     setState(() {
       _mode = _TvPlayerMode.controls;
+      _showControls = true;
+      _episodePanelOpen = false;
+      _qualityPanelOpen = false;
+      _returnToControlsAfterPanel = false;
+      if (focusIndex != null) _controlCursor = focusIndex.clamp(0, _controlCount - 1).toInt();
+    });
+    _scheduleControlAutoHide();
+  }
+
+  void _focusProgressBar() {
+    setState(() {
+      _mode = _TvPlayerMode.progress;
       _showControls = true;
       _episodePanelOpen = false;
       _qualityPanelOpen = false;
@@ -366,14 +383,19 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _scheduleControlAutoHide();
   }
 
-  void _closePanelToControls() {
-    setState(() {
-      _mode = _TvPlayerMode.controls;
-      _episodePanelOpen = false;
-      _qualityPanelOpen = false;
-      _showControls = true;
-    });
-    _scheduleControlAutoHide();
+  void _closePanel() {
+    if (_returnToControlsAfterPanel || _qualityPanelOpen) {
+      setState(() {
+        _mode = _TvPlayerMode.controls;
+        _episodePanelOpen = false;
+        _qualityPanelOpen = false;
+        _showControls = true;
+        _returnToControlsAfterPanel = false;
+      });
+      _scheduleControlAutoHide();
+      return;
+    }
+    _hideAllOverlays();
   }
 
   void _hideAllOverlays() {
@@ -383,6 +405,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _episodePanelOpen = false;
       _qualityPanelOpen = false;
       _showControls = false;
+      _returnToControlsAfterPanel = false;
     });
   }
 
@@ -426,16 +449,26 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     PlayerPreferences.setSubtitle(enabled: next);
   }
 
+  Future<void> _toggleFavorite() async {
+    await LiveGoLocalStore.toggleFavorite(_detail ?? widget.item);
+    if (mounted) setState(() {});
+  }
+
+  void _cycleFit() {
+    setState(() => _fitCover = !_fitCover);
+    _scheduleControlAutoHide();
+  }
+
   void _activateControl() {
     switch (_controlCursor) {
       case 0:
-        _seekRelative(const Duration(seconds: -10));
-        break;
+        if (_episode > 1) _selectEpisode(_episode - 1);
+        return;
       case 1:
         _toggle();
         break;
       case 2:
-        _openEpisodePanel();
+        _openEpisodePanel(returnToControls: true);
         return;
       case 3:
         _toggleSubtitle();
@@ -444,16 +477,23 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _openQualityPanel();
         return;
       case 5:
-        _changeSpeed(0.25);
+        _cycleFit();
         break;
       case 6:
+        final total = _episodeTotal(_detail ?? widget.item);
+        if (_episode < total) _selectEpisode(_episode + 1);
+        return;
+      case 7:
         _toggleAudio();
         break;
-      case 7:
+      case 8:
+        unawaited(_toggleFavorite());
+        break;
+      case 9:
         _openQualityPanel();
         return;
     }
-    if (_mode == _TvPlayerMode.controls) {
+    if (_mode == _TvPlayerMode.controls || _mode == _TvPlayerMode.progress) {
       _scheduleControlAutoHide();
     }
   }
@@ -470,6 +510,29 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
   }
 
+  void _handleBackAction() {
+    final now = DateTime.now();
+    final last = _lastBackHandledAt;
+    if (last != null && now.difference(last).inMilliseconds < 280) return;
+    _lastBackHandledAt = now;
+
+    if (_episodePanelOpen || _qualityPanelOpen ||
+        _mode == _TvPlayerMode.episodes ||
+        _mode == _TvPlayerMode.options) {
+      _closePanel();
+      return;
+    }
+
+    if (_mode == _TvPlayerMode.progress || _mode == _TvPlayerMode.controls || _showControls) {
+      _hideAllOverlays();
+      return;
+    }
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
   KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -478,23 +541,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final item = _detail ?? widget.item;
 
     if (_isBack(key)) {
-      // TV player back is layered:
-      // options/episodes -> controls -> clean playback -> exit.
-      final controlsVisible = _showControls ||
-          _mode == _TvPlayerMode.controls ||
-          _mode == _TvPlayerMode.episodes ||
-          _mode == _TvPlayerMode.options ||
-          _episodePanelOpen ||
-          _qualityPanelOpen;
-      if (_episodePanelOpen || _qualityPanelOpen ||
-          _mode == _TvPlayerMode.episodes ||
-          _mode == _TvPlayerMode.options) {
-        _closePanelToControls();
-      } else if (controlsVisible) {
-        _hideAllOverlays();
-      } else if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
+      _handleBackAction();
       return KeyEventResult.handled;
     }
 
@@ -554,6 +601,33 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
+    if (_mode == _TvPlayerMode.progress) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _seekRelative(const Duration(seconds: -10));
+        _scheduleControlAutoHide();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _seekRelative(const Duration(seconds: 10));
+        _scheduleControlAutoHide();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _openControls();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _scheduleControlAutoHide();
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _toggle();
+        _scheduleControlAutoHide();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
+    }
+
     if (_mode == _TvPlayerMode.controls) {
       if (key == LogicalKeyboardKey.arrowLeft) {
         _moveControl(-1);
@@ -564,12 +638,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
-        _openEpisodePanel();
+        // In control mode DOWN must not open episode list. It stays in player navbar.
+        _scheduleControlAutoHide();
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _showControls = true);
-        _scheduleControlAutoHide();
+        _focusProgressBar();
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -579,7 +653,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
-    // Playback mode: arrows are direct media actions unless UP enters the control bar.
+    // Playback mode: clean video. Arrows are media actions.
     if (_isSelect(key)) {
       _toggle();
       return KeyEventResult.handled;
@@ -601,7 +675,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowDown) {
-      _openEpisodePanel();
+      _openEpisodePanel(returnToControls: false);
       return KeyEventResult.handled;
     }
 
@@ -625,7 +699,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final size = controller.value.size;
     final portrait = size.height > size.width;
     final video = FittedBox(
-      fit: BoxFit.contain,
+      fit: _fitCover ? BoxFit.cover : BoxFit.contain,
       child: SizedBox(
         width: size.width,
         height: size.height,
@@ -679,11 +753,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
 
-    return Focus(
-      autofocus: true,
-      skipTraversal: true,
-      onKeyEvent: _handleRemoteKey,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _handleBackAction();
+      },
+      child: Focus(
+        autofocus: true,
+        skipTraversal: true,
+        onKeyEvent: _handleRemoteKey,
+        child: Scaffold(
         backgroundColor: AppTheme.bg,
         body: Stack(
           fit: StackFit.expand,
@@ -720,7 +799,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 speed: _speed,
                 audioTrack: _audioTrack
               ),
-            if (ready && (_mode == _TvPlayerMode.controls || _episodePanelOpen || _qualityPanelOpen))
+            if (ready && _showControls && !_episodePanelOpen &&
+                (_mode == _TvPlayerMode.controls || _mode == _TvPlayerMode.progress || _mode == _TvPlayerMode.options))
               Positioned(
                 left: 46,
                 right: _episodePanelOpen ? 430 : 46,
@@ -732,6 +812,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   quality: LiveGoSettings.quality,
                   audioTrack: _audioTrack,
                   focusedIndex: _controlCursor,
+                  progressFocused: _mode == _TvPlayerMode.progress,
+                  fitCover: _fitCover,
+                  favorite: LiveGoLocalStore.isFavorite(item),
                 ),
               ),
             if (_episodePanelOpen)
@@ -755,7 +838,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -823,6 +907,9 @@ class _PlayerControlDock extends StatelessWidget {
   final String quality;
   final String audioTrack;
   final int focusedIndex;
+  final bool progressFocused;
+  final bool fitCover;
+  final bool favorite;
 
   const _PlayerControlDock({
     required this.controller,
@@ -831,6 +918,9 @@ class _PlayerControlDock extends StatelessWidget {
     required this.quality,
     required this.audioTrack,
     required this.focusedIndex,
+    required this.progressFocused,
+    required this.fitCover,
+    required this.favorite,
   });
 
   String _fmt(Duration d) {
@@ -859,13 +949,27 @@ class _PlayerControlDock extends StatelessWidget {
               Text(_fmt(value.position), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               const SizedBox(width: 18),
               Expanded(
-                child: VideoProgressIndicator(
-                  controller,
-                  allowScrubbing: false,
-                  colors: const VideoProgressColors(
-                    playedColor: AppTheme.cyan,
-                    bufferedColor: AppTheme.whiteGlow,
-                    backgroundColor: AppTheme.borderSoft,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 90),
+                  padding: EdgeInsets.all(progressFocused ? 5 : 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: progressFocused ? AppTheme.cyan : Colors.transparent,
+                      width: progressFocused ? 2 : 1,
+                    ),
+                    boxShadow: progressFocused
+                        ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.25), blurRadius: 16)]
+                        : null,
+                  ),
+                  child: VideoProgressIndicator(
+                    controller,
+                    allowScrubbing: false,
+                    colors: const VideoProgressColors(
+                      playedColor: AppTheme.cyan,
+                      bufferedColor: AppTheme.whiteGlow,
+                      backgroundColor: AppTheme.borderSoft,
+                    ),
                   ),
                 ),
               ),
@@ -877,14 +981,16 @@ class _PlayerControlDock extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _DockButton(icon: Icons.replay_10_rounded, label: '-10', focused: focusedIndex == 0),
-              _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'OK', active: true, focused: focusedIndex == 1),
+              _DockButton(icon: Icons.skip_previous_rounded, label: 'PREV', focused: focusedIndex == 0),
+              _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'PLAY', active: true, focused: focusedIndex == 1),
               _DockButton(icon: Icons.video_library_rounded, label: 'EP', focused: focusedIndex == 2),
               _DockButton(icon: Icons.subtitles_rounded, label: 'SUB', focused: focusedIndex == 3),
               _DockTextButton(text: quality.toUpperCase(), focused: focusedIndex == 4),
-              _DockTextButton(text: '${speed.toStringAsFixed(2)}x', focused: focusedIndex == 5),
-              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack, focused: focusedIndex == 6),
-              _DockButton(icon: Icons.tune_rounded, label: 'MENU', focused: focusedIndex == 7),
+              _DockButton(icon: fitCover ? Icons.fullscreen_exit_rounded : Icons.fit_screen_rounded, label: fitCover ? 'COVER' : 'FIT', focused: focusedIndex == 5),
+              _DockButton(icon: Icons.skip_next_rounded, label: 'NEXT', focused: focusedIndex == 6),
+              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack, focused: focusedIndex == 7),
+              _DockButton(icon: favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, label: 'FAV', active: favorite, focused: focusedIndex == 8),
+              _DockButton(icon: Icons.tune_rounded, label: 'MORE', focused: focusedIndex == 9),
             ],
           ),
         ],
@@ -962,6 +1068,12 @@ class _EpisodeSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalSafe = total.clamp(1, 120).toInt();
+    final cursorSafe = cursor.clamp(1, totalSafe).toInt();
+    final cursorRow = (cursorSafe - 1) ~/ 5;
+    final firstRow = (cursorRow - 2).clamp(0, 1000).toInt();
+    final startEp = firstRow * 5 + 1;
+    final endEp = (startEp + 24).clamp(1, totalSafe).toInt();
+    final visibleCount = endEp - startEp + 1;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -984,7 +1096,7 @@ class _EpisodeSidePanel extends StatelessWidget {
           Expanded(
             child: GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: totalSafe,
+              itemCount: visibleCount,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 5,
                 crossAxisSpacing: 8,
@@ -992,7 +1104,7 @@ class _EpisodeSidePanel extends StatelessWidget {
                 childAspectRatio: 1.32,
               ),
               itemBuilder: (context, index) {
-                final ep = index + 1;
+                final ep = startEp + index;
                 return _EpisodeBox(ep: ep, selected: ep == selected, focused: ep == cursor);
               },
             ),
