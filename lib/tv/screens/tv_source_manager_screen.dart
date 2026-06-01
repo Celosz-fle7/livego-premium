@@ -30,6 +30,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   bool _categoryMode = false;
   bool _dirty = false;
   bool _confirmOpen = false;
+  static const int _backGuardMs = 360;
   int _lastBackHandledMs = 0;
   String? _pingingSlug;
 
@@ -226,10 +227,19 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     setState(() {});
   }
 
-  void _handleBack() {
+  void _markBackHandled() {
+    _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  bool _ignoreRepeatedBack() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 240) return;
+    if (now - _lastBackHandledMs < _backGuardMs) return true;
     _lastBackHandledMs = now;
+    return false;
+  }
+
+  void _handleBack() {
+    if (_ignoreRepeatedBack()) return;
 
     if (_confirmOpen) {
       _closeConfirm();
@@ -264,7 +274,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _saveAndExit() {
+    _markBackHandled();
     _dirty = false;
+    _confirmOpen = false;
     Navigator.of(context).pop();
   }
 
@@ -288,7 +300,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _handleBack();
+      _markBackHandled();
+      _closeConfirm();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -560,7 +573,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'OK buka/tutup platform • ↓ ke ON/OFF • ↓ lagi ke kategori • Back tutup panel dulu',
+                      'OK buka/tutup platform • ↓ ON/OFF • ↓ kategori • BACK tutup panel dulu',
                       style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                     ),
                   ],
