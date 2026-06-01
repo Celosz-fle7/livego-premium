@@ -427,12 +427,12 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'Default aman API Anichin.',
-      'netshort': 'Source API Anichin aktif.',
-      'pinedrama': 'Source API Anichin aktif.',
-      'dramabox': 'Source API Anichin aktif.',
-      'flickreels': 'Source API Anichin aktif.',
-      'melolo': 'Source API Anichin opsional, belum default karena DRM.',
+      'shortmax': 'MP4 multi-quality. Aman untuk player native.',
+      'netshort': 'Direct CDN + subtitle VTT. Aktif, bahasa default IN.',
+      'pinedrama': 'Direct MP4. Aman untuk player native.',
+      'dramabox': 'HLS signed dari all episode. Aktif, list bisa lebih lambat.',
+      'flickreels': 'HLS signed dari episode/all episode. Aktif.',
+      'melolo': 'Opsional. Catalog/search jalan, video CENC belum dipasang di player native.',
     };    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 }

@@ -19,6 +19,15 @@ class AnichinApiClient {
     'pinedrama': 'pinedrama',
   };
 
+  // Contract from API-DRACIN summary:
+  // - ShortMax, NetShort, PineDrama and FlickReels expose playable /episode.
+  // - DramaBox exposes signed HLS primarily from /allepisode.
+  // - Melolo is encrypted CENC; keep it supported for catalog/search, but do
+  //   not send its encrypted MP4 to the native player until decrypt/player work
+  //   is implemented.
+  static const Set<String> _allEpisodeStreamOnly = {'dramabox'};
+  static const Set<String> _encryptedVideoOnly = {'melolo'};
+
   static const List<String> supportedPlatforms = [
     'shortmax',
     'netshort',
@@ -59,6 +68,13 @@ class AnichinApiClient {
   }) async {
     final slug = _apiSlug(platform);
     final apiLang = _providerLang(slug, lang);
+
+    // Melolo does not expose /foryou in the API summary; trending is documented
+    // as the same feed family, so keep catalog browsing alive without 404 spam.
+    if (slug == 'melolo') {
+      return home(platform: platform, lang: apiLang);
+    }
+
     final json = await _getJson('/api/$slug/foryou', {
       'page': '$page',
       'lang': apiLang,
@@ -75,8 +91,9 @@ class AnichinApiClient {
     final slug = _apiSlug(platform);
     final apiLang = _providerLang(slug, lang);
     final key = collection.toLowerCase().replaceAll(' ', '');
-    final json = await _getJson('/api/$slug/$key', {
-      if (key == 'foryou') 'page': '$page',
+    final path = _collectionPath(slug, key);
+    final json = await _getJson(path, {
+      if (path.endsWith('/foryou')) 'page': '$page',
       'lang': apiLang,
     });
     return _parseItems(json, platform: platform, lang: apiLang);
@@ -228,13 +245,12 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
-    // Provider-aware route based on the Anichin endpoint contract and Termux
-    // checks:
-    // - ShortMax/PineDrama/FlickReels expose playable streams from /episode.
-    // - DramaBox exposes playable signed hlsUrl in /allepisode.
-    // - NetShort can return an empty body when upstream is unavailable, so keep
-    //   the player safe and return StreamInfo.empty instead of crashing.
-    if (slug == 'dramabox') {
+    if (_encryptedVideoOnly.contains(slug)) {
+      print('ANICHIN VIDEO UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
+      return StreamInfo.empty;
+    }
+
+    if (_allEpisodeStreamOnly.contains(slug)) {
       final stream = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang);
       if (stream.url.isNotEmpty) return stream;
       return StreamInfo.empty;
@@ -272,6 +288,21 @@ class AnichinApiClient {
       if (_qualityParam.isNotEmpty) 'q': _qualityParam,
     };
 
+    if (_encryptedVideoOnly.contains(slug)) {
+      print('ANICHIN FAST EP UNSUPPORTED $slug ep=$ep: encrypted CENC/player endpoint not wired yet');
+      return StreamInfo.empty;
+    }
+
+    if (_allEpisodeStreamOnly.contains(slug)) {
+      try {
+        return await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang)
+            .timeout(timeout, onTimeout: () => StreamInfo.empty);
+      } catch (e) {
+        print('ANICHIN FAST ALLEP STREAM EMPTY $slug ep=$ep: $e');
+        return StreamInfo.empty;
+      }
+    }
+
     try {
       final json = await _getJson('/api/$slug/episode', query).timeout(timeout);
       if (json.isEmpty) return StreamInfo.empty;
@@ -288,36 +319,8 @@ class AnichinApiClient {
     required int ep,
     required String slug,
     required String lang,
-  }) async {
-    final data = _dataMap(json);
-    final streamData = _streamData(data);
-    final url = _normalizePlayableUrl(_extractUrl(streamData));
-    if (url.isEmpty) return StreamInfo.empty;
-
-    final total = _parseInt(
-      streamData['totalEpisodes'] ??
-          streamData['total_episodes'] ??
-          streamData['episodes'] ??
-          item.episodes,
-      fallback: item.episodes <= 0 ? 1 : item.episodes,
-    );
-
-    return StreamInfo(
-      url: url,
-      episodeIndex: _parseInt(
-        streamData['episode_index'] ?? streamData['episodeIndex'] ?? streamData['ep'] ?? ep,
-        fallback: ep,
-      ),
-      totalEpisodes: total <= 0 ? (item.episodes <= 0 ? 1 : item.episodes) : total,
-      nextEpisodeId: ep < (total <= 0 ? item.episodes : total) ? '${ep + 1}' : '0',
-      prevEpisodeId: ep > 1 ? '${ep - 1}' : '0',
-      headers: const <String, String>{
-        'User-Agent': 'okhttp/4.12.0',
-        'Accept': '*/*',
-      },
-      subtitles: const <SubtitleTrack>[],
-      qualities: _extractQualities(streamData),
-    );
+  }) {
+    return _parseStream(json, item: item, ep: ep, slug: slug, lang: lang);
   }
 
   static Future<StreamInfo> _streamFromEpisodeEndpoint(
@@ -381,6 +384,22 @@ class AnichinApiClient {
         return 'en';
     }
     return requested.trim().isEmpty ? 'id' : requested.trim();
+  }
+
+  static String _collectionPath(String slug, String key) {
+    if (key == 'foryou') {
+      if (slug == 'melolo') return '/api/melolo/trending';
+      return '/api/$slug/foryou';
+    }
+
+    if (slug == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
+      return '/api/dramabox/$key';
+    }
+
+    // The remaining named categories in LiveGo are UI filters. API-DRACIN only
+    // documents explicit category IDs for PineDrama, not names, so use trending
+    // instead of constructing invalid routes.
+    return '/api/$slug/trending';
   }
 
   static String _searchParam(String slug) {

@@ -115,18 +115,15 @@ class LiveGoCatalog {
 
     try {
       List<ContentItem> rows = const <ContentItem>[];
-      if (key == 'foryou') {
-        rows = await AnichinApiClient.discover(platform: platform, lang: lang)
+      if (key == 'trending' || key.isEmpty || key == 'home') {
+        rows = await AnichinApiClient.home(platform: platform, lang: lang)
             .timeout(const Duration(seconds: 12));
-      } else if (platform == 'dramabox' && (key == 'latest' || key == 'vip' || key == 'dubindo')) {
+      } else {
         rows = await AnichinApiClient.collection(
           platform: platform,
           collection: key,
           lang: lang,
         ).timeout(const Duration(seconds: 12));
-      } else {
-        rows = await AnichinApiClient.home(platform: platform, lang: lang)
-            .timeout(const Duration(seconds: 12));
       }
 
       if (rows.isNotEmpty) {
