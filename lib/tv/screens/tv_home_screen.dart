@@ -146,6 +146,43 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _handleBack() {
     _cancelPendingFocus();
+
+    // Back on TV must move one logical layer at a time.
+    // Grid -> Category -> Platform -> Navbar.
+    // This keeps the last platform/category/grid position intact so RIGHT
+    // from the navbar can return to the same content area.
+    if (_zone == TvZone.grid) {
+      if (_categoryNodes.isNotEmpty &&
+          _focusByZone(TvZone.category, index: _lastCategory)) {
+        return;
+      }
+      if (_platformNodes.isNotEmpty &&
+          _focusByZone(TvZone.platform, index: _lastPlatform)) {
+        return;
+      }
+      _moveToNav(TvZone.grid, grid: _lastGrid);
+      return;
+    }
+
+    if (_zone == TvZone.category) {
+      if (_platformNodes.isNotEmpty &&
+          _focusByZone(TvZone.platform, index: _lastPlatform)) {
+        return;
+      }
+      _moveToNav(TvZone.category, category: _lastCategory);
+      return;
+    }
+
+    if (_zone == TvZone.platform) {
+      _moveToNav(TvZone.platform, platform: _lastPlatform);
+      return;
+    }
+
+    if (_zone == TvZone.banner) {
+      _moveToNav(TvZone.banner);
+      return;
+    }
+
     _moveToNav(_zone);
   }
 

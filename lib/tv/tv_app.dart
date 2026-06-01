@@ -27,6 +27,7 @@ class _TvAppState extends State<TvApp> {
   int _placeholderTicket = 0;
 
   bool _exitDialogOpen = false;
+  int _lastBackHandledMs = 0;
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;
@@ -137,6 +138,12 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _handleBack() {
+    // Android TV can deliver the same Back press through both Shortcuts
+    // and PopScope. Guard it so one physical press produces one action.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < 240) return;
+    _lastBackHandledMs = now;
+
     if (_exitDialogOpen) {
       _closeExitDialog();
       return;
