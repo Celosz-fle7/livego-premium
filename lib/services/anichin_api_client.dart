@@ -220,22 +220,41 @@ class AnichinApiClient {
       return StreamInfo.empty;
     }
 
-    // Jangan anggap semua platform sama. DramaBox paling stabil dari
-    // /allepisode karena response-nya memang membawa hlsUrl signed. Platform
-    // lain dicoba dari /episode dulu, lalu fallback ke /allepisode dan /detail.
-    final attempts = <Future<StreamInfo> Function()>[];
-    if (config.streamFromAllEpisodes) {
-      attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang));
-      attempts.add(() => _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang));
-    } else {
-      attempts.add(() => _streamFromEpisodeEndpoint(item, query: query, ep: ep, slug: slug, lang: apiLang));
-      attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: apiLang));
-    }
-    attempts.add(() => _streamFromDetailEpisode(item, ep: ep, slug: slug, lang: apiLang));
+    Future<StreamInfo> resolveWithLang(String lang) async {
+      final q = <String, String>{
+        'id': playableId,
+        'ep': '$ep',
+        'lang': lang,
+        if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+      };
 
-    for (final attempt in attempts) {
-      final stream = await attempt();
-      if (stream.url.isNotEmpty) return stream;
+      // Jangan anggap semua platform sama. DramaBox paling stabil dari
+      // /allepisode karena response-nya memang membawa hlsUrl signed. FlickReels
+      // dicoba dari /episode dulu, lalu /allepisode sebagai fallback.
+      final attempts = <Future<StreamInfo> Function()>[];
+      if (config.streamFromAllEpisodes) {
+        attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: lang));
+        attempts.add(() => _streamFromEpisodeEndpoint(item, query: q, ep: ep, slug: slug, lang: lang));
+      } else {
+        attempts.add(() => _streamFromEpisodeEndpoint(item, query: q, ep: ep, slug: slug, lang: lang));
+        attempts.add(() => _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: lang));
+      }
+      attempts.add(() => _streamFromDetailEpisode(item, ep: ep, slug: slug, lang: lang));
+
+      for (final attempt in attempts) {
+        final stream = await attempt();
+        if (stream.url.isNotEmpty) return stream;
+      }
+      return StreamInfo.empty;
+    }
+
+    final stream = await resolveWithLang(apiLang);
+    if (stream.url.isNotEmpty) return stream;
+
+    final fallbackLang = _fallbackStreamLang(slug, apiLang);
+    if (fallbackLang != apiLang) {
+      final fallback = await resolveWithLang(fallbackLang);
+      if (fallback.url.isNotEmpty) return fallback;
     }
 
     return StreamInfo.empty;
@@ -298,6 +317,30 @@ class AnichinApiClient {
     for (final attempt in attempts) {
       final stream = await attempt();
       if (stream.url.isNotEmpty) return stream;
+    }
+
+    final fallbackLang = _fallbackStreamLang(slug, apiLang);
+    if (fallbackLang != apiLang) {
+      final fallbackQuery = <String, String>{
+        'id': playableId,
+        'ep': '$ep',
+        'lang': fallbackLang,
+        if (_qualityParam.isNotEmpty) 'q': _qualityParam,
+      };
+      try {
+        final json = await _getJson(ApiEndpoints.episode(slug), fallbackQuery).timeout(timeout);
+        final stream = await _parseFastStream(json, item: item, ep: ep, slug: slug, lang: fallbackLang);
+        if (stream.url.isNotEmpty) return stream;
+      } catch (e) {
+        print('ANICHIN FAST FALLBACK LANG EP EMPTY $slug ep=$ep lang=$fallbackLang: $e');
+      }
+      try {
+        final stream = await _streamFromAllEpisodes(item, ep: ep, slug: slug, lang: fallbackLang)
+            .timeout(timeout, onTimeout: () => StreamInfo.empty);
+        if (stream.url.isNotEmpty) return stream;
+      } catch (e) {
+        print('ANICHIN FAST FALLBACK LANG ALL EMPTY $slug ep=$ep lang=$fallbackLang: $e');
+      }
     }
 
     return StreamInfo.empty;
@@ -389,6 +432,14 @@ class AnichinApiClient {
     return parsed == null || parsed <= 0 ? 1 : parsed;
   }
 
+
+  static String _fallbackStreamLang(String slug, String current) {
+    final config = LiveGoApiPlatforms.bySlug(slug);
+    if (slug == 'netshort' && current != 'in' && config.supportedLangs.contains('in')) return 'in';
+    if (current != 'id' && config.supportedLangs.contains('id')) return 'id';
+    if (current != 'en' && config.supportedLangs.contains('en')) return 'en';
+    return current;
+  }
 
   static String _providerLang(String slug, String requested) {
     return LiveGoApiPlatforms.langFor(slug, requested);

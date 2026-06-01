@@ -94,7 +94,6 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['en', 'ar', 'zh', 'de', 'fr', 'id', 'it', 'ja', 'ko', 'es', 'pt', 'th', 'tr'],
       enabledByDefault: true,
-      streamFromAllEpisodes: true,
       categories: ['Trending', 'For You'],
     ),
     LiveGoApiPlatform(
