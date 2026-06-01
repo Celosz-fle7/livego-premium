@@ -23,7 +23,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
 
   int _lastIndex = 0;
-  int _expandedIndex = 0;
+  int _expandedIndex = -1;
   int _categoryIndex = 0;
   int _optionIndex = 0;
   bool _optionMode = false;
@@ -105,23 +105,35 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     tvFocus(_backNode, alignment: 0.04);
   }
 
+  bool _isExpanded(int index) => _expandedIndex == index;
+
   void _focusSource(int index, {bool optionMode = false, bool categoryMode = false}) {
     if (_sourceNodes.isEmpty) return;
     _lastIndex = _safeSource(index);
-    _expandedIndex = _lastIndex;
     final active = LiveGoSettings.isPlatformActive(_platforms[_lastIndex]);
-    _categoryMode = categoryMode && active;
-    _optionMode = optionMode && !_categoryMode;
+    final expanded = _isExpanded(_lastIndex);
+    _categoryMode = expanded && categoryMode && active;
+    _optionMode = expanded && optionMode && !_categoryMode;
     final cats = _allCategoriesFor(_platforms[_lastIndex]);
     if (_categoryIndex >= cats.length) _categoryIndex = cats.length - 1;
     if (_categoryIndex < 0) _categoryIndex = 0;
     tvFocus(_sourceNodes[_lastIndex], alignment: 0.22);
+    if (mounted) setState(() {});
   }
 
-  void _focusOption(int index) {
+  void _expandSource(int index, {bool optionMode = false, bool categoryMode = false}) {
     final safe = _safeSource(index);
+    _expandedIndex = safe;
     _optionIndex = LiveGoSettings.isPlatformActive(_platforms[safe]) ? 0 : 1;
-    _focusSource(safe, optionMode: true);
+    _focusSource(safe, optionMode: optionMode, categoryMode: categoryMode);
+  }
+
+  void _collapseSource(int index) {
+    final safe = _safeSource(index);
+    if (_expandedIndex == safe) _expandedIndex = -1;
+    _optionMode = false;
+    _categoryMode = false;
+    _focusSource(safe);
   }
 
   Future<void> _autoPingOnce() async {
@@ -281,8 +293,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final key = event.logicalKey;
     final allCategories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);
+    final expanded = _isExpanded(index);
 
-    if (_optionMode && _expandedIndex == index) {
+    if (_optionMode && expanded) {
       if (key == LogicalKeyboardKey.arrowLeft) {
         _optionIndex = 0;
         setState(() {});
@@ -306,7 +319,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           _focusSource(index, categoryMode: true);
         } else {
           _optionMode = false;
-          _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+          _focusSource(index);
         }
         return KeyEventResult.handled;
       }
@@ -317,14 +330,13 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _optionMode = false;
-        _focusSource(index);
+        _collapseSource(index);
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
     }
 
-    if (_categoryMode && _expandedIndex == index) {
+    if (_categoryMode && expanded) {
       if (key == LogicalKeyboardKey.arrowLeft) {
         _categoryIndex = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
         setState(() {});
@@ -345,7 +357,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       if (key == LogicalKeyboardKey.arrowDown) {
         _categoryMode = false;
-        _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+        _focusSource(index);
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -354,9 +366,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _categoryMode = false;
-        _optionIndex = active ? 0 : 1;
-        _focusSource(index, optionMode: true);
+        _collapseSource(index);
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -371,19 +381,41 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+      if (expanded) {
+        _optionIndex = active ? 0 : 1;
+        _focusSource(index, optionMode: true);
+      } else {
+        _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       _focusBack();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
-      _focusOption(index);
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (expanded) {
+        _optionIndex = active ? 0 : 1;
+        _focusSource(index, optionMode: true);
+      } else {
+        _expandSource(index);
+      }
+      return KeyEventResult.handled;
+    }
+    if (_isSelect(key)) {
+      if (expanded) {
+        _collapseSource(index);
+      } else {
+        _expandSource(index);
+      }
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _requestExit();
+      if (expanded) {
+        _collapseSource(index);
+      } else {
+        _requestExit();
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -444,13 +476,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           _TvSourceBackIntent: CallbackAction<_TvSourceBackIntent>(onInvoke: (_) {
             if (_confirmOpen) {
               _closeConfirm();
-            } else if (_categoryMode) {
-              _categoryMode = false;
-              _optionIndex = LiveGoSettings.isPlatformActive(_platforms[_lastIndex]) ? 0 : 1;
-              _focusSource(_lastIndex, optionMode: true);
-            } else if (_optionMode) {
-              _optionMode = false;
-              _focusSource(_lastIndex);
+            } else if (_expandedIndex >= 0) {
+              _collapseSource(_expandedIndex);
             } else {
               _requestExit();
             }
@@ -506,7 +533,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                               categoryMode: _categoryMode && _expandedIndex == i,
                               categoryIndex: _categoryIndex,
                               onKey: (node, event) => _sourceKey(i, _platforms[i], event),
-                              onTap: () => _focusOption(i),
+                              onTap: () => _isExpanded(i) ? _collapseSource(i) : _expandSource(i),
                               isLast: i == _platforms.length - 1,
                             ),
                         ],
@@ -514,7 +541,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'OK/→ buka ON-OFF • ↓ masuk kategori • OK kategori tampil/sembunyi • Back tutup langkah dulu',
+                      'OK buka/tutup platform • ↓ ke ON/OFF • ↓ lagi ke kategori • Back tutup panel dulu',
                       style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -931,7 +958,7 @@ class _ConfirmSaveOverlay extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _DialogButton(node: stayNode, text: 'Tetap di sini', onKey: onKey, onTap: onStay),
+                _DialogButton(node: stayNode, text: 'Batal', onKey: onKey, onTap: onStay),
                 const SizedBox(width: 14),
                 _DialogButton(node: saveNode, text: 'Simpan & Keluar', onKey: onKey, onTap: onSave, filled: true),
               ],
