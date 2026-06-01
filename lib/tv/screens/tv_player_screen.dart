@@ -14,9 +14,9 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
-import '../../services/anichin_api_client.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
+import '../../services/player/playback_resolver.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -180,7 +180,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     try {
       debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep');
       final started = DateTime.now();
-      var stream = await AnichinApiClient.fastEpisodeStream(
+      var stream = await PlaybackResolver.fastStreamInfo(
         playable,
         chapterId: '$ep',
         timeout: const Duration(seconds: 12),

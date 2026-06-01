@@ -6,6 +6,7 @@ import '../services/cache/livego_content_cache.dart';
 import '../services/feed/feed_config.dart';
 import '../services/feed/feed_limiter.dart';
 import '../services/feed/feed_session_state.dart';
+import '../services/player/playback_resolver.dart';
 import '../models/livego_episode.dart';
 import 'mock_catalog.dart';
 
@@ -296,7 +297,7 @@ class LiveGoCatalog {
 
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
     try {
-      return await AnichinApiClient.videoInfo(item, chapterId: chapterId ?? item.chapterId);
+      return await PlaybackResolver.resolveStreamInfo(item, chapterId: chapterId ?? item.chapterId);
     } catch (e) {
       print('LIVEGO STREAM ERROR: $e');
       return StreamInfo.empty;
