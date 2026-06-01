@@ -8,7 +8,7 @@ import '../../core/app_theme.dart';
 import '../../services/image/image_quality_config.dart';
 
 class LiveGoImageCacheManager {
-  static const key = 'livegoPosterImageCache';
+  static const key = 'livegoPosterImageCacheV2';
 
   static final CacheManager instance = CacheManager(
     Config(
@@ -173,12 +173,19 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
   }
 
   String _stableCacheKey(String value) {
+    final clean = value.trim();
     try {
-      final uri = Uri.parse(value);
-      if (!uri.hasScheme || uri.host.isEmpty) return value;
-      return uri.replace(queryParameters: const {}).toString();
+      final uri = Uri.parse(clean);
+      if (!uri.hasScheme || uri.host.isEmpty) return clean;
+
+      // Dobda image proxy URLs commonly differ in query parameters only.
+      // The old key removed query params, so many different posters could share
+      // one cache entry and appear as the same image in Home/grid.
+      // Keep the full URL for correctness, but drop fragments because they do not
+      // identify the network resource.
+      return uri.removeFragment().toString();
     } catch (_) {
-      return value;
+      return clean;
     }
   }
 
