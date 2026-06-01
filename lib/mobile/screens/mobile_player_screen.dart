@@ -14,6 +14,7 @@ import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
+import '../../services/player/playback_timeout_config.dart';
 import '../../services/download/download_service.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
@@ -64,13 +65,13 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     // fetched fresh when an episode is played.
     try {
       final detail = _keepPlayableIdentity(
-        await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 8)),
+        await LiveGoCatalog.detail(widget.item).timeout(PlaybackTimeoutConfig.detailBackground),
       );
       final detailCount = detail.episodes;
       if (mounted && detailCount > 1 && detailCount != _knownEpisodeCount) {
         setState(() => _knownEpisodeCount = detailCount);
       }
-      final rows = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 12));
+      final rows = await LiveGoCatalog.episodes(detail).timeout(PlaybackTimeoutConfig.episodeListBackground);
       final count = rows.length > 1 ? rows.length : detailCount;
       if (!mounted || count <= 1) return;
       if (count != _knownEpisodeCount) {
@@ -102,87 +103,46 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
       lang: widget.item.lang,
     );
 
-    // Start stream + metadata in parallel, but do NOT block first playback on
-    // slow detail/allepisode. ShortMax /episode already returns videoUrl +
-    // qualityList, while detail/allepisode can be much slower and caused the
-    // first player open to wait ~20 seconds.
-    final streamFuture = LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode');
-    final detailFuture = LiveGoCatalog.detail(widget.item);
-
-    var stream = await streamFuture.timeout(
-      const Duration(seconds: 8),
+    // First playback must not wait for detail/allepisode. Tembak /episode
+    // singkat dulu; kalau kosong baru fallback normal. Metadata tetap di-warm
+    // lewat _warmEpisodeMetadata() dan tidak menahan video jalan.
+    var stream = await LiveGoCatalog.fastStreamInfo(
+      fastPlayable,
+      chapterId: '$requestedEpisode',
+      timeout: PlaybackTimeoutConfig.directEpisode,
+    ).timeout(
+      PlaybackTimeoutConfig.directEpisode,
       onTimeout: () => StreamInfo.empty,
     );
 
-    ContentItem detail = widget.item;
-    List<LiveGoEpisode> realEpisodes = const <LiveGoEpisode>[];
-    try {
-      detail = _keepPlayableIdentity(await detailFuture.timeout(const Duration(seconds: 4)));
-      if (detail.episodes > 1 && mounted && detail.episodes != _knownEpisodeCount) {
-        Future.microtask(() {
-          if (mounted) setState(() => _knownEpisodeCount = detail.episodes);
-        });
-      }
-      realEpisodes = await LiveGoCatalog.episodes(detail).timeout(const Duration(seconds: 4));
-    } catch (e) {
-      // Keep the fast stream path. Metadata/episode count can be refreshed on
-      // the next open; playback must not wait for it.
-      debugPrint('LIVEGO FAST PLAYER metadata skipped: $e');
-    }
-
-    final fallbackTotal = widget.item.episodes > 0
-        ? widget.item.episodes
-        : (detail.episodes > 0 ? detail.episodes : (stream.totalEpisodes > 1 ? stream.totalEpisodes : 1));
-    final safeIndex = requestedEpisode.clamp(1, realEpisodes.isEmpty ? fallbackTotal : realEpisodes.length);
-    final episodeId = realEpisodes.isEmpty ? '$safeIndex' : realEpisodes[safeIndex - 1].id;
-    final selected = ContentItem(
-      // Some providers return detail payloads with id=""; the player must keep
-      // the original Home/Search id so /episode?id=... receives a valid value.
-      id: detail.id.trim().isNotEmpty ? detail.id : widget.item.id,
-      title: detail.title.isNotEmpty ? detail.title : widget.item.title,
-      source: detail.source,
-      category: detail.category,
-      description: detail.description,
-      posterUrl: detail.posterUrl.isNotEmpty ? detail.posterUrl : widget.item.posterUrl,
-      backdropUrl: detail.backdropUrl.isNotEmpty ? detail.backdropUrl : widget.item.backdropUrl,
-      rating: detail.rating,
-      episodes: realEpisodes.isEmpty ? fallbackTotal : realEpisodes.length,
-      updated: detail.updated,
-      platformSlug: detail.platformSlug.isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
-      chapterId: episodeId,
-      lang: detail.lang.isNotEmpty ? detail.lang : widget.item.lang,
-    );
-
-    // If the fast direct /episode call failed, retry with selected metadata.
-    // Do not retry only because episodeId differs; for most providers ep is the
-    // episode number and the fast path is the correct first-play source.
     if (stream.url.isEmpty) {
-      stream = await LiveGoCatalog.streamInfo(selected, chapterId: episodeId)
-          .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
+      stream = await LiveGoCatalog.streamInfo(fastPlayable, chapterId: '$requestedEpisode')
+          .timeout(PlaybackTimeoutConfig.fallbackStream, onTimeout: () => StreamInfo.empty);
     }
 
-    final total = realEpisodes.isNotEmpty
-        ? realEpisodes.length
-        : (stream.totalEpisodes > selected.episodes ? stream.totalEpisodes : selected.episodes);
-    if (realEpisodes.length > 1 && mounted && _knownEpisodeCount != realEpisodes.length) {
+    final total = stream.totalEpisodes > widget.item.episodes
+        ? stream.totalEpisodes
+        : (widget.item.episodes <= 0 ? 1 : widget.item.episodes);
+    if (total > 1 && mounted && total != _knownEpisodeCount) {
       Future.microtask(() {
-        if (mounted) setState(() => _knownEpisodeCount = realEpisodes.length);
+        if (mounted) setState(() => _knownEpisodeCount = total);
       });
     }
+
     final playable = ContentItem(
-      id: selected.id,
-      title: selected.title,
-      source: selected.source,
-      category: selected.category,
-      description: selected.description,
-      posterUrl: selected.posterUrl,
-      backdropUrl: selected.backdropUrl,
-      rating: selected.rating,
-      episodes: total <= 0 ? 1 : total,
-      updated: selected.updated,
-      platformSlug: selected.platformSlug,
-      chapterId: episodeId,
-      lang: selected.lang,
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: total,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: '$requestedEpisode',
+      lang: widget.item.lang,
     );
     return _PlayerState(item: playable, stream: stream);
   }

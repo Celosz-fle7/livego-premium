@@ -16,6 +16,7 @@ import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
+import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_resolver.dart';
 
 class TvPlayerScreen extends StatefulWidget {
@@ -183,13 +184,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       var stream = await PlaybackResolver.fastStreamInfo(
         playable,
         chapterId: '$ep',
-        timeout: const Duration(seconds: 12),
+        timeout: PlaybackTimeoutConfig.directEpisode,
       );
       debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty}');
 
       if (stream.url.isEmpty) {
         stream = await LiveGoCatalog.streamInfo(playable, chapterId: '$ep')
-            .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty);
+            .timeout(PlaybackTimeoutConfig.fallbackStream, onTimeout: () => StreamInfo.empty);
       }
 
       if (stream.url.isEmpty) {
@@ -254,7 +255,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     });
 
     final initStart = DateTime.now();
-    await controller.initialize().timeout(const Duration(seconds: 16));
+    await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
     debugPrint('LIVEGO TV VIDEO INIT DONE ${DateTime.now().difference(initStart).inMilliseconds}ms');
     await controller.setPlaybackSpeed(_speed);
     await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
@@ -334,7 +335,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     await PlayerPreferences.setSubtitle(enabled: true, language: track.language);
 
     try {
-      final raw = await _fetchSubtitleText(track.url).timeout(const Duration(seconds: 8));
+      final raw = await _fetchSubtitleText(track.url).timeout(PlaybackTimeoutConfig.subtitleFetch);
       final cues = _parseSubtitle(raw);
       if (!mounted || _selectedSubtitleIndex != trackIndex) return;
       setState(() {
@@ -439,7 +440,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Future<void> _loadEpisodeListBackground(int ep, StreamInfo stream) async {
     try {
       final seed = _detail ?? _playableItem(ep);
-      final rows = await LiveGoCatalog.episodes(seed).timeout(const Duration(seconds: 24));
+      final rows = await LiveGoCatalog.episodes(seed).timeout(PlaybackTimeoutConfig.episodeListBackground);
       if (!mounted) return;
       final count = rows.length > 1
           ? rows.length
@@ -453,7 +454,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<void> _loadDetailBackground(int ep, StreamInfo stream) async {
     try {
-      final detail = await LiveGoCatalog.detail(widget.item).timeout(const Duration(seconds: 10));
+      final detail = await LiveGoCatalog.detail(widget.item).timeout(PlaybackTimeoutConfig.detailBackground);
       if (!mounted) return;
       setState(() => _detail = _safeDetail(detail, ep, stream));
       debugPrint('LIVEGO TV DETAIL BACKGROUND DONE');

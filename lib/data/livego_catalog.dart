@@ -304,6 +304,23 @@ class LiveGoCatalog {
     }
   }
 
+  static Future<StreamInfo> fastStreamInfo(
+    ContentItem item, {
+    String? chapterId,
+    Duration? timeout,
+  }) async {
+    try {
+      return await PlaybackResolver.fastStreamInfo(
+        item,
+        chapterId: chapterId ?? item.chapterId,
+        timeout: timeout ?? const Duration(seconds: 6),
+      );
+    } catch (e) {
+      print('LIVEGO FAST STREAM ERROR: $e');
+      return StreamInfo.empty;
+    }
+  }
+
   static Future<String> videoUrl(ContentItem item) async {
     final info = await streamInfo(item, chapterId: item.chapterId);
     return info.url;
