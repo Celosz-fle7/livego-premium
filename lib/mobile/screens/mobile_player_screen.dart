@@ -186,7 +186,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
         return Scaffold(
           backgroundColor: Colors.black,
           body: _PlayerSurface(
-              key: ValueKey('mobile-player-${stream.url}-$episode'),
+              key: ValueKey('mobile-player-${widget.item.id}'),
               item: item,
               loading: loading,
               stream: stream,
@@ -194,6 +194,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
               onBack: () => Navigator.pop(context),
               onEpisode: _selectEpisode,
               onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
+              onSkipBroken: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
             ),
         );
       },
@@ -209,6 +210,7 @@ class _PlayerSurface extends StatefulWidget {
   final VoidCallback onBack;
   final ValueChanged<int> onEpisode;
   final VoidCallback? onAutoNext;
+  final VoidCallback? onSkipBroken;
 
   const _PlayerSurface({
     super.key,
@@ -219,6 +221,7 @@ class _PlayerSurface extends StatefulWidget {
     required this.onBack,
     required this.onEpisode,
     required this.onAutoNext,
+    required this.onSkipBroken,
   });
 
   @override
@@ -229,6 +232,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   VideoPlayerController? _controller;
   Timer? _timer;
   Timer? _autoQualityTimer;
+  Timer? _errorSkipTimer;
   String _activeUrl = '';
   String _error = '';
   bool _controls = true;
@@ -237,6 +241,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   bool _fitCover = false;
   bool _landscape = false;
   bool _autoNextDone = false;
+  bool _autoSkipFailedDone = false;
+  bool _locked = false;
   String _quality = PlayerPreferences.quality;
   bool _subtitleEnabled = PlayerPreferences.subtitleEnabled;
   String _subtitleLanguage = PlayerPreferences.subtitleLanguage;
@@ -254,7 +260,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   void initState() {
     super.initState();
     _loadPreferences();
-    _openStream();
+    if (!widget.loading && widget.stream.url.isNotEmpty) {
+      _openStream();
+    } else {
+      _buffering = widget.loading;
+    }
     _startTimer();
   }
 
@@ -276,16 +286,20 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   @override
   void didUpdateWidget(covariant _PlayerSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.stream.url != widget.stream.url) _openStream();
+    if (!widget.loading && (oldWidget.loading || oldWidget.stream.url != widget.stream.url)) {
+      _openStream();
+    }
   }
 
   Future<void> _openStream() async {
     _autoQualityTimer?.cancel();
+    _errorSkipTimer?.cancel();
     await _controller?.dispose();
     _controller = null;
     _error = '';
     _buffering = true;
     _autoNextDone = false;
+    _autoSkipFailedDone = false;
     _activeUrl = '';
     if (mounted) setState(() {});
 
@@ -294,6 +308,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _error = 'Stream belum tersedia dari API.';
       _buffering = false;
       if (mounted) setState(() {});
+      _scheduleSkipBrokenEpisode();
       return;
     }
 
@@ -332,12 +347,24 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         }
       }
       if (autoplay) await controller.play();
+      _errorSkipTimer?.cancel();
       if (mounted) setState(() => _buffering = false);
     } catch (e) {
       _error = '$e';
       _buffering = false;
       if (mounted) setState(() {});
+      _scheduleSkipBrokenEpisode();
     }
+  }
+
+  void _scheduleSkipBrokenEpisode() {
+    if (_autoSkipFailedDone || widget.onSkipBroken == null) return;
+    _autoSkipFailedDone = true;
+    _errorSkipTimer?.cancel();
+    _errorSkipTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      widget.onSkipBroken?.call();
+    });
   }
 
   void _scheduleAutoQualityUpgrade() {
@@ -452,6 +479,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   Future<void> _toggleLandscape() async {
     _landscape = !_landscape;
+    if (!_landscape) _locked = false;
     if (_landscape) {
       _fitCover = false;
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -466,6 +494,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   Future<void> _togglePortraitFull() async {
     _fitCover = !_fitCover;
+    if (!_fitCover) _locked = false;
     if (_fitCover) {
       _landscape = false;
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -475,6 +504,18 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     }
     if (mounted) setState(() {});
     _showControls();
+  }
+
+  void _toggleLock() {
+    setState(() {
+      _locked = !_locked;
+      _controls = !_locked;
+    });
+    if (_locked) {
+      _timer?.cancel();
+    } else {
+      _startTimer();
+    }
   }
 
   Future<void> _downloadCurrentEpisode() async {
@@ -941,6 +982,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   void dispose() {
     _timer?.cancel();
     _autoQualityTimer?.cancel();
+    _errorSkipTimer?.cancel();
     _controller?.removeListener(_listen);
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -960,16 +1002,24 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final image = widget.item.backdropUrl.isNotEmpty ? widget.item.backdropUrl : widget.item.posterUrl;
 
     return PopScope(
-      canPop: !_controls,
+      canPop: !_controls && !_locked,
       onPopInvoked: (didPop) {
         if (didPop) return;
+        if (_locked) {
+          setState(() {
+            _locked = false;
+            _controls = true;
+          });
+          _startTimer();
+          return;
+        }
         if (_controls) {
           setState(() => _controls = false);
           _timer?.cancel();
         }
       },
       child: GestureDetector(
-        onTap: _toggleControls,
+        onTap: _locked ? null : _toggleControls,
         child: LayoutBuilder(
           builder: (context, box) {
             final screenW = box.maxWidth;
@@ -1030,13 +1080,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               children: [
                 videoLayer,
                 if (!ready) const DecoratedBox(decoration: BoxDecoration(color: Color(0x88000000))),
-                Row(
-                  children: [
-                    Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
-                    Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
-                    Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(true), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
-                  ],
-                ),
+                if (!_locked)
+                  Row(
+                    children: [
+                      Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(false), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                      Expanded(child: GestureDetector(onTap: _togglePlay, child: const SizedBox.expand())),
+                      Expanded(child: GestureDetector(onTap: () => _doubleTapSeek(true), onLongPressStart: (_) => _holdSpeed(true), onLongPressEnd: (_) => _holdSpeed(false), child: const SizedBox.expand())),
+                    ],
+                  ),
                 if (widget.loading || _buffering) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
                 if (_error.isNotEmpty) Center(child: Padding(padding: const EdgeInsets.all(18), child: Text(_error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)))),
                 if (_activeSubtitleText.isNotEmpty)
@@ -1048,12 +1099,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   ),
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 220),
-                  top: _controls ? 0 : -95,
+                  top: (_controls && !_locked) ? 0 : -95,
                   left: 0,
                   right: 0,
                   child: _TopOverlay(title: '${widget.item.title} - Eps ${widget.episode}', onBack: widget.onBack),
                 ),
-                if (_controls)
+                if (_controls && !_locked)
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1068,7 +1119,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   ),
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 220),
-                  bottom: _controls ? 22 : -190,
+                  bottom: (_controls && !_locked) ? 22 : -210,
                   left: 0,
                   right: 0,
                   child: _BottomOverlay(
@@ -1087,6 +1138,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                     onFit: _togglePortraitFull,
                   ),
                 ),
+                if (fullSurface)
+                  Positioned(
+                    right: 14,
+                    top: (screenH / 2) - 28,
+                    child: _LockButton(locked: _locked, onTap: _toggleLock),
+                  ),
               ],
             );
 
@@ -1105,6 +1162,78 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _WideSeekBar extends StatelessWidget {
+  final VideoPlayerController controller;
+  const _WideSeekBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<VideoPlayerValue>(
+      valueListenable: controller,
+      builder: (_, value, __) {
+        final durationMs = value.duration.inMilliseconds <= 0 ? 1 : value.duration.inMilliseconds;
+        final positionMs = value.position.inMilliseconds.clamp(0, durationMs).toDouble();
+        return Row(
+          children: [
+            SizedBox(
+              width: 44,
+              child: Text(_BottomOverlay._fmt(value.position), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+            Expanded(
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 7,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+                  activeTrackColor: AppTheme.cyan,
+                  inactiveTrackColor: Colors.white24,
+                  thumbColor: AppTheme.cyan,
+                  overlayColor: AppTheme.cyan.withOpacity(0.18),
+                ),
+                child: Slider(
+                  min: 0,
+                  max: durationMs.toDouble(),
+                  value: positionMs,
+                  onChanged: (v) => controller.seekTo(Duration(milliseconds: v.toInt())),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 44,
+              child: Text(_BottomOverlay._fmt(value.duration), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _LockButton extends StatelessWidget {
+  final bool locked;
+  final VoidCallback onTap;
+  const _LockButton({required this.locked, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.58),
+          shape: BoxShape.circle,
+          border: Border.all(color: locked ? AppTheme.cyan : Colors.white30, width: locked ? 2 : 1.2),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.38), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: Icon(locked ? Icons.lock_rounded : Icons.lock_open_rounded, color: locked ? AppTheme.cyan : Colors.white, size: 26),
       ),
     );
   }
@@ -1227,7 +1356,7 @@ class _BottomOverlay extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.72),
             borderRadius: BorderRadius.circular(22),
@@ -1238,47 +1367,25 @@ class _BottomOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (c != null && c.value.isInitialized)
-                Row(
-                  children: [
-                    Text(_fmt(c.value.position), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: SizedBox(
-                            height: 5,
-                            child: VideoProgressIndicator(
-                              c,
-                              allowScrubbing: true,
-                              padding: EdgeInsets.zero,
-                              colors: const VideoProgressColors(playedColor: AppTheme.cyan, bufferedColor: Colors.white30, backgroundColor: Colors.white12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Text(_fmt(c.value.duration), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              const SizedBox(height: 13),
+                _WideSeekBar(controller: c),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   _Shortcut(icon: Icons.menu_rounded, label: 'Eps', onTap: onEpisodes),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 10),
                   _Shortcut(icon: Icons.download_rounded, label: 'Unduh', onTap: onDownload),
-                  const SizedBox(width: 9),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Container(
-                      height: 44,
+                      height: 52,
                       decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.14))),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 19)),
-                          GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12))),
-                          GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 19)),
-                          GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 21)),
+                          IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 22)),
+                          GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
+                          GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 22)),
+                          GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 24)),
                         ],
                       ),
                     ),
@@ -1311,10 +1418,10 @@ class _Shortcut extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
         decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
-        child: Row(children: [Icon(icon, color: Colors.white, size: 15), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700))]),
+        child: Row(children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800))]),
       ),
     );
   }
