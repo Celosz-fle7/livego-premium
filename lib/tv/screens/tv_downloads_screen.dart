@@ -12,10 +12,11 @@ import 'tv_player_screen.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
   final int focusTicket;
 
-  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToHome, this.focusTicket = 0});
+  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToNav, this.onBackToHome, this.focusTicket = 0});
 
   @override
   State<TvDownloadsScreen> createState() => _TvDownloadsScreenState();
@@ -86,6 +87,15 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     }
   }
 
+  void _backToNav() {
+    _zone = TvZone.nav;
+    if (widget.onBackToNav != null) {
+      widget.onBackToNav?.call();
+    } else {
+      _moveToNav();
+    }
+  }
+
   void _backToHome() {
     _zone = TvZone.banner;
     if (widget.onBackToHome != null) {
@@ -142,7 +152,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -171,7 +181,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     }
     if (_isBack(key)) {
       _lastRow = index;
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -195,7 +205,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
           child: Actions(
             actions: <Type, Action<Intent>>{
               _DownloadsBackIntent: CallbackAction<_DownloadsBackIntent>(onInvoke: (_) {
-                _backToHome();
+                _backToNav();
                 return null;
               }),
             },
@@ -218,7 +228,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
                     children: [
                       const Text('Daftar Unduhan', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                       const Spacer(),
-                      Text('Remote: OK buka • ← navbar • Back Home', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                      Text('Remote: OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                     ],
                   ),
                   const SizedBox(height: 12),

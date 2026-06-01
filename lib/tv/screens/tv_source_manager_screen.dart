@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
-import '../focus/tv_back_router.dart';
 import '../utils/tv_focus_utils.dart';
 import '../widgets/tv_focused_border.dart';
 
@@ -21,7 +20,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   late final FocusNode _backNode;
   late final FocusNode _stayNode;
   late final FocusNode _saveNode;
-  final TvBackRouter _backRouter = const TvBackRouter();
+
 
   int _lastIndex = 0;
   int _expandedIndex = -1;
@@ -31,6 +30,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   bool _categoryMode = false;
   bool _dirty = false;
   bool _confirmOpen = false;
+  int _lastBackHandledMs = 0;
   String? _pingingSlug;
 
   List<String> get _platforms => LiveGoCatalog.allPlatforms;
@@ -226,9 +226,28 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     setState(() {});
   }
 
+  void _handleBack() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < 240) return;
+    _lastBackHandledMs = now;
+
+    if (_confirmOpen) {
+      _closeConfirm();
+      return;
+    }
+
+    if (_expandedIndex >= 0) {
+      _collapseSource(_expandedIndex);
+      return;
+    }
+
+    _requestExit();
+  }
+
   void _requestExit() {
+    if (_confirmOpen) return;
     if (!_dirty) {
-      Navigator.of(context).maybePop();
+      Navigator.of(context).pop();
       return;
     }
     setState(() => _confirmOpen = true);
@@ -246,32 +265,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   void _saveAndExit() {
     _dirty = false;
-    Navigator.of(context).maybePop();
-  }
-
-  void _handleBack() {
-    if (!_backRouter.consumeBackPress()) return;
-
-    final action = _backRouter.resolveSourceManagerBack(
-      confirmOpen: _confirmOpen,
-      panelOpen: _expandedIndex >= 0,
-    );
-    switch (action) {
-      case TvBackAction.closeDialog:
-        _closeConfirm();
-        return;
-      case TvBackAction.closePanel:
-        _collapseSource(_expandedIndex);
-        return;
-      case TvBackAction.exitLocalScreen:
-        _requestExit();
-        return;
-      case TvBackAction.none:
-      case TvBackAction.focusNavbar:
-      case TvBackAction.goHomeBanner:
-      case TvBackAction.showExitDialog:
-        return;
-    }
+    Navigator.of(context).pop();
   }
 
   KeyEventResult _confirmKey(FocusNode node, KeyEvent event) {
@@ -294,7 +288,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _closeConfirm();
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -307,7 +301,11 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       _focusSource(_lastIndex);
       return KeyEventResult.handled;
     }
-    if (_isSelect(key) || _isBack(key)) {
+    if (_isSelect(key)) {
+      _requestExit();
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
       _handleBack();
       return KeyEventResult.handled;
     }
@@ -500,9 +498,14 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
             return null;
           }),
         },
-        child: Scaffold(
-          backgroundColor: AppTheme.bgDeep,
-          body: Stack(
+        child: PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) {
+            if (!didPop) _handleBack();
+          },
+          child: Scaffold(
+            backgroundColor: AppTheme.bgDeep,
+            body: Stack(
             children: [
               DefaultTextStyle.merge(
                 style: const TextStyle(decoration: TextDecoration.none),
@@ -513,7 +516,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     _SourceHeader(
                       backNode: _backNode,
                       onBackKey: _backKey,
-                      onBack: _handleBack,
+                      onBack: _requestExit,
                       activeCount: LiveGoSettings.activePlatforms.length,
                       pingingSlug: _pingingSlug,
                     ),
@@ -571,7 +574,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                   onStay: _closeConfirm,
                   onSave: _saveAndExit,
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

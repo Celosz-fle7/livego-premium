@@ -11,12 +11,14 @@ import 'tv_source_manager_screen.dart';
 
 class TvAccountScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
   final int focusTicket;
 
   const TvAccountScreen({
     super.key,
     this.onMoveToNav,
+    this.onBackToNav,
     this.onBackToHome,
     this.focusTicket = 0,
   });
@@ -127,8 +129,12 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _handleBack() {
-    _zone = TvZone.list;
-    widget.onBackToHome?.call();
+    _zone = TvZone.nav;
+    if (widget.onBackToNav != null) {
+      widget.onBackToNav?.call();
+    } else {
+      widget.onMoveToNav?.call();
+    }
   }
 
   void _focusEntry() {
@@ -347,7 +353,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                 const SizedBox(height: 14),
                 ...sectionWidgets,
                 Text(
-                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← navbar • Back Home' : '',
+                  _zone == TvZone.list ? 'Remote: ↑↓ pilih item • OK/→ buka • ← navbar • Back navbar' : '',
                   style: TextStyle(color: AppTheme.textSoft.withOpacity(0.70), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                 ),
               ],

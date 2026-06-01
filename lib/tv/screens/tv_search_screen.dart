@@ -12,10 +12,11 @@ import 'tv_player_screen.dart';
 
 class TvSearchScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
   final int focusTicket;
 
-  const TvSearchScreen({super.key, this.onMoveToNav, this.onBackToHome, this.focusTicket = 0});
+  const TvSearchScreen({super.key, this.onMoveToNav, this.onBackToNav, this.onBackToHome, this.focusTicket = 0});
 
   @override
   State<TvSearchScreen> createState() => _TvSearchScreenState();
@@ -92,6 +93,15 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     }
   }
 
+  void _backToNav() {
+    _zone = TvZone.nav;
+    if (widget.onBackToNav != null) {
+      widget.onBackToNav?.call();
+    } else {
+      _moveToNav();
+    }
+  }
+
   void _backToHome() {
     _zone = TvZone.banner;
     if (widget.onBackToHome != null) {
@@ -157,7 +167,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -203,7 +213,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     }
     if (_isBack(key)) {
       _lastGrid = index;
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -221,7 +231,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
       child: Actions(
         actions: <Type, Action<Intent>>{
           _SearchBackIntent: CallbackAction<_SearchBackIntent>(onInvoke: (_) {
-            _backToHome();
+            _backToNav();
             return null;
           }),
         },
@@ -291,7 +301,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     children: [
                       Text('${_results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                       const Spacer(),
-                      Text('↑ input • OK buka • ← navbar • Back Home', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                      Text('↑ input • OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                     ],
                   ),
                   const SizedBox(height: 12),

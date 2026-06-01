@@ -15,6 +15,7 @@ class TvLibraryScreen extends StatefulWidget {
   final IconData icon;
   final bool favorites;
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
   final int focusTicket;
 
@@ -24,6 +25,7 @@ class TvLibraryScreen extends StatefulWidget {
     required this.icon,
     required this.favorites,
     this.onMoveToNav,
+    this.onBackToNav,
     this.onBackToHome,
     this.focusTicket = 0,
   });
@@ -106,6 +108,15 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     }
   }
 
+  void _backToNav() {
+    _zone = TvZone.nav;
+    if (widget.onBackToNav != null) {
+      widget.onBackToNav?.call();
+    } else {
+      _moveToNav();
+    }
+  }
+
   void _backToHome() {
     _zone = TvZone.banner;
     if (widget.onBackToHome != null) {
@@ -164,7 +175,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -205,7 +216,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     }
     if (_isBack(key)) {
       _lastGrid = index;
-      _backToHome();
+      _backToNav();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -231,7 +242,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
           child: Actions(
             actions: <Type, Action<Intent>>{
               _TvLibraryBackIntent: CallbackAction<_TvLibraryBackIntent>(onInvoke: (_) {
-                _backToHome();
+                _backToNav();
                 return null;
               }),
             },
@@ -261,7 +272,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            'Remote: OK buka • ← navbar • Back Home',
+                            'Remote: OK buka • ← navbar • Back navbar',
                             style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                           ),
                         ],
