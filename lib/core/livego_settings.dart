@@ -25,6 +25,11 @@ class LiveGoSettings {
   static final Set<String> activePlatforms = defaultPlatforms.toSet();
   static final List<String> homePlatforms = List<String>.from(defaultPlatforms);
 
+  static final Map<String, String> platformLanguages = {
+    for (final platform in LiveGoApiPlatforms.all)
+      platform.slug: platform.defaultLang,
+  };
+
   static final Map<String, List<String>> homeCategories = {
     for (final platform in LiveGoApiPlatforms.all)
       platform.slug: List<String>.from(platform.categories),
@@ -63,6 +68,17 @@ class LiveGoSettings {
       }
     }
     if (homePlatforms.isNotEmpty) defaultPlatform = homePlatforms.first;
+  }
+
+  static String languageForPlatform(String platform) {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final saved = platformLanguages[config.slug] ?? config.defaultLang;
+    return LiveGoApiPlatforms.langFor(config.slug, saved);
+  }
+
+  static void setLanguageForPlatform(String platform, String value) {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    platformLanguages[config.slug] = LiveGoApiPlatforms.langFor(config.slug, value);
   }
 
   static List<String> categoriesFor(String platform) {
@@ -110,6 +126,12 @@ class LiveGoSettings {
     homePlatforms
       ..clear()
       ..addAll(defaultPlatforms);
+    platformLanguages
+      ..clear()
+      ..addAll({
+        for (final platform in LiveGoApiPlatforms.all)
+          platform.slug: platform.defaultLang,
+      });
     homeCategories
       ..clear()
       ..addAll({

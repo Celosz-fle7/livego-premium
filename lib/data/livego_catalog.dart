@@ -2,6 +2,7 @@ import '../core/livego_settings.dart';
 import '../models/content_item.dart';
 import '../models/stream_info.dart';
 import '../services/anichin_api_client.dart';
+import '../services/api/api_platform.dart';
 import '../services/cache/livego_content_cache.dart';
 import '../services/feed/feed_config.dart';
 import '../services/feed/feed_limiter.dart';
@@ -25,14 +26,23 @@ class LiveGoCatalog {
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
 
+  static List<String> availableCategoriesFor(String platform) =>
+      LiveGoApiPlatforms.categoriesFor(platform).take(8).toList();
+
+  static List<String> languagesFor(String platform) =>
+      LiveGoApiPlatforms.languagesFor(platform);
+
+  static String languageFor(String platform) =>
+      LiveGoSettings.languageForPlatform(platform);
+
   static Future<List<String>> fetchCategoriesFor(String platform) async {
-    return categoriesFor(platform);
+    return availableCategoriesFor(platform);
   }
 
   static Future<String> pingPlatform(String platform) async {
     final start = DateTime.now();
     try {
-      final rows = await AnichinApiClient.home(platform: platform, lang: LiveGoSettings.language);
+      final rows = await AnichinApiClient.home(platform: platform, lang: languageFor(platform));
       if (rows.isEmpty) {
         LiveGoSettings.setPlatformStatus(platform, 'offline');
         return 'offline';
@@ -52,19 +62,19 @@ class LiveGoCatalog {
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
       endpoint: 'home',
-      params: {'lang': LiveGoSettings.language},
+      params: {'lang': languageFor(platform)},
     );
     if (cached != null && cached.isNotEmpty) return cached;
 
     try {
-      final rows = await AnichinApiClient.home(platform: platform, lang: LiveGoSettings.language)
+      final rows = await AnichinApiClient.home(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
       print('CATALOG HOME $platform -> ${rows.length}');
       if (rows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
           endpoint: 'home',
-          params: {'lang': LiveGoSettings.language},
+          params: {'lang': languageFor(platform)},
           items: rows,
         );
         return rows;
@@ -72,13 +82,13 @@ class LiveGoCatalog {
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
-      final rows = await AnichinApiClient.discover(platform: platform, lang: LiveGoSettings.language)
+      final rows = await AnichinApiClient.discover(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
       if (rows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
           endpoint: 'home',
-          params: {'lang': LiveGoSettings.language},
+          params: {'lang': languageFor(platform)},
           items: rows,
         );
         return rows;
@@ -95,7 +105,7 @@ class LiveGoCatalog {
   }) async {
     final key = category.trim().toLowerCase().replaceAll(' ', '');
     final endpoint = key.isEmpty ? 'home' : key;
-    final lang = LiveGoSettings.language;
+    final lang = languageFor(platform);
     final sessionKey = FeedSessionState.key(platform, endpoint, lang: lang);
     final visitSeed = FeedSessionState.markVisited(sessionKey);
     final shouldRefresh = FeedSessionState.shouldRefresh(
@@ -190,15 +200,15 @@ class LiveGoCatalog {
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
       endpoint: 'search',
-      params: {'q': clean, 'lang': LiveGoSettings.language},
+      params: {'q': clean, 'lang': languageFor(platform)},
     );
     if (cached != null) return cached;
     try {
-      final rows = await AnichinApiClient.search(query: clean, platform: platform, lang: LiveGoSettings.language);
+      final rows = await AnichinApiClient.search(query: clean, platform: platform, lang: languageFor(platform));
       await LiveGoContentCache.writeItems(
         platform: platform,
         endpoint: 'search',
-        params: {'q': clean, 'lang': LiveGoSettings.language},
+        params: {'q': clean, 'lang': languageFor(platform)},
         items: rows,
         ttl: LiveGoContentCache.searchTtl,
       );

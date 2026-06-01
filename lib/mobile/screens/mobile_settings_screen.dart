@@ -235,9 +235,11 @@ class SourceManagerScreen extends StatefulWidget {
 class _SourceManagerScreenState extends State<SourceManagerScreen> {
   late Set<String> _active;
   late List<String> _home;
+  late Map<String, String> _languageDrafts;
+  late Map<String, List<String>> _categoryDrafts;
+
   String _selectedPlatform = LiveGoSettings.defaultPlatform;
   List<String> _availableCategories = const ['Trending', 'For You'];
-  List<String> _selectedCategories = const ['Trending', 'For You'];
   bool _loadingCategories = false;
   bool _pinging = false;
 
@@ -246,6 +248,14 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     super.initState();
     _active = Set<String>.from(LiveGoSettings.activePlatforms);
     _home = List<String>.from(LiveGoSettings.homePlatforms);
+    _languageDrafts = {
+      for (final slug in LiveGoCatalog.allPlatforms)
+        slug: LiveGoSettings.languageForPlatform(slug),
+    };
+    _categoryDrafts = {
+      for (final slug in LiveGoCatalog.allPlatforms)
+        slug: LiveGoSettings.categoriesFor(slug),
+    };
     _selectedPlatform = _home.isNotEmpty ? _home.first : LiveGoSettings.defaultPlatform;
     _loadCategories(_selectedPlatform);
     _pingVisibleOnce();
@@ -255,12 +265,12 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     setState(() {
       _selectedPlatform = platform;
       _loadingCategories = true;
-      _selectedCategories = LiveGoSettings.categoriesFor(platform);
     });
     final rows = await LiveGoCatalog.fetchCategoriesFor(platform);
     if (!mounted) return;
     setState(() {
       _availableCategories = rows;
+      _categoryDrafts.putIfAbsent(platform, () => LiveGoSettings.categoriesFor(platform));
       _loadingCategories = false;
     });
   }
@@ -275,8 +285,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
             return 'offline';
           },
         )));
-    if (mounted) setState(() {});
-    if (mounted) setState(() => _pinging = false);
+    if (!mounted) return;
+    setState(() => _pinging = false);
   }
 
   void _toggleActive(String slug) {
@@ -303,13 +313,19 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     });
   }
 
-  void _toggleCategory(String name) {
+  void _setLanguage(String slug, String lang) {
+    setState(() => _languageDrafts[slug] = lang);
+  }
+
+  void _toggleCategory(String slug, String name) {
+    final current = List<String>.from(_categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug));
     setState(() {
-      if (_selectedCategories.contains(name)) {
-        if (_selectedCategories.length > 1) _selectedCategories = _selectedCategories.where((e) => e != name).toList();
-      } else if (_selectedCategories.length < 6) {
-        _selectedCategories = [..._selectedCategories, name];
+      if (current.contains(name)) {
+        if (current.length > 1) current.remove(name);
+      } else if (current.length < 6) {
+        current.add(name);
       }
+      _categoryDrafts[slug] = current;
     });
   }
 
@@ -320,8 +336,17 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     LiveGoSettings.homePlatforms
       ..clear()
       ..addAll(_home.take(6));
+    if (LiveGoSettings.homePlatforms.isEmpty) {
+      LiveGoSettings.homePlatforms.add(_active.first);
+    }
     LiveGoSettings.defaultPlatform = LiveGoSettings.homePlatforms.first;
-    if (_selectedPlatform.isNotEmpty) LiveGoSettings.setCategoriesFor(_selectedPlatform, _selectedCategories);
+
+    for (final entry in _languageDrafts.entries) {
+      LiveGoSettings.setLanguageForPlatform(entry.key, entry.value);
+    }
+    for (final entry in _categoryDrafts.entries) {
+      LiveGoSettings.setCategoriesFor(entry.key, entry.value);
+    }
     Navigator.pop(context);
   }
 
@@ -360,7 +385,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                 children: [
-                  const Text('Pilih platform aktif. Maksimal 6 platform tampil di Home. Lampu status memakai hasil ping terakhir.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
+                  const Text('Atur platform, bahasa, dan kategori Home HP. Perubahan aktif setelah tombol Simpan ditekan.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
                   const SizedBox(height: 14),
                   for (final slug in platforms) ...[
                     _SourceCard(
@@ -370,6 +395,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
                       home: _home.contains(slug),
                       selected: _selectedPlatform == slug,
                       statusColor: _statusColor(slug),
+                      language: (_languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug)).toUpperCase(),
+                      categoryCount: (_categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug)).length,
                       onTap: () {
                         if (_selectedPlatform == slug) {
                           setState(() => _selectedPlatform = '');
@@ -387,20 +414,14 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
                           padding: const EdgeInsets.all(14),
                           child: _loadingCategories
                               ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Kategori ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                                    const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 9,
-                                      runSpacing: 9,
-                                      children: [
-                                        for (final c in _availableCategories)
-                                          _ChoiceButton(text: c, active: _selectedCategories.contains(c), onTap: () => _toggleCategory(c)),
-                                      ],
-                                    ),
-                                  ],
+                              : _SourcePlatformEditor(
+                                  slug: slug,
+                                  languages: LiveGoCatalog.languagesFor(slug),
+                                  selectedLanguage: _languageDrafts[slug] ?? LiveGoSettings.languageForPlatform(slug),
+                                  availableCategories: _availableCategories,
+                                  selectedCategories: _categoryDrafts[slug] ?? LiveGoSettings.categoriesFor(slug),
+                                  onLanguage: (v) => _setLanguage(slug, v),
+                                  onCategory: (v) => _toggleCategory(slug, v),
                                 ),
                         ),
                       ),
@@ -427,13 +448,14 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'MP4 multi-quality. Aman untuk player native.',
-      'netshort': 'Direct CDN + subtitle VTT. Aktif, bahasa default IN.',
-      'pinedrama': 'Direct MP4. Aman untuk player native.',
-      'dramabox': 'HLS signed dari all episode. Aktif, list bisa lebih lambat.',
-      'flickreels': 'HLS signed dari episode/all episode. Aktif.',
-      'melolo': 'Opsional. Catalog/search jalan, video CENC belum dipasang di player native.',
-    };    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
+      'shortmax': 'MP4 multi-quality. Bahasa ID/EN.',
+      'netshort': 'Direct CDN + subtitle VTT. Bahasa default IN.',
+      'pinedrama': 'Direct MP4. Kategori genre dari API.',
+      'dramabox': 'HLS signed + subtitle. Ada Latest, VIP, Dub Indo.',
+      'flickreels': 'HLS signed. Banyak bahasa termasuk ID.',
+      'melolo': 'Catalog jalan. Video CENC belum dipasang native.',
+    };
+    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 }
 
@@ -444,11 +466,25 @@ class _SourceCard extends StatelessWidget {
   final bool home;
   final bool selected;
   final Color statusColor;
+  final String language;
+  final int categoryCount;
   final VoidCallback onTap;
   final VoidCallback onToggleActive;
   final VoidCallback onToggleHome;
 
-  const _SourceCard({required this.title, required this.subtitle, required this.active, required this.home, required this.selected, required this.statusColor, required this.onTap, required this.onToggleActive, required this.onToggleHome});
+  const _SourceCard({
+    required this.title,
+    required this.subtitle,
+    required this.active,
+    required this.home,
+    required this.selected,
+    required this.statusColor,
+    required this.language,
+    required this.categoryCount,
+    required this.onTap,
+    required this.onToggleActive,
+    required this.onToggleHome,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -470,13 +506,26 @@ class _SourceCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                  Row(
+                    children: [
+                      Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900))),
+                      Text(language, style: const TextStyle(color: AppTheme.cyan, fontSize: 11, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12)),
                   const SizedBox(height: 9),
-                  GestureDetector(
-                    onTap: onToggleHome,
-                    child: Text(home ? 'Tampil di Home' : 'Tambahkan ke Home', style: TextStyle(color: home ? AppTheme.cyan : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11)),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: onToggleHome,
+                        child: Text(home ? 'Tampil di Home' : 'Tambahkan ke Home', style: TextStyle(color: home ? AppTheme.cyan : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11)),
+                      ),
+                      Text('• $categoryCount kategori', style: const TextStyle(color: AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w700)),
+                    ],
                   ),
                 ]),
               ),
@@ -489,6 +538,59 @@ class _SourceCard extends StatelessWidget {
   }
 }
 
+class _SourcePlatformEditor extends StatelessWidget {
+  final String slug;
+  final List<String> languages;
+  final String selectedLanguage;
+  final List<String> availableCategories;
+  final List<String> selectedCategories;
+  final ValueChanged<String> onLanguage;
+  final ValueChanged<String> onCategory;
+
+  const _SourcePlatformEditor({
+    required this.slug,
+    required this.languages,
+    required this.selectedLanguage,
+    required this.availableCategories,
+    required this.selectedCategories,
+    required this.onLanguage,
+    required this.onCategory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Bahasa ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            for (final lang in languages)
+              _ChoiceButton(text: lang.toUpperCase(), active: selectedLanguage == lang, onTap: () => onLanguage(lang)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(color: Color(0xFF24344A), height: 1),
+        const SizedBox(height: 14),
+        Text('Kategori Home ${LiveGoCatalog.label(slug)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        const Text('Kategori aktif saja yang dipanggil dan tampil di Home HP.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            for (final c in availableCategories)
+              _ChoiceButton(text: c, active: selectedCategories.contains(c), onTap: () => onCategory(c)),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 class _GridSlider extends StatelessWidget {
   final String label;
