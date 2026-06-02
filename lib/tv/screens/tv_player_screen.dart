@@ -14,6 +14,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
@@ -54,6 +55,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _subtitleCursor = 0;
   int _lastSavedProgressSecond = -1;
   int _lastBackHandledMs = 0;
+  int _brokenEpisodeSkips = 0;
+  String _lastBrokenReason = '';
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
@@ -201,12 +204,52 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       unawaited(_loadEpisodeListBackground(ep, stream));
       unawaited(_loadDetailBackground(ep, stream));
     } catch (e) {
-      if (!mounted) return;
+      await _handleBrokenEpisodeLoad('$e');
+    }
+  }
+
+  Future<void> _handleBrokenEpisodeLoad(String reason) async {
+    if (!mounted) return;
+    _lastBrokenReason = reason;
+
+    if (!ContentHealthService.shouldAutoSkip(reason)) {
       setState(() {
         _loading = false;
-        _error = '$e';
+        _error = 'Koneksi/server sedang bermasalah. Konten tidak disembunyikan.';
       });
+      return;
     }
+
+    _brokenEpisodeSkips += 1;
+    final total = _episodeTotal(_detail ?? widget.item);
+
+    if (_brokenEpisodeSkips < 3 && _episode < total) {
+      final failed = _episode;
+      setState(() {
+        _loading = true;
+        _error = 'Episode $failed gagal, mencoba Episode ${failed + 1}...';
+        _episode += 1;
+        _episodeCursor = _episode;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      if (mounted) _load();
+      return;
+    }
+
+    final hidden = await ContentHealthService.markBroken(
+      widget.item,
+      reason: _lastBrokenReason,
+      days: 7,
+      failCount: _brokenEpisodeSkips,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = hidden
+          ? 'Beberapa episode tidak bisa diputar. Konten disembunyikan sementara 7 hari.'
+          : 'Beberapa episode gagal, tapi tidak disembunyikan karena kemungkinan jaringan/server.';
+    });
   }
 
   Future<void> _startController(
@@ -272,6 +315,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (autoplay) {
       await controller.play();
     }
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
+    unawaited(ContentHealthService.markPlayable(widget.item));
     if (!mounted) return;
     setState(() => _loading = false);
     unawaited(_preparePreferredSubtitle(stream));
@@ -632,6 +678,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _previousEpisode() {
     if (_episode <= 1) return;
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
     _episode -= 1;
     _hideOverlays();
     _load();
@@ -640,12 +688,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _nextEpisode() {
     final total = _episodeTotal(_detail ?? widget.item);
     if (_episode >= total) return;
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
     _episode += 1;
     _hideOverlays();
     _load();
   }
 
   void _selectEpisode(int episode) {
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
     _episode = episode.clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
     _hideOverlays();
     _load();

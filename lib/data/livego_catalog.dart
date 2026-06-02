@@ -4,6 +4,7 @@ import '../models/stream_info.dart';
 import '../services/livego_api_gateway.dart';
 import '../services/api/api_platform.dart';
 import '../services/cache/livego_content_cache.dart';
+import '../services/content/content_health_service.dart';
 import '../services/feed/feed_config.dart';
 import '../services/feed/feed_limiter.dart';
 import '../services/feed/feed_session_state.dart';
@@ -71,34 +72,36 @@ class LiveGoCatalog {
       endpoint: endpoint,
       params: {'lang': languageFor(platform)},
     );
-    if (cached != null && cached.isNotEmpty) return cached;
+    if (cached != null && cached.isNotEmpty) return ContentHealthService.filterPlayable(cached);
 
     try {
       final rows = await LiveGoApiGateway.home(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
       print('CATALOG HOME $platform -> ${rows.length}');
-      if (rows.isNotEmpty) {
+      final cleanRows = ContentHealthService.filterPlayable(rows);
+      if (cleanRows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
           endpoint: endpoint,
           params: {'lang': languageFor(platform)},
-          items: rows,
+          items: cleanRows,
         );
-        return rows;
+        return cleanRows;
       }
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
     try {
       final rows = await LiveGoApiGateway.discover(platform: platform, lang: languageFor(platform))
           .timeout(const Duration(seconds: 12));
-      if (rows.isNotEmpty) {
+      final cleanRows = ContentHealthService.filterPlayable(rows);
+      if (cleanRows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
           endpoint: endpoint,
           params: {'lang': languageFor(platform)},
-          items: rows,
+          items: cleanRows,
         );
-        return rows;
+        return cleanRows;
       }
     } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
 
@@ -127,7 +130,7 @@ class LiveGoCatalog {
         params: {'lang': lang},
       );
       if (cached != null && cached.isNotEmpty) {
-        return FeedLimiter.prepare(cached, visitSeed: visitSeed);
+        return FeedLimiter.prepare(ContentHealthService.filterPlayable(cached), visitSeed: visitSeed);
       }
     }
 
@@ -144,15 +147,16 @@ class LiveGoCatalog {
         ).timeout(const Duration(seconds: 12));
       }
 
-      if (rows.isNotEmpty) {
+      final cleanRows = ContentHealthService.filterPlayable(rows);
+      if (cleanRows.isNotEmpty) {
         FeedSessionState.markNetworkRefresh(sessionKey);
         await LiveGoContentCache.writeItems(
           platform: platform,
           endpoint: endpoint,
           params: {'lang': lang},
-          items: rows,
+          items: cleanRows,
         );
-        return FeedLimiter.prepare(rows, visitSeed: visitSeed);
+        return FeedLimiter.prepare(cleanRows, visitSeed: visitSeed);
       }
     } catch (e) { print('LIVEGO CATEGORY ERROR: $e'); }
 
@@ -162,10 +166,10 @@ class LiveGoCatalog {
       params: {'lang': lang},
     );
     if (cached != null && cached.isNotEmpty) {
-      return FeedLimiter.prepare(cached, visitSeed: visitSeed);
+      return FeedLimiter.prepare(ContentHealthService.filterPlayable(cached), visitSeed: visitSeed);
     }
 
-    final rows = await home(platform: platform);
+    final rows = ContentHealthService.filterPlayable(await home(platform: platform));
     if (rows.isNotEmpty) {
       await LiveGoContentCache.writeItems(
         platform: platform,
@@ -209,17 +213,18 @@ class LiveGoCatalog {
       endpoint: 'search',
       params: {'q': clean, 'lang': languageFor(platform)},
     );
-    if (cached != null) return cached;
+    if (cached != null) return ContentHealthService.filterPlayable(cached);
     try {
       final rows = await LiveGoApiGateway.search(query: clean, platform: platform, lang: languageFor(platform));
+      final cleanRows = ContentHealthService.filterPlayable(rows);
       await LiveGoContentCache.writeItems(
         platform: platform,
         endpoint: 'search',
         params: {'q': clean, 'lang': languageFor(platform)},
-        items: rows,
+        items: cleanRows,
         ttl: LiveGoContentCache.searchTtl,
       );
-      return rows;
+      return cleanRows;
     } catch (e) {
       print('LIVEGO SEARCH ERROR: $e');
       return [];
@@ -233,8 +238,8 @@ class LiveGoCatalog {
     final seen = <String>{};
     for (final platform in platforms) {
       final rows = await search(clean, platform: platform);
-      for (final item in rows) {
-        final key = '${item.platformSlug}:${item.id}';
+      for (final item in ContentHealthService.filterPlayable(rows)) {
+        final key = ContentHealthService.contentKey(item);
         if (seen.add(key)) merged.add(item);
       }
     }

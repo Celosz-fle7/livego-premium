@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/content_item.dart';
+import '../services/content/content_health_service.dart';
 import 'livego_settings.dart';
 
 class WatchProgress {
@@ -152,6 +153,7 @@ class LiveGoLocalStore {
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
     _loadSettings();
+    await ContentHealthService.init();
     _history
       ..clear()
       ..addAll(_decodeList(_prefs?.getString(_historyKey)).map(itemFromJson));

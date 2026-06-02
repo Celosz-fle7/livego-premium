@@ -14,6 +14,7 @@ import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
@@ -31,6 +32,8 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
   late Future<_PlayerState> _future;
   int episode = 1;
   int _knownEpisodeCount = 0;
+  int _brokenEpisodeSkips = 0;
+  String _lastBrokenReason = '';
 
 
   @override
@@ -149,11 +152,58 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     return _PlayerState(item: playable, stream: stream);
   }
 
-  void _selectEpisode(int value) {
+  void _selectEpisode(int value, {bool autoSkipped = false}) {
+    if (!autoSkipped) {
+      _brokenEpisodeSkips = 0;
+      _lastBrokenReason = '';
+    }
     setState(() {
       episode = value.clamp(1, 9999);
       _future = _load();
     });
+  }
+
+  Future<void> _markPlayable() async {
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
+    await ContentHealthService.markPlayable(widget.item);
+  }
+
+  Future<void> _handleBrokenEpisode(String reason) async {
+    _lastBrokenReason = reason;
+
+    if (!ContentHealthService.shouldAutoSkip(reason)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Koneksi/server sedang bermasalah. Konten tidak disembunyikan.')),
+      );
+      return;
+    }
+
+    _brokenEpisodeSkips += 1;
+    final total = _knownEpisodeCount > widget.item.episodes ? _knownEpisodeCount : widget.item.episodes;
+
+    if (_brokenEpisodeSkips >= 3 || episode >= total) {
+      final hidden = await ContentHealthService.markBroken(
+        widget.item,
+        reason: _lastBrokenReason,
+        days: 7,
+        failCount: _brokenEpisodeSkips,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(hidden
+            ? 'Konten ini bermasalah. Disembunyikan sementara 7 hari.'
+            : 'Beberapa episode gagal, tapi tidak disembunyikan karena kemungkinan jaringan/server.')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Episode $episode gagal, mencoba Episode ${episode + 1}...')),
+    );
+    _selectEpisode(episode + 1, autoSkipped: true);
   }
 
   @override
@@ -194,7 +244,8 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
               onBack: () => Navigator.pop(context),
               onEpisode: _selectEpisode,
               onAutoNext: (LiveGoSettings.autoNextEnabled && episode < item.episodes) ? () => _selectEpisode(episode + 1) : null,
-              onSkipBroken: episode < item.episodes ? () => _selectEpisode(episode + 1) : null,
+              onSkipBroken: (reason) => unawaited(_handleBrokenEpisode(reason)),
+              onPlayable: () => unawaited(_markPlayable()),
             ),
         );
       },
@@ -210,7 +261,8 @@ class _PlayerSurface extends StatefulWidget {
   final VoidCallback onBack;
   final ValueChanged<int> onEpisode;
   final VoidCallback? onAutoNext;
-  final VoidCallback? onSkipBroken;
+  final ValueChanged<String>? onSkipBroken;
+  final VoidCallback? onPlayable;
 
   const _PlayerSurface({
     super.key,
@@ -222,6 +274,7 @@ class _PlayerSurface extends StatefulWidget {
     required this.onEpisode,
     required this.onAutoNext,
     required this.onSkipBroken,
+    required this.onPlayable,
   });
 
   @override
@@ -308,7 +361,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _error = 'Stream belum tersedia dari API.';
       _buffering = false;
       if (mounted) setState(() {});
-      _scheduleSkipBrokenEpisode();
+      _scheduleSkipBrokenEpisode('stream_empty');
       return;
     }
 
@@ -348,22 +401,23 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       }
       if (autoplay) await controller.play();
       _errorSkipTimer?.cancel();
+      widget.onPlayable?.call();
       if (mounted) setState(() => _buffering = false);
     } catch (e) {
       _error = '$e';
       _buffering = false;
       if (mounted) setState(() {});
-      _scheduleSkipBrokenEpisode();
+      _scheduleSkipBrokenEpisode('$e');
     }
   }
 
-  void _scheduleSkipBrokenEpisode() {
+  void _scheduleSkipBrokenEpisode(String reason) {
     if (_autoSkipFailedDone || widget.onSkipBroken == null) return;
     _autoSkipFailedDone = true;
     _errorSkipTimer?.cancel();
     _errorSkipTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
-      widget.onSkipBroken?.call();
+      widget.onSkipBroken?.call(reason);
     });
   }
 
