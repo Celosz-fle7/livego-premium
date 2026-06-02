@@ -65,7 +65,7 @@ class LiveGoCatalog {
   }
 
   static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
-    final endpoint = isDobdaPlatform(platform) ? 'indonesia' : 'home';
+    final endpoint = isDobdaPlatform(platform) ? 'home_clean_v2' : 'home';
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
       endpoint: endpoint,

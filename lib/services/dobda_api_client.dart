@@ -20,8 +20,7 @@ class DobdaApiClient {
     String platform = 'dobda_freereels',
     String lang = 'id',
   }) async {
-    final rows = await _homeRaw(platform: platform, lang: lang);
-    return _cleanDobdaItems(rows);
+    return homeFeed(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
@@ -29,8 +28,7 @@ class DobdaApiClient {
     String lang = 'id',
     int page = 1,
   }) async {
-    final rows = await _discoverRaw(platform: platform, lang: lang, page: page);
-    return _cleanDobdaItems(rows);
+    return homeFeed(platform: platform, lang: lang, page: page);
   }
 
   static Future<List<ContentItem>> collection({
@@ -40,19 +38,13 @@ class DobdaApiClient {
     int page = 1,
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, collection);
-    if (key == 'indonesia' || key == 'home') {
-      return indonesiaFeed(platform: platform, lang: lang, page: page);
+    if (key == 'livego' || key == 'indonesia' || key == 'dubindo') {
+      return liveGoFeed(platform: platform, lang: lang, page: page);
     }
-    if (key == 'discover' || key == 'foryou' || key == 'latest') {
-      return discover(platform: platform, lang: lang, page: page);
-    }
-    if (key == 'banner') {
-      return _cleanDobdaItems(await banner(platform: platform, lang: lang));
-    }
-    return indonesiaFeed(platform: platform, lang: lang, page: page);
+    return homeFeed(platform: platform, lang: lang, page: page);
   }
 
-  static Future<List<ContentItem>> indonesiaFeed({
+  static Future<List<ContentItem>> homeFeed({
     String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
@@ -60,34 +52,55 @@ class DobdaApiClient {
     final results = await Future.wait<List<ContentItem>>([
       _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home'),
       _safeRows(_discoverRaw(platform: platform, lang: lang, page: page), '$platform/discover'),
-      _safeRows(_searchRaw(query: 'dub', platform: platform, lang: lang, page: page), '$platform/dub'),
-      _safeRows(_searchRaw(query: 'dubbing', platform: platform, lang: lang, page: page), '$platform/dubbing'),
-      _safeRows(_searchRaw(query: 'sulih', platform: platform, lang: lang, page: page), '$platform/sulih'),
     ]);
 
     final merged = <ContentItem>[];
     final seen = <String>{};
 
-    void addRows(List<ContentItem> rows, {bool fromDubSearch = false}) {
+    for (final rows in results) {
       for (final item in rows) {
-        if (!_isCleanDobdaItem(item, fromDubSearch: fromDubSearch)) continue;
-        final key = '${item.platformSlug}:${item.id}';
+        // Home Dobda jangan diisi video Dub/Sulih. Konten dub khusus masuk LiveGo.
+        if (!_isCleanDobdaItem(item, excludeDubbed: true)) continue;
+        final key = _contentKey(item);
         if (seen.add(key)) merged.add(item);
       }
     }
 
-    addRows(results[0]);
-    addRows(results[1]);
-    for (var i = 2; i < results.length; i++) {
-      addRows(results[i], fromDubSearch: true);
-    }
+    return merged.take(60).toList();
+  }
 
-    if (merged.isEmpty) {
-      addRows(results[0], fromDubSearch: true);
-      addRows(results[1], fromDubSearch: true);
+  static Future<List<ContentItem>> liveGoFeed({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final results = await Future.wait<List<ContentItem>>([
+      _safeRows(_searchRaw(query: 'dub', platform: platform, lang: lang, page: page), '$platform/livego-dub'),
+      _safeRows(_searchRaw(query: 'dubbing', platform: platform, lang: lang, page: page), '$platform/livego-dubbing'),
+      _safeRows(_searchRaw(query: 'sulih', platform: platform, lang: lang, page: page), '$platform/livego-sulih'),
+    ]);
+
+    final merged = <ContentItem>[];
+    final seen = <String>{};
+
+    for (final rows in results) {
+      for (final item in rows) {
+        if (!_isCleanDobdaItem(item, requireDubbed: true)) continue;
+        final key = _contentKey(item);
+        if (seen.add(key)) merged.add(item);
+      }
     }
 
     return merged.take(60).toList();
+  }
+
+  // Migrasi aman untuk setting/cache lama yang masih menyimpan kategori Indonesia.
+  static Future<List<ContentItem>> indonesiaFeed({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    return liveGoFeed(platform: platform, lang: lang, page: page);
   }
 
   static Future<List<ContentItem>> banner({
@@ -397,12 +410,21 @@ class DobdaApiClient {
   static List<ContentItem> _cleanDobdaItems(
     List<ContentItem> rows, {
     bool fromDubSearch = false,
+    bool requireDubbed = false,
+    bool excludeDubbed = false,
   }) {
     final out = <ContentItem>[];
     final seen = <String>{};
     for (final item in rows) {
-      if (!_isCleanDobdaItem(item, fromDubSearch: fromDubSearch)) continue;
-      final key = '${item.platformSlug}:${item.id}';
+      if (!_isCleanDobdaItem(
+        item,
+        fromDubSearch: fromDubSearch,
+        requireDubbed: requireDubbed,
+        excludeDubbed: excludeDubbed,
+      )) {
+        continue;
+      }
+      final key = _contentKey(item);
       if (seen.add(key)) out.add(item);
     }
     return out;
@@ -411,14 +433,24 @@ class DobdaApiClient {
   static bool _isCleanDobdaItem(
     ContentItem item, {
     bool fromDubSearch = false,
+    bool requireDubbed = false,
+    bool excludeDubbed = false,
   }) {
     if (item.id.trim().isEmpty) return false;
     if (item.title.trim().isEmpty || item.title == 'Untitled') return false;
-    if (item.posterUrl.trim().isEmpty) return false;
+    if (item.posterUrl.trim().isEmpty || item.posterUrl.trim().endsWith('url=')) return false;
     if (item.episodes <= 0) return false;
+
+    final dubbed = _isDubbed(item);
+    if (excludeDubbed && dubbed) return false;
+    if (requireDubbed) return dubbed;
+
+    // Search biasa tetap boleh menampilkan hasil sesuai kata kunci user.
     if (fromDubSearch) return true;
-    return _looksIndonesian(item) || _isDubbed(item);
+    return true;
   }
+
+  static String _contentKey(ContentItem item) => '${item.platformSlug}:${item.id}';
 
   static bool _isDubbed(ContentItem item) {
     final text = _searchBlob(item);
