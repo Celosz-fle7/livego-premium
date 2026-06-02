@@ -12,7 +12,6 @@ import 'tv_source_manager_screen.dart';
 class TvAccountScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
-  final VoidCallback? onBackToHome;
   final ValueChanged<int>? onOpenNavIndex;
   final int focusTicket;
 
@@ -20,7 +19,6 @@ class TvAccountScreen extends StatefulWidget {
     super.key,
     this.onMoveToNav,
     this.onBackToNav,
-    this.onBackToHome,
     this.onOpenNavIndex,
     this.focusTicket = 0,
   });

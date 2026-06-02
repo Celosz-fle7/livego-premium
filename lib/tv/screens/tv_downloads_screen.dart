@@ -14,10 +14,9 @@ import 'tv_player_screen.dart';
 class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
-  final VoidCallback? onBackToHome;
   final int focusTicket;
 
-  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToNav, this.onBackToHome, this.focusTicket = 0});
+  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToNav, this.focusTicket = 0});
 
   @override
   State<TvDownloadsScreen> createState() => _TvDownloadsScreenState();
@@ -94,15 +93,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
       widget.onBackToNav?.call();
     } else {
       _moveToNav();
-    }
-  }
-
-  void _backToHome() {
-    _zone = TvZone.banner;
-    if (widget.onBackToHome != null) {
-      widget.onBackToHome?.call();
-    } else if (Navigator.of(context).canPop()) {
-      Navigator.of(context).maybePop();
     }
   }
 
