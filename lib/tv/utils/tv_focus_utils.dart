@@ -2,13 +2,14 @@ import 'package:flutter/widgets.dart';
 
 /// TV focus helper.
 ///
-/// Request focus immediately when the node is already mounted, then reveal it
-/// after the frame. This avoids a queue of delayed requestFocus() calls when
-/// the user presses the remote quickly.
+/// Request focus immediately, then reveal the focused widget with explicit
+/// alignment. `keepVisibleAtEnd` was too one-way for TV grids: DOWN worked,
+/// but UP could leave the focused poster above the visible viewport. Explicit
+/// alignment keeps UP/DOWN predictable and makes the blue cursor visible.
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
-  Duration duration = const Duration(milliseconds: 70),
+  Duration duration = const Duration(milliseconds: 80),
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -22,7 +23,7 @@ bool tvFocus(
       duration: duration,
       curve: Curves.easeOutCubic,
       alignment: alignment,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );
   });
 
