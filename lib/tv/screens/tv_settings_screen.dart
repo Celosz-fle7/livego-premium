@@ -179,6 +179,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
       _focusRow(_lastRow);
@@ -197,6 +198,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   KeyEventResult _rowKey(int index, _SettingItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {

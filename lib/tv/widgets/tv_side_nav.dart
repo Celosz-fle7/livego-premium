@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../theme/tv_focus_style.dart';
+import '../utils/tv_focus_utils.dart';
 
 class TvNavItem {
   final IconData icon;
@@ -60,6 +61,7 @@ class TvSideNav extends StatelessWidget {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
 
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -110,7 +112,7 @@ class TvSideNav extends StatelessWidget {
         ),
         boxShadow: [
           const BoxShadow(color: Colors.black87, blurRadius: 16),
-          if (_focused) BoxShadow(color: TvFocusStyle.focusBlue.withOpacity(0.20), blurRadius: 26, spreadRadius: 1),
+          if (_focused) TvFocusStyle.glow(0.10, 8),
         ],
       ),
       child: Column(
@@ -215,7 +217,7 @@ class _NavIconButton extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: focused
-                              ? [TvFocusStyle.focusBlue.withOpacity(0.28), AppTheme.purple.withOpacity(0.18)]
+                              ? [TvFocusStyle.focusBlue.withOpacity(0.16), AppTheme.surface3.withOpacity(0.96)]
                               : [AppTheme.surface2, AppTheme.surface],
                         )
                       : null,
@@ -227,12 +229,7 @@ class _NavIconButton extends StatelessWidget {
                         : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
                     width: focused ? 2 : 1,
                   ),
-                  boxShadow: focused
-                      ? [
-                          TvFocusStyle.glow(0.26, 12),
-                          BoxShadow(color: AppTheme.purple.withOpacity(0.08), blurRadius: 12),
-                        ]
-                      : null,
+                  boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
                 ),
                 child: Icon(
                   icon,

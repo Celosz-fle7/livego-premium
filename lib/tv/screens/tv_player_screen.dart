@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
 import '../theme/tv_focus_style.dart';
+import '../utils/tv_focus_utils.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
@@ -207,6 +208,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     final ticket = ++_loadTicket;
     final ep = _episode <= 0 ? 1 : _episode;
     final playable = _playableItem(ep);
@@ -655,7 +657,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Future<void> _loadDetailBackground(int ep, StreamInfo stream) async {
     try {
       final detail = await LiveGoCatalog.detail(widget.item).timeout(PlaybackTimeoutConfig.detailBackground);
-      if (!mounted) return;
+      if (!mounted || ep != _episode) return;
       setState(() => _detail = _safeDetail(detail, ep, stream));
       debugPrint('LIVEGO TV DETAIL BACKGROUND DONE');
     } catch (e) {
@@ -957,6 +959,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     try {
       _saveCurrentProgress(force: true);
       final previous = await _resolveEpisodeByOffset(_episode, -1, skipBroken: true);
+      if (!mounted) return;
       if (previous == _episode) {
         _showStatus('Tidak ada episode sebelumnya');
         return;
@@ -981,6 +984,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     try {
       _saveCurrentProgress(force: true);
       final next = await _resolveEpisodeByOffset(_episode, 1, skipBroken: true);
+      if (!mounted) return;
       if (next == _episode) {
         _showStatus('Tidak ada episode berikutnya');
         return;
@@ -1026,6 +1030,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _episodeNavigationBusy = true;
     try {
       _saveCurrentProgress(force: true);
+      if (!mounted) return;
       _prepareForEpisodeSwitch();
       _brokenEpisodeSkips = 0;
       _lastBrokenReason = '';
@@ -1279,6 +1284,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
 
     if (_isBack(key)) {

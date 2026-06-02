@@ -41,6 +41,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   TvZone _zone = TvZone.list;
   int _lastRow = 0;
   bool _entryPending = false;
+  bool _openingPlayer = false;
 
   @override
   void initState() {
@@ -145,8 +146,11 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   }
 
   void _open(DownloadRecord record) {
+    if (_openingPlayer || !mounted) return;
+    _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+      _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       void restore() {
@@ -159,6 +163,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
 
   KeyEventResult _emptyKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _moveToNav();
@@ -173,6 +178,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
 
   KeyEventResult _rowKey(int index, DownloadRecord record, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _lastRow = index;

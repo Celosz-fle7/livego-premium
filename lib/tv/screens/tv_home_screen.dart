@@ -61,6 +61,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _entryRetry = 0;
   int _entryTicket = 0;
   bool _gridDataReady = false;
+  bool _openingPlayer = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
 
   String get _platform {
@@ -410,6 +411,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   void _open(ContentItem item) {
+    if (_openingPlayer || !mounted) return;
+    _openingPlayer = true;
     final returnZone = _zone == TvZone.nav ? TvZone.grid : _zone;
     final returnIndex = _indexForZone(returnZone);
     widget.onPlayerRouteOpen?.call();
@@ -420,7 +423,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             onExitToHome: widget.onPlayerRouteClosed,
           ),
         ))
-        .then((_) => _restoreAfterRoute(returnZone, returnIndex));
+        .whenComplete(() {
+          _openingPlayer = false;
+          _restoreAfterRoute(returnZone, returnIndex);
+        });
   }
 
   void _selectPlatform(int index) {
@@ -474,6 +480,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (_isBack(key)) {
       _handleBack();
@@ -513,6 +520,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   KeyEventResult _platformKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (_isBack(key)) {
       _handleBack();
@@ -566,6 +574,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   KeyEventResult _categoryKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (_isBack(key)) {
       _handleBack();
@@ -621,6 +630,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   KeyEventResult _gridKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (_isBack(key)) {
       _handleBack();
@@ -701,7 +711,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final platforms = LiveGoCatalog.platformLabels;
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
-        final gridItems = items.take(42).toList();
+        final gridItems = ContentHealthService.filterPlayable(items).take(42).toList();
         _visibleGridItems = gridItems;
         _gridDataReady = !loading;
 
@@ -874,8 +884,7 @@ class _FocusableBanner extends StatelessWidget {
                 ),
                 boxShadow: [
                   const BoxShadow(color: Colors.black87, blurRadius: 20),
-                  if (focused) TvFocusStyle.glow(0.32, 24),
-                  if (focused) BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 38, spreadRadius: 2),
+                  if (focused) TvFocusStyle.glow(0.14, 8),
                 ],
               ),
               child: AnimatedContainer(
@@ -1043,7 +1052,7 @@ class _TvChip extends StatelessWidget {
                 gradient: active
                     ? AppTheme.activeGradient
                     : (focused
-                        ? LinearGradient(colors: [TvFocusStyle.focusBlue.withOpacity(0.20), AppTheme.purple.withOpacity(0.10)])
+                        ? LinearGradient(colors: [TvFocusStyle.focusBlue.withOpacity(0.12), AppTheme.surface3.withOpacity(0.96)])
                         : null),
                 color: active || focused ? null : AppTheme.surface2.withOpacity(0.92),
                 borderRadius: BorderRadius.circular(999),
@@ -1051,12 +1060,7 @@ class _TvChip extends StatelessWidget {
                   color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.18) : AppTheme.border),
                   width: focused ? 2.0 : 1.0,
                 ),
-                boxShadow: focused
-                    ? [
-                        BoxShadow(color: TvFocusStyle.focusBlue.withOpacity(0.30), blurRadius: 20, spreadRadius: 1),
-                        BoxShadow(color: AppTheme.purple.withOpacity(0.13), blurRadius: 28),
-                      ]
-                    : null,
+                boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
               ),
               child: Text(
                 text,
@@ -1186,11 +1190,8 @@ class _TvPosterTile extends StatelessWidget {
                           width: focused ? 2.8 : 0.8,
                         ),
                         boxShadow: focused
-                            ? [
-                                TvFocusStyle.glow(0.36, 20),
-                                BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 30),
-                              ]
-                            : [const BoxShadow(color: Colors.black54, blurRadius: 8)],
+                            ? [TvFocusStyle.glow(0.14, 8)]
+                            : [const BoxShadow(color: Colors.black45, blurRadius: 6)],
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),

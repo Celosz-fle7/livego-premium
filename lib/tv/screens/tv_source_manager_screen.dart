@@ -277,6 +277,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   KeyEventResult _confirmKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
       if (node == _stayNode) {
@@ -304,6 +305,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
       _focusSource(_lastIndex);
@@ -322,6 +324,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   KeyEventResult _sourceKey(int index, String slug, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     final allCategories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);

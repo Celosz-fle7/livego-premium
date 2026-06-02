@@ -200,6 +200,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   KeyEventResult _rowKey(int index, _AccountItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {

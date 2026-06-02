@@ -48,6 +48,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
   TvZone _zone = TvZone.grid;
   int _lastGrid = 0;
   bool _entryPending = false;
+  bool _openingPlayer = false;
 
   List<ContentItem> get _items {
     final raw = widget.favorites ? LiveGoLocalStore.favorites : LiveGoLocalStore.history;
@@ -166,9 +167,12 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
   }
 
   void _open(ContentItem item) {
+    if (_openingPlayer || !mounted) return;
+    _openingPlayer = true;
     _zone = TvZone.player;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+      _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       _zone = TvZone.grid;
@@ -182,6 +186,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
 
   KeyEventResult _emptyKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _moveToNav();
@@ -196,6 +201,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
 
   KeyEventResult _gridKey(int index, ContentItem item, int columns, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     final col = index % columns;
     final row = index ~/ columns;
@@ -404,10 +410,7 @@ class _TvLibraryPoster extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
             focusColor: Colors.transparent,
-            child: AnimatedScale(
-              duration: TvFocusStyle.fast,
-              scale: focused ? 1.035 : 1.0,
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
@@ -416,7 +419,7 @@ class _TvLibraryPoster extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0),
-                        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null,
+                        boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -448,7 +451,6 @@ class _TvLibraryPoster extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
           ),
         );
       },

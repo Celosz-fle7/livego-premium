@@ -14,18 +14,18 @@ class TvFocusStyle {
   static const Duration fast = Duration.zero;
   static const Duration normal = Duration.zero;
 
-  static BoxShadow glow([double opacity = 0.20, double blur = 10]) {
+  static BoxShadow glow([double opacity = 0.14, double blur = 8]) {
     return BoxShadow(
-      color: focusBlue.withOpacity(opacity),
-      blurRadius: blur > 12 ? 12 : blur,
+      color: focusBlue.withOpacity(opacity > 0.18 ? 0.18 : opacity),
+      blurRadius: blur > 8 ? 8 : blur,
       spreadRadius: 0,
     );
   }
 
-  static BoxShadow softGlow([double opacity = 0.10, double blur = 14]) {
+  static BoxShadow softGlow([double opacity = 0.08, double blur = 10]) {
     return BoxShadow(
-      color: focusBlueSoft.withOpacity(opacity),
-      blurRadius: blur > 16 ? 16 : blur,
+      color: focusBlueSoft.withOpacity(opacity > 0.12 ? 0.12 : opacity),
+      blurRadius: blur > 10 ? 10 : blur,
       spreadRadius: 0,
     );
   }

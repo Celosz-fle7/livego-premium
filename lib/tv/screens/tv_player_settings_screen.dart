@@ -154,6 +154,7 @@ class _TvPlayerSettingsScreenState extends State<TvPlayerSettingsScreen> {
 
   KeyEventResult _rowKey(int index, _PlayerSettingItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
       _focusRow(index == 0 ? 0 : index - 1);

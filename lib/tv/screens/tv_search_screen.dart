@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
@@ -44,6 +45,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
   bool _loading = false;
   int _lastGrid = 0;
   int _searchTicket = 0;
+  bool _openingPlayer = false;
   List<ContentItem> _results = [];
 
   @override
@@ -143,7 +145,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     }
     if (!mounted || ticket != _searchTicket || clean != _query) return;
     setState(() {
-      _results = rows;
+      _results = ContentHealthService.filterPlayable(rows);
       _loading = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -164,8 +166,11 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
   }
 
   void _open(ContentItem item) {
+    if (_openingPlayer || !mounted) return;
+    _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+      _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       void restore() {
@@ -178,6 +183,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
 
   KeyEventResult _searchKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
       _moveToNav();
@@ -196,6 +202,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
 
   KeyEventResult _gridKey(int index, ContentItem item, int columns, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     final col = index % columns;
     final row = index ~/ columns;
@@ -439,16 +446,13 @@ class _SearchPoster extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
             focusColor: Colors.transparent,
-            child: AnimatedScale(
-              duration: TvFocusStyle.fast,
-              scale: focused ? 1.035 : 1.0,
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: AnimatedContainer(
                       duration: TvFocusStyle.fast,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: item.posterUrl.isEmpty
@@ -461,7 +465,6 @@ class _SearchPoster extends StatelessWidget {
                   Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.12, decoration: TextDecoration.none)),
                 ],
               ),
-            ),
           ),
         );
       },

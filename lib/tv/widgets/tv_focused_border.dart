@@ -36,12 +36,7 @@ class TvFocusedBorder extends StatelessWidget {
               color: focused ? color.withOpacity(0.98) : Colors.transparent,
               width: focused ? width : 0,
             ),
-            boxShadow: focused
-                ? [
-                    TvFocusStyle.glow(0.24, 12),
-                    BoxShadow(color: AppTheme.whiteGlow.withOpacity(0.06), blurRadius: 8),
-                  ]
-                : null,
+            boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
           ),
           child: child,
         );
