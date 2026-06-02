@@ -245,6 +245,30 @@ class DobdaApiClient {
     final apiLang = _providerLang(config.slug, item.lang);
     final ep = _episodeNumber(chapterId ?? item.chapterId);
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
+    final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
+
+    // Dobda /video membutuhkan chapterId asli dari /detail. Angka 1,2,3
+    // tidak selalu aman sebagai chapterId di semua platform Dobda. Kalau
+    // player meminta episode index, resolve dulu ke chapters[].id supaya
+    // PREV/NEXT dan daftar episode tidak loncat ke video acak.
+    if (requestedIsEpisodeNumber) {
+      final mappedChapter = await _chapterIdForEpisode(
+        item,
+        config: config,
+        apiLang: apiLang,
+        episodeIndex: ep,
+      );
+      if (mappedChapter.isNotEmpty) {
+        final mapped = await _tryVideoByChapter(
+          item,
+          config: config,
+          apiLang: apiLang,
+          chapterId: mappedChapter,
+          episodeIndex: ep,
+        );
+        if (mapped.url.isNotEmpty) return mapped;
+      }
+    }
 
     final direct = await _tryVideoByChapter(
       item,
@@ -255,16 +279,18 @@ class DobdaApiClient {
     );
     if (direct.url.isNotEmpty) return direct;
 
-    final mappedChapter = await _chapterIdForEpisode(item, config: config, apiLang: apiLang, episodeIndex: ep);
-    if (mappedChapter.isNotEmpty && mappedChapter != requested) {
-      final mapped = await _tryVideoByChapter(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapterId: mappedChapter,
-        episodeIndex: ep,
-      );
-      if (mapped.url.isNotEmpty) return mapped;
+    if (!requestedIsEpisodeNumber) {
+      final mappedChapter = await _chapterIdForEpisode(item, config: config, apiLang: apiLang, episodeIndex: ep);
+      if (mappedChapter.isNotEmpty && mappedChapter != requested) {
+        final mapped = await _tryVideoByChapter(
+          item,
+          config: config,
+          apiLang: apiLang,
+          chapterId: mappedChapter,
+          episodeIndex: ep,
+        );
+        if (mapped.url.isNotEmpty) return mapped;
+      }
     }
 
     return StreamInfo.empty;
@@ -279,57 +305,21 @@ class DobdaApiClient {
     final apiLang = _providerLang(config.slug, item.lang);
     final ep = _episodeNumber(chapterId ?? item.chapterId);
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
-    final key = _episodeKey(item, apiLang);
-    final hasEpisodeMap = (_episodeMemory[key]?.isNotEmpty ?? false);
     final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Dobda sering butuh chapterId asli dari /detail. Kalau belum ada map episode,
-    // jangan tunggu probe angka episode terlalu lama: coba cepat saja, lalu langsung
-    // pindah ke detail->chapterId asli. Ini memangkas kasus yang sebelumnya muter >5 detik.
-    if (requestedIsEpisodeNumber && !hasEpisodeMap) {
-      final probeTimeout = _shorterTimeout(timeout, const Duration(milliseconds: 2200));
-      final direct = await _tryVideoByChapter(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapterId: requested,
-        episodeIndex: ep,
-        timeout: probeTimeout,
-      );
-      if (direct.url.isNotEmpty) return direct;
-
+    // Root cause loncat episode Dobda: player TV mengirim episode index
+    // (1,2,3...), sedangkan Dobda /video mengharapkan chapterId asli dari
+    // /detail. Probe angka bisa berhasil di beberapa provider, tapi hasilnya
+    // bukan selalu episode index yang diminta. Jadi untuk angka, selalu map
+    // dulu ke chapters[].id dan jangan tembak angka mentah lebih dulu.
+    if (requestedIsEpisodeNumber) {
       try {
         final mappedChapter = await _chapterIdForEpisode(
           item,
           config: config,
           apiLang: apiLang,
           episodeIndex: ep,
-        ).timeout(const Duration(seconds: 4));
-        if (mappedChapter.isEmpty || mappedChapter == requested) return StreamInfo.empty;
-        return await _tryVideoByChapter(
-          item,
-          config: config,
-          apiLang: apiLang,
-          chapterId: mappedChapter,
-          episodeIndex: ep,
-          timeout: timeout,
-        );
-      } catch (e) {
-        print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
-        return StreamInfo.empty;
-      }
-    }
-
-    // Kalau map episode sudah ada, langsung pakai chapterId asli. Ini jalur tercepat
-    // untuk ganti episode berikutnya.
-    if (requestedIsEpisodeNumber && hasEpisodeMap) {
-      try {
-        final mappedChapter = await _chapterIdForEpisode(
-          item,
-          config: config,
-          apiLang: apiLang,
-          episodeIndex: ep,
-        ).timeout(const Duration(milliseconds: 700));
+        ).timeout(_shorterTimeout(timeout, const Duration(seconds: 4)));
         if (mappedChapter.isNotEmpty) {
           final mapped = await _tryVideoByChapter(
             item,
@@ -341,9 +331,26 @@ class DobdaApiClient {
           );
           if (mapped.url.isNotEmpty) return mapped;
         }
-      } catch (_) {}
+      } catch (e) {
+        print('DOBDA FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
+      }
+
+      // Fallback terakhir saja. Ini hanya untuk provider yang benar-benar
+      // memakai chapterId sama dengan nomor episode.
+      final direct = await _tryVideoByChapter(
+        item,
+        config: config,
+        apiLang: apiLang,
+        chapterId: requested,
+        episodeIndex: ep,
+        timeout: _shorterTimeout(timeout, const Duration(seconds: 3)),
+      );
+      if (direct.url.isNotEmpty) return direct;
+      return StreamInfo.empty;
     }
 
+    // Kalau sudah dikirim chapterId asli, langsung pakai. Ini dipakai ketika
+    // fitur lain nanti mengirim row.id dari daftar episode.
     final direct = await _tryVideoByChapter(
       item,
       config: config,
@@ -360,7 +367,7 @@ class DobdaApiClient {
         config: config,
         apiLang: apiLang,
         episodeIndex: ep,
-      ).timeout(const Duration(seconds: 4));
+      ).timeout(_shorterTimeout(timeout, const Duration(seconds: 4)));
       if (mappedChapter.isEmpty || mappedChapter == requested) return StreamInfo.empty;
       return await _tryVideoByChapter(
         item,

@@ -229,12 +229,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _brokenEpisodeSkips += 1;
     final total = _episodeTotal(_detail ?? widget.item);
 
-    if (_brokenEpisodeSkips < 3 && _episode < total) {
+    final nextEpisode = _episodeByOffset(_episode, 1);
+    if (_brokenEpisodeSkips < 3 && nextEpisode != _episode && _episode < total) {
       final failed = _episode;
       setState(() {
         _loading = true;
-        _error = 'Episode $failed gagal, mencoba Episode ${failed + 1}...';
-        _episode += 1;
+        _error = 'Episode $failed gagal, mencoba Episode $nextEpisode...';
+        _episode = nextEpisode;
         _episodeCursor = _episode;
       });
       await Future<void>.delayed(const Duration(milliseconds: 700));
