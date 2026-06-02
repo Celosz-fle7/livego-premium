@@ -58,12 +58,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _subtitleCursor = 0;
   int _lastSavedProgressSecond = -1;
   int _lastBackHandledMs = 0;
+  int _loadTicket = 0;
+  int _lastPlayableEpisode = 1;
   int _brokenEpisodeSkips = 0;
   String _lastBrokenReason = '';
+  final Set<int> _brokenEpisodes = <int>{};
   List<LiveGoEpisode> _episodes = const <LiveGoEpisode>[];
   List<LiveGoEpisode> _orderedEpisodeCache = const <LiveGoEpisode>[];
   Future<List<LiveGoEpisode>>? _episodeListLoad;
   bool _episodeNavigationBusy = false;
+  bool _resumePlaybackAfterFailedEpisode = true;
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
@@ -75,6 +79,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _showOptions = false;
   bool _progressFocused = false;
   Timer? _autoHideTimer;
+  Timer? _statusTimer;
+  String _statusMessage = '';
 
   static const int _controlCount = 8;
   static const int _optionCount = 6;
@@ -135,6 +141,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void initState() {
     super.initState();
     _episode = LiveGoLocalStore.continueEpisode(widget.item).clamp(1, 999).toInt();
+    _lastPlayableEpisode = _episode;
     _episodeCursor = _episode;
     LiveGoLocalStore.addHistory(widget.item);
     WidgetsBinding.instance.addPostFrameCallback((_) => _rootFocus.requestFocus());
@@ -195,7 +202,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     );
   }
 
+  bool _isCurrentLoad(int ticket, int episode) {
+    return mounted && ticket == _loadTicket && episode == _episode;
+  }
+
   Future<void> _load() async {
+    final ticket = ++_loadTicket;
     final ep = _episode <= 0 ? 1 : _episode;
     final playable = _playableItem(ep);
     _autoAdvancing = false;
@@ -209,35 +221,52 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     try {
       final requestChapter = _isDobdaPlayer ? playable.chapterId : '$ep';
-      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter');
+      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter ticket=$ticket');
       final started = DateTime.now();
       var stream = await PlaybackResolver.fastStreamInfo(
         playable,
         chapterId: requestChapter,
         timeout: PlaybackTimeoutConfig.directEpisode,
       );
-      debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty}');
+      debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty} ticket=$ticket');
+
+      if (!_isCurrentLoad(ticket, ep)) {
+        debugPrint('LIVEGO TV DIRECT EP STALE SKIP ep=$ep current=$_episode ticket=$ticket active=$_loadTicket');
+        return;
+      }
 
       if (stream.url.isEmpty) {
         stream = await LiveGoCatalog.streamInfo(playable, chapterId: requestChapter)
             .timeout(PlaybackTimeoutConfig.fallbackStream, onTimeout: () => StreamInfo.empty);
       }
 
+      if (!_isCurrentLoad(ticket, ep)) {
+        debugPrint('LIVEGO TV FALLBACK EP STALE SKIP ep=$ep current=$_episode ticket=$ticket active=$_loadTicket');
+        return;
+      }
+
       if (stream.url.isEmpty) {
         throw Exception('Stream belum tersedia dari API');
       }
 
-      await _startController(playable, stream);
+      await _startController(playable, stream, loadTicket: ticket, expectedEpisode: ep);
+      if (!_isCurrentLoad(ticket, ep)) return;
       unawaited(_loadEpisodeListBackground(ep, stream));
       unawaited(_loadDetailBackground(ep, stream));
     } catch (e) {
-      await _handleBrokenEpisodeLoad('$e');
+      if (!_isCurrentLoad(ticket, ep)) return;
+      await _handleBrokenEpisodeLoad('$e', failedEpisode: ep, loadTicket: ticket);
     }
   }
 
-  Future<void> _handleBrokenEpisodeLoad(String reason) async {
-    if (!mounted) return;
+  Future<void> _handleBrokenEpisodeLoad(
+    String reason, {
+    required int failedEpisode,
+    required int loadTicket,
+  }) async {
+    if (!_isCurrentLoad(loadTicket, failedEpisode)) return;
     _lastBrokenReason = reason;
+    _brokenEpisodes.add(failedEpisode);
 
     if (!ContentHealthService.shouldAutoSkip(reason)) {
       setState(() {
@@ -249,18 +278,39 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     _brokenEpisodeSkips += 1;
     final total = _episodeTotal(_detail ?? widget.item);
+    final nextEpisode = await _resolveEpisodeByOffset(failedEpisode, 1, skipBroken: true);
 
-    final nextEpisode = await _resolveEpisodeByOffset(_episode, 1);
-    if (_brokenEpisodeSkips < 3 && nextEpisode != _episode && _episode < total) {
-      final failed = _episode;
+    if (!_isCurrentLoad(loadTicket, failedEpisode)) return;
+
+    // Skip episode rusak secara berurutan, tapi jangan biarkan request lama
+    // menimpa request baru. Ini mencegah efek video/label episode loncat-loncat.
+    if (_brokenEpisodeSkips < 7 && nextEpisode != failedEpisode && failedEpisode < total) {
       setState(() {
         _loading = true;
-        _error = 'Episode $failed gagal, mencoba Episode $nextEpisode...';
+        _error = 'Episode $failedEpisode gagal, lanjut Episode $nextEpisode...';
         _episode = nextEpisode;
         _episodeCursor = _episode;
       });
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      if (mounted) _load();
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      if (mounted && _episode == nextEpisode) await _load();
+      return;
+    }
+
+    final activeController = _controller;
+    final canReturnToLastPlayable = activeController != null &&
+        activeController.value.isInitialized &&
+        _lastPlayableEpisode > 0 &&
+        _lastPlayableEpisode != failedEpisode;
+
+    if (canReturnToLastPlayable) {
+      setState(() {
+        _episode = _lastPlayableEpisode;
+        _episodeCursor = _episode;
+        _loading = false;
+        _error = 'Episode $failedEpisode tidak bisa diputar. Tetap di Episode $_lastPlayableEpisode.';
+      });
+      if (_resumePlaybackAfterFailedEpisode) unawaited(activeController.play());
+      _showStatus('Episode $failedEpisode gagal, kembali ke Episode $_lastPlayableEpisode');
       return;
     }
 
@@ -271,44 +321,23 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       failCount: _brokenEpisodeSkips,
     );
 
-    if (!mounted) return;
+    if (!mounted || loadTicket != _loadTicket) return;
     setState(() {
       _loading = false;
       _error = hidden
-          ? 'Beberapa episode tidak bisa diputar. Konten disembunyikan sementara 7 hari.'
+          ? 'Konten ini belum bisa diputar. Disembunyikan sementara 7 hari.'
           : 'Beberapa episode gagal, tapi tidak disembunyikan karena kemungkinan jaringan/server.';
     });
   }
 
-  Future<void> _startController(
-    ContentItem playable,
-    StreamInfo stream, {
-    String? overrideUrl,
-    Duration? resumePosition,
-    bool autoplay = true,
-  }) async {
-    await _controller?.dispose();
-    _streamInfo = stream;
-    _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
-    final playUrl = (overrideUrl ?? stream.urlForQuality(LiveGoSettings.quality)).trim();
-    if (playUrl.isEmpty) throw Exception('URL video kosong');
-    _currentStreamUrl = playUrl;
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(playUrl),
-      httpHeaders: stream.headers.isEmpty
-          ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
-          : stream.headers,
-    );
-    _controller = controller;
-
+  void _attachControllerListener(VideoPlayerController controller) {
     controller.addListener(() {
-      if (!mounted || !controller.value.isInitialized) return;
+      if (!mounted || !controller.value.isInitialized || _controller != controller) return;
       final value = controller.value;
       _syncSubtitleAt(value.position);
       final second = value.position.inSeconds;
       if (second > 0 && second % 5 == 0 && second != _lastSavedProgressSecond) {
-        _lastSavedProgressSecond = second;
-        LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
+        _saveCurrentProgress(force: true);
       }
       final duration = value.duration;
       if (!_autoAdvancing &&
@@ -318,36 +347,106 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         final remaining = duration - value.position;
         if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
           _autoAdvancing = true;
+          LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
+          _saveCurrentProgress(force: true);
           unawaited(_autoAdvanceToNext());
         }
       }
     });
+  }
 
-    final initStart = DateTime.now();
-    await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
-    debugPrint('LIVEGO TV VIDEO INIT DONE ${DateTime.now().difference(initStart).inMilliseconds}ms');
-    await controller.setPlaybackSpeed(_speed);
-    await controller.setVolume(_muted ? 0 : 1);
+  void _saveCurrentProgress({bool force = false}) {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    final value = c.value;
+    final second = value.position.inSeconds;
+    if (second <= 0) return;
+    if (!force && second == _lastSavedProgressSecond) return;
+    _lastSavedProgressSecond = second;
+    LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
+  }
 
-    if (resumePosition != null && resumePosition.inMilliseconds > 0) {
-      await controller.seekTo(resumePosition);
-    } else {
-      final saved = LiveGoLocalStore.progressFor(playable);
-      if (saved != null && saved.episode == _episode && saved.position.inSeconds > 5) {
-        await controller.seekTo(saved.position);
+  void _prepareForEpisodeSwitch() {
+    final c = _controller;
+    _resumePlaybackAfterFailedEpisode = c?.value.isPlaying ?? true;
+    if (c != null && c.value.isInitialized) {
+      unawaited(c.pause());
+    }
+  }
+
+  Future<void> _startController(
+    ContentItem playable,
+    StreamInfo stream, {
+    required int loadTicket,
+    required int expectedEpisode,
+    String? overrideUrl,
+    Duration? resumePosition,
+    bool autoplay = true,
+  }) async {
+    final playUrl = (overrideUrl ?? stream.urlForQuality(LiveGoSettings.quality)).trim();
+    if (playUrl.isEmpty) throw Exception('URL video kosong');
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(playUrl),
+      httpHeaders: stream.headers.isEmpty
+          ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+          : stream.headers,
+    );
+
+    _attachControllerListener(controller);
+
+    try {
+      final initStart = DateTime.now();
+      await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
+      debugPrint('LIVEGO TV VIDEO INIT DONE ${DateTime.now().difference(initStart).inMilliseconds}ms ep=$expectedEpisode ticket=$loadTicket');
+      await controller.setPlaybackSpeed(_speed);
+      await controller.setVolume(_muted ? 0 : 1);
+
+      if (resumePosition != null && resumePosition.inMilliseconds > 0) {
+        await controller.seekTo(resumePosition);
+      } else {
+        final saved = LiveGoLocalStore.progressFor(playable);
+        if (saved != null && saved.episode == expectedEpisode && saved.position.inSeconds > 5) {
+          await controller.seekTo(saved.position);
+        }
       }
-    }
 
-    if (autoplay) {
-      await controller.play();
+      if (!_isCurrentLoad(loadTicket, expectedEpisode)) {
+        await controller.dispose();
+        return;
+      }
+
+      if (autoplay) {
+        await controller.play();
+      }
+
+      if (!_isCurrentLoad(loadTicket, expectedEpisode)) {
+        await controller.dispose();
+        return;
+      }
+
+      final previous = _controller;
+      _controller = controller;
+      _streamInfo = stream;
+      _currentStreamUrl = playUrl;
+      _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
+      _lastPlayableEpisode = expectedEpisode;
+      _brokenEpisodeSkips = 0;
+      _lastBrokenReason = '';
+      _brokenEpisodes.remove(expectedEpisode);
+      unawaited(ContentHealthService.markPlayable(widget.item));
+      if (!mounted) {
+        await previous?.dispose();
+        return;
+      }
+      setState(() => _loading = false);
+      unawaited(previous?.dispose());
+      unawaited(_preparePreferredSubtitle(stream));
+      _showControlsMode(defaultPlay: true);
+    } catch (_) {
+      await controller.dispose();
+      rethrow;
     }
-    _brokenEpisodeSkips = 0;
-    _lastBrokenReason = '';
-    unawaited(ContentHealthService.markPlayable(widget.item));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    unawaited(_preparePreferredSubtitle(stream));
-    _showControlsMode(defaultPlay: true);
   }
 
   Future<void> _preparePreferredSubtitle(StreamInfo stream) async {
@@ -591,6 +690,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _autoHideTimer = null;
   }
 
+  void _showStatus(String message, {Duration duration = const Duration(seconds: 2)}) {
+    _statusTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _statusMessage = message);
+    _statusTimer = Timer(duration, () {
+      if (mounted) setState(() => _statusMessage = '');
+    });
+  }
+
+
   void _scheduleAutoHide() {
     _cancelAutoHide();
     _autoHideTimer = Timer(const Duration(seconds: 5), () {
@@ -704,6 +813,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     // BACK from normal watching/controls must return to the poster grid.
     // Menus still close first, but the control bar itself should not trap BACK.
     if (Navigator.canPop(context)) {
+      _saveCurrentProgress(force: true);
       widget.onExitToHome?.call();
       Navigator.pop(context);
     }
@@ -767,40 +877,60 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   List<LiveGoEpisode> _orderedEpisodes() {
-    if (_orderedEpisodeCache.length == _episodes.length && _orderedEpisodeCache.isNotEmpty) {
-      return _orderedEpisodeCache;
-    }
+    // Episode rows can change while keeping the same length after detail/API
+    // refresh. Recompute the normalized rows instead of trusting length-only
+    // cache, otherwise PREV/NEXT or the episode side panel can point to stale
+    // chapter ids.
     final normalized = _normalizeEpisodeRows(_episodes, _detail ?? widget.item);
     _orderedEpisodeCache = normalized;
     return normalized;
   }
 
-  int _episodeByOffsetFromRows(List<LiveGoEpisode> rows, int from, int delta) {
+  int _episodeByOffsetFromRows(
+    List<LiveGoEpisode> rows,
+    int from,
+    int delta, {
+    Set<int> excluded = const <int>{},
+  }) {
+    final step = delta < 0 ? -1 : 1;
     if (rows.length > 1) {
       final currentPos = rows.indexWhere((e) => e.index == from);
       if (currentPos >= 0) {
-        final nextPos = (currentPos + delta).clamp(0, rows.length - 1).toInt();
-        return rows[nextPos].index;
+        var nextPos = currentPos + step;
+        while (nextPos >= 0 && nextPos < rows.length) {
+          final candidate = rows[nextPos].index;
+          if (!excluded.contains(candidate)) return candidate;
+          nextPos += step;
+        }
+        return from;
       }
-      if (delta > 0) {
+      if (step > 0) {
         for (final row in rows) {
-          if (row.index > from) return row.index;
+          if (row.index > from && !excluded.contains(row.index)) return row.index;
         }
-        return rows.last.index;
+        return from;
       }
-      if (delta < 0) {
-        for (var i = rows.length - 1; i >= 0; i--) {
-          if (rows[i].index < from) return rows[i].index;
-        }
-        return rows.first.index;
+      for (var i = rows.length - 1; i >= 0; i--) {
+        final candidate = rows[i].index;
+        if (candidate < from && !excluded.contains(candidate)) return candidate;
       }
+      return from;
     }
-    return (from + delta).clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
+
+    final total = _episodeTotal(_detail ?? widget.item);
+    var candidate = from;
+    for (var i = 0; i < total; i++) {
+      final next = (candidate + step).clamp(1, total).toInt();
+      if (next == candidate) return from;
+      candidate = next;
+      if (!excluded.contains(candidate)) return candidate;
+    }
+    return from;
   }
 
   int _episodeByOffset(int from, int delta) => _episodeByOffsetFromRows(_orderedEpisodes(), from, delta);
 
-  Future<int> _resolveEpisodeByOffset(int from, int delta) async {
+  Future<int> _resolveEpisodeByOffset(int from, int delta, {bool skipBroken = true}) async {
     var rows = _orderedEpisodes();
     if (rows.length <= 1 && _isDobdaPlayer) {
       try {
@@ -813,21 +943,33 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       // jangan pakai fallback +1 karena bisa tembak chapterId salah.
       if (rows.length <= 1) return from;
     }
-    return _episodeByOffsetFromRows(rows, from, delta);
+    return _episodeByOffsetFromRows(
+      rows,
+      from,
+      delta,
+      excluded: skipBroken ? _brokenEpisodes : const <int>{},
+    );
   }
 
   Future<void> _previousEpisode() async {
     if (_episodeNavigationBusy) return;
     _episodeNavigationBusy = true;
     try {
-      final previous = await _resolveEpisodeByOffset(_episode, -1);
-      if (previous == _episode) return;
+      _saveCurrentProgress(force: true);
+      final previous = await _resolveEpisodeByOffset(_episode, -1, skipBroken: true);
+      if (previous == _episode) {
+        _showStatus('Tidak ada episode sebelumnya');
+        return;
+      }
+      _prepareForEpisodeSwitch();
       _brokenEpisodeSkips = 0;
       _lastBrokenReason = '';
-      _episode = previous;
-      _episodeCursor = _episode;
+      setState(() {
+        _episode = previous;
+        _episodeCursor = _episode;
+      });
       _hideOverlays();
-      _load();
+      await _load();
     } finally {
       _episodeNavigationBusy = false;
     }
@@ -837,40 +979,66 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (_episodeNavigationBusy) return;
     _episodeNavigationBusy = true;
     try {
-      final next = await _resolveEpisodeByOffset(_episode, 1);
-      if (next == _episode) return;
+      _saveCurrentProgress(force: true);
+      final next = await _resolveEpisodeByOffset(_episode, 1, skipBroken: true);
+      if (next == _episode) {
+        _showStatus('Tidak ada episode berikutnya');
+        return;
+      }
+      _prepareForEpisodeSwitch();
       _brokenEpisodeSkips = 0;
       _lastBrokenReason = '';
-      _episode = next;
-      _episodeCursor = _episode;
+      setState(() {
+        _episode = next;
+        _episodeCursor = _episode;
+      });
       _hideOverlays();
-      _load();
+      await _load();
     } finally {
       _episodeNavigationBusy = false;
     }
   }
 
   Future<void> _autoAdvanceToNext() async {
-    final next = await _resolveEpisodeByOffset(_episode, 1);
-    if (!mounted || next == _episode) {
-      _autoAdvancing = false;
-      return;
+    if (_episodeNavigationBusy) return;
+    _episodeNavigationBusy = true;
+    try {
+      final next = await _resolveEpisodeByOffset(_episode, 1, skipBroken: true);
+      if (!mounted || next == _episode) {
+        _autoAdvancing = false;
+        _showStatus('Episode terakhir selesai');
+        return;
+      }
+      LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
+      _prepareForEpisodeSwitch();
+      setState(() {
+        _episode = next;
+        _episodeCursor = _episode;
+      });
+      await _load();
+    } finally {
+      _episodeNavigationBusy = false;
     }
-    LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
-    setState(() {
-      _episode = next;
-      _episodeCursor = _episode;
-    });
-    _load();
   }
 
-  void _selectEpisode(int episode) {
-    _brokenEpisodeSkips = 0;
-    _lastBrokenReason = '';
-    _episode = episode.clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
-    _episodeCursor = _episode;
-    _hideOverlays();
-    _load();
+  Future<void> _selectEpisode(int episode) async {
+    if (_episodeNavigationBusy) return;
+    _episodeNavigationBusy = true;
+    try {
+      _saveCurrentProgress(force: true);
+      _prepareForEpisodeSwitch();
+      _brokenEpisodeSkips = 0;
+      _lastBrokenReason = '';
+      _brokenEpisodes.remove(episode);
+      setState(() {
+        _episode = episode.clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
+        _episodeCursor = _episode;
+      });
+      _hideOverlays();
+      await _load();
+    } finally {
+      _episodeNavigationBusy = false;
+    }
   }
 
   void _moveEpisodeCursor(int delta) {
@@ -900,39 +1068,95 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<void> _applyQualityChoice(int index) async {
     final choices = _qualityChoices;
-    if (choices.isEmpty) return;
+    if (choices.isEmpty) {
+      _showControlsMode();
+      return;
+    }
     final safe = index.clamp(0, choices.length - 1).toInt();
     final label = choices[safe];
+    final previousQuality = LiveGoSettings.quality;
     setState(() {
       _qualityCursor = safe;
       LiveGoSettings.quality = label;
     });
     await PlayerPreferences.setQuality(label);
 
-    if (_streamInfo.url.isEmpty) return;
-    final nextUrl = _streamInfo.urlForQuality(label).trim();
-    if (nextUrl.isEmpty || nextUrl == _currentStreamUrl) return;
+    if (_streamInfo.url.isEmpty) {
+      _showStatus('Kualitas disimpan: $label');
+      _showControlsMode();
+      return;
+    }
 
+    final nextUrl = _streamInfo.urlForQuality(label).trim();
+    if (nextUrl.isEmpty) {
+      _showStatus('URL kualitas tidak tersedia');
+      _showControlsMode();
+      return;
+    }
+    if (nextUrl == _currentStreamUrl) {
+      _showStatus('Kualitas aktif: $label');
+      _showControlsMode();
+      return;
+    }
+
+    final switched = await _switchQualityController(label, nextUrl);
+    if (!switched && mounted) {
+      setState(() {
+        LiveGoSettings.quality = previousQuality;
+        _qualityCursor = _qualityIndexFor(previousQuality);
+      });
+      await PlayerPreferences.setQuality(previousQuality);
+    }
+  }
+
+  Future<bool> _switchQualityController(String label, String nextUrl) async {
     final old = _controller;
     final resume = old != null && old.value.isInitialized ? old.value.position : Duration.zero;
+    final duration = old != null && old.value.isInitialized ? old.value.duration : Duration.zero;
     final wasPlaying = old?.value.isPlaying ?? true;
-    setState(() => _loading = true);
+
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(nextUrl),
+      httpHeaders: _streamInfo.headers.isEmpty
+          ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'}
+          : _streamInfo.headers,
+    );
+
     try {
-      await _startController(
-        _detail ?? _playableItem(_episode),
-        _streamInfo,
-        overrideUrl: nextUrl,
-        resumePosition: resume,
-        autoplay: wasPlaying,
-      );
-      _showControlsMode();
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = '$e';
-        });
+      _attachControllerListener(controller);
+      await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
+      await controller.setPlaybackSpeed(_speed);
+      await controller.setVolume(_muted ? 0 : 1);
+      if (resume.inMilliseconds > 0) {
+        final target = duration.inMilliseconds > 0 && resume > duration ? duration : resume;
+        await controller.seekTo(target);
       }
+      if (wasPlaying) await controller.play();
+
+      final previous = _controller;
+      _controller = controller;
+      _currentStreamUrl = nextUrl;
+      if (!mounted) {
+        await previous?.dispose();
+        return true;
+      }
+      setState(() => _loading = false);
+      unawaited(previous?.dispose());
+      _showStatus('Kualitas aktif: $label');
+      _showControlsMode();
+      return true;
+    } catch (e) {
+      await controller.dispose();
+      if (!mounted) return false;
+      setState(() => _loading = false);
+      _showStatus('Gagal ganti kualitas, tetap memakai stream lama');
+      _showControlsMode();
+      return false;
     }
   }
 
@@ -950,19 +1174,56 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _selectSourceAudio() {
-    setState(() => _audioTrack = 'Source');
+    setState(() {
+      _audioTrack = 'Source';
+      _muted = false;
+    });
+    _controller?.setVolume(1);
     PlayerPreferences.setAudioTrack('Source');
   }
 
   void _toggleMute() {
-    setState(() => _muted = !_muted);
-    _controller?.setVolume(_muted ? 0 : 1);
+    final next = !_muted;
+    setState(() {
+      _muted = next;
+      _audioTrack = next ? 'Mute' : 'Source';
+    });
+    _controller?.setVolume(next ? 0 : 1);
+    PlayerPreferences.setAudioTrack(next ? 'Mute' : 'Source');
+  }
+
+  Future<void> _selectSubtitleChoice() async {
+    if (_subtitleCursor == 0) {
+      await _applySubtitle(-1);
+      _showStatus('Subtitle OFF');
+      _showControlsMode();
+      return;
+    }
+    final trackIndex = _subtitleCursor - 1;
+    if (_streamInfo.subtitles.isEmpty || trackIndex >= _streamInfo.subtitles.length) {
+      _showStatus('Subtitle tidak tersedia');
+      _showControlsMode();
+      return;
+    }
+    await _applySubtitle(trackIndex);
+    if (!mounted) return;
+    _showStatus('Subtitle aktif: ${_streamInfo.subtitles[trackIndex].language}');
+    _showControlsMode();
   }
 
   void _toggleSubtitle() {
     final next = !LiveGoSettings.subtitlesEnabled;
-    setState(() => LiveGoSettings.subtitlesEnabled = next);
-    PlayerPreferences.setSubtitle(enabled: next);
+    if (!next) {
+      unawaited(_applySubtitle(-1));
+      return;
+    }
+    if (_streamInfo.subtitles.isNotEmpty) {
+      unawaited(_applySubtitle(0));
+    } else {
+      setState(() => LiveGoSettings.subtitlesEnabled = true);
+      PlayerPreferences.setSubtitle(enabled: true);
+      _showStatus('Subtitle API tidak tersedia');
+    }
   }
 
   Future<void> _toggleFavorite() async {
@@ -1019,7 +1280,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   KeyEventResult _handleRemoteKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    final item = _detail ?? widget.item;
 
     if (_isBack(key)) {
       _handleBack();
@@ -1039,7 +1299,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       } else if (key == LogicalKeyboardKey.arrowDown) {
         _moveEpisodeCursor(1);
       } else if (_isSelect(key)) {
-        _selectEpisode(_episodeCursor);
+        unawaited(_selectEpisode(_episodeCursor));
       }
       return KeyEventResult.handled;
     }
@@ -1066,11 +1326,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _showControlsMode();
       } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
-        if (_subtitleCursor == 0) {
-          unawaited(_applySubtitle(-1));
-        } else if (_streamInfo.subtitles.isNotEmpty && _subtitleCursor - 1 < _streamInfo.subtitles.length) {
-          unawaited(_applySubtitle(_subtitleCursor - 1));
-        }
+        unawaited(_selectSubtitleChoice());
       }
       return KeyEventResult.handled;
     }
@@ -1111,7 +1367,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         setState(() => _progressFocused = true);
         _scheduleAutoHide();
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        _scheduleAutoHide();
+        _showEpisodeList();
       } else if (_isSelect(key)) {
         _activateControl();
       }
@@ -1168,6 +1424,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   @override
   void dispose() {
     _cancelAutoHide();
+    _statusTimer?.cancel();
+    _saveCurrentProgress(force: true);
     _rootFocus.dispose();
     _controller?.dispose();
     super.dispose();
@@ -1205,6 +1463,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
               if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+              if (_statusMessage.isNotEmpty)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: _showControls ? 156 : 36,
+                  child: Center(child: _PlayerStatusToast(message: _statusMessage)),
+                ),
               if (!_loading && !ready)
                 Center(
                   child: Padding(
@@ -1262,6 +1527,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     total: _episodeTotal(item),
                     selected: _episode,
                     cursor: _episodeCursor,
+                    broken: _brokenEpisodes,
                   ),
                 ),
               if (_mode == _PlayerMode.qualityPopup)
@@ -1409,7 +1675,7 @@ class _PlayerControlDock extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.90),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.34)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 28), const BoxShadow(color: Colors.black87, blurRadius: 18)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1425,7 +1691,7 @@ class _PlayerControlDock extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: progressFocused ? AppTheme.cyan : Colors.transparent, width: 2),
-                    boxShadow: progressFocused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 16)] : null,
+                    boxShadow: progressFocused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
                   ),
                   child: VideoProgressIndicator(
                     controller,
@@ -1482,7 +1748,7 @@ class _DockButton extends StatelessWidget {
             : (active ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.055)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.75) : Colors.white12), width: focused ? 2.5 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 18)] : null,
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1514,7 +1780,7 @@ class _DockTextButton extends StatelessWidget {
         color: focused ? AppTheme.cyan.withOpacity(0.20) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2.5 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 18)] : null,
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Text(text, style: TextStyle(color: focused ? Colors.white : Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
@@ -1526,8 +1792,15 @@ class _EpisodeSidePanel extends StatelessWidget {
   final int total;
   final int selected;
   final int cursor;
+  final Set<int> broken;
 
-  const _EpisodeSidePanel({required this.episodes, required this.total, required this.selected, required this.cursor});
+  const _EpisodeSidePanel({
+    required this.episodes,
+    required this.total,
+    required this.selected,
+    required this.cursor,
+    this.broken = const <int>{},
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1546,7 +1819,7 @@ class _EpisodeSidePanel extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.7), blurRadius: 28), BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 30)],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.65), blurRadius: 12), BoxShadow(color: AppTheme.cyan.withOpacity(0.04), blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1573,6 +1846,7 @@ class _EpisodeSidePanel extends StatelessWidget {
                     title: row.title,
                     selected: ep == selected,
                     focused: ep == cursor,
+                    broken: broken.contains(ep),
                   ),
                 );
               },
@@ -1589,7 +1863,14 @@ class _EpisodeListRow extends StatelessWidget {
   final String title;
   final bool selected;
   final bool focused;
-  const _EpisodeListRow({required this.ep, required this.title, required this.selected, required this.focused});
+  final bool broken;
+  const _EpisodeListRow({
+    required this.ep,
+    required this.title,
+    required this.selected,
+    required this.focused,
+    this.broken = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1601,14 +1882,19 @@ class _EpisodeListRow extends StatelessWidget {
         color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 14)] : null,
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Row(
         children: [
-          Icon(selected ? Icons.play_arrow_rounded : Icons.radio_button_unchecked_rounded, color: selected || focused ? Colors.white : AppTheme.textSoft, size: 18),
+          Icon(
+            broken ? Icons.error_outline_rounded : (selected ? Icons.play_arrow_rounded : Icons.radio_button_unchecked_rounded),
+            color: broken ? Colors.orangeAccent : (selected || focused ? Colors.white : AppTheme.textSoft),
+            size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(child: Text(title.trim().isEmpty ? 'Episode $ep' : title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused || selected ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
-          if (selected) const Text('DIPUTAR', style: TextStyle(color: AppTheme.cyan, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          if (broken) const Text('GAGAL', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none))
+          else if (selected) const Text('DIPUTAR', style: TextStyle(color: AppTheme.cyan, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );
@@ -1640,7 +1926,7 @@ class _ChoicePanel extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.96),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 24), const BoxShadow(color: Colors.black87, blurRadius: 22)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1685,7 +1971,7 @@ class _ChoiceRow extends StatelessWidget {
           color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.62) : Colors.white12),
           width: focused ? 2 : 1,
         ),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 14)] : null,
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Row(
         children: [
@@ -1726,7 +2012,7 @@ class _PlayerOptionsPanel extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 24), const BoxShadow(color: Colors.black87, blurRadius: 22)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1769,6 +2055,38 @@ class _OptionRow extends StatelessWidget {
           Expanded(child: Text(label, style: TextStyle(color: focused ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
           Text(value, style: TextStyle(color: focused ? Colors.white : AppTheme.cyan, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
+      ),
+    );
+  }
+}
+
+class _PlayerStatusToast extends StatelessWidget {
+  final String message;
+  const _PlayerStatusToast({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.14)),
+        ),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            decoration: TextDecoration.none,
+          ),
+        ),
       ),
     );
   }
