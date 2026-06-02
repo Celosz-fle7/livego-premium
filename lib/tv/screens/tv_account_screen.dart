@@ -35,6 +35,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   int _lastIndex = 0;
   int _lastBackHandledMs = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusRow(_lastIndex);
+    });
+  }
+
   List<_AccountItem> get _items => [
         _AccountItem(
           icon: Icons.layers_rounded,
@@ -149,10 +157,15 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _focusRow(int index) {
     if (_nodes.isEmpty) return;
     _lastIndex = _safe(index);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) setState(() {});
+
+    void request() {
       if (!mounted || _nodes.isEmpty) return;
-      tvFocus(_nodes[_lastIndex], alignment: 0.22, duration: const Duration(milliseconds: 110));
-    });
+      tvFocus(_nodes[_lastIndex], alignment: 0.24, duration: const Duration(milliseconds: 105));
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => request());
+    Future<void>.delayed(const Duration(milliseconds: 70), request);
   }
 
   void _pushScreen(Widget screen) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
@@ -35,6 +36,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   int source = 0;
   int category = 0;
+  int _settingsVersion = LiveGoLocalStore.version.value;
   late Future<_TvHomeState> _future;
 
   final ScrollController _pageScroll = ScrollController();
@@ -72,9 +74,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void didUpdateWidget(covariant TvHomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
+      _refreshIfSettingsChanged();
       _focusEntry();
     }
     if (widget.bannerFocusTicket > 0 && oldWidget.bannerFocusTicket != widget.bannerFocusTicket) {
+      _refreshIfSettingsChanged();
       _focusBannerEntry();
     }
   }
@@ -103,6 +107,28 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       final hero = fallback.isNotEmpty ? fallback.first : await LiveGoCatalog.hero(platform: 'shortmax');
       return _TvHomeState(hero: hero, items: fallback);
     }
+  }
+
+  void _refreshIfSettingsChanged() {
+    final current = LiveGoLocalStore.version.value;
+    if (current == _settingsVersion) return;
+    _settingsVersion = current;
+
+    final platforms = LiveGoCatalog.platforms;
+    if (platforms.isEmpty) {
+      source = 0;
+      category = 0;
+    } else {
+      source = source.clamp(0, platforms.length - 1).toInt();
+      final categories = LiveGoCatalog.categoriesFor(platforms[source]);
+      category = categories.isEmpty ? 0 : category.clamp(0, categories.length - 1).toInt();
+    }
+    _lastPlatform = source;
+    _lastCategory = category;
+    _lastGrid = 0;
+    _gridDataReady = false;
+    _visibleGridItems = const <ContentItem>[];
+    setState(() => _future = _load());
   }
 
   void _reload() {
