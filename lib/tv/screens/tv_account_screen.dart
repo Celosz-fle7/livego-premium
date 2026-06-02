@@ -160,13 +160,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _lastIndex = _safe(index);
     if (mounted) setState(() {});
 
-    void request() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _nodes.isEmpty) return;
-      tvFocus(_nodes[_lastIndex], alignment: 0.24, duration: TvFocusStyle.fast);
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => request());
-    Future<void>.delayed(TvFocusStyle.fast, request);
+      tvFocusComfort(_nodes[_lastIndex], topMargin: 86, bottomMargin: 108);
+    });
   }
 
   void _pushScreen(Widget screen) {
@@ -179,9 +176,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     if (!mounted) return;
     _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
     _focusRow(_lastIndex);
-    Future<void>.delayed(const Duration(milliseconds: 110), () {
-      if (mounted) _focusRow(_lastIndex);
-    });
   }
 
   void _showMessage(String message) {
@@ -426,16 +420,15 @@ class _AccountActionCard extends StatelessWidget {
                     ? LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [TvFocusStyle.focusBlue.withOpacity(0.24), AppTheme.purple.withOpacity(0.14)],
+                        colors: [TvFocusStyle.focusBlue.withOpacity(0.16), AppTheme.purple.withOpacity(0.08)],
                       )
                     : null,
                 color: focused ? null : AppTheme.surface.withOpacity(0.86),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2.4 : 1),
+                border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2.0 : 1),
                 boxShadow: focused
                     ? [
-                        TvFocusStyle.glow(0.16, 12),
-                        BoxShadow(color: AppTheme.purple.withOpacity(0.06), blurRadius: 18),
+                        TvFocusStyle.glow(0.08, 6),
                       ]
                     : null,
               ),

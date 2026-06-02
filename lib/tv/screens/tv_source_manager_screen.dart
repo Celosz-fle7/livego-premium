@@ -140,7 +140,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   void _focusBack() {
     _categoryMode = false;
-    tvFocus(_backNode, alignment: 0.04);
+    tvFocusComfort(_backNode, topMargin: 56, bottomMargin: 96);
     if (mounted) setState(() {});
   }
 
@@ -154,7 +154,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (categoryIndex != null) _categoryIndex = categoryIndex;
     if (_categoryIndex >= categories.length) _categoryIndex = categories.length - 1;
     if (_categoryIndex < 0) _categoryIndex = 0;
-    tvFocus(_sourceNodes[_lastIndex], alignment: _categoryMode ? 0.34 : 0.26);
+    tvFocusComfort(_sourceNodes[_lastIndex], topMargin: 92, bottomMargin: 122);
     if (mounted) setState(() {});
   }
 
@@ -508,7 +508,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                           ),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: AppTheme.border),
-                          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 28)],
+                          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.032), blurRadius: 18)],
                         ),
                         child: Column(
                           children: [
@@ -721,10 +721,10 @@ class _SourceRow extends StatelessWidget {
         color: focused && selectedPanel
             ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
             : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
-        width: focused && selectedPanel ? 2 : 1,
+        width: focused && selectedPanel ? 1.7 : 1,
       ),
       boxShadow: focused && selectedPanel
-          ? [TvFocusStyle.glow(0.085, 7)]
+          ? [TvFocusStyle.glow(0.055, 5)]
           : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
     );
   }
@@ -930,8 +930,8 @@ class _SwitchPill extends StatelessWidget {
         gradient: active ? AppTheme.activeGradient : null,
         color: active ? null : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [TvFocusStyle.glow(0.09, 7)] : null,
+        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 1.7 : 1),
+        boxShadow: focused ? [TvFocusStyle.glow(0.055, 5)] : null,
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
@@ -970,7 +970,7 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      height: 38,
+      height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -979,9 +979,9 @@ class _CategoryChip extends StatelessWidget {
         color: selected ? null : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
         border: Border.all(
           color: focused ? AppTheme.whiteGlow : (selected ? Colors.white.withOpacity(0.14) : Colors.white12),
-          width: focused ? 2 : 1,
+          width: focused ? 1.7 : 1,
         ),
-        boxShadow: focused ? [TvFocusStyle.glow(0.09, 7)] : null,
+        boxShadow: focused ? [TvFocusStyle.glow(0.055, 5)] : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1121,7 +1121,7 @@ class _DialogButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
                   color: focused ? AppTheme.whiteGlow : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
-                  width: focused ? 2 : 1,
+                  width: focused ? 1.7 : 1,
                 ),
                 boxShadow: focused ? [TvFocusStyle.glow(0.10, 8)] : null,
               ),

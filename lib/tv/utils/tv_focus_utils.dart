@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -29,6 +30,65 @@ bool tvFocus(
     } catch (_) {
       // Focus can move while a route/list is rebuilding. Never let scroll
       // restoration crash the TV UI; the next remote press will re-focus.
+    }
+  });
+
+  return true;
+}
+
+
+/// Request focus without forcing the item into a fixed screen position.
+///
+/// Use this for vertical menu/list screens such as Account and Source Manager.
+/// The old explicit alignment is good for Home zone jumps, but on tall lists it
+/// can make the viewport jump on every UP/DOWN press. This helper only scrolls
+/// when the focused widget is close to/outside the safe viewport edge.
+bool tvFocusComfort(
+  FocusNode node, {
+  double topMargin = 72,
+  double bottomMargin = 88,
+  Duration duration = Duration.zero,
+}) {
+  if (!node.canRequestFocus || node.context == null) return false;
+
+  node.requestFocus();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = node.context;
+    if (context == null || !node.hasFocus) return;
+    try {
+      final scrollable = Scrollable.maybeOf(context);
+      final renderObject = context.findRenderObject();
+      if (scrollable == null || renderObject == null) return;
+      final viewport = RenderAbstractViewport.maybeOf(renderObject);
+      if (viewport == null) return;
+
+      final position = scrollable.position;
+      if (!position.hasPixels || !position.hasViewportDimension) return;
+
+      final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+      final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+      final current = position.pixels;
+      final viewportExtent = position.viewportDimension;
+
+      double? target;
+      if (leading < current + topMargin) {
+        target = leading - topMargin;
+      } else if (trailing > current + viewportExtent - bottomMargin) {
+        target = trailing - viewportExtent + bottomMargin;
+      }
+
+      if (target == null) return;
+      final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+      if ((clamped - current).abs() < 1) return;
+      if (duration == Duration.zero) {
+        position.jumpTo(clamped);
+      } else {
+        position.animateTo(clamped, duration: duration, curve: Curves.linear);
+      }
+    } catch (_) {
+      // Lists can rebuild while a remote key repeats. Ignore; the next focus
+      // movement will correct the viewport if needed.
     }
   });
 
