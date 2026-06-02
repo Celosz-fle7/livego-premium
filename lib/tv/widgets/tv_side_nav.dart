@@ -89,7 +89,7 @@ class TvSideNav extends StatelessWidget {
       child: AnimatedContainer(
         duration: TvFocusStyle.normal,
         curve: Curves.linear,
-        width: _visible ? 74 : 16,
+        width: _visible ? 74 : 10,
         child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
       ),
     );
@@ -97,7 +97,7 @@ class TvSideNav extends StatelessWidget {
 
   Widget _buildRail() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(6, 12, 6, 12),
+      margin: const EdgeInsets.fromLTRB(6, 22, 6, 22),
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -111,8 +111,8 @@ class TvSideNav extends StatelessWidget {
           width: _focused ? 1.4 : 1,
         ),
         boxShadow: [
-          const BoxShadow(color: Colors.black87, blurRadius: 16),
-          if (_focused) TvFocusStyle.glow(0.10, 8),
+          const BoxShadow(color: Colors.black54, blurRadius: 10),
+          if (_focused) TvFocusStyle.glow(0.07, 6),
         ],
       ),
       child: Column(
@@ -152,11 +152,11 @@ class _HiddenGrip extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: AnimatedContainer(
         duration: TvFocusStyle.fast,
-        width: 4,
-        height: active ? 120 : 80,
-        margin: const EdgeInsets.only(left: 2),
+        width: 2.5,
+        height: active ? 96 : 64,
+        margin: const EdgeInsets.only(left: 1.5),
         decoration: BoxDecoration(
-          color: active ? TvFocusStyle.focusBlue.withOpacity(0.42) : Colors.white.withOpacity(0.08),
+          color: active ? TvFocusStyle.focusBlue.withOpacity(0.18) : Colors.white.withOpacity(0.035),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -229,7 +229,7 @@ class _NavIconButton extends StatelessWidget {
                         : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
                     width: focused ? 2 : 1,
                   ),
-                  boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
+                  boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
                 ),
                 child: Icon(
                   icon,

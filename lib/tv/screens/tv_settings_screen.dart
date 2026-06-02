@@ -154,14 +154,14 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   void _focusBack() {
     if (!widget.showBackButton) return;
     _zone = TvZone.nav;
-    tvFocus(_backNode, alignment: 0.05);
+    tvFocus(_backNode, alignment: 0.10);
   }
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.settings;
     _lastRow = _safe(index);
-    tvFocus(_rowNodes[_lastRow], alignment: 0.28);
+    tvFocus(_rowNodes[_lastRow], alignment: 0.32);
   }
 
   void _goBack() {
@@ -386,7 +386,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             style: const TextStyle(decoration: TextDecoration.none),
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 18, 28, 28),
+              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
               children: [
                 _Header(
                   showBackButton: widget.showBackButton,
@@ -522,7 +522,7 @@ class _Header extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.96),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.border),
-        boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 22)],
+        boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 14)],
       ),
       child: Row(
         children: [
@@ -705,7 +705,7 @@ class _FocusedSettingRow extends StatelessWidget {
                     color: focused ? AppTheme.surface3 : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
-                    boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.16), blurRadius: 16)] : null,
+                    boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.10), blurRadius: 10)] : null,
                   ),
                   child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
                 ),

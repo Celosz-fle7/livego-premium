@@ -250,7 +250,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           builder: (context, _, __) {
             return ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(22, 18, 30, 28),
+              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
               children: [
                 const _AccountHeader(),
                 const SizedBox(height: 14),
@@ -316,7 +316,7 @@ class _AccountHeader extends StatelessWidget {
         gradient: AppTheme.panelGradient,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.border),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.07), blurRadius: 26)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.045), blurRadius: 18)],
       ),
       child: Row(
         children: [
@@ -434,8 +434,8 @@ class _AccountActionCard extends StatelessWidget {
                 border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2.4 : 1),
                 boxShadow: focused
                     ? [
-                        TvFocusStyle.glow(0.30, 22),
-                        BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 34),
+                        TvFocusStyle.glow(0.16, 12),
+                        BoxShadow(color: AppTheme.purple.withOpacity(0.06), blurRadius: 18),
                       ]
                     : null,
               ),

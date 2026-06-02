@@ -230,7 +230,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
             },
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(18, 20, 30, 32),
+              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
               children: [
                 _DownloadHeader(count: rows.length),
                 const SizedBox(height: 16),

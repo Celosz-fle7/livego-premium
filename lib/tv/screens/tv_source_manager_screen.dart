@@ -525,7 +525,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                 style: const TextStyle(decoration: TextDecoration.none),
                 child: ListView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 16, 34, 32),
+                  padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
                   children: [
                     _SourceHeader(
                       backNode: _backNode,
@@ -627,7 +627,7 @@ class _SourceHeader extends StatelessWidget {
         gradient: AppTheme.panelGradient,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 26)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.045), blurRadius: 18)],
       ),
       child: Row(
         children: [
@@ -776,8 +776,8 @@ class _SourceRow extends StatelessWidget {
                     border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : AppTheme.borderSoft, width: focused ? 2 : 1),
                     boxShadow: focused
                         ? [
-                            BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 24, spreadRadius: 1),
-                            BoxShadow(color: AppTheme.purple.withOpacity(0.08), blurRadius: 36),
+                            BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 14),
+                            BoxShadow(color: AppTheme.purple.withOpacity(0.05), blurRadius: 18),
                           ]
                         : null,
                   ),

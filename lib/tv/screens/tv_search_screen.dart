@@ -268,7 +268,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
             final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
             return ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(18, 20, 30, 32),
+              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
               children: [
                 _SearchHeader(),
                 const SizedBox(height: 14),
@@ -452,7 +452,7 @@ class _SearchPoster extends StatelessWidget {
                   Expanded(
                     child: AnimatedContainer(
                       duration: TvFocusStyle.fast,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: item.posterUrl.isEmpty

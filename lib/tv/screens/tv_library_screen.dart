@@ -270,7 +270,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                 final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
                 return ListView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(18, 20, 30, 32),
+                  padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
                   children: [
                     _LibraryHeader(title: widget.title, icon: widget.icon, count: items.length, favorites: widget.favorites),
                     const SizedBox(height: 16),
@@ -419,7 +419,7 @@ class _TvLibraryPoster extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0),
-                        boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
+                        boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),

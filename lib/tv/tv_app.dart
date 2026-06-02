@@ -528,8 +528,8 @@ class _TvAppState extends State<TvApp> {
                         AnimatedContainer(
                           duration: TvFocusStyle.normal,
                           width: _navMode == TvSideNavMode.hidden ? 0 : 1,
-                          margin: const EdgeInsets.symmetric(vertical: 18),
-                          color: Colors.white.withOpacity(0.055),
+                          margin: const EdgeInsets.symmetric(vertical: 30),
+                          color: Colors.white.withOpacity(0.035),
                         ),
                         Expanded(
                           child: RepaintBoundary(
