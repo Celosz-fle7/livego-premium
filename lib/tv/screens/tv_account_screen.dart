@@ -162,7 +162,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _nodes.isEmpty) return;
-      tvFocusComfort(_nodes[_lastIndex], topMargin: 86, bottomMargin: 108);
+      tvFocusComfort(_nodes[_lastIndex], topMargin: 104, bottomMargin: 188);
     });
   }
 
@@ -244,7 +244,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           builder: (context, _, __) {
             return ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+              padding: const EdgeInsets.fromLTRB(28, 34, 40, 190),
               children: [
                 const _AccountHeader(),
                 const SizedBox(height: 14),
@@ -270,6 +270,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                     decoration: TextDecoration.none,
                   ),
                 ),
+                const SizedBox(height: 96),
               ],
             );
           },

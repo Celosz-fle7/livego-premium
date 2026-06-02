@@ -140,7 +140,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   void _focusBack() {
     _categoryMode = false;
-    tvFocusComfort(_backNode, topMargin: 56, bottomMargin: 96);
+    tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
     if (mounted) setState(() {});
   }
 
@@ -154,7 +154,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (categoryIndex != null) _categoryIndex = categoryIndex;
     if (_categoryIndex >= categories.length) _categoryIndex = categories.length - 1;
     if (_categoryIndex < 0) _categoryIndex = 0;
-    tvFocusComfort(_sourceNodes[_lastIndex], topMargin: 92, bottomMargin: 122);
+    tvFocusComfort(_sourceNodes[_lastIndex], topMargin: 112, bottomMargin: 218);
     if (mounted) setState(() {});
   }
 
@@ -488,7 +488,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                   style: const TextStyle(decoration: TextDecoration.none),
                   child: ListView(
                     controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+                    padding: const EdgeInsets.fromLTRB(28, 34, 40, 210),
                     children: [
                       _SourceHeader(
                         backNode: _backNode,
@@ -539,6 +539,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         'OK ON/OFF platform • RIGHT masuk kategori • OK di kategori ON/OFF • BACK keluar mode kategori',
                         style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                       ),
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
