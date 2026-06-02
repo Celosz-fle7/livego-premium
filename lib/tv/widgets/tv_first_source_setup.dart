@@ -22,15 +22,17 @@ class TvFirstSourceSetup extends StatefulWidget {
 
 class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
   static const int _maxActive = 6;
+
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-root');
+  final FocusNode _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-save');
   final List<FocusNode> _nodes = <FocusNode>[];
-  late final FocusNode _rootNode;
-  late final FocusNode _saveNode;
-  Timer? _focusRetryTimer;
+
   late final List<String> _platforms;
   late final Set<String> _selected;
   int _index = 0;
   bool _saving = false;
+  Timer? _focusRetryTimer;
 
   @override
   void initState() {
@@ -40,62 +42,38 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     final fallback = LiveGoSettings.defaultPlatforms.where(_platforms.contains).take(_maxActive).toList();
     _selected = <String>{...(current.isNotEmpty ? current : fallback)};
     if (_selected.isEmpty && _platforms.isNotEmpty) _selected.add(_platforms.first);
-    _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-root');
-    _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-save');
-    _syncNodes();
-    _requestInitialFocus();
+    for (var i = 0; i < _platforms.length; i++) {
+      _nodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-$i'));
+    }
+    _scheduleInitialFocus();
   }
 
   @override
   void dispose() {
+    _focusRetryTimer?.cancel();
     for (final node in _nodes) {
       node.dispose();
     }
-    _focusRetryTimer?.cancel();
     _rootNode.dispose();
     _saveNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _syncNodes() {
-    while (_nodes.length < _platforms.length) {
-      _nodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-${_nodes.length}'));
-    }
-  }
-
-  void _requestInitialFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  void _scheduleInitialFocus() {
+    void run() {
       if (!mounted) return;
-      _rootNode.requestFocus();
-      if (_nodes.isNotEmpty) _focusRow(0);
-    });
-    _focusRetryTimer?.cancel();
-    _focusRetryTimer = Timer(const Duration(milliseconds: 120), () {
-      if (!mounted) return;
-      if (!_saveNode.hasFocus && !_nodes.any((node) => node.hasFocus)) {
-        _rootNode.requestFocus();
-        if (_nodes.isNotEmpty) _focusRow(_index);
+      FocusManager.instance.primaryFocus?.unfocus();
+      if (_nodes.isNotEmpty) {
+        _focusRow(_index.clamp(0, _nodes.length - 1).toInt());
+      } else {
+        _focusSave();
       }
-    });
-  }
+    }
 
-  KeyEventResult _rootKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (_saveNode.hasFocus) return _saveKey(_saveNode, event);
-    if (_nodes.isNotEmpty && _index >= 0 && _index < _nodes.length) {
-      return _rowKey(_index, _platforms[_index], event);
-    }
-    if (_isSelect(key) || _isBack(key)) {
-      _saveAndContinue();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
+    WidgetsBinding.instance.addPostFrameCallback((_) => run());
+    _focusRetryTimer?.cancel();
+    _focusRetryTimer = Timer(const Duration(milliseconds: 160), run);
   }
 
   bool _isSelect(LogicalKeyboardKey key) =>
@@ -121,17 +99,9 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     if (mounted) setState(() {});
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.surface2,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+  void _toggleCurrent() {
+    if (_nodes.isEmpty || _index < 0 || _index >= _platforms.length) return;
+    _toggle(_platforms[_index]);
   }
 
   void _toggle(String slug) {
@@ -151,24 +121,42 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     setState(() {});
   }
 
+  void _showSnack(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.surface2,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
   Future<void> _saveAndContinue() async {
     if (_saving) return;
     setState(() => _saving = true);
+
     final chosen = _platforms.where(_selected.contains).take(_maxActive).toList();
     if (chosen.isEmpty) {
       chosen.addAll(LiveGoSettings.defaultPlatforms.where(_platforms.contains).take(_maxActive));
     }
     if (chosen.isEmpty && _platforms.isNotEmpty) chosen.add(_platforms.first);
 
-    LiveGoSettings.activePlatforms
-      ..clear()
-      ..addAll(chosen);
-    LiveGoSettings.homePlatforms
-      ..clear()
-      ..addAll(chosen);
-    LiveGoSettings.defaultPlatform = chosen.first;
-    for (final slug in chosen) {
-      LiveGoSettings.setCategoriesFor(slug, LiveGoApiPlatforms.categoriesFor(slug).take(2).toList());
+    if (chosen.isNotEmpty) {
+      LiveGoSettings.activePlatforms
+        ..clear()
+        ..addAll(chosen);
+      LiveGoSettings.homePlatforms
+        ..clear()
+        ..addAll(chosen);
+      LiveGoSettings.defaultPlatform = chosen.first;
+      for (final slug in chosen) {
+        LiveGoSettings.setCategoriesFor(slug, LiveGoApiPlatforms.categoriesFor(slug).take(2).toList());
+      }
     }
     LiveGoSettings.tvSourceSetupCompleted = true;
     await LiveGoLocalStore.saveSettings();
@@ -176,47 +164,50 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     widget.onDone();
   }
 
-  KeyEventResult _rowKey(int index, String slug, KeyEvent event) {
+  KeyEventResult _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
+
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(index == 0 ? 0 : index - 1);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (index >= _nodes.length - 1) {
-        _focusSave();
+      if (_saveNode.hasFocus) {
+        _focusRow(_nodes.isEmpty ? 0 : _nodes.length - 1);
       } else {
-        _focusRow(index + 1);
+        _focusRow(_index == 0 ? 0 : _index - 1);
       }
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (_nodes.isEmpty || (!_saveNode.hasFocus && _index >= _nodes.length - 1)) {
+        _focusSave();
+      } else if (!_saveNode.hasFocus) {
+        _focusRow(_index + 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (_saveNode.hasFocus) _focusRow(_nodes.isEmpty ? 0 : _nodes.length - 1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (!_saveNode.hasFocus && _nodes.isNotEmpty && _index >= _nodes.length - 1) _focusSave();
+      return KeyEventResult.handled;
+    }
     if (_isSelect(key)) {
-      _toggle(slug);
-      _focusRow(index);
+      if (_saveNode.hasFocus || _nodes.isEmpty) {
+        unawaited(_saveAndContinue());
+      } else {
+        _toggleCurrent();
+        _focusRow(_index);
+      }
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _saveAndContinue();
+      unawaited(_saveAndContinue());
       return KeyEventResult.handled;
     }
-    return KeyEventResult.ignored;
-  }
 
-  KeyEventResult _saveKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowLeft) {
-      _focusRow(_nodes.isEmpty ? 0 : _nodes.length - 1);
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key) || _isBack(key)) {
-      _saveAndContinue();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+    return KeyEventResult.handled;
   }
 
   String _statusText(String slug) {
@@ -244,27 +235,16 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
-      child: Shortcuts(
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.goBack): _TvFirstSourceSetupBackIntent(),
-          SingleActivator(LogicalKeyboardKey.escape): _TvFirstSourceSetupBackIntent(),
-          SingleActivator(LogicalKeyboardKey.browserBack): _TvFirstSourceSetupBackIntent(),
-        },
-        child: Actions(
-          actions: <Type, Action<Intent>>{
-            _TvFirstSourceSetupBackIntent: CallbackAction<_TvFirstSourceSetupBackIntent>(onInvoke: (_) {
-              _saveAndContinue();
-              return null;
-            }),
-          },
-          child: Focus(
-            focusNode: _rootNode,
-            autofocus: true,
-            skipTraversal: true,
-            onKeyEvent: _rootKey,
-            child: Container(
-              color: Colors.black.withOpacity(0.78),
-              child: SafeArea(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Focus(
+          focusNode: _rootNode,
+          autofocus: true,
+          skipTraversal: true,
+          onKeyEvent: (_, event) => _handleKey(event),
+          child: Container(
+            color: Colors.black.withOpacity(0.78),
+            child: SafeArea(
               minimum: const EdgeInsets.fromLTRB(34, 30, 34, 34),
               child: Center(
                 child: Container(
@@ -331,25 +311,36 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
                       ),
                       const SizedBox(height: 18),
                       Expanded(
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.only(bottom: 130),
-                          itemCount: _platforms.length,
-                          itemBuilder: (context, index) {
-                            final slug = _platforms[index];
-                            return _SetupSourceRow(
-                              node: _nodes[index],
-                              title: LiveGoCatalog.label(slug),
-                              backend: LiveGoCatalog.backendLabel(slug),
-                              description: _description(slug),
-                              selected: _selected.contains(slug),
-                              statusText: _statusText(slug),
-                              statusColor: _statusColor(slug),
-                              onKey: (node, event) => _rowKey(index, slug, event),
-                              onTap: () => _toggle(slug),
-                            );
-                          },
-                        ),
+                        child: _platforms.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Belum ada platform tersedia.',
+                                  style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.only(bottom: 130),
+                                itemCount: _platforms.length,
+                                itemBuilder: (context, index) {
+                                  final slug = _platforms[index];
+                                  return _SetupSourceRow(
+                                    node: _nodes[index],
+                                    title: LiveGoCatalog.label(slug),
+                                    backend: LiveGoCatalog.backendLabel(slug),
+                                    description: _description(slug),
+                                    selected: _selected.contains(slug),
+                                    statusText: _statusText(slug),
+                                    statusColor: _statusColor(slug),
+                                    onKey: (node, event) => _handleKey(event),
+                                    onTap: () {
+                                      _index = index;
+                                      _toggle(slug);
+                                      _focusRow(index);
+                                    },
+                                  );
+                                },
+                              ),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -363,10 +354,8 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
                           Focus(
                             focusNode: _saveNode,
                             skipTraversal: true,
-                            onKeyEvent: _saveKey,
-                            child: InkWell(
-                              canRequestFocus: false,
-                              borderRadius: BorderRadius.circular(999),
+                            onKeyEvent: (_, event) => _handleKey(event),
+                            child: GestureDetector(
                               onTap: _saveAndContinue,
                               child: ListenableBuilder(
                                 listenable: _saveNode,
@@ -400,15 +389,10 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
               ),
             ),
           ),
-          ),
         ),
       ),
     );
   }
-}
-
-class _TvFirstSourceSetupBackIntent extends Intent {
-  const _TvFirstSourceSetupBackIntent();
 }
 
 class _SetupSourceRow extends StatelessWidget {
@@ -444,10 +428,8 @@ class _SetupSourceRow extends StatelessWidget {
           focusNode: node,
           skipTraversal: true,
           onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
+          child: GestureDetector(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
             child: AnimatedContainer(
               duration: TvFocusStyle.fast,
               margin: const EdgeInsets.only(bottom: 9),

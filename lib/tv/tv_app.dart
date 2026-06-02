@@ -59,7 +59,11 @@ class _TvAppState extends State<TvApp> {
     // Start TV directly on the Home banner. The navbar is still one LEFT away,
     // but the first remote action does not wait on API/image loading.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _sourceSetupOpen) return;
+      if (!mounted) return;
+      if (_sourceSetupOpen) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        return;
+      }
       setState(() => _homeBannerTicket++);
     });
   }
@@ -542,42 +546,34 @@ class _TvAppState extends State<TvApp> {
                 },
                 child: Stack(
                   children: [
-                    if (!_sourceSetupOpen)
-                      Row(
-                        children: [
-                          TvSideNav(
-                            index: _index,
-                            mode: _navMode,
-                            focusNodes: _navNodes,
-                            onChanged: _openNavPage,
-                            onOpenContent: _enterContent,
-                          ),
-                          AnimatedContainer(
-                            duration: TvFocusStyle.normal,
-                            width: _navMode == TvSideNavMode.hidden ? 0 : 1,
-                            margin: const EdgeInsets.symmetric(vertical: 30),
-                            color: Colors.white.withOpacity(0.035),
-                          ),
-                          Expanded(
-                            child: RepaintBoundary(
-                              child: IndexedStack(index: _index, children: _pages()),
+                    ExcludeFocus(
+                      excluding: _sourceSetupOpen,
+                      child: TickerMode(
+                        enabled: !_sourceSetupOpen,
+                        child: Row(
+                          children: [
+                            TvSideNav(
+                              index: _index,
+                              mode: _navMode,
+                              focusNodes: _navNodes,
+                              onChanged: _openNavPage,
+                              onOpenContent: _enterContent,
                             ),
-                          ),
-                        ],
-                      )
-                    else
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFF07111F), Color(0xFF020617), Color(0xFF000000)],
+                            AnimatedContainer(
+                              duration: TvFocusStyle.normal,
+                              width: _navMode == TvSideNavMode.hidden ? 0 : 1,
+                              margin: const EdgeInsets.symmetric(vertical: 30),
+                              color: Colors.white.withOpacity(0.035),
                             ),
-                          ),
-                          child: const SizedBox.expand(),
+                            Expanded(
+                              child: RepaintBoundary(
+                                child: IndexedStack(index: _index, children: _pages()),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    ),
                     _buildExitDialog(),
                     if (_sourceSetupOpen)
                       TvFirstSourceSetup(
