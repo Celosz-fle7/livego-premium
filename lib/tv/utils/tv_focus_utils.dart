@@ -2,11 +2,47 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-/// TV focus helper.
-///
-/// Request focus immediately, then reveal the focused widget with explicit
-/// alignment when needed. Focus movement is intentionally instant on TV;
-/// animated scroll/focus can look like vibration when a remote key repeats.
+// ---------------------------------------------------------------------------
+// TV focus throttle.
+//
+// Android TV remotes can emit repeated arrow events faster than the UI can
+// complete requestFocus() + post-frame scroll. Without a guard, focus can move
+// several items while the viewport is still revealing an older item.
+//
+// This helper keeps navigation controlled:
+// - minimum interval for focus navigation: about 12 steps/second
+// - token per FocusNode so only the latest callback for that node may scroll
+// - scroll is post-frame, after the focused widget has a valid layout
+// ---------------------------------------------------------------------------
+
+final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
+DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
+const Duration _navInterval = Duration(milliseconds: 80);
+
+bool _throttledFocus(
+  FocusNode node,
+  VoidCallback doFocus,
+  VoidCallback doScroll,
+) {
+  final now = DateTime.now();
+  if (now.difference(_lastNavTime) < _navInterval) return false;
+  _lastNavTime = now;
+
+  final token = (_focusFrameToken[node] ?? 0) + 1;
+  _focusFrameToken[node] = token;
+
+  doFocus();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_focusFrameToken[node] != token) return;
+    _focusFrameToken.remove(node);
+    doScroll();
+  });
+
+  return true;
+}
+
+/// TV focus helper for Home zone jumps and other explicit alignment movement.
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
@@ -14,85 +50,85 @@ bool tvFocus(
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
-  node.requestFocus();
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final context = node.context;
-    if (context == null || !node.hasFocus) return;
-    try {
-      Scrollable.ensureVisible(
-        context,
-        duration: duration,
-        curve: Curves.linear,
-        alignment: alignment,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-      );
-    } catch (_) {
-      // Focus can move while a route/list is rebuilding. Never let scroll
-      // restoration crash the TV UI; the next remote press will re-focus.
-    }
-  });
-
-  return true;
+  return _throttledFocus(
+    node,
+    () => node.requestFocus(),
+    () {
+      final context = node.context;
+      if (context == null || !node.hasFocus) return;
+      try {
+        Scrollable.ensureVisible(
+          context,
+          duration: duration,
+          curve: Curves.linear,
+          alignment: alignment,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        );
+      } catch (_) {
+        // Routes/lists can rebuild while a remote key repeats. Ignore; the next
+        // focus movement will correct the viewport if needed.
+      }
+    },
+  );
 }
-
 
 /// Request focus without forcing the item into a fixed screen position.
 ///
-/// Use this for vertical menu/list screens such as Account and Source Manager.
-/// The old explicit alignment is good for Home zone jumps, but on tall lists it
-/// can make the viewport jump on every UP/DOWN press. This helper only scrolls
-/// when the focused widget is close to/outside the safe viewport edge.
+/// Use this for vertical menu/list screens such as Account, Source Manager,
+/// Search, History, Favorite, and Download. It only scrolls when the focused
+/// widget is near/outside the safe viewport edge.
 bool tvFocusComfort(
   FocusNode node, {
   double topMargin = 72,
-  double bottomMargin = 88,
+  double bottomMargin = 120,
   Duration duration = Duration.zero,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
-  node.requestFocus();
+  return _throttledFocus(
+    node,
+    () => node.requestFocus(),
+    () {
+      final context = node.context;
+      if (context == null || !node.hasFocus) return;
+      try {
+        final scrollable = Scrollable.maybeOf(context);
+        final renderObject = context.findRenderObject();
+        if (scrollable == null || renderObject == null) return;
+        final viewport = RenderAbstractViewport.maybeOf(renderObject);
+        if (viewport == null) return;
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final context = node.context;
-    if (context == null || !node.hasFocus) return;
-    try {
-      final scrollable = Scrollable.maybeOf(context);
-      final renderObject = context.findRenderObject();
-      if (scrollable == null || renderObject == null) return;
-      final viewport = RenderAbstractViewport.maybeOf(renderObject);
-      if (viewport == null) return;
+        final position = scrollable.position;
+        if (!position.hasPixels || !position.hasViewportDimension) return;
 
-      final position = scrollable.position;
-      if (!position.hasPixels || !position.hasViewportDimension) return;
+        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+        final current = position.pixels;
+        final viewportExtent = position.viewportDimension;
 
-      final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-      final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-      final current = position.pixels;
-      final viewportExtent = position.viewportDimension;
+        double? target;
+        if (leading < current + topMargin) {
+          target = leading - topMargin;
+        } else if (trailing > current + viewportExtent - bottomMargin) {
+          target = trailing - viewportExtent + bottomMargin;
+        }
 
-      double? target;
-      if (leading < current + topMargin) {
-        target = leading - topMargin;
-      } else if (trailing > current + viewportExtent - bottomMargin) {
-        target = trailing - viewportExtent + bottomMargin;
+        if (target == null) return;
+        final clamped = target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((clamped - current).abs() < 1) return;
+        if (duration == Duration.zero) {
+          position.jumpTo(clamped);
+        } else {
+          position.animateTo(clamped, duration: duration, curve: Curves.linear);
+        }
+      } catch (_) {
+        // Lists can rebuild while a remote key repeats. Ignore; the next focus
+        // movement will correct the viewport if needed.
       }
-
-      if (target == null) return;
-      final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
-      if ((clamped - current).abs() < 1) return;
-      if (duration == Duration.zero) {
-        position.jumpTo(clamped);
-      } else {
-        position.animateTo(clamped, duration: duration, curve: Curves.linear);
-      }
-    } catch (_) {
-      // Lists can rebuild while a remote key repeats. Ignore; the next focus
-      // movement will correct the viewport if needed.
-    }
-  });
-
-  return true;
+    },
+  );
 }
 
 bool tvIsSelectKey(LogicalKeyboardKey key) {
