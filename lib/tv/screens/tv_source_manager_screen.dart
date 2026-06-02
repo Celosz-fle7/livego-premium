@@ -160,7 +160,22 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   Future<void> _autoPingOnce() async {
     if (_pingingSlug != null) return;
+
+    // Jangan ping semua source Dobda sekaligus. Setelah Dobda masuk daftar,
+    // ping seluruh platform bisa membuat Source Manager terasa berat. Cukup
+    // cek platform yang sedang aktif, maksimal 6, dan tandai Dobda sebagai BETA.
     for (final slug in _platforms) {
+      if (LiveGoCatalog.isDobdaPlatform(slug)) {
+        LiveGoSettings.setPlatformStatus(slug, 'beta');
+      }
+    }
+
+    final targets = _platforms
+        .where(LiveGoSettings.isPlatformActive)
+        .where((slug) => !LiveGoCatalog.isDobdaPlatform(slug))
+        .take(6)
+        .toList();
+    for (final slug in targets) {
       if (!mounted) return;
       setState(() => _pingingSlug = slug);
       await LiveGoCatalog.pingPlatform(slug).timeout(
@@ -427,8 +442,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return Colors.orangeAccent;
       case 'offline':
         return Colors.redAccent;
+      case 'beta':
+        return Colors.orangeAccent;
       default:
-        return Colors.blueGrey;
+        return LiveGoCatalog.isDobdaPlatform(slug) ? Colors.orangeAccent : Colors.blueGrey;
     }
   }
 
@@ -441,8 +458,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return 'LAMBAT';
       case 'offline':
         return 'OFFLINE';
+      case 'beta':
+        return 'BETA';
       default:
-        return 'BELUM';
+        return LiveGoCatalog.isDobdaPlatform(slug) ? 'BETA' : 'BELUM';
     }
   }
 
@@ -455,6 +474,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       'flickreels': 'HLS signed dari episode/all episode.',
       'melolo': 'Opsional. DRM/CENC belum dipasang di player native.',
     };
+    if (LiveGoCatalog.isDobdaPlatform(slug)) {
+      return 'Dobda beta. Aktifkan seperlunya agar Home tetap ringan.';
+    }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 

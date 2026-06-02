@@ -281,6 +281,7 @@ class LiveGoLocalStore {
       'backgroundPoster': LiveGoSettings.backgroundPoster,
       'cachePlayback': LiveGoSettings.cachePlayback,
       'manualRotateButton': LiveGoSettings.manualRotateButton,
+      'tvSourceSetupCompleted': LiveGoSettings.tvSourceSetupCompleted,
       'mobileHomeGrid': LiveGoSettings.mobileHomeGrid,
       'tvHomeGrid': LiveGoSettings.tvHomeGrid,
       'activePlatforms': LiveGoSettings.activePlatforms.toList(),
@@ -321,6 +322,7 @@ class LiveGoLocalStore {
       LiveGoSettings.backgroundPoster = _bool(json['backgroundPoster'], LiveGoSettings.backgroundPoster);
       LiveGoSettings.cachePlayback = _bool(json['cachePlayback'], LiveGoSettings.cachePlayback);
       LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
+      LiveGoSettings.tvSourceSetupCompleted = _bool(json['tvSourceSetupCompleted'], LiveGoSettings.tvSourceSetupCompleted);
       LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 6).toInt();
       LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(4, 10).toInt();
 

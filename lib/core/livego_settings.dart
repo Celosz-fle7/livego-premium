@@ -15,6 +15,7 @@ class LiveGoSettings {
   static bool backgroundPoster = true;
   static bool cachePlayback = true;
   static bool manualRotateButton = true;
+  static bool tvSourceSetupCompleted = false;
   static int mobileHomeGrid = 3;
   static int tvHomeGrid = 6;
   static final Map<String, int> tvLastHomeCategories = <String, int>{};
@@ -121,6 +122,7 @@ class LiveGoSettings {
     backgroundPoster = true;
     cachePlayback = true;
     manualRotateButton = true;
+    tvSourceSetupCompleted = false;
     mobileHomeGrid = 3;
     tvHomeGrid = 6;
     tvLastHomeCategories.clear();

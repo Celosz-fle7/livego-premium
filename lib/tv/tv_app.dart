@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
+import '../core/livego_settings.dart';
 
 import '../shared/widgets/premium_shell.dart';
 import 'screens/tv_account_screen.dart';
@@ -12,6 +13,7 @@ import 'screens/tv_search_screen.dart';
 import 'utils/tv_focus_utils.dart';
 import 'theme/tv_focus_style.dart';
 import 'widgets/tv_side_nav.dart';
+import 'widgets/tv_first_source_setup.dart';
 
 class TvApp extends StatefulWidget {
   const TvApp({super.key});
@@ -37,6 +39,7 @@ class _TvAppState extends State<TvApp> {
 
   bool _exitDialogOpen = false;
   bool _restoreHomeBannerAfterExitDialog = false;
+  bool _sourceSetupOpen = !LiveGoSettings.tvSourceSetupCompleted;
   int _lastBackHandledMs = 0;
   int _suppressBackUntilMs = 0;
   late final List<FocusNode> _navNodes;
@@ -298,6 +301,8 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _handleBack() {
+    if (_sourceSetupOpen) return;
+
     // Android TV can deliver the same Back press through both Shortcuts
     // and PopScope. Guard it so one physical press produces one action.
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -560,6 +565,18 @@ class _TvAppState extends State<TvApp> {
                       ],
                     ),
                     _buildExitDialog(),
+                    if (_sourceSetupOpen)
+                      TvFirstSourceSetup(
+                        onDone: () {
+                          if (!mounted) return;
+                          setState(() {
+                            _sourceSetupOpen = false;
+                            _index = _homeIndex;
+                            _navMode = TvSideNavMode.hidden;
+                            _homeBannerTicket++;
+                          });
+                        },
+                      ),
                   ],
                 ),
               ),
