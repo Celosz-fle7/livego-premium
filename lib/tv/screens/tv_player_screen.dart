@@ -82,9 +82,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _returnControlsAfterPanel = false;
   Timer? _autoHideTimer;
   Timer? _statusTimer;
+  Timer? _seekDebounceTimer;
+  Duration? _pendingSeekTarget;
   String _statusMessage = '';
 
   static const int _controlCount = 8;
+  static const Duration _seekApplyDelay = Duration(milliseconds: 280);
   static const int _optionCount = 6;
 
 
@@ -362,14 +365,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     final value = c.value;
-    final second = value.position.inSeconds;
+    final position = _pendingSeekTarget ?? value.position;
+    final second = position.inSeconds;
     if (second <= 0) return;
     if (!force && second == _lastSavedProgressSecond) return;
     _lastSavedProgressSecond = second;
-    LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, value.position, value.duration);
+    LiveGoLocalStore.saveProgress(_detail ?? widget.item, _episode, position, value.duration);
   }
 
   void _prepareForEpisodeSwitch() {
+    _cancelPendingSeek();
     final c = _controller;
     _resumePlaybackAfterFailedEpisode = c?.value.isPlaying ?? true;
     if (c != null && c.value.isInitialized) {
@@ -834,6 +839,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (Navigator.canPop(context)) {
       _saveCurrentProgress(force: true);
+      _flushPendingSeek();
       widget.onExitToHome?.call();
       Navigator.pop(context);
     }
@@ -850,12 +856,59 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     setState(() {});
   }
 
+  Duration _clampSeekTarget(Duration target) {
+    final c = _controller;
+    final duration = c != null && c.value.isInitialized ? c.value.duration : Duration.zero;
+    if (target.isNegative) return Duration.zero;
+    if (duration > Duration.zero && target > duration) return duration;
+    return target;
+  }
+
+  String _formatDurationBrief(Duration value) {
+    final totalSeconds = value.inSeconds < 0 ? 0 : value.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (hours > 0) return '$hours:${two(minutes)}:${two(seconds)}';
+    return '$minutes:${two(seconds)}';
+  }
+
+  void _cancelPendingSeek() {
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = null;
+    _pendingSeekTarget = null;
+  }
+
+  void _flushPendingSeek() {
+    final c = _controller;
+    final target = _pendingSeekTarget;
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = null;
+    _pendingSeekTarget = null;
+    if (c == null || !c.value.isInitialized || target == null) return;
+    final clamped = _clampSeekTarget(target);
+    unawaited(c.seekTo(clamped));
+  }
+
   void _seekRelative(Duration offset) {
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
-    final target = c.value.position + offset;
+
+    final base = _pendingSeekTarget ?? c.value.position;
+    final target = _clampSeekTarget(base + offset);
+    _pendingSeekTarget = target;
+
+    final direction = offset.isNegative ? '-' : '+';
+    final stepSeconds = offset.inSeconds.abs();
     final duration = c.value.duration;
-    c.seekTo(target.isNegative ? Duration.zero : (target > duration ? duration : target));
+    final targetLabel = duration > Duration.zero
+        ? '${_formatDurationBrief(target)} / ${_formatDurationBrief(duration)}'
+        : _formatDurationBrief(target);
+    _showStatus('$direction$stepSeconds detik • $targetLabel', duration: const Duration(milliseconds: 900));
+
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = Timer(_seekApplyDelay, _flushPendingSeek);
   }
 
   void _moveControl(int delta) {
@@ -1376,10 +1429,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (_progressFocused) {
         if (key == LogicalKeyboardKey.arrowLeft) {
           _seekRelative(const Duration(seconds: -10));
-          _showStatus('-10 detik', duration: const Duration(milliseconds: 800));
         } else if (key == LogicalKeyboardKey.arrowRight) {
           _seekRelative(const Duration(seconds: 10));
-          _showStatus('+10 detik', duration: const Duration(milliseconds: 800));
         } else if (key == LogicalKeyboardKey.arrowDown) {
           setState(() => _progressFocused = false);
         } else if (key == LogicalKeyboardKey.arrowUp) {
@@ -1414,10 +1465,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _togglePlay();
     } else if (key == LogicalKeyboardKey.arrowLeft) {
       _seekRelative(const Duration(seconds: -10));
-      _showStatus('-10 detik', duration: const Duration(milliseconds: 800));
     } else if (key == LogicalKeyboardKey.arrowRight) {
       _seekRelative(const Duration(seconds: 10));
-      _showStatus('+10 detik', duration: const Duration(milliseconds: 800));
     } else if (key == LogicalKeyboardKey.arrowUp) {
       _showControlsMode(defaultPlay: true);
     } else if (key == LogicalKeyboardKey.arrowDown) {
@@ -1463,6 +1512,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _cancelAutoHide();
     _statusTimer?.cancel();
     _saveCurrentProgress(force: true);
+    _cancelPendingSeek();
     _rootFocus.dispose();
     _controller?.dispose();
     super.dispose();
