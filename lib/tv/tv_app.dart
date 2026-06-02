@@ -142,7 +142,27 @@ class _TvAppState extends State<TvApp> {
     });
   }
 
+  void _backToHomeNav() {
+    _markBackHandled();
+    setState(() {
+      _returnToAccountMenuOnBack = false;
+      _index = 0;
+      _navMode = TvSideNavMode.focused;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tvFocus(_navNodes[_safeNav(0)], alignment: 0.10);
+    });
+  }
 
+  void _backToHomeBanner() {
+    _markBackHandled();
+    setState(() {
+      _returnToAccountMenuOnBack = false;
+      _index = 0;
+      _navMode = TvSideNavMode.hidden;
+      _homeBannerTicket++;
+    });
+  }
 
   void _returnToHomeLastFocus() {
     _markBackHandled();
@@ -302,11 +322,13 @@ class _TvAppState extends State<TvApp> {
         focusTicket: _index == 1 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvLibraryScreen(
         title: 'Favorit',
@@ -315,16 +337,19 @@ class _TvAppState extends State<TvApp> {
         focusTicket: _index == 3 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
         onOpenNavIndex: _openFromAccountMenu,
       ),
     ];

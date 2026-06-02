@@ -17,6 +17,7 @@ class TvLibraryScreen extends StatefulWidget {
   final bool favorites;
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
+  final VoidCallback? onBackToHome;
   final int focusTicket;
 
   const TvLibraryScreen({
@@ -26,6 +27,7 @@ class TvLibraryScreen extends StatefulWidget {
     required this.favorites,
     this.onMoveToNav,
     this.onBackToNav,
+    this.onBackToHome,
     this.focusTicket = 0,
   });
 
@@ -113,6 +115,15 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       widget.onBackToNav?.call();
     } else {
       _moveToNav();
+    }
+  }
+
+  void _backToHome() {
+    _zone = TvZone.banner;
+    if (widget.onBackToHome != null) {
+      widget.onBackToHome?.call();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).maybePop();
     }
   }
 

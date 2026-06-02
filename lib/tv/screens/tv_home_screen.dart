@@ -5,7 +5,6 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
-import '../../data/mock_catalog.dart';
 import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/hero_banner.dart';
@@ -87,7 +86,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   @override
   void dispose() {
-    _cancelPendingFocus();
     _bannerNode.dispose();
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
@@ -101,38 +99,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       final categories = LiveGoCatalog.categoriesFor(_platform);
       if (category >= categories.length) category = 0;
       final selectedCategory = categories.isEmpty ? 'Populer' : categories[category];
-      final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory)
-          .timeout(const Duration(seconds: 14));
-      final hero = items.isNotEmpty
-          ? items.first
-          : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
+      final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory).timeout(const Duration(seconds: 14));
+      final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
       return _TvHomeState(hero: hero, items: items);
     } catch (e) {
       debugPrint('TV HOME LOAD ERROR: $e');
-      var fallback = <ContentItem>[];
-      try {
-        fallback = await LiveGoCatalog.home(platform: 'shortmax')
-            .timeout(const Duration(seconds: 8));
-      } catch (fallbackError) {
-        debugPrint('TV HOME FALLBACK ERROR: $fallbackError');
-      }
-
-      ContentItem hero = fallback.isNotEmpty ? fallback.first : MockCatalog.hero;
-      if (fallback.isEmpty) {
-        try {
-          hero = await LiveGoCatalog.hero(platform: 'shortmax')
-              .timeout(const Duration(seconds: 4));
-        } catch (heroError) {
-          debugPrint('TV HOME HERO FALLBACK ERROR: $heroError');
-          hero = MockCatalog.hero;
-        }
-      }
-
-      return _TvHomeState(
-        hero: hero,
-        items: fallback,
-        error: 'Data belum siap. Tekan OK/refresh nanti atau cek koneksi.',
-      );
+      final fallback = await LiveGoCatalog.home(platform: 'shortmax').catchError((_) => <ContentItem>[]);
+      final hero = fallback.isNotEmpty ? fallback.first : await LiveGoCatalog.hero(platform: 'shortmax');
+      return _TvHomeState(hero: hero, items: fallback);
     }
   }
 
@@ -208,11 +182,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _cancelPendingFocus();
 
     // Back on TV must move one logical layer at a time.
-    // From a poster/player return, the expected flow is:
-    // Grid -> Platform -> Banner -> Exit dialog.
-    // Category is navigated with UP/DOWN, but BACK should not trap the user
-    // in category when they are leaving from the grid/player path.
+    // Grid -> Category -> Platform -> Banner -> Exit dialog.
+    // LEFT still opens the navbar; BACK exits one content layer at a time.
     if (_zone == TvZone.grid) {
+      if (_categoryNodes.isNotEmpty &&
+          _focusByZone(TvZone.category, index: _lastCategory)) {
+        return;
+      }
       if (_platformNodes.isNotEmpty &&
           _focusByZone(TvZone.platform, index: _lastPlatform)) {
         return;
@@ -285,7 +261,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void _retryFocusEntry(int ticket) {
     if (!mounted || !_entryPending || ticket != _entryTicket) return;
     _entryRetry++;
-    if (_entryRetry > 8) {
+    if (_entryRetry > 24) {
       final fallbackFocused =
           _focusByZone(TvZone.category, index: _lastCategory) ||
           _focusByZone(TvZone.platform, index: _lastPlatform) ||
@@ -680,7 +656,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         final loading = snap.connectionState != ConnectionState.done;
         final hero = snap.data?.hero;
         final items = snap.data?.items ?? const <ContentItem>[];
-        final errorMessage = snap.hasError ? 'Gagal memuat Home. Coba lagi nanti.' : snap.data?.error;
         final platforms = LiveGoCatalog.platformLabels;
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
@@ -714,10 +689,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               controller: _pageScroll,
               padding: const EdgeInsets.fromLTRB(12, 10, 22, 30),
               children: [
-            if (errorMessage != null) ...[
-              _HomeInlineMessage(message: errorMessage, onRetry: _reload),
-              const SizedBox(height: 8),
-            ],
             _FocusableBanner(
               item: hero,
               focusNode: _bannerNode,
@@ -794,51 +765,9 @@ class _HomeBackIntent extends Intent {
 }
 
 class _TvHomeState {
-  final ContentItem? hero;
+  final ContentItem hero;
   final List<ContentItem> items;
-  final String? error;
-  const _TvHomeState({required this.hero, required this.items, this.error});
-}
-
-
-class _HomeInlineMessage extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-
-  const _HomeInlineMessage({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: TvFocusStyle.focusBlue.withOpacity(0.34)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline_rounded, color: TvFocusStyle.focusBlue, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Coba lagi'),
-          ),
-        ],
-      ),
-    );
-  }
+  const _TvHomeState({required this.hero, required this.items});
 }
 
 class _FocusableBanner extends StatelessWidget {
