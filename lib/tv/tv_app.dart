@@ -51,7 +51,7 @@ class _TvAppState extends State<TvApp> {
     // but the first remote action does not wait on API/image loading.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _homeTicket++);
+      setState(() => _homeBannerTicket++);
     });
   }
 
@@ -183,12 +183,22 @@ class _TvAppState extends State<TvApp> {
         _navMode = TvSideNavMode.hidden;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _bumpContentTicket();
+        if (mounted) {
+          if (safe == 0) {
+            setState(() => _homeBannerTicket++);
+          } else {
+            _bumpContentTicket();
+          }
+        }
       });
       return;
     }
     _hideNav();
-    _bumpContentTicket();
+    if (safe == 0) {
+      setState(() => _homeBannerTicket++);
+    } else {
+      _bumpContentTicket();
+    }
   }
 
   void _openFromAccountMenu(int navIndex) {
@@ -275,9 +285,13 @@ class _TvAppState extends State<TvApp> {
       return;
     }
 
-    // BACK from the focused rail only hides the rail and returns to the
-    // last Home focus. The Home icon is a shortcut, not a refresh zone.
-    _returnToHomeLastFocus();
+    // BACK from the focused rail only hides the rail. If the rail is on the
+    // first shortcut, return to the real Home banner, not the rail icon.
+    if (_index == 0) {
+      _backToHomeBanner();
+    } else {
+      _returnToHomeLastFocus();
+    }
   }
 
   KeyEventResult _exitDialogKey(FocusNode node, KeyEvent event) {

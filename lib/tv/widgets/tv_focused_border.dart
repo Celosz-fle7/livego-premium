@@ -28,7 +28,7 @@ class TvFocusedBorder extends StatelessWidget {
         final focused = focusNode.hasFocus;
         return AnimatedContainer(
           duration: TvFocusStyle.fast,
-          curve: Curves.easeOutCubic,
+          curve: Curves.linear,
           padding: padding,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(radius),
@@ -38,9 +38,8 @@ class TvFocusedBorder extends StatelessWidget {
             ),
             boxShadow: focused
                 ? [
-                    TvFocusStyle.glow(0.36, 22),
-                    TvFocusStyle.softGlow(0.18, 32),
-                    BoxShadow(color: AppTheme.whiteGlow.withOpacity(0.10), blurRadius: 12),
+                    TvFocusStyle.glow(0.24, 12),
+                    BoxShadow(color: AppTheme.whiteGlow.withOpacity(0.06), blurRadius: 8),
                   ]
                 : null,
           ),

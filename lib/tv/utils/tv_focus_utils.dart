@@ -9,7 +9,7 @@ import 'package:flutter/widgets.dart';
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
-  Duration duration = const Duration(milliseconds: 80),
+  Duration duration = const Duration(milliseconds: 35),
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -21,7 +21,7 @@ bool tvFocus(
     Scrollable.ensureVisible(
       context,
       duration: duration,
-      curve: Curves.easeOutCubic,
+      curve: Curves.linear,
       alignment: alignment,
       alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );

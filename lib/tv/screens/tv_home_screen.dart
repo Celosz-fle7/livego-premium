@@ -86,6 +86,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   @override
   void dispose() {
+    _cancelPendingFocus();
     _bannerNode.dispose();
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
@@ -99,14 +100,23 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       final categories = LiveGoCatalog.categoriesFor(_platform);
       if (category >= categories.length) category = 0;
       final selectedCategory = categories.isEmpty ? 'Populer' : categories[category];
-      final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory).timeout(const Duration(seconds: 14));
-      final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 8));
+      final items = await LiveGoCatalog.homeByCategory(platform: _platform, category: selectedCategory).timeout(const Duration(seconds: 12));
+      final hero = items.isNotEmpty ? items.first : await LiveGoCatalog.hero(platform: _platform).timeout(const Duration(seconds: 5));
       return _TvHomeState(hero: hero, items: items);
     } catch (e) {
       debugPrint('TV HOME LOAD ERROR: $e');
-      final fallback = await LiveGoCatalog.home(platform: 'shortmax').catchError((_) => <ContentItem>[]);
-      final hero = fallback.isNotEmpty ? fallback.first : await LiveGoCatalog.hero(platform: 'shortmax');
-      return _TvHomeState(hero: hero, items: fallback);
+      final fallback = await LiveGoCatalog.home(platform: 'shortmax').timeout(const Duration(seconds: 6)).catchError((_) => <ContentItem>[]);
+      ContentItem? hero;
+      if (fallback.isNotEmpty) {
+        hero = fallback.first;
+      } else {
+        try {
+          hero = await LiveGoCatalog.hero(platform: 'shortmax').timeout(const Duration(seconds: 4));
+        } catch (_) {
+          hero = null;
+        }
+      }
+      return _TvHomeState(hero: hero, items: fallback, hasError: true);
     }
   }
 
@@ -182,13 +192,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _cancelPendingFocus();
 
     // Back on TV must move one logical layer at a time.
-    // Grid -> Category -> Platform -> Banner -> Exit dialog.
-    // LEFT still opens the navbar; BACK exits one content layer at a time.
+    // Grid -> Platform -> Banner -> Exit dialog.
+    // Category is changed with UP/DOWN, but it is not a required BACK stop.
     if (_zone == TvZone.grid) {
-      if (_categoryNodes.isNotEmpty &&
-          _focusByZone(TvZone.category, index: _lastCategory)) {
-        return;
-      }
       if (_platformNodes.isNotEmpty &&
           _focusByZone(TvZone.platform, index: _lastPlatform)) {
         return;
@@ -261,7 +267,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void _retryFocusEntry(int ticket) {
     if (!mounted || !_entryPending || ticket != _entryTicket) return;
     _entryRetry++;
-    if (_entryRetry > 24) {
+    if (_entryRetry > 8) {
       final fallbackFocused =
           _focusByZone(TvZone.category, index: _lastCategory) ||
           _focusByZone(TvZone.platform, index: _lastPlatform) ||
@@ -370,8 +376,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-    Future<void>.delayed(const Duration(milliseconds: 120), restore);
-    Future<void>.delayed(const Duration(milliseconds: 260), restore);
+    Future<void>.delayed(const Duration(milliseconds: 50), restore);
   }
 
   void _open(ContentItem item) {
@@ -655,6 +660,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final hero = snap.data?.hero;
+        final hasError = snap.data?.hasError ?? false;
         final items = snap.data?.items ?? const <ContentItem>[];
         final platforms = LiveGoCatalog.platformLabels;
         final categories = LiveGoCatalog.categoriesFor(_platform);
@@ -696,6 +702,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               onTap: hero == null ? null : () => _open(hero),
               onKey: (node, event) => _bannerKey(hero, event),
             ),
+            if (hasError)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Sebagian data gagal dimuat. Coba ganti platform atau refresh nanti.',
+                  style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
             const SizedBox(height: 8),
             _HeaderBox(
               label: 'Platform',
@@ -765,9 +779,11 @@ class _HomeBackIntent extends Intent {
 }
 
 class _TvHomeState {
-  final ContentItem hero;
+  final ContentItem? hero;
   final List<ContentItem> items;
-  const _TvHomeState({required this.hero, required this.items});
+  final bool hasError;
+
+  const _TvHomeState({required this.hero, required this.items, this.hasError = false});
 }
 
 class _FocusableBanner extends StatelessWidget {

@@ -30,7 +30,7 @@ class TvSideNav extends StatelessWidget {
   });
 
   static const items = [
-    TvNavItem(Icons.home_rounded, 'Home'),
+    TvNavItem(Icons.keyboard_arrow_left_rounded, 'Tutup'),
     TvNavItem(Icons.history_rounded, 'Histori'),
     TvNavItem(Icons.search_rounded, 'Cari'),
     TvNavItem(Icons.favorite_rounded, 'Favorit'),
@@ -86,7 +86,7 @@ class TvSideNav extends StatelessWidget {
     return RepaintBoundary(
       child: AnimatedContainer(
         duration: TvFocusStyle.normal,
-        curve: Curves.easeOutCubic,
+        curve: Curves.linear,
         width: _visible ? 74 : 16,
         child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
       ),
@@ -149,7 +149,7 @@ class _HiddenGrip extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: AnimatedContainer(
-        duration: TvFocusStyle.normal,
+        duration: TvFocusStyle.fast,
         width: 4,
         height: active ? 120 : 80,
         margin: const EdgeInsets.only(left: 2),
@@ -193,7 +193,7 @@ class _NavIconButton extends StatelessWidget {
         final size = logo ? 50.0 : 47.0;
         return Tooltip(
           message: label,
-          waitDuration: const Duration(milliseconds: 500),
+          waitDuration: const Duration(milliseconds: 200),
           child: Focus(
             focusNode: focusNode,
             skipTraversal: true,
@@ -229,8 +229,8 @@ class _NavIconButton extends StatelessWidget {
                   ),
                   boxShadow: focused
                       ? [
-                          TvFocusStyle.glow(0.34, 20),
-                          BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 28),
+                          TvFocusStyle.glow(0.26, 12),
+                          BoxShadow(color: AppTheme.purple.withOpacity(0.08), blurRadius: 12),
                         ]
                       : null,
                 ),

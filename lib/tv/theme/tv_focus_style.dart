@@ -8,8 +8,8 @@ class TvFocusStyle {
   static const Color focusBlueSoft = Color(0xFF58D7FF);
   static const Color focusText = Color(0xFFEAFBFF);
 
-  static const Duration fast = Duration(milliseconds: 70);
-  static const Duration normal = Duration(milliseconds: 90);
+  static const Duration fast = Duration(milliseconds: 25);
+  static const Duration normal = Duration(milliseconds: 35);
 
   static BoxShadow glow([double opacity = 0.34, double blur = 20]) {
     return BoxShadow(
