@@ -179,16 +179,25 @@ class AnichinApiClient {
   static List<LiveGoEpisode> _episodesFromJson(Map<String, dynamic> json) {
     final raw = _episodeList(json);
     if (raw.isEmpty) return const <LiveGoEpisode>[];
-    return raw.asMap().entries.map((entry) {
+    final parsed = raw.asMap().entries.map((entry) {
       final idx = entry.key + 1;
       final row = entry.value;
       final number = _parseInt(
         row['number'] ?? row['episode'] ?? row['episodeNumber'] ?? row['episode_number'] ?? row['chapterNo'] ?? row['chapter_no'] ?? row['chapterIndex'] ?? row['chapter_index'] ?? row['ep'] ?? row['index'],
         fallback: idx,
       );
-      final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title', 'chapterTitle', 'chapter_title'], fallback: 'Episode $number');
-      return LiveGoEpisode(id: '$number', index: number, title: title);
-    }).toList();
+      final safeNumber = number <= 0 ? idx : number;
+      final title = _first(row, const ['chapterName', 'chapter_name', 'title', 'name', 'episodeTitle', 'episode_title', 'chapterTitle', 'chapter_title'], fallback: 'Episode $safeNumber');
+      return LiveGoEpisode(id: '$safeNumber', index: safeNumber, title: title);
+    }).toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+
+    final unique = <LiveGoEpisode>[];
+    final seen = <int>{};
+    for (final row in parsed) {
+      if (seen.add(row.index)) unique.add(row);
+    }
+    return unique;
   }
 
   static List<LiveGoEpisode> _syntheticEpisodes(int total) {

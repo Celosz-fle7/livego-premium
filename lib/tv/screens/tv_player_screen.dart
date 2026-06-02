@@ -13,6 +13,7 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../models/livego_episode.dart';
 import '../../models/stream_info.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/content/content_health_service.dart';
@@ -58,6 +59,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _lastBackHandledMs = 0;
   int _brokenEpisodeSkips = 0;
   String _lastBrokenReason = '';
+  List<LiveGoEpisode> _episodes = const <LiveGoEpisode>[];
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
@@ -71,6 +73,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Timer? _autoHideTimer;
 
   static const int _controlCount = 8;
+  static const int _optionCount = 6;
 
 
   List<String> get _qualityChoices {
@@ -292,9 +295,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           _episode < _episodeTotal(_detail ?? widget.item)) {
         final remaining = duration - value.position;
         if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
+          final next = _episodeByOffset(_episode, 1);
+          if (next == _episode) return;
           _autoAdvancing = true;
           LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
-          _episode += 1;
+          _episode = next;
+          _episodeCursor = _episode;
           _load();
         }
       }
@@ -491,10 +497,17 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       final seed = _detail ?? _playableItem(ep);
       final rows = await LiveGoCatalog.episodes(seed).timeout(PlaybackTimeoutConfig.episodeListBackground);
       if (!mounted) return;
-      final count = rows.length > 1
-          ? rows.length
+      final sorted = rows.where((e) => e.index > 0).toList()
+        ..sort((a, b) => a.index.compareTo(b.index));
+      final count = sorted.length > 1
+          ? sorted.length
           : (stream.totalEpisodes > 1 ? stream.totalEpisodes : seed.episodes);
-      if (count > 1) setState(() => _knownEpisodeCount = count);
+      if (count > 1) {
+        setState(() {
+          _knownEpisodeCount = count;
+          if (sorted.length > 1) _episodes = sorted;
+        });
+      }
       debugPrint('LIVEGO TV EPISODE LIST BACKGROUND DONE episodes=$count');
     } catch (e) {
       debugPrint('LIVEGO TV EPISODE LIST BACKGROUND SKIP: $e');
@@ -513,7 +526,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   int _episodeTotal(ContentItem item) {
-    final total = _knownEpisodeCount > item.episodes ? _knownEpisodeCount : item.episodes;
+    final ordered = _orderedEpisodes();
+    final fromRows = ordered.isNotEmpty ? ordered.last.index : 0;
+    final total = [fromRows, _knownEpisodeCount, item.episodes].reduce((a, b) => a > b ? a : b);
     return total.clamp(1, 120).toInt();
   }
 
@@ -680,21 +695,49 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _scheduleAutoHide();
   }
 
+  List<LiveGoEpisode> _orderedEpisodes() {
+    final seen = <int>{};
+    final rows = _episodes
+        .where((e) => e.index > 0)
+        .toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    final unique = <LiveGoEpisode>[];
+    for (final row in rows) {
+      if (seen.add(row.index)) unique.add(row);
+    }
+    return unique;
+  }
+
+  int _episodeByOffset(int from, int delta) {
+    final rows = _orderedEpisodes();
+    if (rows.length > 1) {
+      final currentPos = rows.indexWhere((e) => e.index == from);
+      if (currentPos >= 0) {
+        final nextPos = (currentPos + delta).clamp(0, rows.length - 1).toInt();
+        return rows[nextPos].index;
+      }
+    }
+    return (from + delta).clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
+  }
+
   void _previousEpisode() {
-    if (_episode <= 1) return;
+    final previous = _episodeByOffset(_episode, -1);
+    if (previous == _episode) return;
     _brokenEpisodeSkips = 0;
     _lastBrokenReason = '';
-    _episode -= 1;
+    _episode = previous;
+    _episodeCursor = _episode;
     _hideOverlays();
     _load();
   }
 
   void _nextEpisode() {
-    final total = _episodeTotal(_detail ?? widget.item);
-    if (_episode >= total) return;
+    final next = _episodeByOffset(_episode, 1);
+    if (next == _episode) return;
     _brokenEpisodeSkips = 0;
     _lastBrokenReason = '';
-    _episode += 1;
+    _episode = next;
+    _episodeCursor = _episode;
     _hideOverlays();
     _load();
   }
@@ -703,8 +746,27 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _brokenEpisodeSkips = 0;
     _lastBrokenReason = '';
     _episode = episode.clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
+    _episodeCursor = _episode;
     _hideOverlays();
     _load();
+  }
+
+  void _moveEpisodeCursor(int delta) {
+    final rows = _orderedEpisodes();
+    if (rows.length > 1) {
+      final current = rows.indexWhere((e) => e.index == _episodeCursor);
+      final start = current >= 0 ? current : rows.indexWhere((e) => e.index == _episode);
+      final nextPos = ((start >= 0 ? start : 0) + delta).clamp(0, rows.length - 1).toInt();
+      setState(() => _episodeCursor = rows[nextPos].index);
+      return;
+    }
+    final total = _episodeTotal(_detail ?? widget.item);
+    setState(() => _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt());
+  }
+
+  Future<void> _toggleAutoNext() async {
+    setState(() => LiveGoSettings.autoNextEnabled = !LiveGoSettings.autoNextEnabled);
+    await LiveGoLocalStore.saveSettings();
   }
 
   Future<void> _applyQualityChoice(int index) async {
@@ -815,10 +877,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     } else if (_optionCursor == 1) {
       _selectSourceAudio();
     } else if (_optionCursor == 2) {
-      setState(() => _fitCover = !_fitCover);
+      unawaited(_toggleAutoNext());
     } else if (_optionCursor == 3) {
-      unawaited(_toggleFavorite());
+      setState(() => _fitCover = !_fitCover);
     } else if (_optionCursor == 4) {
+      unawaited(_toggleFavorite());
+    } else if (_optionCursor == 5) {
       _toggleMute();
     }
   }
@@ -839,13 +903,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
 
     if (_mode == _PlayerMode.episodeList) {
-      final total = _episodeTotal(item);
       if (key == LogicalKeyboardKey.arrowLeft) {
         _hideOverlays();
       } else if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _episodeCursor = (_episodeCursor - 1).clamp(1, total).toInt());
+        _moveEpisodeCursor(-1);
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _episodeCursor = (_episodeCursor + 1).clamp(1, total).toInt());
+        _moveEpisodeCursor(1);
       } else if (_isSelect(key)) {
         _selectEpisode(_episodeCursor);
       }
@@ -885,9 +948,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_mode == _PlayerMode.options) {
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 4).toInt());
+        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, _optionCount - 1).toInt());
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 4).toInt());
+        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, _optionCount - 1).toInt());
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _changeOption(-1);
       } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
@@ -1040,6 +1103,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   total: _episodeTotal(item),
                   speed: _speed,
                   audioTrack: _audioTrack,
+                  autoNext: LiveGoSettings.autoNextEnabled,
                 ),
               if (ready && _activeSubtitleText.isNotEmpty)
                 Positioned(
@@ -1073,6 +1137,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   bottom: 28,
                   width: 390,
                   child: _EpisodeSidePanel(
+                    episodes: _orderedEpisodes(),
                     total: _episodeTotal(item),
                     selected: _episode,
                     cursor: _episodeCursor,
@@ -1109,6 +1174,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   child: _PlayerOptionsPanel(
                     speed: _speed,
                     audioTrack: _audioTrack,
+                    autoNext: LiveGoSettings.autoNextEnabled,
                     fitCover: _fitCover,
                     favorite: LiveGoLocalStore.isFavorite(item),
                     muted: _muted,
@@ -1130,6 +1196,7 @@ class _PlayerInfoOverlay extends StatelessWidget {
   final int total;
   final double speed;
   final String audioTrack;
+  final bool autoNext;
 
   const _PlayerInfoOverlay({
     required this.item,
@@ -1138,6 +1205,7 @@ class _PlayerInfoOverlay extends StatelessWidget {
     required this.total,
     required this.speed,
     required this.audioTrack,
+    required this.autoNext,
   });
 
   @override
@@ -1159,7 +1227,7 @@ class _PlayerInfoOverlay extends StatelessWidget {
                     children: [
                       Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                       const SizedBox(height: 4),
-                      Text('EP $episode / $total • ${speed.toStringAsFixed(2)}x • Audio: $audioTrack', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                      Text('EP $episode / $total • ${speed.toStringAsFixed(2)}x • Audio: $audioTrack • Next: ${autoNext ? 'Auto' : 'Manual'}', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                     ],
                   ),
                 ),
@@ -1333,17 +1401,24 @@ class _DockTextButton extends StatelessWidget {
 }
 
 class _EpisodeSidePanel extends StatelessWidget {
+  final List<LiveGoEpisode> episodes;
   final int total;
   final int selected;
   final int cursor;
 
-  const _EpisodeSidePanel({required this.total, required this.selected, required this.cursor});
+  const _EpisodeSidePanel({required this.episodes, required this.total, required this.selected, required this.cursor});
 
   @override
   Widget build(BuildContext context) {
     final totalSafe = total.clamp(1, 120).toInt();
-    final start = (cursor - 5).clamp(1, totalSafe).toInt();
-    final end = (start + 11).clamp(1, totalSafe).toInt();
+    final ordered = episodes.isEmpty
+        ? List.generate(totalSafe, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'))
+        : episodes;
+    final activePos = ordered.indexWhere((e) => e.index == cursor);
+    final center = activePos >= 0 ? activePos : ordered.indexWhere((e) => e.index == selected);
+    final startPos = ((center >= 0 ? center : 0) - 5).clamp(0, ordered.length - 1).toInt();
+    final endPos = (startPos + 11).clamp(0, ordered.length - 1).toInt();
+    final visible = ordered.sublist(startPos, endPos + 1);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1366,12 +1441,18 @@ class _EpisodeSidePanel extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: end - start + 1,
+              itemCount: visible.length,
               itemBuilder: (context, index) {
-                final ep = start + index;
+                final row = visible[index];
+                final ep = row.index;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _EpisodeListRow(ep: ep, selected: ep == selected, focused: ep == cursor),
+                  child: _EpisodeListRow(
+                    ep: ep,
+                    title: row.title,
+                    selected: ep == selected,
+                    focused: ep == cursor,
+                  ),
                 );
               },
             ),
@@ -1384,9 +1465,10 @@ class _EpisodeSidePanel extends StatelessWidget {
 
 class _EpisodeListRow extends StatelessWidget {
   final int ep;
+  final String title;
   final bool selected;
   final bool focused;
-  const _EpisodeListRow({required this.ep, required this.selected, required this.focused});
+  const _EpisodeListRow({required this.ep, required this.title, required this.selected, required this.focused});
 
   @override
   Widget build(BuildContext context) {
@@ -1404,7 +1486,7 @@ class _EpisodeListRow extends StatelessWidget {
         children: [
           Icon(selected ? Icons.play_arrow_rounded : Icons.radio_button_unchecked_rounded, color: selected || focused ? Colors.white : AppTheme.textSoft, size: 18),
           const SizedBox(width: 10),
-          Expanded(child: Text('Episode $ep', style: TextStyle(color: focused || selected ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+          Expanded(child: Text(title.trim().isEmpty ? 'Episode $ep' : title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused || selected ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
           if (selected) const Text('DIPUTAR', style: TextStyle(color: AppTheme.cyan, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
@@ -1498,6 +1580,7 @@ class _ChoiceRow extends StatelessWidget {
 class _PlayerOptionsPanel extends StatelessWidget {
   final double speed;
   final String audioTrack;
+  final bool autoNext;
   final bool fitCover;
   final bool favorite;
   final bool muted;
@@ -1506,6 +1589,7 @@ class _PlayerOptionsPanel extends StatelessWidget {
   const _PlayerOptionsPanel({
     required this.speed,
     required this.audioTrack,
+    required this.autoNext,
     required this.fitCover,
     required this.favorite,
     required this.muted,
@@ -1531,9 +1615,10 @@ class _PlayerOptionsPanel extends StatelessWidget {
           const SizedBox(height: 14),
           _OptionRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 0),
           _OptionRow(label: 'Audio Track', value: audioTrack, focused: cursor == 1),
-          _OptionRow(label: 'Layar', value: fitCover ? 'Cover' : 'Fit', focused: cursor == 2),
-          _OptionRow(label: 'Favorit', value: favorite ? 'Aktif' : 'Mati', focused: cursor == 3),
-          _OptionRow(label: 'Volume', value: muted ? 'Mute' : 'Normal', focused: cursor == 4),
+          _OptionRow(label: 'Next Episode', value: autoNext ? 'Auto' : 'Manual', focused: cursor == 2),
+          _OptionRow(label: 'Layar', value: fitCover ? 'Cover' : 'Fit', focused: cursor == 3),
+          _OptionRow(label: 'Favorit', value: favorite ? 'Aktif' : 'Mati', focused: cursor == 4),
+          _OptionRow(label: 'Volume', value: muted ? 'Mute' : 'Normal', focused: cursor == 5),
         ],
       ),
     );

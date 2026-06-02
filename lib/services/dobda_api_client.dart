@@ -705,17 +705,26 @@ class DobdaApiClient {
   static List<LiveGoEpisode> _episodesFromJson(Map<String, dynamic> json) {
     final rows = _episodeList(json);
     if (rows.isEmpty) return const <LiveGoEpisode>[];
-    return rows.asMap().entries.map((entry) {
+    final parsed = rows.asMap().entries.map((entry) {
       final idx = entry.key + 1;
       final row = entry.value;
       final index = _parseInt(
         row['index'] ?? row['episode_index'] ?? row['episodeIndex'] ?? row['episode'] ?? row['number'] ?? row['chapterNo'] ?? row['chapter_no'],
         fallback: idx,
       );
-      final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'videoId', 'video_id'], fallback: '$index');
-      final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name'], fallback: 'Episode $index');
-      return LiveGoEpisode(id: id, index: index <= 0 ? idx : index, title: title);
-    }).toList();
+      final safeIndex = index <= 0 ? idx : index;
+      final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'videoId', 'video_id'], fallback: '$safeIndex');
+      final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name'], fallback: 'Episode $safeIndex');
+      return LiveGoEpisode(id: id, index: safeIndex, title: title);
+    }).toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+
+    final unique = <LiveGoEpisode>[];
+    final seen = <int>{};
+    for (final row in parsed) {
+      if (seen.add(row.index)) unique.add(row);
+    }
+    return unique;
   }
 
   static List<Map<String, dynamic>> _dataList(Map<String, dynamic> json) {
