@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -22,7 +24,9 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
   static const int _maxActive = 6;
   final ScrollController _scrollController = ScrollController();
   final List<FocusNode> _nodes = <FocusNode>[];
+  late final FocusNode _rootNode;
   late final FocusNode _saveNode;
+  Timer? _focusRetryTimer;
   late final List<String> _platforms;
   late final Set<String> _selected;
   int _index = 0;
@@ -36,11 +40,10 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     final fallback = LiveGoSettings.defaultPlatforms.where(_platforms.contains).take(_maxActive).toList();
     _selected = <String>{...(current.isNotEmpty ? current : fallback)};
     if (_selected.isEmpty && _platforms.isNotEmpty) _selected.add(_platforms.first);
+    _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-root');
     _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-save');
     _syncNodes();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _nodes.isNotEmpty) _focusRow(0);
-    });
+    _requestInitialFocus();
   }
 
   @override
@@ -48,6 +51,8 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     for (final node in _nodes) {
       node.dispose();
     }
+    _focusRetryTimer?.cancel();
+    _rootNode.dispose();
     _saveNode.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -57,6 +62,40 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     while (_nodes.length < _platforms.length) {
       _nodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-first-source-${_nodes.length}'));
     }
+  }
+
+  void _requestInitialFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _rootNode.requestFocus();
+      if (_nodes.isNotEmpty) _focusRow(0);
+    });
+    _focusRetryTimer?.cancel();
+    _focusRetryTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      if (!_saveNode.hasFocus && !_nodes.any((node) => node.hasFocus)) {
+        _rootNode.requestFocus();
+        if (_nodes.isNotEmpty) _focusRow(_index);
+      }
+    });
+  }
+
+  KeyEventResult _rootKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    if (_saveNode.hasFocus) return _saveKey(_saveNode, event);
+    if (_nodes.isNotEmpty && _index >= 0 && _index < _nodes.length) {
+      return _rowKey(_index, _platforms[_index], event);
+    }
+    if (_isSelect(key) || _isBack(key)) {
+      _saveAndContinue();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.handled;
   }
 
   bool _isSelect(LogicalKeyboardKey key) =>
@@ -218,9 +257,14 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
               return null;
             }),
           },
-          child: Container(
-            color: Colors.black.withOpacity(0.78),
-            child: SafeArea(
+          child: Focus(
+            focusNode: _rootNode,
+            autofocus: true,
+            skipTraversal: true,
+            onKeyEvent: _rootKey,
+            child: Container(
+              color: Colors.black.withOpacity(0.78),
+              child: SafeArea(
               minimum: const EdgeInsets.fromLTRB(34, 30, 34, 34),
               child: Center(
                 child: Container(
@@ -355,6 +399,7 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
                 ),
               ),
             ),
+          ),
           ),
         ),
       ),
