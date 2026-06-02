@@ -626,6 +626,22 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   },
                 ),
                 _SheetRow(
+                  title: 'Mode Layar',
+                  value: _fitCover ? 'Full Portrait' : (_landscape ? 'Landscape' : 'Normal'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _togglePortraitFull();
+                  },
+                ),
+                _SheetRow(
+                  title: 'Rotasi',
+                  value: _landscape ? 'Landscape' : 'Portrait',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _toggleLandscape();
+                  },
+                ),
+                _SheetRow(
                   title: 'Download Episode',
                   value: 'Mulai',
                   onTap: () {
@@ -1146,7 +1162,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   Positioned(
                     left: 18,
                     right: 18,
-                    bottom: _controls ? 184 : 34,
+                    bottom: _controls ? 128 : 34,
                     child: _SubtitleOverlay(text: _activeSubtitleText),
                   ),
                 AnimatedPositioned(
@@ -1154,7 +1170,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   top: (_controls && !_locked) ? 0 : -95,
                   left: 0,
                   right: 0,
-                  child: _TopOverlay(title: '${widget.item.title} - Eps ${widget.episode}', onBack: widget.onBack),
+                  child: _TopOverlay(
+                    title: '${widget.item.title} - Eps ${widget.episode}',
+                    onBack: widget.onBack,
+                    fitCover: _fitCover,
+                    landscape: _landscape,
+                    onRotate: _toggleLandscape,
+                    onFit: _togglePortraitFull,
+                  ),
                 ),
                 if (_controls && !_locked)
                   Center(
@@ -1171,7 +1194,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   ),
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 220),
-                  bottom: (_controls && !_locked) ? 22 : -210,
+                  bottom: (_controls && !_locked) ? 12 : -170,
                   left: 0,
                   right: 0,
                   child: _BottomOverlay(
@@ -1362,19 +1385,70 @@ class _BottomInfoPanel extends StatelessWidget {
 class _TopOverlay extends StatelessWidget {
   final String title;
   final VoidCallback onBack;
-  const _TopOverlay({required this.title, required this.onBack});
+  final bool fitCover;
+  final bool landscape;
+  final VoidCallback onRotate;
+  final VoidCallback onFit;
+  const _TopOverlay({
+    required this.title,
+    required this.onBack,
+    required this.fitCover,
+    required this.landscape,
+    required this.onRotate,
+    required this.onFit,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 88,
-      padding: const EdgeInsets.only(top: 28, left: 8, right: 12),
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.86), Colors.transparent])),
+      height: 86,
+      padding: const EdgeInsets.only(top: 28, left: 8, right: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withOpacity(0.86), Colors.transparent],
+        ),
+      ),
       child: Row(
         children: [
           IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20)),
           Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+          _TopPill(icon: Icons.screen_rotation_rounded, label: landscape ? 'Land' : 'Rotasi', onTap: onRotate),
+          const SizedBox(width: 8),
+          _TopPill(icon: fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, label: fitCover ? 'Fit' : 'Full', onTap: onFit),
         ],
+      ),
+    );
+  }
+}
+
+class _TopPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _TopPill({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.52),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.20)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 5),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w900)),
+          ],
+        ),
       ),
     );
   }
@@ -1403,44 +1477,44 @@ class _BottomOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 38, 12, 0),
+      padding: const EdgeInsets.fromLTRB(10, 28, 10, 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [Colors.black.withOpacity(0.88), Colors.black.withOpacity(0.22), Colors.transparent],
+          colors: [Colors.black.withOpacity(0.86), Colors.black.withOpacity(0.18), Colors.transparent],
         ),
       ),
       child: SafeArea(
         top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withOpacity(0.16)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.45), blurRadius: 22, offset: const Offset(0, 10))],
+            color: Colors.black.withOpacity(0.64),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.14)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 18, offset: const Offset(0, 8))],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (c != null && c.value.isInitialized)
                 _WideSeekBar(controller: c),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 9,
-                runSpacing: 9,
-                alignment: WrapAlignment.center,
-                children: [
-                  _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
-                  _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
-                  _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
-                  _Shortcut(icon: Icons.audiotrack_rounded, label: 'Audio', onTap: onAudio),
-                  _Shortcut(icon: Icons.speed_rounded, label: 'Speed', onTap: onSpeed),
-                  _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
-                  _Shortcut(icon: Icons.screen_rotation_rounded, label: 'Rotate', onTap: onRotate),
-                  _Shortcut(icon: fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, label: fitCover ? 'Fit' : 'Full', onTap: onFit),
-                ],
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
+                    _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
+                    _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
+                    _Shortcut(icon: Icons.audiotrack_rounded, label: 'Audio', onTap: onAudio),
+                    _Shortcut(icon: Icons.speed_rounded, label: 'Speed', onTap: onSpeed),
+                    _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1465,13 +1539,23 @@ class _Shortcut extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
-        child: Row(children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))]),
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white24)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
       ),
     );
   }
