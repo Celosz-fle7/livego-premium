@@ -23,9 +23,10 @@ class LiveGoContentCache {
     required String platform,
     required String endpoint,
     Map<String, String?> params = const {},
+    bool allowExpired = false,
   }) async {
     final file = await _file(platform: platform, endpoint: endpoint, params: params);
-    final payload = await _readPayload(file);
+    final payload = await _readPayload(file, allowExpired: allowExpired);
     if (payload == null) return null;
     final items = payload['items'];
     if (items is! List) return null;
@@ -143,13 +144,14 @@ class LiveGoContentCache {
     }
   }
 
-  static Future<Map<String, dynamic>?> _readPayload(File file) async {
+  static Future<Map<String, dynamic>?> _readPayload(File file, {bool allowExpired = false}) async {
     try {
       if (!await file.exists()) return null;
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map) return null;
       final payload = Map<String, dynamic>.from(decoded);
       if (_isExpired(payload)) {
+        if (allowExpired) return payload;
         await file.delete();
         return null;
       }

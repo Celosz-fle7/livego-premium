@@ -109,6 +109,38 @@ class LiveGoCatalog {
   }
 
 
+  static Future<List<ContentItem>> cachedHomeByCategory({
+    String platform = 'shortmax',
+    String category = 'Populer',
+    bool allowExpired = true,
+  }) async {
+    final key = LiveGoApiPlatforms.categoryKey(platform, category);
+    final endpoint = key.isEmpty ? 'home' : key;
+    final lang = languageFor(platform);
+
+    final cached = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: endpoint,
+      params: {'lang': lang},
+      allowExpired: allowExpired,
+    );
+    final cleanCached = ContentHealthService.filterPlayable(cached ?? const <ContentItem>[]);
+    if (cleanCached.isNotEmpty) return cleanCached.take(FeedConfig.itemsPerCategory).toList(growable: false);
+
+    if (endpoint != 'home') {
+      final homeCached = await LiveGoContentCache.readItems(
+        platform: platform,
+        endpoint: 'home',
+        params: {'lang': lang},
+        allowExpired: allowExpired,
+      );
+      final cleanHome = ContentHealthService.filterPlayable(homeCached ?? const <ContentItem>[]);
+      if (cleanHome.isNotEmpty) return cleanHome.take(FeedConfig.itemsPerCategory).toList(growable: false);
+    }
+
+    return const <ContentItem>[];
+  }
+
   static Future<List<ContentItem>> homeByCategory({
     String platform = 'shortmax',
     String category = 'Populer',
