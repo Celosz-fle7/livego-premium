@@ -28,6 +28,7 @@ class _TvAppState extends State<TvApp> {
   int _homeBannerTicket = 0;
   int _accountTicket = 0;
   int _placeholderTicket = 0;
+  bool _returnToAccountMenuOnBack = false;
 
   bool _exitDialogOpen = false;
   bool _restoreHomeBannerAfterExitDialog = false;
@@ -117,12 +118,22 @@ class _TvAppState extends State<TvApp> {
 
   void _backToCurrentNav() {
     _markBackHandled();
+    if (_returnToAccountMenuOnBack && _index != 5) {
+      _returnToAccountMenuOnBack = false;
+      setState(() {
+        _index = 5;
+        _navMode = TvSideNavMode.hidden;
+        _accountTicket++;
+      });
+      return;
+    }
     _focusCurrentNav();
   }
 
   void _openNavPage(int navIndex) {
     final safe = _safeNav(navIndex);
     setState(() {
+      _returnToAccountMenuOnBack = false;
       _index = safe;
       _navMode = TvSideNavMode.focused;
     });
@@ -134,6 +145,7 @@ class _TvAppState extends State<TvApp> {
   void _backToHomeNav() {
     _markBackHandled();
     setState(() {
+      _returnToAccountMenuOnBack = false;
       _index = 0;
       _navMode = TvSideNavMode.focused;
     });
@@ -145,6 +157,7 @@ class _TvAppState extends State<TvApp> {
   void _backToHomeBanner() {
     _markBackHandled();
     setState(() {
+      _returnToAccountMenuOnBack = false;
       _index = 0;
       _navMode = TvSideNavMode.hidden;
       _homeBannerTicket++;
@@ -154,6 +167,7 @@ class _TvAppState extends State<TvApp> {
   void _returnToHomeLastFocus() {
     _markBackHandled();
     setState(() {
+      _returnToAccountMenuOnBack = false;
       _index = 0;
       _navMode = TvSideNavMode.hidden;
       _homeTicket++;
@@ -162,6 +176,7 @@ class _TvAppState extends State<TvApp> {
 
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
+    _returnToAccountMenuOnBack = false;
     if (safe != _index) {
       setState(() {
         _index = safe;
@@ -174,6 +189,17 @@ class _TvAppState extends State<TvApp> {
     }
     _hideNav();
     _bumpContentTicket();
+  }
+
+  void _openFromAccountMenu(int navIndex) {
+    final safe = _safeNav(navIndex);
+    if (safe == 5) return;
+    setState(() {
+      _returnToAccountMenuOnBack = true;
+      _index = safe;
+      _navMode = TvSideNavMode.hidden;
+      _placeholderTicket++;
+    });
   }
 
   void _bumpContentTicket() {
@@ -236,6 +262,15 @@ class _TvAppState extends State<TvApp> {
     // If a content screen did not handle BACK itself, close it to the
     // active navbar item first. Do not jump straight to Home/banner.
     if (!_navHasFocus) {
+      if (_returnToAccountMenuOnBack && _index != 5) {
+        _returnToAccountMenuOnBack = false;
+        setState(() {
+          _index = 5;
+          _navMode = TvSideNavMode.hidden;
+          _accountTicket++;
+        });
+        return;
+      }
       _focusCurrentNav();
       return;
     }
@@ -315,7 +350,7 @@ class _TvAppState extends State<TvApp> {
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _returnToHomeLastFocus,
-        onOpenNavIndex: _enterContent,
+        onOpenNavIndex: _openFromAccountMenu,
       ),
     ];
   }
