@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
+import '../../core/livego_local_store.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../models/tv_zone.dart';
 import '../utils/tv_focus_utils.dart';
@@ -254,8 +255,13 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     return KeyEventResult.ignored;
   }
 
+  void _persistSettings() {
+    LiveGoLocalStore.saveSettings();
+  }
+
   void _adjustTvGrid(int delta) {
     setState(() => LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta));
+    _persistSettings();
   }
 
   String _nextDrm(int delta) {
@@ -268,6 +274,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _cycleDrm(int delta) {
     setState(() => LiveGoSettings.drmMode = _nextDrm(delta));
+    _persistSettings();
   }
 
   void _activate(_SettingKind kind) {
@@ -322,6 +329,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
       }
     });
+    _persistSettings();
   }
 
   @override

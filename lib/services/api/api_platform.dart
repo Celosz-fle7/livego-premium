@@ -352,7 +352,10 @@ class LiveGoApiPlatforms {
     ),
   ];
 
-  static List<String> get supportedSlugs => all.map((e) => e.slug).toList();
+  static List<String> get supportedSlugs => all
+      .where((e) => e.backend == LiveGoApiBackend.anichin)
+      .map((e) => e.slug)
+      .toList();
 
   static List<String> get defaultSlugs => all
       .where((e) => e.enabledByDefault)

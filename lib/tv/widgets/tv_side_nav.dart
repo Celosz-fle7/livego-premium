@@ -30,7 +30,7 @@ class TvSideNav extends StatelessWidget {
   });
 
   static const items = [
-    TvNavItem(Icons.keyboard_arrow_left_rounded, 'Tutup'),
+    TvNavItem(Icons.home_rounded, 'Home'),
     TvNavItem(Icons.history_rounded, 'Histori'),
     TvNavItem(Icons.search_rounded, 'Cari'),
     TvNavItem(Icons.favorite_rounded, 'Favorit'),
@@ -75,7 +75,7 @@ class TvSideNav extends StatelessWidget {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      focusNodes[_safe(itemIndex)].requestFocus();
+      onOpenContent(itemIndex);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

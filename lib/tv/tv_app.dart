@@ -103,10 +103,8 @@ class _TvAppState extends State<TvApp> {
   }
 
   void _peekOrFocusNav() {
-    if (_navMode == TvSideNavMode.hidden) {
-      setState(() => _navMode = TvSideNavMode.peek);
-      return;
-    }
+    // LEFT from content must land on the navbar immediately.
+    // Peek-only made TV remote navigation feel like it needed two LEFT presses.
     _focusCurrentNav();
   }
 
