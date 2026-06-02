@@ -150,6 +150,15 @@ class _TvAppState extends State<TvApp> {
     });
   }
 
+  void _returnToHomeLastFocus() {
+    _markBackHandled();
+    setState(() {
+      _index = 0;
+      _navMode = TvSideNavMode.hidden;
+      _homeTicket++;
+    });
+  }
+
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
     if (safe != _index) {
@@ -230,15 +239,9 @@ class _TvAppState extends State<TvApp> {
       return;
     }
 
-    // Navbar item other than Home -> Home navbar.
-    // Next BACK from Home navbar -> Home banner.
-    // Next BACK is handled by Home banner -> exit popup.
-    if (_index != 0) {
-      _backToHomeNav();
-      return;
-    }
-
-    _backToHomeBanner();
+    // BACK from the focused rail only hides the rail and returns to the
+    // last Home focus. The Home icon is a shortcut, not a refresh zone.
+    _returnToHomeLastFocus();
   }
 
   KeyEventResult _exitDialogKey(FocusNode node, KeyEvent event) {
@@ -283,13 +286,13 @@ class _TvAppState extends State<TvApp> {
         focusTicket: _index == 1 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvLibraryScreen(
         title: 'Favorit',
@@ -298,19 +301,19 @@ class _TvAppState extends State<TvApp> {
         focusTicket: _index == 3 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _returnToHomeLastFocus,
       ),
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
-        onBackToHome: _backToHomeBanner,
+        onBackToHome: _returnToHomeLastFocus,
         onOpenNavIndex: _enterContent,
       ),
     ];
