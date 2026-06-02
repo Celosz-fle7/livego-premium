@@ -658,12 +658,24 @@ class _SourceRow extends StatelessWidget {
     required this.isLast,
   });
 
+  List<int> _visibleCategoryIndexes() {
+    if (categories.isEmpty) return const <int>[];
+    const maxVisible = 6;
+    if (categories.length <= maxVisible) return List<int>.generate(categories.length, (i) => i);
+    final safeIndex = categoryIndex.clamp(0, categories.length - 1).toInt();
+    final desiredStart = categoryMode ? safeIndex - 2 : 0;
+    final start = desiredStart.clamp(0, categories.length - maxVisible).toInt();
+    return List<int>.generate(maxVisible, (i) => start + i);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: node,
       builder: (context, _) {
         final focused = node.hasFocus;
+        final visibleIndexes = _visibleCategoryIndexes();
+        final safeCategoryIndex = categories.isEmpty ? 0 : categoryIndex.clamp(0, categories.length - 1).toInt();
         return Focus(
           focusNode: node,
           skipTraversal: true,
@@ -671,25 +683,29 @@ class _SourceRow extends StatelessWidget {
           child: InkWell(
             canRequestFocus: false,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(22),
             child: Column(
               children: [
                 AnimatedContainer(
                   duration: TvFocusStyle.fast,
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  margin: const EdgeInsets.symmetric(vertical: 5),
+                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
                   decoration: BoxDecoration(
                     gradient: active
-                        ? (focused
-                            ? const LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
-                            : const LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]))
-                        : LinearGradient(colors: [Colors.black.withOpacity(0.78), AppTheme.bgDeep]),
-                    borderRadius: BorderRadius.circular(20),
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF10243A), Color(0xFF07111F)],
+                          )
+                        : LinearGradient(colors: [Colors.black.withOpacity(0.72), const Color(0xFF020617)]),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: focused ? (categoryMode ? Colors.white.withOpacity(0.75) : AppTheme.cyan.withOpacity(0.95)) : AppTheme.borderSoft,
+                      color: focused
+                          ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
+                          : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
                       width: focused ? 2 : 1,
                     ),
-                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 14)] : null,
+                    boxShadow: focused ? [TvFocusStyle.glow(0.085, 7)] : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -697,14 +713,42 @@ class _SourceRow extends StatelessWidget {
                       Row(
                         children: [
                           _StatusLamp(color: statusColor, text: statusText),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 13),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: active ? Colors.white : Colors.white54,
+                                          fontSize: 17.2,
+                                          fontWeight: FontWeight.w900,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                    if (focused)
+                                      _ModeBadge(text: categoryMode ? 'PILIH KATEGORI' : 'OK ON/OFF'),
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
-                                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                                Text(
+                                  active ? subtitle : 'Platform dimatikan. Tekan OK untuk mengaktifkan lagi.',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: active ? AppTheme.textSoft : Colors.white38,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -712,46 +756,80 @@ class _SourceRow extends StatelessWidget {
                           _SwitchPill(active: active, focused: focused && !categoryMode),
                         ],
                       ),
-                      const SizedBox(height: 11),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           SizedBox(
-                            width: 72,
-                            child: Text(
-                              active ? 'Kategori' : 'OFF',
-                              style: TextStyle(color: active ? AppTheme.textSoft : Colors.white38, fontSize: 10.5, fontWeight: FontWeight.w900),
+                            width: 88,
+                            child: Row(
+                              children: [
+                                Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
+                                const SizedBox(width: 6),
+                                Text(
+                                  active ? 'Kategori' : 'OFF',
+                                  style: TextStyle(
+                                    color: active ? AppTheme.textSoft : Colors.white35,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          if (categories.length > visibleIndexes.length)
+                            Icon(Icons.chevron_left_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
                           Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              physics: const NeverScrollableScrollPhysics(),
-                              child: Row(
-                                children: [
-                                  for (var i = 0; i < categories.length; i++) ...[
-                                    _CategoryChip(
-                                      text: categories[i],
-                                      selected: active && selectedCategories.contains(categories[i]),
-                                      focused: focused && categoryMode && i == categoryIndex,
+                            child: Row(
+                              children: [
+                                for (var j = 0; j < visibleIndexes.length; j++) ...[
+                                  Expanded(
+                                    child: _CategoryChip(
+                                      text: categories[visibleIndexes[j]],
+                                      selected: active && selectedCategories.contains(categories[visibleIndexes[j]]),
+                                      focused: focused && categoryMode && visibleIndexes[j] == safeCategoryIndex,
                                       disabled: !active,
                                     ),
-                                    if (i != categories.length - 1) const SizedBox(width: 9),
-                                  ],
+                                  ),
+                                  if (j != visibleIndexes.length - 1) const SizedBox(width: 8),
                                 ],
-                              ),
+                              ],
                             ),
                           ),
+                          if (categories.length > visibleIndexes.length)
+                            Icon(Icons.chevron_right_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
                         ],
                       ),
                     ],
                   ),
                 ),
-                if (!isLast) const Divider(color: AppTheme.border, height: 1),
+                if (!isLast) const Divider(color: AppTheme.borderSoft, height: 1),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ModeBadge extends StatelessWidget {
+  final String text;
+  const _ModeBadge({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.cyan.withOpacity(0.11),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.22)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: AppTheme.cyan, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.5, decoration: TextDecoration.none),
+      ),
     );
   }
 }
@@ -791,26 +869,34 @@ class _SwitchPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      width: 78,
-      height: 34,
+      width: 84,
+      height: 36,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.055),
+        gradient: active ? AppTheme.activeGradient : null,
+        color: active ? null : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? Colors.white : (active ? AppTheme.cyan.withOpacity(0.65) : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 13)] : null,
+        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 2 : 1),
+        boxShadow: focused ? [TvFocusStyle.glow(0.09, 7)] : null,
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
         children: [
           AnimatedContainer(
             duration: TvFocusStyle.fast,
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(color: active ? AppTheme.cyan : Colors.white38, shape: BoxShape.circle),
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: active ? Colors.white : Colors.white38,
+              shape: BoxShape.circle,
+              boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.20), blurRadius: 6)] : null,
+            ),
           ),
           Center(
-            child: Text(active ? 'ON' : 'OFF', style: TextStyle(color: active ? AppTheme.cyan : Colors.white54, fontSize: 10, fontWeight: FontWeight.w900)),
+            child: Text(
+              active ? 'ON' : 'OFF',
+              style: TextStyle(color: active ? Colors.white : Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+            ),
           ),
         ],
       ),
@@ -830,27 +916,41 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      constraints: const BoxConstraints(minWidth: 78),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: selected ? AppTheme.activeGradient : null,
         color: selected ? null : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
         border: Border.all(
-          color: focused ? Colors.white : (selected ? Colors.transparent : Colors.white12),
+          color: focused ? AppTheme.whiteGlow : (selected ? Colors.white.withOpacity(0.14) : Colors.white12),
           width: focused ? 2 : 1,
         ),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 14)] : null,
+        boxShadow: focused ? [TvFocusStyle.glow(0.09, 7)] : null,
       ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selected) ...[
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
+                fontSize: 11.4,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -868,31 +968,61 @@ class _ConfirmSaveOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black.withOpacity(0.62),
+      color: Colors.black.withOpacity(0.66),
       alignment: Alignment.center,
       child: Container(
-        width: 520,
-        padding: const EdgeInsets.all(24),
+        width: 560,
+        padding: const EdgeInsets.all(26),
         decoration: BoxDecoration(
-          gradient: AppTheme.panelGradient,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
-          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.16), blurRadius: 34)],
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF10243A), Color(0xFF07111F), Color(0xFF020617)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: AppTheme.cyan.withOpacity(0.28), width: 1.2),
+          boxShadow: [
+            const BoxShadow(color: Colors.black87, blurRadius: 36),
+            BoxShadow(color: AppTheme.cyan.withOpacity(0.14), blurRadius: 30),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Simpan perubahan sumber data?', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-            const SizedBox(height: 8),
-            const Text('Perubahan platform dan kategori akan dipakai Beranda TV setelah kembali.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-            const SizedBox(height: 22),
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.activeGradient,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [TvFocusStyle.glow(0.10, 8)],
+                  ),
+                  child: const Icon(Icons.save_rounded, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Simpan perubahan?', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                      SizedBox(height: 4),
+                      Text('Platform dan kategori aktif akan diterapkan ke Beranda TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 _DialogButton(node: stayNode, text: 'Batal', onKey: onKey, onTap: onStay),
                 const SizedBox(width: 14),
-                _DialogButton(node: saveNode, text: 'Simpan & Keluar', onKey: onKey, onTap: onSave, filled: true),
+                _DialogButton(node: saveNode, text: 'Simpan', onKey: onKey, onTap: onSave, filled: true),
               ],
             ),
           ],
@@ -913,31 +1043,42 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: node,
-      skipTraversal: true,
-      onKeyEvent: onKey,
-      child: InkWell(
-        canRequestFocus: false,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: TvFocusedBorder(
+    return ListenableBuilder(
+      listenable: node,
+      builder: (context, _) {
+        final focused = node.hasFocus;
+        return Focus(
           focusNode: node,
-          color: AppTheme.cyan,
-          radius: 999,
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: filled ? AppTheme.cyan.withOpacity(0.16) : Colors.transparent,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: filled ? AppTheme.cyan.withOpacity(0.50) : Colors.white12),
+          skipTraversal: true,
+          onKeyEvent: onKey,
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(999),
+            child: AnimatedContainer(
+              duration: TvFocusStyle.fast,
+              height: 48,
+              constraints: const BoxConstraints(minWidth: 132),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: filled ? AppTheme.activeGradient : null,
+                color: filled ? null : Colors.white.withOpacity(focused ? 0.075 : 0.035),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: focused ? AppTheme.whiteGlow : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
+                  width: focused ? 2 : 1,
+                ),
+                boxShadow: focused ? [TvFocusStyle.glow(0.10, 8)] : null,
+              ),
+              child: Text(
+                text,
+                style: TextStyle(color: filled || focused ? Colors.white : Colors.white70, fontSize: 13.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+              ),
             ),
-            child: Text(text, style: TextStyle(color: filled ? AppTheme.cyan : Colors.white70, fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

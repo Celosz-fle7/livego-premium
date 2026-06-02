@@ -912,8 +912,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               ),
             const SizedBox(height: 12),
             _HeaderBox(
+              icon: Icons.apps_rounded,
               label: 'Platform',
-              height: 72,
+              hint: LiveGoCatalog.label(_platform),
+              height: 76,
               child: _ChipRow(
                 labels: platforms,
                 selected: source,
@@ -928,8 +930,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             ),
             const SizedBox(height: 10),
             _HeaderBox(
+              icon: Icons.tune_rounded,
               label: 'Kategori',
-              height: 72,
+              hint: categories.isEmpty ? 'Default' : categories[category],
+              height: 76,
               child: _ChipRow(
                 labels: categories,
                 selected: category,
@@ -1148,29 +1152,29 @@ class _FocusableBanner extends StatelessWidget {
             child: AnimatedContainer(
               duration: TvFocusStyle.normal,
               curve: Curves.easeOutCubic,
-              height: 190,
-              padding: const EdgeInsets.all(10),
+              height: 208,
+              padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [AppTheme.surface2, AppTheme.bgDeep],
                 ),
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(30),
                 border: Border.all(
-                  color: focused ? TvFocusStyle.focusBlue : AppTheme.border,
-                  width: focused ? 2.1 : 1.1,
+                  color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.92),
+                  width: focused ? 2.2 : 1.0,
                 ),
                 boxShadow: [
-                  const BoxShadow(color: Colors.black87, blurRadius: 20),
-                  if (focused) TvFocusStyle.glow(0.10, 7),
+                  const BoxShadow(color: Colors.black87, blurRadius: 18),
+                  BoxShadow(color: AppTheme.cyan.withOpacity(focused ? 0.12 : 0.045), blurRadius: focused ? 18 : 10),
                 ],
               ),
               child: AnimatedContainer(
                 duration: TvFocusStyle.normal,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: focused ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.04)),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: focused ? Colors.white.withOpacity(0.13) : Colors.white.withOpacity(0.045)),
                 ),
                 child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 182),
               ),
@@ -1183,47 +1187,94 @@ class _FocusableBanner extends StatelessWidget {
 }
 
 class _HeaderBox extends StatelessWidget {
+  final IconData icon;
   final String label;
+  final String hint;
   final double height;
   final Widget child;
 
-  const _HeaderBox({required this.label, required this.height, required this.child});
+  const _HeaderBox({required this.icon, required this.label, required this.hint, required this.height, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 7),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xF2071326), Color(0xEE010409)],
+          colors: [Color(0xF4071326), Color(0xF0010409)],
         ),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: AppTheme.border, width: 1.1),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.92), width: 1.0),
         boxShadow: [
-          const BoxShadow(color: Colors.black54, blurRadius: 14),
-          BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 20, spreadRadius: 1),
+          const BoxShadow(color: Colors.black54, blurRadius: 11),
+          BoxShadow(color: AppTheme.cyan.withOpacity(0.035), blurRadius: 18),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 5),
-            child: Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                color: TvFocusStyle.focusBlue.withOpacity(0.72),
-                fontSize: 9.2,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2.2,
-                decoration: TextDecoration.none,
-              ),
+          Container(
+            width: 116,
+            height: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.035),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: Colors.white.withOpacity(0.055)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.cyan.withOpacity(0.11),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
+                  ),
+                  child: Icon(icon, color: AppTheme.cyan.withOpacity(0.92), size: 17),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: TvFocusStyle.focusBlue.withOpacity(0.78),
+                          fontSize: 9.4,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.3,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hint,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10.8,
+                          fontWeight: FontWeight.w800,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          Expanded(child: Align(alignment: Alignment.centerLeft, child: child)),
+          const SizedBox(width: 12),
+          Expanded(child: child),
         ],
       ),
     );
@@ -1326,29 +1377,49 @@ class _TvChip extends StatelessWidget {
             focusColor: Colors.transparent,
             child: AnimatedContainer(
               duration: TvFocusStyle.fast,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: active
                     ? AppTheme.activeGradient
                     : (focused
-                        ? LinearGradient(colors: [TvFocusStyle.focusBlue.withOpacity(0.12), AppTheme.surface3.withOpacity(0.96)])
+                        ? LinearGradient(colors: [AppTheme.cyan.withOpacity(0.13), AppTheme.surface3.withOpacity(0.98)])
                         : null),
-                color: active || focused ? null : AppTheme.surface2.withOpacity(0.92),
+                color: active || focused ? null : AppTheme.surface2.withOpacity(0.82),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.18) : AppTheme.border),
+                  color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white.withOpacity(0.075)),
                   width: focused ? 2.0 : 1.0,
                 ),
-                boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
+                boxShadow: focused ? [TvFocusStyle.glow(0.075, 6)] : null,
               ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppTheme.textSoft,
-                  fontSize: 12.6,
-                  fontWeight: FontWeight.w900,
-                  decoration: TextDecoration.none,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (active) ...[
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 7),
+                  ],
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? Colors.white : AppTheme.textSoft,
+                        fontSize: 12.4,
+                        fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1357,7 +1428,6 @@ class _TvChip extends StatelessWidget {
     );
   }
 }
-
 
 double _tvPosterAspectFor(int count) {
   if (count >= 9) return 0.58;
@@ -1393,11 +1463,17 @@ class _ContentGrid extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title.trim().isNotEmpty) ...[
-            Text(
-              title.toUpperCase(),
-              style: TextStyle(color: TvFocusStyle.focusBlue.withOpacity(0.66), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.2, decoration: TextDecoration.none),
+            Row(
+              children: [
+                Container(width: 4, height: 18, decoration: BoxDecoration(color: TvFocusStyle.focusBlue.withOpacity(0.70), borderRadius: BorderRadius.circular(999))),
+                const SizedBox(width: 9),
+                Text(
+                  title.toUpperCase(),
+                  style: TextStyle(color: Colors.white.withOpacity(0.86), letterSpacing: 1.4, fontWeight: FontWeight.w900, fontSize: 13.4, decoration: TextDecoration.none),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
           ],
           GridView.builder(
             shrinkWrap: true,
@@ -1465,12 +1541,12 @@ class _TvPosterTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? TvFocusStyle.focusBlue : AppTheme.borderSoft.withOpacity(0.58),
-                          width: focused ? 2.2 : 0.7,
+                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.42),
+                          width: focused ? 2.0 : 0.6,
                         ),
                         boxShadow: focused
-                            ? [TvFocusStyle.glow(0.09, 6)]
-                            : [const BoxShadow(color: Colors.black45, blurRadius: 6)],
+                            ? [TvFocusStyle.glow(0.075, 6), const BoxShadow(color: Colors.black54, blurRadius: 7)]
+                            : [const BoxShadow(color: Colors.black38, blurRadius: 5)],
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),

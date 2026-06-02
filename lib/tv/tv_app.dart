@@ -11,7 +11,6 @@ import 'screens/tv_library_screen.dart';
 import 'screens/tv_search_screen.dart';
 import 'utils/tv_focus_utils.dart';
 import 'theme/tv_focus_style.dart';
-import 'widgets/tv_focused_border.dart';
 import 'widgets/tv_side_nav.dart';
 
 class TvApp extends StatefulWidget {
@@ -433,40 +432,57 @@ class _TvAppState extends State<TvApp> {
     if (!_exitDialogOpen) return const SizedBox.shrink();
     return Positioned.fill(
       child: Container(
-        color: Colors.black.withOpacity(0.62),
+        color: Colors.black.withOpacity(0.66),
         alignment: Alignment.center,
         child: Container(
-          width: 470,
+          width: 560,
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
-            color: AppTheme.surface2,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: AppTheme.border, width: 1.5),
-            boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 34)],
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF10243A), Color(0xFF07111F), Color(0xFF020617)],
+            ),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppTheme.cyan.withOpacity(0.26), width: 1.2),
+            boxShadow: [
+              const BoxShadow(color: Colors.black87, blurRadius: 38),
+              BoxShadow(color: AppTheme.cyan.withOpacity(0.12), blurRadius: 30),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.power_settings_new_rounded, color: TvFocusStyle.focusBlue, size: 58),
+              Container(
+                width: 62,
+                height: 62,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.activeGradient,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [TvFocusStyle.glow(0.12, 8)],
+                ),
+                child: const Icon(Icons.logout_rounded, color: Colors.white, size: 32),
+              ),
               const SizedBox(height: 18),
               const Text(
                 'Keluar dari LiveGO?',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, decoration: TextDecoration.none),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 25, decoration: TextDecoration.none),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Tekan Tetap untuk kembali ke aplikasi.',
+                'Tontonan terakhir disimpan otomatis. Kamu bisa lanjut lagi nanti.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+                style: TextStyle(color: AppTheme.textSoft, fontSize: 13.5, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 26),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _ExitDialogButton(
                     node: _exitCancelNode,
-                    label: 'Tetap',
+                    label: 'Tetap Menonton',
                     primary: true,
                     onKey: _exitDialogKey,
                     onTap: _closeExitDialog,
@@ -571,40 +587,49 @@ class _ExitDialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: node,
-      skipTraversal: true,
-      autofocus: false,
-      onKeyEvent: onKey,
-      child: TvFocusedBorder(
-        focusNode: node,
-        color: primary ? TvFocusStyle.focusBlue : AppTheme.danger,
-        radius: 16,
-        child: InkWell(
-              canRequestFocus: false,
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          focusColor: Colors.transparent,
-          child: Container(
-            width: 148,
-            height: 54,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: primary ? AppTheme.surface3 : AppTheme.danger.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: primary ? AppTheme.whiteGlow : AppTheme.danger.withOpacity(0.95),
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                decoration: TextDecoration.none,
+    return ListenableBuilder(
+      listenable: node,
+      builder: (context, _) {
+        final focused = node.hasFocus;
+        return Focus(
+          focusNode: node,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(999),
+            focusColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: TvFocusStyle.fast,
+              height: 52,
+              constraints: const BoxConstraints(minWidth: 156),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: primary ? AppTheme.activeGradient : null,
+                color: primary ? null : AppTheme.danger.withOpacity(focused ? 0.18 : 0.10),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: focused ? AppTheme.whiteGlow : (primary ? Colors.white.withOpacity(0.16) : AppTheme.danger.withOpacity(0.34)),
+                  width: focused ? 2 : 1,
+                ),
+                boxShadow: focused ? [primary ? TvFocusStyle.glow(0.10, 8) : BoxShadow(color: AppTheme.danger.withOpacity(0.16), blurRadius: 8)] : null,
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: primary || focused ? Colors.white : AppTheme.danger.withOpacity(0.95),
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

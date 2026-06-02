@@ -13,7 +13,7 @@ class HeroBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: tv ? double.infinity : 335,
-      padding: EdgeInsets.all(tv ? 6 : 10),
+      padding: EdgeInsets.all(tv ? 7 : 10),
       decoration: BoxDecoration(
         gradient: tv
             ? const LinearGradient(
@@ -23,17 +23,17 @@ class HeroBanner extends StatelessWidget {
               )
             : null,
         color: tv ? null : AppTheme.surface.withOpacity(0.75),
-        borderRadius: BorderRadius.circular(tv ? 22 : 34),
-        border: Border.all(color: tv ? AppTheme.border : AppTheme.borderBright.withOpacity(0.32)),
+        borderRadius: BorderRadius.circular(tv ? 24 : 34),
+        border: Border.all(color: tv ? AppTheme.borderSoft.withOpacity(0.92) : AppTheme.borderBright.withOpacity(0.32)),
         boxShadow: tv
             ? [
-                BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 22, spreadRadius: 1),
-                const BoxShadow(color: Colors.black87, blurRadius: 18),
+                BoxShadow(color: AppTheme.cyan.withOpacity(0.055), blurRadius: 18),
+                const BoxShadow(color: Colors.black87, blurRadius: 15),
               ]
             : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(tv ? 18 : 26),
+        borderRadius: BorderRadius.circular(tv ? 20 : 26),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -59,9 +59,9 @@ class HeroBanner extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: tv ? 20 : 28,
-              bottom: tv ? 14 : 32,
-              right: tv ? 118 : 128,
+              left: tv ? 24 : 28,
+              bottom: tv ? 18 : 32,
+              right: tv ? 138 : 128,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -85,36 +85,36 @@ class HeroBanner extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: tv ? 20 : 28,
+                      fontSize: tv ? 22 : 28,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   SizedBox(height: tv ? 5 : 10),
                   Text(
                     item.description,
-                    maxLines: tv ? 1 : 3,
+                    maxLines: tv ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 11.5 : 13),
+                    style: TextStyle(color: Colors.white.withOpacity(0.82), fontSize: tv ? 12.0 : 13, height: 1.25),
                   ),
                 ],
               ),
             ),
             Positioned(
-              right: tv ? 18 : 24,
-              bottom: tv ? 16 : 40,
+              right: tv ? 22 : 24,
+              bottom: tv ? 18 : 40,
               child: Container(
                 padding: EdgeInsets.all(tv ? 2.5 : 0),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(19),
-                  border: tv ? Border.all(color: AppTheme.cyan.withOpacity(0.18)) : null,
-                  boxShadow: tv ? [BoxShadow(color: AppTheme.purple.withOpacity(0.18), blurRadius: 18)] : null,
+                  borderRadius: BorderRadius.circular(20),
+                  border: tv ? Border.all(color: AppTheme.cyan.withOpacity(0.20)) : null,
+                  boxShadow: tv ? [BoxShadow(color: AppTheme.purple.withOpacity(0.14), blurRadius: 14)] : null,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(tv ? 17 : 16),
                   child: LiveGoCachedImage(
                   url: item.posterUrl,
-                  width: tv ? 64 : 92,
-                  height: tv ? 90 : 132,
+                  width: tv ? 76 : 92,
+                  height: tv ? 106 : 132,
                   fit: BoxFit.cover,
                   role: LiveGoImageRole.poster,
                   tv: tv,
@@ -122,7 +122,7 @@ class HeroBanner extends StatelessWidget {
                 ),
               ),
             ),
-            Positioned(left: tv ? 18 : 24, top: tv ? 14 : 20, child: _AccentLine(tv: tv)),
+            Positioned(left: tv ? 22 : 24, top: tv ? 16 : 20, child: _AccentLine(tv: tv)),
           ],
         ),
       ),
