@@ -162,7 +162,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     if (_resultNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocus(_resultNodes[_lastGrid], alignment: 0.34);
+    tvFocusComfort(_resultNodes[_lastGrid], topMargin: 118, bottomMargin: 180);
   }
 
   void _open(ContentItem item) {
@@ -266,9 +266,10 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
-            return ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+            return SafeArea(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(32, 32, 44, 190),
               children: [
                 _SearchHeader(),
                 const SizedBox(height: 14),
@@ -352,7 +353,9 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     },
                   ),
                 ],
+                const SizedBox(height: 130),
               ],
+            ),
             );
           },
         ),
@@ -369,16 +372,16 @@ class _SearchHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 96,
+      height: 88,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.border)),
       child: Row(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(gradient: AppTheme.activeGradient, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.search_rounded, color: Colors.white, size: 30),
+            child: const Icon(Icons.search_rounded, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           const Expanded(

@@ -127,7 +127,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     final rows = DownloadService.items;
     if (rows.isEmpty) {
       _entryPending = false;
-      tvFocus(_emptyNode, alignment: 0.45);
+      tvFocusComfort(_emptyNode, topMargin: 110, bottomMargin: 180);
       return;
     }
     if (_rowNodes.isEmpty) {
@@ -142,7 +142,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.list;
     _lastRow = _safe(index);
-    tvFocus(_rowNodes[_lastRow], alignment: 0.32);
+    tvFocusComfort(_rowNodes[_lastRow], topMargin: 110, bottomMargin: 180);
   }
 
   void _open(DownloadRecord record) {
@@ -228,9 +228,10 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
                 return null;
               }),
             },
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+            child: SafeArea(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(32, 32, 44, 190),
               children: [
                 _DownloadHeader(count: rows.length),
                 const SizedBox(height: 16),
@@ -254,9 +255,11 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
                   for (var i = 0; i < rows.length; i++)
                     _DownloadRow(node: _rowNodes[i], record: rows[i], onTap: () => _open(rows[i]), onKey: (node, event) => _rowKey(i, rows[i], event)),
                 ],
+                const SizedBox(height: 130),
               ],
             ),
           ),
+        ),
         );
       },
     );
@@ -274,16 +277,16 @@ class _DownloadHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 96,
+      height: 88,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.border)),
       child: Row(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(gradient: AppTheme.activeGradient, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.download_done_rounded, color: Colors.white, size: 30),
+            child: const Icon(Icons.download_done_rounded, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(

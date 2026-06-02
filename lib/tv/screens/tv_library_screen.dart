@@ -148,7 +148,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     final items = _items;
     if (items.isEmpty) {
       _entryPending = false;
-      tvFocus(_emptyNode, alignment: 0.45);
+      tvFocusComfort(_emptyNode, topMargin: 110, bottomMargin: 180);
       return;
     }
     if (_gridNodes.isEmpty) {
@@ -163,7 +163,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     if (_gridNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocus(_gridNodes[_lastGrid], alignment: 0.35);
+    tvFocusComfort(_gridNodes[_lastGrid], topMargin: 110, bottomMargin: 180);
   }
 
   void _open(ContentItem item) {
@@ -268,9 +268,10 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
-                return ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+                return SafeArea(
+                  child: ListView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(32, 32, 44, 190),
                   children: [
                     _LibraryHeader(title: widget.title, icon: widget.icon, count: items.length, favorites: widget.favorites),
                     const SizedBox(height: 16),
@@ -321,7 +322,9 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                         },
                       ),
                     ],
+                    const SizedBox(height: 130),
                   ],
+                ),
                 );
               },
             ),
@@ -347,7 +350,7 @@ class _LibraryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 96,
+      height: 88,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.94),
@@ -357,13 +360,13 @@ class _LibraryHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               gradient: AppTheme.activeGradient,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(icon, color: Colors.white, size: 30),
+            child: Icon(icon, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
