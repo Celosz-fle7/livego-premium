@@ -329,11 +329,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _quality = PlayerPreferences.quality;
       _subtitleEnabled = PlayerPreferences.subtitleEnabled;
       _subtitleLanguage = PlayerPreferences.subtitleLanguage;
-      _audioTrack = PlayerPreferences.audioTrack;
+      _audioTrack = PlayerPreferences.audioTrack.toLowerCase() == 'mute' ? 'Source' : PlayerPreferences.audioTrack;
+      _muted = PlayerPreferences.audioTrack.toLowerCase() == 'mute';
       _speed = PlayerPreferences.speed;
     });
     await _controller?.setPlaybackSpeed(_speed);
-    await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+    await _controller?.setVolume(_muted ? 0 : 1);
   }
 
   @override
@@ -392,7 +393,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       controller.addListener(_listen);
       await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
       await controller.setPlaybackSpeed(_speed);
-      await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+      await controller.setVolume(_muted ? 0 : 1);
       if (resume) {
         final saved = LiveGoLocalStore.progressFor(widget.item);
         if (saved != null && saved.episode == widget.episode && saved.position.inSeconds > 5) {
@@ -525,9 +526,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final c = _controller;
     if (c == null) return;
     _muted = !_muted;
-    _audioTrack = _muted ? 'Mute' : 'Source';
     await c.setVolume(_muted ? 0 : 1);
-    await PlayerPreferences.setAudioTrack(_audioTrack);
+    if (mounted) setState(() {});
     _showControls();
   }
 
@@ -612,6 +612,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                 const Text('Pengaturan Player', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
                 _SheetRow(title: 'Kualitas Video', value: _quality, onTap: _qualityMenu),
+                _SheetRow(title: 'Subtitle', value: subtitleText, onTap: _subtitleMenu),
+                _SheetRow(title: 'Audio Track', value: _audioTrack, onTap: _audioMenu),
+                _SheetRow(title: 'Kecepatan Pemutaran', value: '${_speed.toStringAsFixed(1)}x', onTap: _speedMenu),
+                _SheetRow(title: 'Volume', value: _muted ? 'Mute' : 'Normal', onTap: _toggleMute),
                 _SheetRow(
                   title: 'Auto Next',
                   value: LiveGoSettings.autoNextEnabled ? 'Aktif' : 'Mati',
@@ -621,10 +625,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                     _openPlayerSettings();
                   },
                 ),
-                _SheetRow(title: 'Kecepatan Pemutaran', value: '${_speed.toStringAsFixed(1)}x', onTap: _speedMenu),
-                _SheetRow(title: 'Audio Track', value: _audioTrack, onTap: _audioMenu),
-                _SheetRow(title: 'Widevine DRM', value: LiveGoSettings.drmMode, onTap: _drmMenu),
-                _SheetRow(title: 'Pengaturan Subtitle', value: subtitleText, onTap: _subtitleMenu),
+                _SheetRow(
+                  title: 'Download Episode',
+                  value: 'Mulai',
+                  onTap: () {
+                    Navigator.pop(context);
+                    unawaited(_downloadCurrentEpisode());
+                  },
+                ),
               ],
             ),
           ),
@@ -917,13 +925,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Pilih Audio', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const Text('Pilih Audio Track', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
               const SizedBox(height: 14),
               _OptionTile(label: 'Source / Default', selected: _audioTrack == 'Source', onTap: () => Navigator.pop(context, 'Source')),
-              _OptionTile(label: 'Mute', selected: _muted, onTap: () => Navigator.pop(context, 'Mute')),
               const Padding(
                 padding: EdgeInsets.only(top: 10),
-                child: Text('Audio multi-track real akan aktif kalau provider mengirim audio track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
+                child: Text('Mute ada di menu Volume. Audio Track khusus untuk bahasa suara video seperti Indonesia, English, Mandarin kalau provider mengirim track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
               ),
             ],
           ),
@@ -931,17 +938,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       ),
     );
     if (picked != null) {
-      if (picked == 'Mute') {
-        _muted = true;
-        _audioTrack = 'Mute';
-        await _controller?.setVolume(0);
-        await PlayerPreferences.setAudioTrack('Mute');
-      } else {
-        _audioTrack = picked;
-        _muted = false;
-        await _controller?.setVolume(1);
-        await PlayerPreferences.setAudioTrack(picked);
-      }
+      _audioTrack = picked;
+      await PlayerPreferences.setAudioTrack(picked);
       if (mounted) setState(() {});
     }
     _showControls();
@@ -1188,6 +1186,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                     onDownload: _downloadCurrentEpisode,
                     onSettings: _openPlayerSettings,
                     onQuality: _qualityMenu,
+                    onSubtitle: _subtitleMenu,
+                    onAudio: _audioMenu,
+                    onSpeed: _speedMenu,
                     onRotate: _toggleLandscape,
                     onFit: _togglePortraitFull,
                   ),
@@ -1391,9 +1392,12 @@ class _BottomOverlay extends StatelessWidget {
   final VoidCallback onDownload;
   final VoidCallback onSettings;
   final VoidCallback onQuality;
+  final VoidCallback onSubtitle;
+  final VoidCallback onAudio;
+  final VoidCallback onSpeed;
   final VoidCallback onRotate;
   final VoidCallback onFit;
-  const _BottomOverlay({required this.controller, required this.episode, required this.total, required this.quality, required this.muted, required this.fitCover, required this.landscape, required this.onEpisodes, required this.onDownload, required this.onSettings, required this.onQuality, required this.onRotate, required this.onFit});
+  const _BottomOverlay({required this.controller, required this.episode, required this.total, required this.quality, required this.muted, required this.fitCover, required this.landscape, required this.onEpisodes, required this.onDownload, required this.onSettings, required this.onQuality, required this.onSubtitle, required this.onAudio, required this.onSpeed, required this.onRotate, required this.onFit});
 
   @override
   Widget build(BuildContext context) {
@@ -1423,27 +1427,19 @@ class _BottomOverlay extends StatelessWidget {
               if (c != null && c.value.isInitialized)
                 _WideSeekBar(controller: c),
               const SizedBox(height: 16),
-              Row(
+              Wrap(
+                spacing: 9,
+                runSpacing: 9,
+                alignment: WrapAlignment.center,
                 children: [
-                  _Shortcut(icon: Icons.menu_rounded, label: 'Eps', onTap: onEpisodes),
-                  const SizedBox(width: 10),
-                  _Shortcut(icon: Icons.download_rounded, label: 'Unduh', onTap: onDownload),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.14))),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onSettings, icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 22)),
-                          GestureDetector(onTap: onQuality, child: Text(quality, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13))),
-                          GestureDetector(onTap: onRotate, child: Icon(Icons.screen_rotation_rounded, color: landscape ? AppTheme.cyan : Colors.white, size: 22)),
-                          GestureDetector(onTap: onFit, child: Icon(fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, color: fitCover ? AppTheme.cyan : Colors.white, size: 24)),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
+                  _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
+                  _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
+                  _Shortcut(icon: Icons.audiotrack_rounded, label: 'Audio', onTap: onAudio),
+                  _Shortcut(icon: Icons.speed_rounded, label: 'Speed', onTap: onSpeed),
+                  _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
+                  _Shortcut(icon: Icons.screen_rotation_rounded, label: 'Rotate', onTap: onRotate),
+                  _Shortcut(icon: fitCover ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded, label: fitCover ? 'Fit' : 'Full', onTap: onFit),
                 ],
               ),
             ],
@@ -1472,10 +1468,10 @@ class _Shortcut extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white24)),
-        child: Row(children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800))]),
+        child: Row(children: [Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 6), Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900))]),
       ),
     );
   }

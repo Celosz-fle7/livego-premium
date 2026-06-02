@@ -154,8 +154,7 @@ class PlaybackSource {
       qualities: stream.qualities.map(PlaybackQuality.fromStreamQuality).toList(),
       subtitles: stream.subtitles.map(PlaybackSubtitle.fromSubtitleTrack).toList(),
       audioTracks: const <PlaybackAudioTrack>[
-        PlaybackAudioTrack(id: 'source', label: 'Source'),
-        PlaybackAudioTrack(id: 'mute', label: 'Mute'),
+        PlaybackAudioTrack(id: 'source', label: 'Source / Default'),
       ],
       selectedQuality: selectedQuality,
       selectedSubtitle: selectedSubtitle,

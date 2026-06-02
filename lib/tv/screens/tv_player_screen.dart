@@ -60,6 +60,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
+  bool _muted = false;
 
   _PlayerMode _mode = _PlayerMode.controlsVisible;
   bool _showControls = true;
@@ -68,7 +69,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _progressFocused = false;
   Timer? _autoHideTimer;
 
-  static const int _controlCount = 10;
+  static const int _controlCount = 8;
 
 
   List<String> get _qualityChoices {
@@ -122,13 +123,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (!mounted) return;
     setState(() {
       _speed = PlayerPreferences.speed;
-      _audioTrack = PlayerPreferences.audioTrack;
+      _audioTrack = PlayerPreferences.audioTrack.toLowerCase() == 'mute' ? 'Source' : PlayerPreferences.audioTrack;
+      _muted = PlayerPreferences.audioTrack.toLowerCase() == 'mute';
       LiveGoSettings.quality = PlayerPreferences.quality;
       LiveGoSettings.subtitlesEnabled = PlayerPreferences.subtitleEnabled;
       _qualityCursor = _qualityIndexFor(PlayerPreferences.quality);
     });
     await _controller?.setPlaybackSpeed(_speed);
-    await _controller?.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+    await _controller?.setVolume(_muted ? 0 : 1);
   }
 
   ContentItem _playableItem(int episode) {
@@ -301,7 +303,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
     debugPrint('LIVEGO TV VIDEO INIT DONE ${DateTime.now().difference(initStart).inMilliseconds}ms');
     await controller.setPlaybackSpeed(_speed);
-    await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
+    await controller.setVolume(_muted ? 0 : 1);
 
     if (resumePosition != null && resumePosition.inMilliseconds > 0) {
       await controller.seekTo(resumePosition);
@@ -597,7 +599,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     Future.microtask(() => _rootFocus.requestFocus());
   }
 
-  void _showOptionsPanel() {
+  void _showOptionsPanel({int cursor = 0}) {
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.options;
@@ -605,6 +607,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = true;
       _progressFocused = false;
+      _optionCursor = cursor;
     });
     Future.microtask(() => _rootFocus.requestFocus());
   }
@@ -754,11 +757,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     PlayerPreferences.setSpeed(next);
   }
 
-  void _toggleAudio() {
-    final next = _audioTrack == 'Mute' ? 'Source' : 'Mute';
-    setState(() => _audioTrack = next);
-    _controller?.setVolume(next == 'Mute' ? 0 : 1);
-    PlayerPreferences.setAudioTrack(next);
+  void _selectSourceAudio() {
+    setState(() => _audioTrack = 'Source');
+    PlayerPreferences.setAudioTrack('Source');
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _controller?.setVolume(_muted ? 0 : 1);
   }
 
   void _toggleSubtitle() {
@@ -781,27 +787,21 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _togglePlay();
         break;
       case 2:
-        _showEpisodeList();
+        _nextEpisode();
         return;
       case 3:
-        _showSubtitlePopup();
+        _showEpisodeList();
         return;
       case 4:
         _showQualityPopup();
         return;
       case 5:
-        setState(() => _fitCover = !_fitCover);
-        break;
+        _showSubtitlePopup();
+        return;
       case 6:
-        _nextEpisode();
+        _showOptionsPanel(cursor: 1);
         return;
       case 7:
-        _toggleAudio();
-        break;
-      case 8:
-        unawaited(_toggleFavorite());
-        break;
-      case 9:
         _showOptionsPanel();
         return;
     }
@@ -812,9 +812,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (_optionCursor == 0) {
       _changeSpeed(delta > 0 ? 0.25 : -0.25);
     } else if (_optionCursor == 1) {
-      _toggleAudio();
+      _selectSourceAudio();
     } else if (_optionCursor == 2) {
       setState(() => _fitCover = !_fitCover);
+    } else if (_optionCursor == 3) {
+      unawaited(_toggleFavorite());
+    } else if (_optionCursor == 4) {
+      _toggleMute();
     }
   }
 
@@ -880,9 +884,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_mode == _PlayerMode.options) {
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 2).toInt());
+        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, 4).toInt());
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 2).toInt());
+        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, 4).toInt());
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _changeOption(-1);
       } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
@@ -1105,6 +1109,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     speed: _speed,
                     audioTrack: _audioTrack,
                     fitCover: _fitCover,
+                    favorite: LiveGoLocalStore.isFavorite(item),
+                    muted: _muted,
                     cursor: _optionCursor,
                   ),
                 ),
@@ -1252,14 +1258,12 @@ class _PlayerControlDock extends StatelessWidget {
             children: [
               _DockButton(icon: Icons.skip_previous_rounded, label: 'PREV', focused: focusedIndex == 0),
               _DockButton(icon: playing ? Icons.pause_rounded : Icons.play_arrow_rounded, label: 'PLAY', active: true, focused: focusedIndex == 1),
-              _DockButton(icon: Icons.video_library_rounded, label: 'EP', focused: focusedIndex == 2),
-              _DockButton(icon: Icons.subtitles_rounded, label: subtitleStatus.toUpperCase(), focused: focusedIndex == 3),
+              _DockButton(icon: Icons.skip_next_rounded, label: 'NEXT', focused: focusedIndex == 2),
+              _DockButton(icon: Icons.video_library_rounded, label: 'EPISODE', focused: focusedIndex == 3),
               _DockTextButton(text: quality.toUpperCase(), focused: focusedIndex == 4),
-              _DockButton(icon: fitCover ? Icons.fit_screen_rounded : Icons.fullscreen_rounded, label: fitCover ? 'COVER' : 'FIT', focused: focusedIndex == 5),
-              _DockButton(icon: Icons.skip_next_rounded, label: 'NEXT', focused: focusedIndex == 6),
-              _DockButton(icon: Icons.audiotrack_rounded, label: audioTrack, focused: focusedIndex == 7),
-              _DockButton(icon: favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, label: 'FAV', active: favorite, focused: focusedIndex == 8),
-              _DockButton(icon: Icons.tune_rounded, label: 'MORE', focused: focusedIndex == 9),
+              _DockButton(icon: Icons.subtitles_rounded, label: 'SUB', focused: focusedIndex == 5),
+              _DockButton(icon: Icons.audiotrack_rounded, label: 'AUDIO', focused: focusedIndex == 6),
+              _DockButton(icon: Icons.tune_rounded, label: 'MORE', focused: focusedIndex == 7),
             ],
           ),
         ],
@@ -1494,12 +1498,16 @@ class _PlayerOptionsPanel extends StatelessWidget {
   final double speed;
   final String audioTrack;
   final bool fitCover;
+  final bool favorite;
+  final bool muted;
   final int cursor;
 
   const _PlayerOptionsPanel({
     required this.speed,
     required this.audioTrack,
     required this.fitCover,
+    required this.favorite,
+    required this.muted,
     required this.cursor,
   });
 
@@ -1521,8 +1529,10 @@ class _PlayerOptionsPanel extends StatelessWidget {
           const Text('Opsi Player', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           const SizedBox(height: 14),
           _OptionRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 0),
-          _OptionRow(label: 'Audio', value: audioTrack, focused: cursor == 1),
+          _OptionRow(label: 'Audio Track', value: audioTrack, focused: cursor == 1),
           _OptionRow(label: 'Layar', value: fitCover ? 'Cover' : 'Fit', focused: cursor == 2),
+          _OptionRow(label: 'Favorit', value: favorite ? 'Aktif' : 'Mati', focused: cursor == 3),
+          _OptionRow(label: 'Volume', value: muted ? 'Mute' : 'Normal', focused: cursor == 4),
         ],
       ),
     );
