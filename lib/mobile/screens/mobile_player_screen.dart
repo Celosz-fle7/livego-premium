@@ -390,7 +390,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       );
       _controller = controller;
       controller.addListener(_listen);
-      await controller.initialize();
+      await controller.initialize().timeout(PlaybackTimeoutConfig.controllerInit);
       await controller.setPlaybackSpeed(_speed);
       await controller.setVolume(_audioTrack == 'Mute' ? 0 : 1);
       if (resume) {
@@ -427,10 +427,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final best = widget.stream.autoBestUrl;
     if (best.isEmpty || best == _activeUrl) return;
 
-    _autoQualityTimer = Timer(const Duration(seconds: 10), () async {
+    _autoQualityTimer = Timer(const Duration(seconds: 18), () async {
       final c = _controller;
       if (!mounted || c == null || !c.value.isInitialized || _quality.toLowerCase() != 'auto') return;
-      if (c.value.position.inSeconds < 5 || c.value.isBuffering) return;
+      if (c.value.position.inSeconds < 12 || c.value.isBuffering) return;
       final pos = c.value.position;
       final wasPlaying = c.value.isPlaying;
       setState(() => _buffering = true);
