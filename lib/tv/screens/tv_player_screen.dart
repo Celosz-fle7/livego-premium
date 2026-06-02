@@ -21,6 +21,7 @@ import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_resolver.dart';
+import '../../services/api/api_platform.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -60,6 +61,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _brokenEpisodeSkips = 0;
   String _lastBrokenReason = '';
   List<LiveGoEpisode> _episodes = const <LiveGoEpisode>[];
+  List<LiveGoEpisode> _orderedEpisodeCache = const <LiveGoEpisode>[];
+  Future<List<LiveGoEpisode>>? _episodeListLoad;
+  bool _episodeNavigationBusy = false;
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
@@ -88,6 +92,22 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   List<SubtitleTrack> get _subtitleTracks => _streamInfo.subtitles;
+
+  bool get _isDobdaPlayer {
+    try {
+      return LiveGoApiPlatforms.bySlug(widget.item.platformSlug).isDobda;
+    } catch (_) {
+      return widget.item.platformSlug.startsWith('dobda_');
+    }
+  }
+
+  String _chapterIdForEpisodeIndex(int episode) {
+    for (final row in _orderedEpisodes()) {
+      if (row.index == episode && row.id.trim().isNotEmpty) return row.id.trim();
+    }
+    return '$episode';
+  }
+
 
   List<String> get _subtitleChoices {
     final rows = <String>['OFF'];
@@ -150,7 +170,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
       updated: widget.item.updated,
       platformSlug: widget.item.platformSlug,
-      chapterId: '$episode',
+      chapterId: _chapterIdForEpisodeIndex(episode),
       lang: widget.item.lang,
     );
   }
@@ -170,7 +190,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           : (stream.totalEpisodes > 1 ? stream.totalEpisodes : widget.item.episodes),
       updated: detail.updated || widget.item.updated,
       platformSlug: detail.platformSlug.trim().isNotEmpty ? detail.platformSlug : widget.item.platformSlug,
-      chapterId: '$episode',
+      chapterId: _chapterIdForEpisodeIndex(episode),
       lang: detail.lang.trim().isNotEmpty ? detail.lang : widget.item.lang,
     );
   }
@@ -188,17 +208,18 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     });
 
     try {
-      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep');
+      final requestChapter = _isDobdaPlayer ? playable.chapterId : '$ep';
+      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter');
       final started = DateTime.now();
       var stream = await PlaybackResolver.fastStreamInfo(
         playable,
-        chapterId: '$ep',
+        chapterId: requestChapter,
         timeout: PlaybackTimeoutConfig.directEpisode,
       );
       debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty}');
 
       if (stream.url.isEmpty) {
-        stream = await LiveGoCatalog.streamInfo(playable, chapterId: '$ep')
+        stream = await LiveGoCatalog.streamInfo(playable, chapterId: requestChapter)
             .timeout(PlaybackTimeoutConfig.fallbackStream, onTimeout: () => StreamInfo.empty);
       }
 
@@ -229,7 +250,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _brokenEpisodeSkips += 1;
     final total = _episodeTotal(_detail ?? widget.item);
 
-    final nextEpisode = _episodeByOffset(_episode, 1);
+    final nextEpisode = await _resolveEpisodeByOffset(_episode, 1);
     if (_brokenEpisodeSkips < 3 && nextEpisode != _episode && _episode < total) {
       final failed = _episode;
       setState(() {
@@ -296,13 +317,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           _episode < _episodeTotal(_detail ?? widget.item)) {
         final remaining = duration - value.position;
         if (remaining.inSeconds <= 2 && value.position.inSeconds > 8) {
-          final next = _episodeByOffset(_episode, 1);
-          if (next == _episode) return;
           _autoAdvancing = true;
-          LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
-          _episode = next;
-          _episodeCursor = _episode;
-          _load();
+          unawaited(_autoAdvanceToNext());
         }
       }
     });
@@ -495,24 +511,46 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<void> _loadEpisodeListBackground(int ep, StreamInfo stream) async {
     try {
-      final seed = _detail ?? _playableItem(ep);
-      final rows = await LiveGoCatalog.episodes(seed).timeout(PlaybackTimeoutConfig.episodeListBackground);
-      if (!mounted) return;
-      final sorted = rows.where((e) => e.index > 0).toList()
-        ..sort((a, b) => a.index.compareTo(b.index));
-      final count = sorted.length > 1
-          ? sorted.length
-          : (stream.totalEpisodes > 1 ? stream.totalEpisodes : seed.episodes);
-      if (count > 1) {
-        setState(() {
-          _knownEpisodeCount = count;
-          if (sorted.length > 1) _episodes = sorted;
-        });
-      }
-      debugPrint('LIVEGO TV EPISODE LIST BACKGROUND DONE episodes=$count');
+      final rows = await _ensureEpisodeListReady(ep: ep, stream: stream);
+      debugPrint('LIVEGO TV EPISODE LIST BACKGROUND DONE episodes=${rows.length}');
     } catch (e) {
       debugPrint('LIVEGO TV EPISODE LIST BACKGROUND SKIP: $e');
     }
+  }
+
+  Future<List<LiveGoEpisode>> _ensureEpisodeListReady({int? ep, StreamInfo? stream}) {
+    final existing = _orderedEpisodes();
+    if (existing.length > 1) return Future.value(existing);
+    final running = _episodeListLoad;
+    if (running != null) return running;
+
+    final seed = _detail ?? _playableItem(ep ?? _episode);
+    late final Future<List<LiveGoEpisode>> future;
+    future = LiveGoCatalog.episodes(seed)
+        .timeout(PlaybackTimeoutConfig.episodeListBackground)
+        .then((rows) {
+      if (!mounted) return _orderedEpisodes();
+      final normalized = _normalizeEpisodeRows(rows, seed);
+      final streamTotal = stream?.totalEpisodes ?? _streamInfo.totalEpisodes;
+      final count = _maxInt([
+        normalized.length,
+        streamTotal,
+        seed.episodes,
+        _knownEpisodeCount,
+      ]);
+      setState(() {
+        _knownEpisodeCount = count.clamp(1, 999).toInt();
+        if (normalized.length > 1) {
+          _episodes = normalized;
+          _orderedEpisodeCache = normalized;
+        }
+      });
+      return _orderedEpisodes();
+    }).whenComplete(() {
+      if (identical(_episodeListLoad, future)) _episodeListLoad = null;
+    });
+    _episodeListLoad = future;
+    return future;
   }
 
   Future<void> _loadDetailBackground(int ep, StreamInfo stream) async {
@@ -696,50 +734,131 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _scheduleAutoHide();
   }
 
-  List<LiveGoEpisode> _orderedEpisodes() {
-    final seen = <int>{};
-    final rows = _episodes
-        .where((e) => e.index > 0)
-        .toList()
-      ..sort((a, b) => a.index.compareTo(b.index));
-    final unique = <LiveGoEpisode>[];
-    for (final row in rows) {
-      if (seen.add(row.index)) unique.add(row);
+  int _maxInt(Iterable<int> values) {
+    var max = 0;
+    for (final value in values) {
+      if (value > max) max = value;
     }
-    return unique;
+    return max;
   }
 
-  int _episodeByOffset(int from, int delta) {
-    final rows = _orderedEpisodes();
+  List<LiveGoEpisode> _normalizeEpisodeRows(List<LiveGoEpisode> rows, ContentItem seed) {
+    if (rows.isEmpty) return const <LiveGoEpisode>[];
+    final maxRawIndex = _maxInt(rows.map((e) => e.index <= 0 ? 0 : e.index));
+    // Jangan buang gap normal seperti [1,5,10]. Hanya buang episode spesial
+    // yang jelas outlier, misalnya [1,2,3,99], supaya NEXT tidak loncat jauh.
+    final maxAllowed = maxRawIndex > rows.length * 4 ? rows.length + 5 : 1000000;
+    final seen = <int>{};
+    final normalized = <LiveGoEpisode>[];
+    for (final row in rows) {
+      final index = row.index <= 0 ? normalized.length + 1 : row.index;
+      if (maxAllowed > 3 && index > maxAllowed) continue;
+      if (!seen.add(index)) continue;
+      normalized.add(LiveGoEpisode(
+        id: row.id.trim().isEmpty ? '$index' : row.id.trim(),
+        index: index,
+        title: row.title.trim().isEmpty ? 'Episode $index' : row.title.trim(),
+      ));
+    }
+    normalized.sort((a, b) => a.index.compareTo(b.index));
+    return normalized;
+  }
+
+  List<LiveGoEpisode> _orderedEpisodes() {
+    if (_orderedEpisodeCache.length == _episodes.length && _orderedEpisodeCache.isNotEmpty) {
+      return _orderedEpisodeCache;
+    }
+    final normalized = _normalizeEpisodeRows(_episodes, _detail ?? widget.item);
+    _orderedEpisodeCache = normalized;
+    return normalized;
+  }
+
+  int _episodeByOffsetFromRows(List<LiveGoEpisode> rows, int from, int delta) {
     if (rows.length > 1) {
       final currentPos = rows.indexWhere((e) => e.index == from);
       if (currentPos >= 0) {
         final nextPos = (currentPos + delta).clamp(0, rows.length - 1).toInt();
         return rows[nextPos].index;
       }
+      if (delta > 0) {
+        for (final row in rows) {
+          if (row.index > from) return row.index;
+        }
+        return rows.last.index;
+      }
+      if (delta < 0) {
+        for (var i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].index < from) return rows[i].index;
+        }
+        return rows.first.index;
+      }
     }
     return (from + delta).clamp(1, _episodeTotal(_detail ?? widget.item)).toInt();
   }
 
-  void _previousEpisode() {
-    final previous = _episodeByOffset(_episode, -1);
-    if (previous == _episode) return;
-    _brokenEpisodeSkips = 0;
-    _lastBrokenReason = '';
-    _episode = previous;
-    _episodeCursor = _episode;
-    _hideOverlays();
-    _load();
+  int _episodeByOffset(int from, int delta) => _episodeByOffsetFromRows(_orderedEpisodes(), from, delta);
+
+  Future<int> _resolveEpisodeByOffset(int from, int delta) async {
+    var rows = _orderedEpisodes();
+    if (rows.length <= 1 && _isDobdaPlayer) {
+      try {
+        rows = await _ensureEpisodeListReady(ep: from, stream: _streamInfo)
+            .timeout(const Duration(seconds: 4));
+      } catch (_) {
+        rows = _orderedEpisodes();
+      }
+      // Dobda wajib chapterId asli dari /detail. Kalau daftar belum siap,
+      // jangan pakai fallback +1 karena bisa tembak chapterId salah.
+      if (rows.length <= 1) return from;
+    }
+    return _episodeByOffsetFromRows(rows, from, delta);
   }
 
-  void _nextEpisode() {
-    final next = _episodeByOffset(_episode, 1);
-    if (next == _episode) return;
-    _brokenEpisodeSkips = 0;
-    _lastBrokenReason = '';
-    _episode = next;
-    _episodeCursor = _episode;
-    _hideOverlays();
+  Future<void> _previousEpisode() async {
+    if (_episodeNavigationBusy) return;
+    _episodeNavigationBusy = true;
+    try {
+      final previous = await _resolveEpisodeByOffset(_episode, -1);
+      if (previous == _episode) return;
+      _brokenEpisodeSkips = 0;
+      _lastBrokenReason = '';
+      _episode = previous;
+      _episodeCursor = _episode;
+      _hideOverlays();
+      _load();
+    } finally {
+      _episodeNavigationBusy = false;
+    }
+  }
+
+  Future<void> _nextEpisode() async {
+    if (_episodeNavigationBusy) return;
+    _episodeNavigationBusy = true;
+    try {
+      final next = await _resolveEpisodeByOffset(_episode, 1);
+      if (next == _episode) return;
+      _brokenEpisodeSkips = 0;
+      _lastBrokenReason = '';
+      _episode = next;
+      _episodeCursor = _episode;
+      _hideOverlays();
+      _load();
+    } finally {
+      _episodeNavigationBusy = false;
+    }
+  }
+
+  Future<void> _autoAdvanceToNext() async {
+    final next = await _resolveEpisodeByOffset(_episode, 1);
+    if (!mounted || next == _episode) {
+      _autoAdvancing = false;
+      return;
+    }
+    LiveGoLocalStore.markEpisodeComplete(_detail ?? widget.item, _episode);
+    setState(() {
+      _episode = next;
+      _episodeCursor = _episode;
+    });
     _load();
   }
 
@@ -757,9 +876,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (rows.length > 1) {
       final current = rows.indexWhere((e) => e.index == _episodeCursor);
       final start = current >= 0 ? current : rows.indexWhere((e) => e.index == _episode);
-      final nextPos = ((start >= 0 ? start : 0) + delta).clamp(0, rows.length - 1).toInt();
-      setState(() => _episodeCursor = rows[nextPos].index);
+      if (start >= 0) {
+        final nextPos = (start + delta).clamp(0, rows.length - 1).toInt();
+        setState(() => _episodeCursor = rows[nextPos].index);
+        return;
+      }
+      setState(() => _episodeCursor = _episodeByOffsetFromRows(rows, _episodeCursor, delta));
       return;
+    }
+    if (_isDobdaPlayer) {
+      unawaited(_ensureEpisodeListReady(ep: _episodeCursor, stream: _streamInfo));
     }
     final total = _episodeTotal(_detail ?? widget.item);
     setState(() => _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt());
@@ -845,13 +971,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _activateControl() {
     switch (_controlCursor) {
       case 0:
-        _previousEpisode();
+        unawaited(_previousEpisode());
         return;
       case 1:
         _togglePlay();
         break;
       case 2:
-        _nextEpisode();
+        unawaited(_nextEpisode());
         return;
       case 3:
         _showEpisodeList();
