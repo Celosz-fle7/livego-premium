@@ -79,6 +79,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _showEpisodes = false;
   bool _showOptions = false;
   bool _progressFocused = false;
+  bool _returnControlsAfterPanel = false;
   Timer? _autoHideTimer;
   Timer? _statusTimer;
   String _statusMessage = '';
@@ -718,13 +719,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = false;
       _progressFocused = false;
+      _returnControlsAfterPanel = false;
       if (defaultPlay) _controlCursor = 1;
     });
     Future.microtask(() => _rootFocus.requestFocus());
     _scheduleAutoHide();
   }
 
-  void _showEpisodeList() {
+  void _showEpisodeList({bool returnToControls = false}) {
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.episodeList;
@@ -732,6 +734,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showOptions = false;
       _showEpisodes = true;
       _progressFocused = false;
+      _returnControlsAfterPanel = returnToControls;
       _episodeCursor = _episode;
     });
     Future.microtask(() => _rootFocus.requestFocus());
@@ -745,6 +748,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = false;
       _progressFocused = false;
+      _returnControlsAfterPanel = true;
       _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
     });
     Future.microtask(() => _rootFocus.requestFocus());
@@ -758,6 +762,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = false;
       _progressFocused = false;
+      _returnControlsAfterPanel = true;
       _subtitleCursor = LiveGoSettings.subtitlesEnabled && _selectedSubtitleIndex >= 0
           ? _selectedSubtitleIndex + 1
           : 0;
@@ -773,6 +778,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = true;
       _progressFocused = false;
+      _returnControlsAfterPanel = true;
       _optionCursor = cursor;
     });
     Future.microtask(() => _rootFocus.requestFocus());
@@ -786,6 +792,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _showEpisodes = false;
       _showOptions = false;
       _progressFocused = false;
+      _returnControlsAfterPanel = false;
     });
     _rootFocus.unfocus();
     Future.microtask(() => _rootFocus.requestFocus());
@@ -813,7 +820,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return;
     }
     if (_mode == _PlayerMode.episodeList || _showEpisodes) {
-      _hideOverlays();
+      if (_returnControlsAfterPanel) {
+        _showControlsMode();
+      } else {
+        _hideOverlays();
+      }
       return;
     }
     if (_mode == _PlayerMode.controlsVisible || _showControls || _progressFocused) {
@@ -1255,7 +1266,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         unawaited(_nextEpisode());
         return;
       case 3:
-        _showEpisodeList();
+        _showEpisodeList(returnToControls: true);
         return;
       case 4:
         _showQualityPopup();
@@ -1306,7 +1317,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_mode == _PlayerMode.episodeList) {
       if (key == LogicalKeyboardKey.arrowLeft) {
-        _hideOverlays();
+        if (_returnControlsAfterPanel) {
+          _showControlsMode();
+        } else {
+          _hideOverlays();
+        }
       } else if (key == LogicalKeyboardKey.arrowUp) {
         _moveEpisodeCursor(-1);
       } else if (key == LogicalKeyboardKey.arrowDown) {
@@ -1361,10 +1376,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (_progressFocused) {
         if (key == LogicalKeyboardKey.arrowLeft) {
           _seekRelative(const Duration(seconds: -10));
+          _showStatus('-10 detik', duration: const Duration(milliseconds: 800));
         } else if (key == LogicalKeyboardKey.arrowRight) {
           _seekRelative(const Duration(seconds: 10));
+          _showStatus('+10 detik', duration: const Duration(milliseconds: 800));
         } else if (key == LogicalKeyboardKey.arrowDown) {
           setState(() => _progressFocused = false);
+        } else if (key == LogicalKeyboardKey.arrowUp) {
+          _hideOverlays();
+          return KeyEventResult.handled;
         } else if (_isSelect(key)) {
           _togglePlay();
         }
@@ -1380,7 +1400,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         setState(() => _progressFocused = true);
         _scheduleAutoHide();
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        _showEpisodeList();
+        // Saat control dock tampil, arah remote dipakai untuk navigasi focus.
+        // Episode list dibuka lewat tombol EPISODE/OK, bukan setiap DOWN.
+        _scheduleAutoHide();
       } else if (_isSelect(key)) {
         _activateControl();
       }
@@ -1392,12 +1414,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _togglePlay();
     } else if (key == LogicalKeyboardKey.arrowLeft) {
       _seekRelative(const Duration(seconds: -10));
+      _showStatus('-10 detik', duration: const Duration(milliseconds: 800));
     } else if (key == LogicalKeyboardKey.arrowRight) {
       _seekRelative(const Duration(seconds: 10));
+      _showStatus('+10 detik', duration: const Duration(milliseconds: 800));
     } else if (key == LogicalKeyboardKey.arrowUp) {
       _showControlsMode(defaultPlay: true);
     } else if (key == LogicalKeyboardKey.arrowDown) {
-      _showEpisodeList();
+      _showEpisodeList(returnToControls: false);
     } else {
       return KeyEventResult.ignored;
     }
