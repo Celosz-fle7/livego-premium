@@ -1499,7 +1499,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   tv: true,
                 ),
               Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
-              if (_loading) const Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+              if (_loading)
+                _PlayerLoadingOverlay(
+                  title: item.title,
+                  episode: _episode,
+                  message: _error.isNotEmpty ? _error : 'Menyiapkan stream video...',
+                ),
               if (_statusMessage.isNotEmpty)
                 Positioned(
                   left: 0,
@@ -1512,15 +1517,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   ),
                 ),
               if (!_loading && !ready)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(36),
-                    child: Text(
-                      _error.isNotEmpty ? _error : 'Menyiapkan player...',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 18),
-                    ),
-                  ),
+                _PlayerErrorOverlay(
+                  title: item.title,
+                  episode: _episode,
+                  message: _error.isNotEmpty ? _error : 'Player belum siap. Coba kembali lalu buka lagi.',
                 ),
               if (_showControls || _showEpisodes || _showOptions)
                 _PlayerInfoOverlay(
@@ -1634,6 +1634,177 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     ),
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _PlayerLoadingOverlay extends StatelessWidget {
+  final String title;
+  final int episode;
+  final String message;
+
+  const _PlayerLoadingOverlay({
+    required this.title,
+    required this.episode,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+          decoration: BoxDecoration(
+            color: AppTheme.surface.withOpacity(0.86),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppTheme.cyan.withOpacity(0.32)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.58), blurRadius: 18),
+              BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 12),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(color: AppTheme.cyan, strokeWidth: 3),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Episode $episode',
+                style: const TextStyle(
+                  color: AppTheme.cyan,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.textSoft,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerErrorOverlay extends StatelessWidget {
+  final String title;
+  final int episode;
+  final String message;
+
+  const _PlayerErrorOverlay({
+    required this.title,
+    required this.episode,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.fromLTRB(30, 26, 30, 26),
+          decoration: BoxDecoration(
+            color: AppTheme.surface.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.orangeAccent.withOpacity(0.42)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.62), blurRadius: 20)],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 40),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Episode $episode belum bisa diputar',
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.textSoft,
+                  fontSize: 14,
+                  height: 1.3,
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: const Text(
+                  'BACK kembali • NEXT akan skip episode rusak',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1899,9 +2070,16 @@ class _EpisodeSidePanel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.white.withOpacity(0.06), border: Border.all(color: Colors.white12)),
-            child: Text('$totalSafe Ep • BACK/LEFT tutup', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+            child: Text('$totalSafe Ep • UP/DOWN pilih • OK putar • BACK tutup', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            'Aktif: Episode $selected • Cursor: Episode $cursor',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+          ),
+          const SizedBox(height: 14),
           Expanded(
             child: ListView.builder(
               physics: const NeverScrollableScrollPhysics(),
@@ -1990,30 +2168,65 @@ class _ChoicePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = choices.isEmpty ? const <String>['Tidak tersedia'] : choices;
+    final safeCursor = cursor.clamp(0, rows.length - 1).toInt();
+    var start = safeCursor - 3;
+    if (start < 0) start = 0;
+    var end = start + 6;
+    if (end >= rows.length) {
+      end = rows.length - 1;
+      start = (end - 6).clamp(0, rows.length - 1).toInt();
+    }
+    final visible = rows.sublist(start, end + 1);
+
     return Container(
-      width: 360,
+      width: 370,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
+        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          Row(
+            children: [
+              Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.055),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Text('${safeCursor + 1}/${rows.length}', style: const TextStyle(color: AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
           Text(hint, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
           const SizedBox(height: 14),
-          ...List.generate(rows.length, (index) {
+          ...List.generate(visible.length, (visibleIndex) {
+            final index = start + visibleIndex;
             return _ChoiceRow(
               label: rows[index],
-              focused: index == cursor,
+              focused: index == safeCursor,
               active: index == activeIndex,
             );
           }),
+          if (rows.length > visible.length) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                start > 0 && end < rows.length - 1
+                    ? '▲ item lain tersedia ▼'
+                    : (start > 0 ? '▲ item sebelumnya' : 'item berikutnya ▼'),
+                style: const TextStyle(color: AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2090,9 +2303,11 @@ class _PlayerOptionsPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text('Opsi Player', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          const SizedBox(height: 4),
+          const Text('LEFT/RIGHT ubah • BACK tutup', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
           const SizedBox(height: 14),
           _OptionRow(label: 'Speed', value: '${speed.toStringAsFixed(2)}x', focused: cursor == 0),
-          _OptionRow(label: 'Audio Track', value: audioTrack, focused: cursor == 1),
+          _OptionRow(label: 'Audio', value: audioTrack.trim().isEmpty ? 'Source' : audioTrack, focused: cursor == 1),
           _OptionRow(label: 'Next Episode', value: autoNext ? 'Auto' : 'Manual', focused: cursor == 2),
           _OptionRow(label: 'Layar', value: fitCover ? 'Cover' : 'Fit', focused: cursor == 3),
           _OptionRow(label: 'Favorit', value: favorite ? 'Aktif' : 'Mati', focused: cursor == 4),
