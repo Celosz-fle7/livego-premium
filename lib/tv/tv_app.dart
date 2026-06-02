@@ -22,6 +22,7 @@ class TvApp extends StatefulWidget {
 
 class _TvAppState extends State<TvApp> {
   int _index = 0;
+  TvSideNavMode _navMode = TvSideNavMode.hidden;
   int _homeTicket = 0;
   int _homeBannerTicket = 0;
   int _accountTicket = 0;
@@ -91,7 +92,26 @@ class _TvAppState extends State<TvApp> {
 
   void _focusCurrentNav() {
     if (_navNodes.isEmpty) return;
-    tvFocus(_navNodes[_safeNav(_index)], alignment: 0.10);
+    if (_navMode != TvSideNavMode.focused) {
+      setState(() => _navMode = TvSideNavMode.focused);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tvFocus(_navNodes[_safeNav(_index)], alignment: 0.10);
+    });
+  }
+
+  void _peekOrFocusNav() {
+    if (_navMode == TvSideNavMode.hidden) {
+      setState(() => _navMode = TvSideNavMode.peek);
+      return;
+    }
+    _focusCurrentNav();
+  }
+
+  void _hideNav() {
+    if (_navMode != TvSideNavMode.hidden) {
+      setState(() => _navMode = TvSideNavMode.hidden);
+    }
   }
 
   void _backToCurrentNav() {
@@ -101,7 +121,10 @@ class _TvAppState extends State<TvApp> {
 
   void _openNavPage(int navIndex) {
     final safe = _safeNav(navIndex);
-    setState(() => _index = safe);
+    setState(() {
+      _index = safe;
+      _navMode = TvSideNavMode.focused;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) tvFocus(_navNodes[safe], alignment: 0.10);
     });
@@ -109,7 +132,10 @@ class _TvAppState extends State<TvApp> {
 
   void _backToHomeNav() {
     _markBackHandled();
-    setState(() => _index = 0);
+    setState(() {
+      _index = 0;
+      _navMode = TvSideNavMode.focused;
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) tvFocus(_navNodes[_safeNav(0)], alignment: 0.10);
     });
@@ -119,6 +145,7 @@ class _TvAppState extends State<TvApp> {
     _markBackHandled();
     setState(() {
       _index = 0;
+      _navMode = TvSideNavMode.hidden;
       _homeBannerTicket++;
     });
   }
@@ -126,12 +153,16 @@ class _TvAppState extends State<TvApp> {
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
     if (safe != _index) {
-      setState(() => _index = safe);
+      setState(() {
+        _index = safe;
+        _navMode = TvSideNavMode.hidden;
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _bumpContentTicket();
       });
       return;
     }
+    _hideNav();
     _bumpContentTicket();
   }
 
@@ -242,7 +273,7 @@ class _TvAppState extends State<TvApp> {
       TvHomeScreen(
         focusTicket: _index == 0 ? _homeTicket : 0,
         bannerFocusTicket: _index == 0 ? _homeBannerTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onRequestExit: _showExitDialogFromHome,
       ),
       TvLibraryScreen(
@@ -250,13 +281,13 @@ class _TvAppState extends State<TvApp> {
         icon: Icons.history_rounded,
         favorites: false,
         focusTicket: _index == 1 ? _placeholderTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _backToHomeBanner,
       ),
       TvSearchScreen(
         focusTicket: _index == 2 ? _placeholderTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _backToHomeBanner,
       ),
@@ -265,21 +296,22 @@ class _TvAppState extends State<TvApp> {
         icon: Icons.favorite_rounded,
         favorites: true,
         focusTicket: _index == 3 ? _placeholderTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _backToHomeBanner,
       ),
       TvDownloadsScreen(
         focusTicket: _index == 4 ? _placeholderTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _backToHomeBanner,
       ),
       TvAccountScreen(
         focusTicket: _index == 5 ? _accountTicket : 0,
-        onMoveToNav: _focusCurrentNav,
+        onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _backToHomeBanner,
+        onOpenNavIndex: _enterContent,
       ),
     ];
   }
@@ -375,12 +407,14 @@ class _TvAppState extends State<TvApp> {
                       children: [
                         TvSideNav(
                           index: _index,
+                          mode: _navMode,
                           focusNodes: _navNodes,
                           onChanged: _openNavPage,
                           onOpenContent: _enterContent,
                         ),
-                        Container(
-                          width: 1,
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          width: _navMode == TvSideNavMode.hidden ? 0 : 1,
                           margin: const EdgeInsets.symmetric(vertical: 18),
                           color: Colors.white.withOpacity(0.055),
                         ),
