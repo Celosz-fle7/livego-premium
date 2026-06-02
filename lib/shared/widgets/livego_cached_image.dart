@@ -105,7 +105,11 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return;
     }
 
-    final delayMs = ImageQualityConfig.progressiveDelayMsFor(widget.role);
+    final baseDelayMs = ImageQualityConfig.progressiveDelayMsFor(widget.role);
+    // TV remote focus must stay responsive. Let low-res posters settle first,
+    // then upgrade quality a little later so image decoding does not fight
+    // rapid UP/DOWN/LEFT/RIGHT focus moves.
+    final delayMs = widget.tv ? baseDelayMs + 220 : baseDelayMs;
     _highQualityTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!mounted) return;
       setState(() => _loadHighQuality = true);
@@ -215,6 +219,22 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
   }
 
   Widget _placeholder() {
+    if (widget.tv) {
+      // A grid full of animated spinners can steal frames from TV remote focus.
+      // Use a static placeholder on TV; the low-res image will replace it fast.
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        color: AppTheme.surface2,
+        alignment: Alignment.center,
+        child: Icon(
+          widget.role == LiveGoImageRole.banner ? Icons.image_rounded : Icons.movie_rounded,
+          color: Colors.white24,
+          size: widget.role == LiveGoImageRole.banner ? 42 : 30,
+        ),
+      );
+    }
+
     return Container(
       width: widget.width,
       height: widget.height,

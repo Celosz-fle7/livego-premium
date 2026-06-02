@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
+import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
 import 'tv_settings_screen.dart';
 import 'tv_source_manager_screen.dart';
@@ -161,11 +162,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
     void request() {
       if (!mounted || _nodes.isEmpty) return;
-      tvFocus(_nodes[_lastIndex], alignment: 0.24, duration: const Duration(milliseconds: 105));
+      tvFocus(_nodes[_lastIndex], alignment: 0.24, duration: TvFocusStyle.fast);
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => request());
-    Future<void>.delayed(const Duration(milliseconds: 70), request);
+    Future<void>.delayed(TvFocusStyle.fast, request);
   }
 
   void _pushScreen(Widget screen) {
@@ -178,7 +179,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     if (!mounted) return;
     _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
     _focusRow(_lastIndex);
-    Future<void>.delayed(const Duration(milliseconds: 150), () {
+    Future<void>.delayed(const Duration(milliseconds: 110), () {
       if (mounted) _focusRow(_lastIndex);
     });
   }
@@ -416,7 +417,7 @@ class _AccountActionCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 130),
+              duration: TvFocusStyle.fast,
               height: 78,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -424,15 +425,15 @@ class _AccountActionCard extends StatelessWidget {
                     ? LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [AppTheme.cyan.withOpacity(0.22), AppTheme.purple.withOpacity(0.14)],
+                        colors: [TvFocusStyle.focusBlue.withOpacity(0.24), AppTheme.purple.withOpacity(0.14)],
                       )
                     : null,
                 color: focused ? null : AppTheme.surface.withOpacity(0.86),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
+                border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2.4 : 1),
                 boxShadow: focused
                     ? [
-                        BoxShadow(color: AppTheme.cyan.withOpacity(0.20), blurRadius: 22),
+                        TvFocusStyle.glow(0.30, 22),
                         BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 34),
                       ]
                     : null,
@@ -447,7 +448,7 @@ class _AccountActionCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft),
                     ),
-                    child: Icon(item.icon, color: focused ? AppTheme.whiteGlow : AppTheme.cyan, size: 25),
+                    child: Icon(item.icon, color: focused ? AppTheme.whiteGlow : TvFocusStyle.focusBlue, size: 25),
                   ),
                   const SizedBox(width: 15),
                   Expanded(

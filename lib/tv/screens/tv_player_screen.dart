@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
+import '../theme/tv_focus_style.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
@@ -1230,7 +1231,7 @@ class _PlayerControlDock extends StatelessWidget {
               const SizedBox(width: 18),
               Expanded(
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 90),
+                  duration: TvFocusStyle.fast,
                   padding: EdgeInsets.all(progressFocused ? 4 : 0),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(999),
@@ -1282,7 +1283,7 @@ class _DockButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: TvFocusStyle.fast,
       width: 58,
       height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -1314,7 +1315,7 @@ class _DockTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: TvFocusStyle.fast,
       height: 50,
       constraints: const BoxConstraints(minWidth: 76),
       alignment: Alignment.center,
@@ -1390,7 +1391,7 @@ class _EpisodeListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: TvFocusStyle.fast,
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -1469,7 +1470,7 @@ class _ChoiceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: TvFocusStyle.fast,
       margin: const EdgeInsets.symmetric(vertical: 5),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
@@ -1549,7 +1550,7 @@ class _OptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 90),
+      duration: TvFocusStyle.fast,
       margin: const EdgeInsets.symmetric(vertical: 5),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(

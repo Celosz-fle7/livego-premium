@@ -10,6 +10,7 @@ import 'screens/tv_home_screen.dart';
 import 'screens/tv_library_screen.dart';
 import 'screens/tv_search_screen.dart';
 import 'utils/tv_focus_utils.dart';
+import 'theme/tv_focus_style.dart';
 import 'widgets/tv_focused_border.dart';
 import 'widgets/tv_side_nav.dart';
 
@@ -337,7 +338,7 @@ class _TvAppState extends State<TvApp> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.power_settings_new_rounded, color: AppTheme.cyan, size: 58),
+              const Icon(Icons.power_settings_new_rounded, color: TvFocusStyle.focusBlue, size: 58),
               const SizedBox(height: 18),
               const Text(
                 'Keluar dari LiveGO?',
@@ -416,7 +417,7 @@ class _TvAppState extends State<TvApp> {
                           onOpenContent: _enterContent,
                         ),
                         AnimatedContainer(
-                          duration: const Duration(milliseconds: 160),
+                          duration: TvFocusStyle.normal,
                           width: _navMode == TvSideNavMode.hidden ? 0 : 1,
                           margin: const EdgeInsets.symmetric(vertical: 18),
                           color: Colors.white.withOpacity(0.055),
@@ -468,7 +469,7 @@ class _ExitDialogButton extends StatelessWidget {
       onKeyEvent: onKey,
       child: TvFocusedBorder(
         focusNode: node,
-        color: primary ? AppTheme.cyan : AppTheme.danger,
+        color: primary ? TvFocusStyle.focusBlue : AppTheme.danger,
         radius: 16,
         child: InkWell(
               canRequestFocus: false,

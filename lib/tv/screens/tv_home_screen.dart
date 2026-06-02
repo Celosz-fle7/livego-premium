@@ -10,6 +10,7 @@ import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
+import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
 import 'tv_player_screen.dart';
 
@@ -804,7 +805,7 @@ class _FocusableBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(28),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
+              duration: TvFocusStyle.normal,
               curve: Curves.easeOutCubic,
               height: 178,
               padding: const EdgeInsets.all(10),
@@ -816,17 +817,17 @@ class _FocusableBanner extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(
-                  color: focused ? AppTheme.cyan.withOpacity(0.96) : AppTheme.border,
+                  color: focused ? TvFocusStyle.focusBlue : AppTheme.border,
                   width: focused ? 2.1 : 1.1,
                 ),
                 boxShadow: [
                   const BoxShadow(color: Colors.black87, blurRadius: 20),
-                  if (focused) BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 28, spreadRadius: 1),
+                  if (focused) TvFocusStyle.glow(0.32, 24),
                   if (focused) BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 38, spreadRadius: 2),
                 ],
               ),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
+                duration: TvFocusStyle.normal,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: focused ? Colors.white.withOpacity(0.10) : Colors.white.withOpacity(0.04)),
@@ -874,7 +875,7 @@ class _HeaderBox extends StatelessWidget {
             child: Text(
               label.toUpperCase(),
               style: TextStyle(
-                color: AppTheme.cyan.withOpacity(0.62),
+                color: TvFocusStyle.focusBlue.withOpacity(0.72),
                 fontSize: 9.2,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.2,
@@ -984,13 +985,13 @@ class _TvChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
+              duration: TvFocusStyle.fast,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
                 gradient: active
                     ? AppTheme.activeGradient
                     : (focused
-                        ? LinearGradient(colors: [AppTheme.cyan.withOpacity(0.18), AppTheme.purple.withOpacity(0.10)])
+                        ? LinearGradient(colors: [TvFocusStyle.focusBlue.withOpacity(0.20), AppTheme.purple.withOpacity(0.10)])
                         : null),
                 color: active || focused ? null : AppTheme.surface2.withOpacity(0.92),
                 borderRadius: BorderRadius.circular(999),
@@ -1000,7 +1001,7 @@ class _TvChip extends StatelessWidget {
                 ),
                 boxShadow: focused
                     ? [
-                        BoxShadow(color: AppTheme.cyan.withOpacity(0.26), blurRadius: 20, spreadRadius: 1),
+                        BoxShadow(color: TvFocusStyle.focusBlue.withOpacity(0.30), blurRadius: 20, spreadRadius: 1),
                         BoxShadow(color: AppTheme.purple.withOpacity(0.13), blurRadius: 28),
                       ]
                     : null,
@@ -1059,7 +1060,7 @@ class _ContentGrid extends StatelessWidget {
           if (title.trim().isNotEmpty) ...[
             Text(
               title.toUpperCase(),
-              style: TextStyle(color: AppTheme.cyan.withOpacity(0.58), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.8, decoration: TextDecoration.none),
+              style: TextStyle(color: TvFocusStyle.focusBlue.withOpacity(0.66), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.8, decoration: TextDecoration.none),
             ),
             const SizedBox(height: 8),
           ],
@@ -1125,16 +1126,16 @@ class _TvPosterTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 100),
+                      duration: TvFocusStyle.fast,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft,
-                          width: focused ? 2.2 : 0.8,
+                          color: focused ? TvFocusStyle.focusBlue : AppTheme.borderSoft,
+                          width: focused ? 2.8 : 0.8,
                         ),
                         boxShadow: focused
                             ? [
-                                BoxShadow(color: AppTheme.cyan.withOpacity(0.28), blurRadius: 22, spreadRadius: 1),
+                                TvFocusStyle.glow(0.36, 20),
                                 BoxShadow(color: AppTheme.purple.withOpacity(0.12), blurRadius: 30),
                               ]
                             : [const BoxShadow(color: Colors.black54, blurRadius: 8)],
@@ -1188,7 +1189,7 @@ class _Badge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.86),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
+        border: Border.all(color: TvFocusStyle.focusBlue.withOpacity(0.20)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 6)],
       ),
       child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 8.4, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),

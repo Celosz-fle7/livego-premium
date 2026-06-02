@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../theme/tv_focus_style.dart';
 
 class TvNavItem {
   final IconData icon;
@@ -84,7 +85,7 @@ class TvSideNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: TvFocusStyle.normal,
         curve: Curves.easeOutCubic,
         width: _visible ? 74 : 16,
         child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
@@ -104,12 +105,12 @@ class TvSideNav extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: _focused ? AppTheme.cyan.withOpacity(0.42) : AppTheme.borderSoft,
+          color: _focused ? TvFocusStyle.focusBlue.withOpacity(0.56) : AppTheme.borderSoft,
           width: _focused ? 1.4 : 1,
         ),
         boxShadow: [
           const BoxShadow(color: Colors.black87, blurRadius: 16),
-          if (_focused) BoxShadow(color: AppTheme.cyan.withOpacity(0.14), blurRadius: 26, spreadRadius: 1),
+          if (_focused) BoxShadow(color: TvFocusStyle.focusBlue.withOpacity(0.20), blurRadius: 26, spreadRadius: 1),
         ],
       ),
       child: Column(
@@ -148,12 +149,12 @@ class _HiddenGrip extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: TvFocusStyle.normal,
         width: 4,
         height: active ? 120 : 80,
         margin: const EdgeInsets.only(left: 2),
         decoration: BoxDecoration(
-          color: active ? AppTheme.cyan.withOpacity(0.32) : Colors.white.withOpacity(0.08),
+          color: active ? TvFocusStyle.focusBlue.withOpacity(0.42) : Colors.white.withOpacity(0.08),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -204,7 +205,7 @@ class _NavIconButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(15),
               focusColor: Colors.transparent,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 130),
+                duration: TvFocusStyle.fast,
                 height: size,
                 width: size,
                 alignment: Alignment.center,
@@ -214,7 +215,7 @@ class _NavIconButton extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: focused
-                              ? [AppTheme.cyan.withOpacity(0.26), AppTheme.purple.withOpacity(0.18)]
+                              ? [TvFocusStyle.focusBlue.withOpacity(0.28), AppTheme.purple.withOpacity(0.18)]
                               : [AppTheme.surface2, AppTheme.surface],
                         )
                       : null,
@@ -222,13 +223,13 @@ class _NavIconButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(
                     color: focused
-                        ? AppTheme.cyan.withOpacity(0.98)
-                        : (active ? AppTheme.cyan.withOpacity(0.30) : Colors.transparent),
+                        ? TvFocusStyle.focusBlue
+                        : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
                     width: focused ? 2 : 1,
                   ),
                   boxShadow: focused
                       ? [
-                          BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 18, spreadRadius: 1),
+                          TvFocusStyle.glow(0.34, 20),
                           BoxShadow(color: AppTheme.purple.withOpacity(0.10), blurRadius: 28),
                         ]
                       : null,

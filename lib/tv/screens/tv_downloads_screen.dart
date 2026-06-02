@@ -7,6 +7,7 @@ import '../../services/download/download_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
+import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
 import 'tv_player_screen.dart';
 
@@ -140,7 +141,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
         if (mounted) _focusRow(_lastRow);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-      Future<void>.delayed(const Duration(milliseconds: 120), restore);
+      Future<void>.delayed(TvFocusStyle.normal, restore);
     });
   }
 
@@ -310,7 +311,7 @@ class _DownloadRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             focusColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
+              duration: TvFocusStyle.fast,
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -376,7 +377,7 @@ class _EmptyDownloads extends StatelessWidget {
       builder: (context, _) {
         final focused = node.hasFocus;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: TvFocusStyle.fast,
           height: 260,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.92), borderRadius: BorderRadius.circular(24), border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1)),

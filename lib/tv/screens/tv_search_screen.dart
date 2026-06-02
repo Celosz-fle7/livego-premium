@@ -7,6 +7,7 @@ import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
+import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
 import 'tv_player_screen.dart';
 
@@ -151,7 +152,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
         if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-      Future<void>.delayed(const Duration(milliseconds: 120), restore);
+      Future<void>.delayed(TvFocusStyle.normal, restore);
     });
   }
 
@@ -253,7 +254,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     builder: (context, _) {
                       final focused = _searchNode.hasFocus;
                       return AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
+                        duration: TvFocusStyle.fast,
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(22),
@@ -419,14 +420,14 @@ class _SearchPoster extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             focusColor: Colors.transparent,
             child: AnimatedScale(
-              duration: const Duration(milliseconds: 120),
+              duration: TvFocusStyle.fast,
               scale: focused ? 1.035 : 1.0,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
+                      duration: TvFocusStyle.fast,
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 18)] : null),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),

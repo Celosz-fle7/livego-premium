@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
+import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
 import '../widgets/tv_focused_border.dart';
 
@@ -759,7 +760,7 @@ class _SourceRow extends StatelessWidget {
             child: Column(
               children: [
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 130),
+                  duration: TvFocusStyle.fast,
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
@@ -904,7 +905,7 @@ class _SwitchPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 130),
+      duration: TvFocusStyle.fast,
       width: 74,
       height: 32,
       padding: const EdgeInsets.all(4),
@@ -917,7 +918,7 @@ class _SwitchPill extends StatelessWidget {
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 130),
+            duration: TvFocusStyle.fast,
             width: 24,
             height: 24,
             decoration: BoxDecoration(color: active ? AppTheme.cyan : Colors.white38, shape: BoxShape.circle),
@@ -941,7 +942,7 @@ class _PowerChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: TvFocusStyle.fast,
       width: 76,
       height: 34,
       alignment: Alignment.center,
@@ -966,7 +967,7 @@ class _CategoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: TvFocusStyle.fast,
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),

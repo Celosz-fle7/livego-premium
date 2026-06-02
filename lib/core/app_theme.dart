@@ -12,9 +12,9 @@ class AppTheme {
 
   static const border = Color(0xFF1B3554);
   static const borderSoft = Color(0xFF12233A);
-  static const borderBright = Color(0xFF58A6FF);
+  static const borderBright = Color(0xFF28C7FF);
 
-  static const cyan = Color(0xFF58A6FF);
+  static const cyan = Color(0xFF28C7FF);
   static const blue = Color(0xFF1F6FEB);
   static const purple = Color(0xFF8B5CF6);
   static const whiteGlow = Color(0xFFE6F6FF);

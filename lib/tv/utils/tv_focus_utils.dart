@@ -8,7 +8,7 @@ import 'package:flutter/widgets.dart';
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
-  Duration duration = const Duration(milliseconds: 120),
+  Duration duration = const Duration(milliseconds: 70),
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -22,7 +22,7 @@ bool tvFocus(
       duration: duration,
       curve: Curves.easeOutCubic,
       alignment: alignment,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
     );
   });
 
