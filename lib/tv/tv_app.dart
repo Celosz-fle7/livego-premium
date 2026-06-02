@@ -313,11 +313,16 @@ class _TvAppState extends State<TvApp> {
       return;
     }
 
-    // If a content screen did not handle BACK itself, close it to the
-    // active navbar item first. Do not jump straight to Home/banner.
+    // If the focused Home banner misses the key through a route/root shortcut,
+    // still show the exit popup. Other Home zones keep their own BACK ladder.
     if (!_navHasFocus) {
       if (_index == _homeIndex) {
-        _returnToHomeLastFocus();
+        final focusedLabel = FocusManager.instance.primaryFocus?.debugLabel ?? '';
+        if (focusedLabel == 'tv-home-banner') {
+          _showExitDialog(restoreHomeBanner: true);
+        } else {
+          _returnToHomeLastFocus();
+        }
         return;
       }
       if (_returnToAccountMenuOnBack && _index != _accountIndex) {

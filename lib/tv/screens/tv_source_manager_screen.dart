@@ -32,6 +32,11 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   int _lastBackHandledMs = 0;
   String? _pingingSlug;
 
+  late final Set<String> _initialActivePlatforms;
+  late final List<String> _initialHomePlatforms;
+  late final String _initialDefaultPlatform;
+  late final Map<String, List<String>> _initialCategories;
+
   List<String> get _platforms => LiveGoCatalog.allPlatforms;
 
   @override
@@ -40,6 +45,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-back');
     _stayNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-confirm-stay');
     _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-confirm-save');
+    _captureInitialSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusSource(0);
@@ -91,6 +97,47 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   List<String> _selectedCategoriesFor(String slug) => LiveGoSettings.categoriesFor(slug);
 
+  void _captureInitialSettings() {
+    _initialActivePlatforms = Set<String>.from(LiveGoSettings.activePlatforms);
+    _initialHomePlatforms = List<String>.from(LiveGoSettings.homePlatforms);
+    _initialDefaultPlatform = LiveGoSettings.defaultPlatform;
+    _initialCategories = <String, List<String>>{
+      for (final entry in LiveGoSettings.homeCategories.entries)
+        entry.key: List<String>.from(entry.value),
+    };
+  }
+
+  void _restoreInitialSettings() {
+    LiveGoSettings.activePlatforms
+      ..clear()
+      ..addAll(_initialActivePlatforms);
+    LiveGoSettings.homePlatforms
+      ..clear()
+      ..addAll(_initialHomePlatforms.where(LiveGoSettings.activePlatforms.contains));
+    if (LiveGoSettings.homePlatforms.isEmpty && LiveGoSettings.activePlatforms.isNotEmpty) {
+      LiveGoSettings.homePlatforms.add(LiveGoSettings.activePlatforms.first);
+    }
+    LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.contains(_initialDefaultPlatform)
+        ? _initialDefaultPlatform
+        : (LiveGoSettings.homePlatforms.isNotEmpty
+            ? LiveGoSettings.homePlatforms.first
+            : LiveGoSettings.defaultPlatforms.first);
+    LiveGoSettings.homeCategories
+      ..clear()
+      ..addAll({
+        for (final entry in _initialCategories.entries)
+          entry.key: List<String>.from(entry.value),
+      });
+  }
+
+  void _discardAndExit() {
+    _markBackHandled();
+    _restoreInitialSettings();
+    _dirty = false;
+    _confirmOpen = false;
+    if (mounted) Navigator.of(context).pop();
+  }
+
   void _focusBack() {
     _categoryMode = false;
     tvFocus(_backNode, alignment: 0.04);
@@ -107,7 +154,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (categoryIndex != null) _categoryIndex = categoryIndex;
     if (_categoryIndex >= categories.length) _categoryIndex = categories.length - 1;
     if (_categoryIndex < 0) _categoryIndex = 0;
-    tvFocus(_sourceNodes[_lastIndex], alignment: 0.22);
+    tvFocus(_sourceNodes[_lastIndex], alignment: _categoryMode ? 0.34 : 0.26);
     if (mounted) setState(() {});
   }
 
@@ -219,7 +266,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (_ignoreRepeatedBack()) return;
 
     if (_confirmOpen) {
-      _closeConfirm();
+      _discardAndExit();
       return;
     }
 
@@ -240,13 +287,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     setState(() => _confirmOpen = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) tvFocus(_stayNode, alignment: 0.5);
-    });
-  }
-
-  void _closeConfirm() {
-    setState(() => _confirmOpen = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusSource(_lastIndex, categoryMode: _categoryMode);
     });
   }
 
@@ -274,13 +314,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (node == _saveNode) {
         _saveAndExit();
       } else {
-        _closeConfirm();
+        _discardAndExit();
       }
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _markBackHandled();
-      _closeConfirm();
+      _discardAndExit();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -508,7 +547,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     stayNode: _stayNode,
                     saveNode: _saveNode,
                     onKey: _confirmKey,
-                    onStay: _closeConfirm,
+                    onStay: _discardAndExit,
                     onSave: _saveAndExit,
                   ),
               ],
@@ -668,6 +707,28 @@ class _SourceRow extends StatelessWidget {
     return List<int>.generate(maxVisible, (i) => start + i);
   }
 
+  BoxDecoration _panelDecoration({required bool focused, required bool selectedPanel}) {
+    return BoxDecoration(
+      gradient: active
+          ? const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF10243A), Color(0xFF07111F)],
+            )
+          : LinearGradient(colors: [Colors.black.withOpacity(0.72), const Color(0xFF020617)]),
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(
+        color: focused && selectedPanel
+            ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
+            : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
+        width: focused && selectedPanel ? 2 : 1,
+      ),
+      boxShadow: focused && selectedPanel
+          ? [TvFocusStyle.glow(0.085, 7)]
+          : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -686,119 +747,112 @@ class _SourceRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             child: Column(
               children: [
-                AnimatedContainer(
-                  duration: TvFocusStyle.fast,
-                  margin: const EdgeInsets.symmetric(vertical: 5),
-                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-                  decoration: BoxDecoration(
-                    gradient: active
-                        ? const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF10243A), Color(0xFF07111F)],
-                          )
-                        : LinearGradient(colors: [Colors.black.withOpacity(0.72), const Color(0xFF020617)]),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: focused
-                          ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
-                          : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
-                      width: focused ? 2 : 1,
-                    ),
-                    boxShadow: focused ? [TvFocusStyle.glow(0.085, 7)] : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
-                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          _StatusLamp(color: statusColor, text: statusText),
-                          const SizedBox(width: 13),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: active ? Colors.white : Colors.white54,
-                                          fontSize: 17.2,
-                                          fontWeight: FontWeight.w900,
-                                          decoration: TextDecoration.none,
+                      AnimatedContainer(
+                        duration: TvFocusStyle.fast,
+                        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+                        decoration: _panelDecoration(focused: focused, selectedPanel: !categoryMode),
+                        child: Row(
+                          children: [
+                            _StatusLamp(color: statusColor, text: statusText),
+                            const SizedBox(width: 13),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: active ? Colors.white : Colors.white54,
+                                            fontSize: 17.2,
+                                            fontWeight: FontWeight.w900,
+                                            decoration: TextDecoration.none,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    if (focused)
-                                      _ModeBadge(text: categoryMode ? 'PILIH KATEGORI' : 'OK ON/OFF'),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  active ? subtitle : 'Platform dimatikan. Tekan OK untuk mengaktifkan lagi.',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: active ? AppTheme.textSoft : Colors.white38,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    decoration: TextDecoration.none,
+                                      if (focused && !categoryMode) _ModeBadge(text: 'OK ON/OFF'),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _SwitchPill(active: active, focused: focused && !categoryMode),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 88,
-                            child: Row(
-                              children: [
-                                Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
-                                const SizedBox(width: 6),
-                                Text(
-                                  active ? 'Kategori' : 'OFF',
-                                  style: TextStyle(
-                                    color: active ? AppTheme.textSoft : Colors.white38,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w900,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (categories.length > visibleIndexes.length)
-                            Icon(Icons.chevron_left_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
-                          Expanded(
-                            child: Row(
-                              children: [
-                                for (var j = 0; j < visibleIndexes.length; j++) ...[
-                                  Expanded(
-                                    child: _CategoryChip(
-                                      text: categories[visibleIndexes[j]],
-                                      selected: active && selectedCategories.contains(categories[visibleIndexes[j]]),
-                                      focused: focused && categoryMode && visibleIndexes[j] == safeCategoryIndex,
-                                      disabled: !active,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    active ? subtitle : 'Platform dimatikan. Tekan OK untuk mengaktifkan lagi.',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: active ? AppTheme.textSoft : Colors.white38,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.none,
                                     ),
                                   ),
-                                  if (j != visibleIndexes.length - 1) const SizedBox(width: 8),
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                          if (categories.length > visibleIndexes.length)
-                            Icon(Icons.chevron_right_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
-                        ],
+                            const SizedBox(width: 12),
+                            _SwitchPill(active: active, focused: focused && !categoryMode),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      AnimatedContainer(
+                        duration: TvFocusStyle.fast,
+                        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+                        decoration: _panelDecoration(focused: focused, selectedPanel: categoryMode),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 94,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    active ? 'Kategori' : 'OFF',
+                                    style: TextStyle(
+                                      color: active ? AppTheme.textSoft : Colors.white38,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w900,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (categories.length > visibleIndexes.length)
+                              Icon(Icons.chevron_left_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  for (var j = 0; j < visibleIndexes.length; j++) ...[
+                                    Expanded(
+                                      child: _CategoryChip(
+                                        text: categories[visibleIndexes[j]],
+                                        selected: active && selectedCategories.contains(categories[visibleIndexes[j]]),
+                                        focused: focused && categoryMode && visibleIndexes[j] == safeCategoryIndex,
+                                        disabled: !active,
+                                      ),
+                                    ),
+                                    if (j != visibleIndexes.length - 1) const SizedBox(width: 8),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (categories.length > visibleIndexes.length)
+                              Icon(Icons.chevron_right_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
+                            if (focused && categoryMode) ...[
+                              const SizedBox(width: 10),
+                              _ModeBadge(text: 'OK PILIH'),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

@@ -24,7 +24,7 @@ bool tvFocus(
         duration: duration,
         curve: Curves.linear,
         alignment: alignment,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
       );
     } catch (_) {
       // Focus can move while a route/list is rebuilding. Never let scroll
