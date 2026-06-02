@@ -800,6 +800,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _handleBack() {
     if (_backDebounced()) return;
+
+    // BACK harus mundur satu langkah di player:
+    // popup -> control dock -> layar video bersih -> keluar ke asal poster.
+    // Jangan langsung keluar saat control dock masih terlihat, karena itu terasa
+    // seperti BACK menembus overlay.
     if (_mode == _PlayerMode.options ||
         _mode == _PlayerMode.qualityPopup ||
         _mode == _PlayerMode.subtitlePopup ||
@@ -811,9 +816,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _hideOverlays();
       return;
     }
+    if (_mode == _PlayerMode.controlsVisible || _showControls || _progressFocused) {
+      _hideOverlays();
+      return;
+    }
 
-    // BACK from normal watching/controls must return to the poster grid.
-    // Menus still close first, but the control bar itself should not trap BACK.
     if (Navigator.canPop(context)) {
       _saveCurrentProgress(force: true);
       widget.onExitToHome?.call();
@@ -1473,8 +1480,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: _showControls ? 156 : 36,
-                  child: Center(child: _PlayerStatusToast(message: _statusMessage)),
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: EdgeInsets.only(bottom: _showControls ? 174 : 42),
+                    child: Center(child: _PlayerStatusToast(message: _statusMessage)),
+                  ),
                 ),
               if (!_loading && !ready)
                 Center(
@@ -1499,79 +1510,104 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (ready && _activeSubtitleText.isNotEmpty)
                 Positioned(
-                  left: 180,
-                  right: 180,
-                  bottom: _showControls ? 180 : 52,
-                  child: _SubtitleOverlay(text: _activeSubtitleText),
+                  left: 160,
+                  right: 160,
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: EdgeInsets.only(bottom: _showControls ? 202 : 58),
+                    child: _SubtitleOverlay(text: _activeSubtitleText),
+                  ),
                 ),
               if (ready && _showControls)
                 Positioned(
-                  left: 46,
-                  right: 46,
-                  bottom: 30,
-                  child: _PlayerControlDock(
-                    controller: controller,
-                    playing: controller.value.isPlaying,
-                    speed: _speed,
-                    quality: LiveGoSettings.quality,
-                    audioTrack: _audioTrack,
-                    subtitleStatus: _subtitleStatus,
-                    focusedIndex: _controlCursor,
-                    progressFocused: _progressFocused,
-                    fitCover: _fitCover,
-                    favorite: LiveGoLocalStore.isFavorite(item),
+                  left: 42,
+                  right: 42,
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: const EdgeInsets.only(bottom: 18),
+                    child: _PlayerControlDock(
+                      controller: controller,
+                      playing: controller.value.isPlaying,
+                      speed: _speed,
+                      quality: LiveGoSettings.quality,
+                      audioTrack: _audioTrack,
+                      subtitleStatus: _subtitleStatus,
+                      focusedIndex: _controlCursor,
+                      progressFocused: _progressFocused,
+                      fitCover: _fitCover,
+                      favorite: LiveGoLocalStore.isFavorite(item),
+                    ),
                   ),
                 ),
               if (_showEpisodes)
                 Positioned(
                   right: 28,
-                  top: 28,
-                  bottom: 28,
+                  top: 0,
+                  bottom: 0,
                   width: 390,
-                  child: _EpisodeSidePanel(
-                    episodes: _orderedEpisodes(),
-                    total: _episodeTotal(item),
-                    selected: _episode,
-                    cursor: _episodeCursor,
-                    broken: _brokenEpisodes,
+                  child: SafeArea(
+                    top: true,
+                    bottom: true,
+                    minimum: const EdgeInsets.only(top: 26, bottom: 30),
+                    child: _EpisodeSidePanel(
+                      episodes: _orderedEpisodes(),
+                      total: _episodeTotal(item),
+                      selected: _episode,
+                      cursor: _episodeCursor,
+                      broken: _brokenEpisodes,
+                    ),
                   ),
                 ),
               if (_mode == _PlayerMode.qualityPopup)
                 Positioned(
                   right: 38,
-                  bottom: 72,
-                  child: _ChoicePanel(
-                    title: 'Pilih Kualitas',
-                    hint: _qualityChoices.length > 1 ? 'OK pilih kualitas video' : 'Kualitas API tidak tersedia',
-                    choices: _qualityChoices,
-                    cursor: _qualityCursor,
-                    activeIndex: _qualityIndexFor(LiveGoSettings.quality),
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: const EdgeInsets.only(bottom: 176),
+                    child: _ChoicePanel(
+                      title: 'Pilih Kualitas',
+                      hint: _qualityChoices.length > 1 ? 'OK pilih kualitas video' : 'Kualitas API tidak tersedia',
+                      choices: _qualityChoices,
+                      cursor: _qualityCursor,
+                      activeIndex: _qualityIndexFor(LiveGoSettings.quality),
+                    ),
                   ),
                 ),
               if (_mode == _PlayerMode.subtitlePopup)
                 Positioned(
                   right: 38,
-                  bottom: 72,
-                  child: _ChoicePanel(
-                    title: 'Pilih Subtitle',
-                    hint: _streamInfo.subtitles.isEmpty ? 'Subtitle API tidak tersedia' : 'OK aktifkan subtitle',
-                    choices: _subtitleChoices,
-                    cursor: _subtitleCursor,
-                    activeIndex: LiveGoSettings.subtitlesEnabled && _selectedSubtitleIndex >= 0 ? _selectedSubtitleIndex + 1 : 0,
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: const EdgeInsets.only(bottom: 176),
+                    child: _ChoicePanel(
+                      title: 'Pilih Subtitle',
+                      hint: _streamInfo.subtitles.isEmpty ? 'Subtitle API tidak tersedia' : 'OK aktifkan subtitle',
+                      choices: _subtitleChoices,
+                      cursor: _subtitleCursor,
+                      activeIndex: LiveGoSettings.subtitlesEnabled && _selectedSubtitleIndex >= 0 ? _selectedSubtitleIndex + 1 : 0,
+                    ),
                   ),
                 ),
               if (_showOptions)
                 Positioned(
                   right: 38,
-                  bottom: 72,
-                  child: _PlayerOptionsPanel(
-                    speed: _speed,
-                    audioTrack: _audioTrack,
-                    autoNext: LiveGoSettings.autoNextEnabled,
-                    fitCover: _fitCover,
-                    favorite: LiveGoLocalStore.isFavorite(item),
-                    muted: _muted,
-                    cursor: _optionCursor,
+                  bottom: 0,
+                  child: SafeArea(
+                    bottom: true,
+                    minimum: const EdgeInsets.only(bottom: 176),
+                    child: _PlayerOptionsPanel(
+                      speed: _speed,
+                      audioTrack: _audioTrack,
+                      autoNext: LiveGoSettings.autoNextEnabled,
+                      fitCover: _fitCover,
+                      favorite: LiveGoLocalStore.isFavorite(item),
+                      muted: _muted,
+                      cursor: _optionCursor,
+                    ),
                   ),
                 ),
             ],
@@ -1608,9 +1644,12 @@ class _PlayerInfoOverlay extends StatelessWidget {
         children: [
           Positioned(
             left: 32,
-            top: 26,
+            top: 0,
             right: 32,
-            child: Row(
+            child: SafeArea(
+              top: true,
+              minimum: const EdgeInsets.only(top: 24),
+              child: Row(
               children: [
                 const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
                 const SizedBox(width: 14),
@@ -1625,6 +1664,7 @@ class _PlayerInfoOverlay extends StatelessWidget {
                   ),
                 ),
               ],
+              ),
             ),
           ),
           Center(
@@ -1676,7 +1716,7 @@ class _PlayerControlDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final value = controller.value;
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.90),
         borderRadius: BorderRadius.circular(28),
@@ -1714,7 +1754,7 @@ class _PlayerControlDock extends StatelessWidget {
               Text(_fmt(value.duration), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1745,8 +1785,8 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      width: 58,
-      height: 50,
+      width: 56,
+      height: 48,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         color: focused
@@ -1777,8 +1817,8 @@ class _DockTextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      height: 50,
-      constraints: const BoxConstraints(minWidth: 76),
+      height: 48,
+      constraints: const BoxConstraints(minWidth: 74),
       alignment: Alignment.center,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1820,7 +1860,7 @@ class _EpisodeSidePanel extends StatelessWidget {
     final endPos = (startPos + 11).clamp(0, ordered.length - 1).toInt();
     final visible = ordered.sublist(startPos, endPos + 1);
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
@@ -1841,6 +1881,7 @@ class _EpisodeSidePanel extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 18),
               itemCount: visible.length,
               itemBuilder: (context, index) {
                 final row = visible[index];
