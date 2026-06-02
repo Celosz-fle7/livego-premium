@@ -78,7 +78,44 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreSavedHomeSelection();
     _future = _startLoad();
+  }
+
+  void _restoreSavedHomeSelection() {
+    final platforms = LiveGoCatalog.platforms;
+    if (platforms.isEmpty) {
+      source = 0;
+      category = 0;
+      return;
+    }
+
+    final savedPlatform = LiveGoSettings.defaultPlatform.trim();
+    final savedIndex = platforms.indexOf(savedPlatform);
+    source = savedIndex >= 0 ? savedIndex : 0;
+
+    final platform = platforms[source];
+    final categories = LiveGoCatalog.categoriesFor(platform);
+    final savedCategory = LiveGoSettings.tvLastHomeCategories[platform] ?? 0;
+    category = categories.isEmpty ? 0 : savedCategory.clamp(0, categories.length - 1).toInt();
+    _lastPlatform = source;
+    _lastCategory = category;
+  }
+
+  void _rememberHomeSelection({String? platform, int? categoryIndex}) {
+    final selectedPlatform = platform ?? _platform;
+    if (selectedPlatform.trim().isEmpty) return;
+    LiveGoSettings.defaultPlatform = selectedPlatform;
+    if (categoryIndex != null) {
+      final categories = LiveGoCatalog.categoriesFor(selectedPlatform);
+      final max = categories.length - 1;
+      if (max >= 0) {
+        LiveGoSettings.tvLastHomeCategories[selectedPlatform] = categoryIndex.clamp(0, max).toInt();
+      }
+    }
+    unawaited(LiveGoLocalStore.saveSettings().then((_) {
+      if (mounted) _settingsVersion = LiveGoLocalStore.version.value;
+    }));
   }
 
   @override
@@ -233,7 +270,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       source = 0;
       category = 0;
     } else {
-      source = source.clamp(0, platforms.length - 1).toInt();
+      _restoreSavedHomeSelection();
       final categories = LiveGoCatalog.categoriesFor(platforms[source]);
       category = categories.isEmpty ? 0 : category.clamp(0, categories.length - 1).toInt();
     }
@@ -530,27 +567,36 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _selectPlatform(int index) {
     _cancelPendingFocus();
-    final targetPlatform = _safe(index, LiveGoCatalog.platformLabels.length);
+    final targetPlatform = _safe(index, LiveGoCatalog.platforms.length);
     if (targetPlatform == source) {
       _lastPlatform = targetPlatform;
+      _rememberHomeSelection(platform: _platform, categoryIndex: category);
       _zone = TvZone.category;
       _queueFocusEntry(TvZone.category, index: _lastCategory);
       return;
     }
 
+    final selectedPlatform = LiveGoCatalog.platforms[targetPlatform];
+    final platformCategories = LiveGoCatalog.categoriesFor(selectedPlatform);
+    final rememberedCategory = LiveGoSettings.tvLastHomeCategories[selectedPlatform] ?? 0;
+    final nextCategory = platformCategories.isEmpty
+        ? 0
+        : rememberedCategory.clamp(0, platformCategories.length - 1).toInt();
+    _rememberHomeSelection(platform: selectedPlatform, categoryIndex: nextCategory);
+
     setState(() {
       source = targetPlatform;
-      category = 0;
+      category = nextCategory;
       _zone = TvZone.category;
       _lastPlatform = targetPlatform;
-      _lastCategory = 0;
+      _lastCategory = nextCategory;
       _lastGrid = 0;
       _gridDataReady = false;
       _visibleGridItems = const <ContentItem>[];
       _lastGoodState = null;
       _future = _startLoad();
     });
-    _queueFocusEntry(TvZone.category, index: 0);
+    _queueFocusEntry(TvZone.category, index: nextCategory);
   }
 
   void _selectCategory(int index) {
@@ -563,11 +609,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     // and let DOWN enter the grid only when the new data is ready.
     if (targetCategory == category) {
       _lastCategory = targetCategory;
+      _rememberHomeSelection(categoryIndex: targetCategory);
       _zone = TvZone.category;
       _queueFocusEntry(TvZone.category, index: targetCategory);
       return;
     }
 
+    _rememberHomeSelection(categoryIndex: targetCategory);
     setState(() {
       category = targetCategory;
       _zone = TvZone.category;
@@ -847,7 +895,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             },
             child: ListView(
               controller: _pageScroll,
-              padding: const EdgeInsets.fromLTRB(12, 10, 22, 30),
+              padding: const EdgeInsets.fromLTRB(28, 28, 38, 44),
               children: [
             _FocusableBanner(
               item: hero,
@@ -862,7 +910,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 hasError: hasError,
                 fromCache: fromCache,
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _HeaderBox(
               label: 'Platform',
               height: 72,
@@ -878,7 +926,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 onKey: _platformKey,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _HeaderBox(
               label: 'Kategori',
               height: 72,
@@ -894,14 +942,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 onKey: _categoryKey,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             if (loading)
               const _TvSkeleton(height: 260)
             else if (gridItems.isEmpty)
               _HomeEmptyState(hasError: hasError)
             else
               _ContentGrid(
-                title: '',
+                title: categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[category]}',
                 columns: _gridColumns,
                 items: gridItems,
                 nodes: _gridNodes,
@@ -1100,7 +1148,7 @@ class _FocusableBanner extends StatelessWidget {
             child: AnimatedContainer(
               duration: TvFocusStyle.normal,
               curve: Curves.easeOutCubic,
-              height: 178,
+              height: 190,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -1115,7 +1163,7 @@ class _FocusableBanner extends StatelessWidget {
                 ),
                 boxShadow: [
                   const BoxShadow(color: Colors.black87, blurRadius: 20),
-                  if (focused) TvFocusStyle.glow(0.14, 8),
+                  if (focused) TvFocusStyle.glow(0.10, 7),
                 ],
               ),
               child: AnimatedContainer(
@@ -1291,7 +1339,7 @@ class _TvChip extends StatelessWidget {
                   color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.18) : AppTheme.border),
                   width: focused ? 2.0 : 1.0,
                 ),
-                boxShadow: focused ? [TvFocusStyle.glow(0.12, 8)] : null,
+                boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
               ),
               child: Text(
                 text,
@@ -1347,7 +1395,7 @@ class _ContentGrid extends StatelessWidget {
           if (title.trim().isNotEmpty) ...[
             Text(
               title.toUpperCase(),
-              style: TextStyle(color: TvFocusStyle.focusBlue.withOpacity(0.66), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.8, decoration: TextDecoration.none),
+              style: TextStyle(color: TvFocusStyle.focusBlue.withOpacity(0.66), letterSpacing: 1.8, fontWeight: FontWeight.w900, fontSize: 13.2, decoration: TextDecoration.none),
             ),
             const SizedBox(height: 8),
           ],
@@ -1357,8 +1405,8 @@ class _ContentGrid extends StatelessWidget {
             itemCount: items.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: columns.clamp(4, 10),
-              crossAxisSpacing: 11,
-              mainAxisSpacing: 12,
+              crossAxisSpacing: 13,
+              mainAxisSpacing: 14,
               childAspectRatio: _tvPosterAspectFor(columns),
             ),
             itemBuilder: (_, i) => _TvPosterTile(
@@ -1417,11 +1465,11 @@ class _TvPosterTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? TvFocusStyle.focusBlue : AppTheme.borderSoft,
-                          width: focused ? 2.8 : 0.8,
+                          color: focused ? TvFocusStyle.focusBlue : AppTheme.borderSoft.withOpacity(0.58),
+                          width: focused ? 2.2 : 0.7,
                         ),
                         boxShadow: focused
-                            ? [TvFocusStyle.glow(0.14, 8)]
+                            ? [TvFocusStyle.glow(0.09, 6)]
                             : [const BoxShadow(color: Colors.black45, blurRadius: 6)],
                       ),
                       child: ClipRRect(

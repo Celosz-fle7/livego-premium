@@ -287,6 +287,7 @@ class LiveGoLocalStore {
       'homePlatforms': LiveGoSettings.homePlatforms.toList(),
       'platformLanguages': LiveGoSettings.platformLanguages,
       'homeCategories': LiveGoSettings.homeCategories,
+      'tvLastHomeCategories': LiveGoSettings.tvLastHomeCategories,
     };
     await prefs.setString(_settingsKey, jsonEncode(payload));
     _bump();
@@ -362,6 +363,18 @@ class LiveGoLocalStore {
           final slug = '${entry.key}';
           if (!supported.contains(slug)) continue;
           LiveGoSettings.setCategoriesFor(slug, _stringList(entry.value));
+        }
+      }
+
+      final tvLastCategories = json['tvLastHomeCategories'];
+      if (tvLastCategories is Map) {
+        LiveGoSettings.tvLastHomeCategories.clear();
+        for (final entry in tvLastCategories.entries) {
+          final slug = '${entry.key}';
+          if (!supported.contains(slug)) continue;
+          final max = LiveGoSettings.categoriesFor(slug).length - 1;
+          if (max < 0) continue;
+          LiveGoSettings.tvLastHomeCategories[slug] = parseInt(entry.value, fallback: 0).clamp(0, max).toInt();
         }
       }
     } catch (e) {

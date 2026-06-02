@@ -17,6 +17,7 @@ class LiveGoSettings {
   static bool manualRotateButton = true;
   static int mobileHomeGrid = 3;
   static int tvHomeGrid = 6;
+  static final Map<String, int> tvLastHomeCategories = <String, int>{};
 
   static final List<String> defaultPlatforms = LiveGoApiPlatforms.defaultSlugs;
 
@@ -122,6 +123,7 @@ class LiveGoSettings {
     manualRotateButton = true;
     mobileHomeGrid = 3;
     tvHomeGrid = 6;
+    tvLastHomeCategories.clear();
     activePlatforms
       ..clear()
       ..addAll(defaultPlatforms);

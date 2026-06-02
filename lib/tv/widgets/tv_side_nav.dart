@@ -89,7 +89,7 @@ class TvSideNav extends StatelessWidget {
       child: AnimatedContainer(
         duration: TvFocusStyle.normal,
         curve: Curves.linear,
-        width: _visible ? 74 : 10,
+        width: _visible ? 80 : 8,
         child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
       ),
     );
@@ -97,8 +97,8 @@ class TvSideNav extends StatelessWidget {
 
   Widget _buildRail() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(6, 22, 6, 22),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      margin: const EdgeInsets.fromLTRB(7, 30, 7, 30),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 7),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -116,6 +116,8 @@ class TvSideNav extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           for (var i = 0; i < TvSideNav.items.length; i++) ...[
             _NavIconButton(
@@ -152,9 +154,9 @@ class _HiddenGrip extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: AnimatedContainer(
         duration: TvFocusStyle.fast,
-        width: 2.5,
-        height: active ? 96 : 64,
-        margin: const EdgeInsets.only(left: 1.5),
+        width: 2,
+        height: active ? 88 : 56,
+        margin: const EdgeInsets.only(left: 1),
         decoration: BoxDecoration(
           color: active ? TvFocusStyle.focusBlue.withOpacity(0.18) : Colors.white.withOpacity(0.035),
           borderRadius: BorderRadius.circular(999),
@@ -192,7 +194,7 @@ class _NavIconButton extends StatelessWidget {
       builder: (context, _) {
         final focused = focusNode.hasFocus;
         final selected = focused || active;
-        final size = logo ? 50.0 : 47.0;
+        final size = 50.0;
         return Tooltip(
           message: label,
           waitDuration: const Duration(milliseconds: 200),
@@ -204,7 +206,7 @@ class _NavIconButton extends StatelessWidget {
             child: InkWell(
               canRequestFocus: false,
               onTap: onTap,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(16),
               focusColor: Colors.transparent,
               child: AnimatedContainer(
                 duration: TvFocusStyle.fast,
@@ -222,14 +224,14 @@ class _NavIconButton extends StatelessWidget {
                         )
                       : null,
                   color: selected ? null : Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: focused
                         ? TvFocusStyle.focusBlue
                         : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
-                    width: focused ? 2 : 1,
+                    width: focused ? 2.0 : 1.0,
                   ),
-                  boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
+                  boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null,
                 ),
                 child: Icon(
                   icon,

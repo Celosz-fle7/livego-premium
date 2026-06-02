@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
-import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
+import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
@@ -23,12 +23,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   late final FocusNode _stayNode;
   late final FocusNode _saveNode;
 
-
   int _lastIndex = 0;
-  int _expandedIndex = -1;
   int _categoryIndex = 0;
-  int _optionIndex = 0;
-  bool _optionMode = false;
   bool _categoryMode = false;
   bool _dirty = false;
   bool _confirmOpen = false;
@@ -96,40 +92,23 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   List<String> _selectedCategoriesFor(String slug) => LiveGoSettings.categoriesFor(slug);
 
   void _focusBack() {
-    _optionMode = false;
     _categoryMode = false;
     tvFocus(_backNode, alignment: 0.04);
-  }
-
-  bool _isExpanded(int index) => _expandedIndex == index;
-
-  void _focusSource(int index, {bool optionMode = false, bool categoryMode = false}) {
-    if (_sourceNodes.isEmpty) return;
-    _lastIndex = _safeSource(index);
-    final active = LiveGoSettings.isPlatformActive(_platforms[_lastIndex]);
-    final expanded = _isExpanded(_lastIndex);
-    _categoryMode = expanded && categoryMode && active;
-    _optionMode = expanded && optionMode && !_categoryMode;
-    final cats = _allCategoriesFor(_platforms[_lastIndex]);
-    if (_categoryIndex >= cats.length) _categoryIndex = cats.length - 1;
-    if (_categoryIndex < 0) _categoryIndex = 0;
-    tvFocus(_sourceNodes[_lastIndex], alignment: 0.22);
     if (mounted) setState(() {});
   }
 
-  void _expandSource(int index, {bool optionMode = false, bool categoryMode = false}) {
-    final safe = _safeSource(index);
-    _expandedIndex = safe;
-    _optionIndex = LiveGoSettings.isPlatformActive(_platforms[safe]) ? 0 : 1;
-    _focusSource(safe, optionMode: optionMode, categoryMode: categoryMode);
-  }
-
-  void _collapseSource(int index) {
-    final safe = _safeSource(index);
-    if (_expandedIndex == safe) _expandedIndex = -1;
-    _optionMode = false;
-    _categoryMode = false;
-    _focusSource(safe);
+  void _focusSource(int index, {bool categoryMode = false, int? categoryIndex}) {
+    if (_sourceNodes.isEmpty) return;
+    _lastIndex = _safeSource(index);
+    final slug = _platforms[_lastIndex];
+    final categories = _allCategoriesFor(slug);
+    final active = LiveGoSettings.isPlatformActive(slug);
+    _categoryMode = categoryMode && active && categories.isNotEmpty;
+    if (categoryIndex != null) _categoryIndex = categoryIndex;
+    if (_categoryIndex >= categories.length) _categoryIndex = categories.length - 1;
+    if (_categoryIndex < 0) _categoryIndex = 0;
+    tvFocus(_sourceNodes[_lastIndex], alignment: 0.22);
+    if (mounted) setState(() {});
   }
 
   Future<void> _autoPingOnce() async {
@@ -197,19 +176,23 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return true;
   }
 
+  void _togglePlatform(String slug) {
+    final next = !LiveGoSettings.isPlatformActive(slug);
+    final ok = _setPlatformActive(slug, next);
+    if (ok && next) {
+      _focusSource(_lastIndex, categoryMode: false);
+    }
+  }
 
   void _toggleCategory(String slug) {
-    if (!LiveGoSettings.isPlatformActive(slug)) {
-      final ok = _setPlatformActive(slug, true);
-      if (!ok) return;
-    }
+    if (!LiveGoSettings.isPlatformActive(slug)) return;
     final all = _allCategoriesFor(slug);
     if (all.isEmpty) return;
     final cat = all[_categoryIndex.clamp(0, all.length - 1).toInt()];
     final selected = _selectedCategoriesFor(slug);
     if (selected.contains(cat)) {
       if (selected.length <= 1) {
-        _showSnack('Minimal 1 kategori harus tampil untuk platform aktif.');
+        _showSnack('Minimal 1 kategori harus tetap aktif.');
         return;
       }
       selected.remove(cat);
@@ -240,8 +223,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return;
     }
 
-    if (_expandedIndex >= 0) {
-      _collapseSource(_expandedIndex);
+    if (_categoryMode) {
+      _focusSource(_lastIndex, categoryMode: false);
       return;
     }
 
@@ -263,7 +246,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   void _closeConfirm() {
     setState(() => _confirmOpen = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusSource(_lastIndex, optionMode: _optionMode, categoryMode: _categoryMode);
+      if (mounted) _focusSource(_lastIndex, categoryMode: _categoryMode);
     });
   }
 
@@ -326,73 +309,26 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
-    final allCategories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);
-    final expanded = _isExpanded(index);
+    final categories = _allCategoriesFor(slug);
 
-    if (_optionMode && expanded) {
-      if (key == LogicalKeyboardKey.arrowLeft) {
-        _optionIndex = 0;
-        setState(() {});
-        _focusSource(index, optionMode: true);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowRight) {
-        _optionIndex = 1;
-        setState(() {});
-        _focusSource(index, optionMode: true);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowUp) {
-        _optionMode = false;
-        _focusSource(index);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowDown) {
-        if (active) {
-          _categoryIndex = 0;
-          _focusSource(index, categoryMode: true);
-        } else {
-          _optionMode = false;
-          _focusSource(index);
-        }
-        return KeyEventResult.handled;
-      }
-      if (_isSelect(key)) {
-        final wantActive = _optionIndex == 0;
-        _setPlatformActive(slug, wantActive);
-        _focusSource(index, optionMode: true);
-        return KeyEventResult.handled;
-      }
-      if (_isBack(key)) {
-        _handleBack();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    if (_categoryMode && expanded) {
+    if (_categoryMode) {
       if (key == LogicalKeyboardKey.arrowLeft) {
         _categoryIndex = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
-        setState(() {});
         _focusSource(index, categoryMode: true);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowRight) {
-        _categoryIndex = _categoryIndex < allCategories.length - 1 ? _categoryIndex + 1 : _categoryIndex;
-        setState(() {});
+        _categoryIndex = _categoryIndex < categories.length - 1 ? _categoryIndex + 1 : _categoryIndex;
         _focusSource(index, categoryMode: true);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
-        _categoryMode = false;
-        _optionIndex = active ? 0 : 1;
-        _focusSource(index, optionMode: true);
+        _focusSource(index, categoryMode: false);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
-        _categoryMode = false;
-        _focusSource(index);
+        _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index, categoryMode: false);
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
@@ -416,12 +352,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (expanded) {
-        _optionIndex = active ? 0 : 1;
-        _focusSource(index, optionMode: true);
-      } else {
-        _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
-      }
+      _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -429,20 +360,16 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (expanded) {
-        _optionIndex = active ? 0 : 1;
-        _focusSource(index, optionMode: true);
+      if (active && categories.isNotEmpty) {
+        _categoryIndex = _categoryIndex.clamp(0, categories.length - 1).toInt();
+        _focusSource(index, categoryMode: true);
       } else {
-        _expandSource(index);
+        _showSnack('Aktifkan platform dulu dengan OK.');
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      if (expanded) {
-        _collapseSource(index);
-      } else {
-        _expandSource(index);
-      }
+      _togglePlatform(slug);
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
@@ -482,16 +409,13 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'Anichin • MP4 multi-quality. Aman untuk player native.',
-      'netshort': 'Anichin • Direct CDN + subtitle VTT. Aktif, bahasa default IN.',
-      'pinedrama': 'Anichin • Direct MP4. Aman untuk player native.',
-      'dramabox': 'Anichin • HLS signed dari all episode. Aktif, list bisa lebih lambat.',
-      'flickreels': 'Anichin • HLS signed dari episode/all episode. Aktif.',
-      'melolo': 'Anichin • Opsional. Video CENC belum dipasang di player native.',
+      'shortmax': 'MP4 multi-quality. Aman untuk player native.',
+      'netshort': 'Direct CDN + subtitle VTT. Bahasa default IN.',
+      'pinedrama': 'Direct MP4. Aman untuk player native.',
+      'dramabox': 'HLS signed. List bisa lebih lambat.',
+      'flickreels': 'HLS signed dari episode/all episode.',
+      'melolo': 'Opsional. DRM/CENC belum dipasang di player native.',
     };
-    if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Dobda • Beranda/Jelajah/Search/Detail/Video HMAC. Stream + subtitle dari /api/v2/video.';
-    }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }
 
@@ -520,77 +444,73 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           child: Scaffold(
             backgroundColor: AppTheme.bgDeep,
             body: Stack(
-            children: [
-              DefaultTextStyle.merge(
-                style: const TextStyle(decoration: TextDecoration.none),
-                child: ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
-                  children: [
-                    _SourceHeader(
-                      backNode: _backNode,
-                      onBackKey: _backKey,
-                      onBack: _requestExit,
-                      activeCount: LiveGoSettings.activePlatforms.length,
-                      pingingSlug: _pingingSlug,
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppTheme.surface, AppTheme.bgDeep],
+              children: [
+                DefaultTextStyle.merge(
+                  style: const TextStyle(decoration: TextDecoration.none),
+                  child: ListView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
+                    children: [
+                      _SourceHeader(
+                        backNode: _backNode,
+                        onBackKey: _backKey,
+                        onBack: _requestExit,
+                        activeCount: LiveGoSettings.activePlatforms.length,
+                        pingingSlug: _pingingSlug,
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppTheme.surface, AppTheme.bgDeep],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppTheme.border),
+                          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 28)],
                         ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppTheme.border),
-                        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.05), blurRadius: 32)],
-                      ),
-                      child: Column(
-                        children: [
-                          for (var i = 0; i < _platforms.length; i++) ...[
-                            if (i == 0 || LiveGoCatalog.backendLabel(_platforms[i]) != LiveGoCatalog.backendLabel(_platforms[i - 1]))
-                              _SourceGroupHeader(text: LiveGoCatalog.backendLabel(_platforms[i])),
-                            _SourceRow(
-                              node: _sourceNodes[i],
-                              slug: _platforms[i],
-                              title: LiveGoCatalog.label(_platforms[i]),
-                              subtitle: _sourceDescription(_platforms[i]),
-                              active: LiveGoSettings.isPlatformActive(_platforms[i]),
-                              statusColor: _statusColor(_platforms[i]),
-                              statusText: _statusText(_platforms[i]),
-                              categories: _allCategoriesFor(_platforms[i]),
-                              selectedCategories: _selectedCategoriesFor(_platforms[i]),
-                              expanded: _expandedIndex == i,
-                              optionMode: _optionMode && _expandedIndex == i,
-                              optionIndex: _optionIndex,
-                              categoryMode: _categoryMode && _expandedIndex == i,
-                              categoryIndex: _categoryIndex,
-                              onKey: (node, event) => _sourceKey(i, _platforms[i], event),
-                              onTap: () => _isExpanded(i) ? _collapseSource(i) : _expandSource(i),
-                              isLast: i == _platforms.length - 1,
-                            ),
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < _platforms.length; i++) ...[
+                              if (i == 0 || LiveGoCatalog.backendLabel(_platforms[i]) != LiveGoCatalog.backendLabel(_platforms[i - 1]))
+                                _SourceGroupHeader(text: LiveGoCatalog.backendLabel(_platforms[i])),
+                              _SourceRow(
+                                node: _sourceNodes[i],
+                                title: LiveGoCatalog.label(_platforms[i]),
+                                subtitle: _sourceDescription(_platforms[i]),
+                                active: LiveGoSettings.isPlatformActive(_platforms[i]),
+                                statusColor: _statusColor(_platforms[i]),
+                                statusText: _statusText(_platforms[i]),
+                                categories: _allCategoriesFor(_platforms[i]),
+                                selectedCategories: _selectedCategoriesFor(_platforms[i]),
+                                categoryMode: _categoryMode && _lastIndex == i,
+                                categoryIndex: _categoryIndex,
+                                onKey: (node, event) => _sourceKey(i, _platforms[i], event),
+                                onTap: () => _togglePlatform(_platforms[i]),
+                                isLast: i == _platforms.length - 1,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'OK buka/tutup platform • ↓ ON/OFF • ↓ kategori • BACK tutup panel dulu',
-                      style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'OK ON/OFF platform • RIGHT masuk kategori • OK di kategori ON/OFF • BACK keluar mode kategori',
+                        style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              if (_confirmOpen)
-                _ConfirmSaveOverlay(
-                  stayNode: _stayNode,
-                  saveNode: _saveNode,
-                  onKey: _confirmKey,
-                  onStay: _closeConfirm,
-                  onSave: _saveAndExit,
-                ),
+                if (_confirmOpen)
+                  _ConfirmSaveOverlay(
+                    stayNode: _stayNode,
+                    saveNode: _saveNode,
+                    onKey: _confirmKey,
+                    onStay: _closeConfirm,
+                    onSave: _saveAndExit,
+                  ),
               ],
             ),
           ),
@@ -661,7 +581,7 @@ class _SourceHeader extends StatelessWidget {
                 const Text('Kelola Sumber Data', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 3),
                 Text(
-                  pingingSlug == null ? 'Status server dicek otomatis saat halaman dibuka.' : 'Mengecek server ${LiveGoCatalog.label(pingingSlug!)}...',
+                  pingingSlug == null ? 'OK mengaktifkan platform. RIGHT memilih kategori di bawah platform.' : 'Mengecek server ${LiveGoCatalog.label(pingingSlug!)}...',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700),
@@ -709,7 +629,6 @@ class _SourceGroupHeader extends StatelessWidget {
 
 class _SourceRow extends StatelessWidget {
   final FocusNode node;
-  final String slug;
   final String title;
   final String subtitle;
   final bool active;
@@ -717,9 +636,6 @@ class _SourceRow extends StatelessWidget {
   final String statusText;
   final List<String> categories;
   final List<String> selectedCategories;
-  final bool expanded;
-  final bool optionMode;
-  final int optionIndex;
   final bool categoryMode;
   final int categoryIndex;
   final FocusOnKeyEventCallback onKey;
@@ -728,7 +644,6 @@ class _SourceRow extends StatelessWidget {
 
   const _SourceRow({
     required this.node,
-    required this.slug,
     required this.title,
     required this.subtitle,
     required this.active,
@@ -736,9 +651,6 @@ class _SourceRow extends StatelessWidget {
     required this.statusText,
     required this.categories,
     required this.selectedCategories,
-    required this.expanded,
-    required this.optionMode,
-    required this.optionIndex,
     required this.categoryMode,
     required this.categoryIndex,
     required this.onKey,
@@ -765,21 +677,19 @@ class _SourceRow extends StatelessWidget {
                 AnimatedContainer(
                   duration: TvFocusStyle.fast,
                   margin: const EdgeInsets.symmetric(vertical: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
                     gradient: active
                         ? (focused
-                            ? LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
-                            : LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]))
-                        : LinearGradient(colors: [Colors.black.withOpacity(0.82), AppTheme.bgDeep]),
+                            ? const LinearGradient(colors: [AppTheme.surface3, AppTheme.surface])
+                            : const LinearGradient(colors: [AppTheme.surface, AppTheme.bgDeep]))
+                        : LinearGradient(colors: [Colors.black.withOpacity(0.78), AppTheme.bgDeep]),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.95) : AppTheme.borderSoft, width: focused ? 2 : 1),
-                    boxShadow: focused
-                        ? [
-                            BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 14),
-                            BoxShadow(color: AppTheme.purple.withOpacity(0.05), blurRadius: 18),
-                          ]
-                        : null,
+                    border: Border.all(
+                      color: focused ? (categoryMode ? Colors.white.withOpacity(0.75) : AppTheme.cyan.withOpacity(0.95)) : AppTheme.borderSoft,
+                      width: focused ? 2 : 1,
+                    ),
+                    boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 14)] : null,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -792,76 +702,47 @@ class _SourceRow extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900))),
-                                    Icon(expanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 26),
-                                  ],
-                                ),
+                                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
                                 const SizedBox(height: 4),
                                 Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
                           const SizedBox(width: 12),
-                          _SwitchPill(active: active),
+                          _SwitchPill(active: active, focused: focused && !categoryMode),
                         ],
                       ),
-                      if (expanded) ...[
-                        const SizedBox(height: 12),
-                        Divider(color: Colors.white.withOpacity(0.10), height: 1),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const SizedBox(width: 86, child: Text('STATUS', style: TextStyle(color: AppTheme.textSoft, fontSize: 10.5, fontWeight: FontWeight.w900))),
-                            _PowerChoice(text: 'ON', selected: active, focused: focused && optionMode && optionIndex == 0),
-                            const SizedBox(width: 10),
-                            _PowerChoice(text: 'OFF', selected: !active, focused: focused && optionMode && optionIndex == 1),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
-                                active ? 'Tampil di Beranda TV' : 'Hitam = tidak ditampilkan di Beranda TV',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: active ? AppTheme.cyan : Colors.white54, fontSize: 11.5, fontWeight: FontWeight.w800),
+                      const SizedBox(height: 11),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 72,
+                            child: Text(
+                              active ? 'Kategori' : 'OFF',
+                              style: TextStyle(color: active ? AppTheme.textSoft : Colors.white38, fontSize: 10.5, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  for (var i = 0; i < categories.length; i++) ...[
+                                    _CategoryChip(
+                                      text: categories[i],
+                                      selected: active && selectedCategories.contains(categories[i]),
+                                      focused: focused && categoryMode && i == categoryIndex,
+                                      disabled: !active,
+                                    ),
+                                    if (i != categories.length - 1) const SizedBox(width: 9),
+                                  ],
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        active
-                            ? Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.bgDeep.withOpacity(0.92),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: AppTheme.border),
-                                ),
-                                child: Wrap(
-                                  spacing: 10,
-                                  runSpacing: 8,
-                                  children: [
-                                    for (var i = 0; i < categories.length; i++)
-                                      _CategoryChip(
-                                        text: categories[i],
-                                        selected: selectedCategories.contains(categories[i]),
-                                        focused: focused && categoryMode && i == categoryIndex,
-                                      ),
-                                  ],
-                                ),
-                              )
-                            : Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.38),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: Colors.white10),
-                                ),
-                                child: const Text('Kategori disembunyikan karena platform OFF.', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w800)),
-                              ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -889,7 +770,7 @@ class _StatusLamp extends StatelessWidget {
           Container(
             width: 13,
             height: 13,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.45), blurRadius: 12)]),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.32), blurRadius: 10)]),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -903,19 +784,21 @@ class _StatusLamp extends StatelessWidget {
 
 class _SwitchPill extends StatelessWidget {
   final bool active;
-  const _SwitchPill({required this.active});
+  final bool focused;
+  const _SwitchPill({required this.active, required this.focused});
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
-      width: 74,
-      height: 32,
+      width: 78,
+      height: 34,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: active ? AppTheme.cyan.withOpacity(0.65) : Colors.white12),
+        border: Border.all(color: focused ? Colors.white : (active ? AppTheme.cyan.withOpacity(0.65) : Colors.white12), width: focused ? 2 : 1),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 13)] : null,
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
@@ -935,51 +818,40 @@ class _SwitchPill extends StatelessWidget {
   }
 }
 
-class _PowerChoice extends StatelessWidget {
-  final String text;
-  final bool selected;
-  final bool focused;
-
-  const _PowerChoice({required this.text, required this.selected, required this.focused});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
-      width: 76,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
-        border: Border.all(color: focused ? Colors.white : (selected ? AppTheme.cyan.withOpacity(0.65) : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.24), blurRadius: 16)] : null,
-      ),
-      child: Text(text, style: TextStyle(color: selected || focused ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.w900)),
-    );
-  }
-}
-
 class _CategoryChip extends StatelessWidget {
   final String text;
   final bool selected;
   final bool focused;
+  final bool disabled;
 
-  const _CategoryChip({required this.text, required this.selected, required this.focused});
+  const _CategoryChip({required this.text, required this.selected, required this.focused, required this.disabled});
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: TvFocusStyle.fast,
+      constraints: const BoxConstraints(minWidth: 78),
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: selected ? AppTheme.activeGradient : null,
-        color: selected ? null : Colors.white.withOpacity(0.045),
-        border: Border.all(color: focused ? Colors.white : (selected ? Colors.transparent : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.22), blurRadius: 16)] : null,
+        color: selected ? null : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
+        border: Border.all(
+          color: focused ? Colors.white : (selected ? Colors.transparent : Colors.white12),
+          width: focused ? 2 : 1,
+        ),
+        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.18), blurRadius: 14)] : null,
       ),
-      child: Text(text, style: TextStyle(color: selected || focused ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.w900)),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
