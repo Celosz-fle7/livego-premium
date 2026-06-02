@@ -31,11 +31,11 @@ class TvSideNav extends StatelessWidget {
 
   static const items = [
     TvNavItem(Icons.home_rounded, 'Home'),
-    TvNavItem(Icons.history_rounded, 'Histori'),
-    TvNavItem(Icons.search_rounded, 'Cari'),
-    TvNavItem(Icons.favorite_rounded, 'Favorit'),
     TvNavItem(Icons.download_rounded, 'Unduhan'),
+    TvNavItem(Icons.history_rounded, 'Histori'),
+    TvNavItem(Icons.favorite_rounded, 'Favorit'),
     TvNavItem(Icons.person_rounded, 'Akun'),
+    TvNavItem(Icons.search_rounded, 'Cari'),
   ];
 
   bool get _visible => mode != TvSideNavMode.hidden;

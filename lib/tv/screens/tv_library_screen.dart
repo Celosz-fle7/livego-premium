@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
+import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
@@ -18,6 +19,8 @@ class TvLibraryScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
+  final VoidCallback? onPlayerRouteOpen;
+  final VoidCallback? onPlayerRouteClosed;
   final int focusTicket;
 
   const TvLibraryScreen({
@@ -28,6 +31,8 @@ class TvLibraryScreen extends StatefulWidget {
     this.onMoveToNav,
     this.onBackToNav,
     this.onBackToHome,
+    this.onPlayerRouteOpen,
+    this.onPlayerRouteClosed,
     this.focusTicket = 0,
   });
 
@@ -44,7 +49,12 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
   int _lastGrid = 0;
   bool _entryPending = false;
 
-  List<ContentItem> get _items => widget.favorites ? LiveGoLocalStore.favorites : LiveGoLocalStore.history;
+  List<ContentItem> get _items {
+    final raw = widget.favorites ? LiveGoLocalStore.favorites : LiveGoLocalStore.history;
+    // Hide posters that the player already marked as broken, so History/Favorite
+    // does not keep sending users back into content that cannot play.
+    return ContentHealthService.filterPlayable(raw);
+  }
 
   @override
   void initState() {
@@ -157,7 +167,9 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
 
   void _open(ContentItem item) {
     _zone = TvZone.player;
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
+    widget.onPlayerRouteOpen?.call();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       _zone = TvZone.grid;
       void restore() {

@@ -15,9 +15,19 @@ class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
+  final VoidCallback? onPlayerRouteOpen;
+  final VoidCallback? onPlayerRouteClosed;
   final int focusTicket;
 
-  const TvDownloadsScreen({super.key, this.onMoveToNav, this.onBackToNav, this.onBackToHome, this.focusTicket = 0});
+  const TvDownloadsScreen({
+    super.key,
+    this.onMoveToNav,
+    this.onBackToNav,
+    this.onBackToHome,
+    this.onPlayerRouteOpen,
+    this.onPlayerRouteClosed,
+    this.focusTicket = 0,
+  });
 
   @override
   State<TvDownloadsScreen> createState() => _TvDownloadsScreenState();
@@ -135,7 +145,9 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   }
 
   void _open(DownloadRecord record) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item))).then((_) {
+    widget.onPlayerRouteOpen?.call();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       void restore() {
         if (mounted) _focusRow(_lastRow);

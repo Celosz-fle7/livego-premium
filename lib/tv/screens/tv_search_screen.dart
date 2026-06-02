@@ -15,9 +15,19 @@ class TvSearchScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
+  final VoidCallback? onPlayerRouteOpen;
+  final VoidCallback? onPlayerRouteClosed;
   final int focusTicket;
 
-  const TvSearchScreen({super.key, this.onMoveToNav, this.onBackToNav, this.onBackToHome, this.focusTicket = 0});
+  const TvSearchScreen({
+    super.key,
+    this.onMoveToNav,
+    this.onBackToNav,
+    this.onBackToHome,
+    this.onPlayerRouteOpen,
+    this.onPlayerRouteClosed,
+    this.focusTicket = 0,
+  });
 
   @override
   State<TvSearchScreen> createState() => _TvSearchScreenState();
@@ -33,6 +43,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
   String _query = '';
   bool _loading = false;
   int _lastGrid = 0;
+  int _searchTicket = 0;
   List<ContentItem> _results = [];
 
   @override
@@ -114,6 +125,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
 
   Future<void> _search(String value) async {
     final clean = value.trim();
+    final ticket = ++_searchTicket;
     setState(() {
       _query = clean;
       if (clean.isEmpty) _results = [];
@@ -122,14 +134,20 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     });
     if (clean.isEmpty) return;
 
-    final rows = await LiveGoCatalog.searchAll(clean);
-    if (!mounted) return;
+    List<ContentItem> rows = const <ContentItem>[];
+    try {
+      rows = await LiveGoCatalog.searchAll(clean)
+          .timeout(const Duration(seconds: 22), onTimeout: () => const <ContentItem>[]);
+    } catch (_) {
+      rows = const <ContentItem>[];
+    }
+    if (!mounted || ticket != _searchTicket || clean != _query) return;
     setState(() {
       _results = rows;
       _loading = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || ticket != _searchTicket) return;
       if (_resultNodes.isNotEmpty) {
         _focusGrid(0);
       } else {
@@ -146,7 +164,9 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
   }
 
   void _open(ContentItem item) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).then((_) {
+    widget.onPlayerRouteOpen?.call();
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).then((_) {
+      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       void restore() {
         if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid);

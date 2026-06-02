@@ -22,7 +22,13 @@ class TvApp extends StatefulWidget {
 }
 
 class _TvAppState extends State<TvApp> {
-  int _index = 0;
+  static const int _homeIndex = 0;
+  static const int _downloadIndex = 1;
+  static const int _historyIndex = 2;
+  static const int _favoriteIndex = 3;
+  static const int _accountIndex = 4;
+  static const int _searchIndex = 5;
+  int _index = _homeIndex;
   TvSideNavMode _navMode = TvSideNavMode.hidden;
   int _homeTicket = 0;
   int _homeBannerTicket = 0;
@@ -111,9 +117,22 @@ class _TvAppState extends State<TvApp> {
     if (!mounted) return;
     setState(() {
       _returnToAccountMenuOnBack = false;
-      _index = 0;
+      _index = _homeIndex;
       _navMode = TvSideNavMode.hidden;
     });
+  }
+
+  void _prepareContentPlayerRoute() {
+    // Same guard as Home, but keep the current TV page selected.
+    _suppressBackFor(1200);
+    _hideNav();
+  }
+
+  void _restoreContentAfterPlayerRoute() {
+    _suppressBackFor(1100);
+    if (!mounted) return;
+    setState(() => _navMode = TvSideNavMode.hidden);
+    _bumpContentTicket();
   }
 
   void _focusCurrentNav() {
@@ -140,10 +159,10 @@ class _TvAppState extends State<TvApp> {
 
   void _backToCurrentNav() {
     _markBackHandled();
-    if (_returnToAccountMenuOnBack && _index != 5) {
+    if (_returnToAccountMenuOnBack && _index != _accountIndex) {
       _returnToAccountMenuOnBack = false;
       setState(() {
-        _index = 5;
+        _index = _accountIndex;
         _navMode = TvSideNavMode.hidden;
         _accountTicket++;
       });
@@ -168,11 +187,11 @@ class _TvAppState extends State<TvApp> {
     _markBackHandled();
     setState(() {
       _returnToAccountMenuOnBack = false;
-      _index = 0;
+      _index = _homeIndex;
       _navMode = TvSideNavMode.focused;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_navNodes[_safeNav(0)], alignment: 0.10);
+      if (mounted) tvFocus(_navNodes[_safeNav(_homeIndex)], alignment: 0.10);
     });
   }
 
@@ -180,7 +199,7 @@ class _TvAppState extends State<TvApp> {
     _markBackHandled();
     setState(() {
       _returnToAccountMenuOnBack = false;
-      _index = 0;
+      _index = _homeIndex;
       _navMode = TvSideNavMode.hidden;
       _homeBannerTicket++;
     });
@@ -190,7 +209,7 @@ class _TvAppState extends State<TvApp> {
     _markBackHandled();
     setState(() {
       _returnToAccountMenuOnBack = false;
-      _index = 0;
+      _index = _homeIndex;
       _navMode = TvSideNavMode.hidden;
       _homeTicket++;
     });
@@ -206,7 +225,7 @@ class _TvAppState extends State<TvApp> {
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          if (safe == 0) {
+          if (safe == _homeIndex) {
             setState(() => _homeBannerTicket++);
           } else {
             _bumpContentTicket();
@@ -216,7 +235,7 @@ class _TvAppState extends State<TvApp> {
       return;
     }
     _hideNav();
-    if (safe == 0) {
+    if (safe == _homeIndex) {
       setState(() => _homeBannerTicket++);
     } else {
       _bumpContentTicket();
@@ -225,7 +244,7 @@ class _TvAppState extends State<TvApp> {
 
   void _openFromAccountMenu(int navIndex) {
     final safe = _safeNav(navIndex);
-    if (safe == 5) return;
+    if (safe == _accountIndex) return;
     setState(() {
       _returnToAccountMenuOnBack = true;
       _index = safe;
@@ -237,9 +256,9 @@ class _TvAppState extends State<TvApp> {
   void _bumpContentTicket() {
     if (!mounted) return;
     setState(() {
-      if (_index == 0) {
+      if (_index == _homeIndex) {
         _homeTicket++;
-      } else if (_index == 5) {
+      } else if (_index == _accountIndex) {
         _accountTicket++;
       } else {
         _placeholderTicket++;
@@ -269,13 +288,13 @@ class _TvAppState extends State<TvApp> {
     setState(() {
       _exitDialogOpen = false;
       _restoreHomeBannerAfterExitDialog = false;
-      if (restoreHomeBanner && _index == 0) {
+      if (restoreHomeBanner && _index == _homeIndex) {
         _homeBannerTicket++;
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (!restoreHomeBanner || _index != 0) _focusCurrentNav();
+      if (!restoreHomeBanner || _index != _homeIndex) _focusCurrentNav();
     });
   }
 
@@ -298,14 +317,14 @@ class _TvAppState extends State<TvApp> {
     // If a content screen did not handle BACK itself, close it to the
     // active navbar item first. Do not jump straight to Home/banner.
     if (!_navHasFocus) {
-      if (_index == 0) {
+      if (_index == _homeIndex) {
         _returnToHomeLastFocus();
         return;
       }
-      if (_returnToAccountMenuOnBack && _index != 5) {
+      if (_returnToAccountMenuOnBack && _index != _accountIndex) {
         _returnToAccountMenuOnBack = false;
         setState(() {
-          _index = 5;
+          _index = _accountIndex;
           _navMode = TvSideNavMode.hidden;
           _accountTicket++;
         });
@@ -317,7 +336,7 @@ class _TvAppState extends State<TvApp> {
 
     // BACK from the focused rail only hides the rail. If the rail is on the
     // first shortcut, return to the real Home banner, not the rail icon.
-    if (_index == 0) {
+    if (_index == _homeIndex) {
       _backToHomeBanner();
     } else {
       _returnToHomeLastFocus();
@@ -354,49 +373,57 @@ class _TvAppState extends State<TvApp> {
   List<Widget> _pages() {
     return [
       TvHomeScreen(
-        focusTicket: _index == 0 ? _homeTicket : 0,
-        bannerFocusTicket: _index == 0 ? _homeBannerTicket : 0,
+        focusTicket: _index == _homeIndex ? _homeTicket : 0,
+        bannerFocusTicket: _index == _homeIndex ? _homeBannerTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onRequestExit: _showExitDialogFromHome,
         onPlayerRouteOpen: _prepareHomePlayerRoute,
         onPlayerRouteClosed: _restoreHomeAfterPlayerRoute,
       ),
+      TvDownloadsScreen(
+        focusTicket: _index == _downloadIndex ? _placeholderTicket : 0,
+        onMoveToNav: _peekOrFocusNav,
+        onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
+        onPlayerRouteOpen: _prepareContentPlayerRoute,
+        onPlayerRouteClosed: _restoreContentAfterPlayerRoute,
+      ),
       TvLibraryScreen(
         title: 'Histori',
         icon: Icons.history_rounded,
         favorites: false,
-        focusTicket: _index == 1 ? _placeholderTicket : 0,
+        focusTicket: _index == _historyIndex ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _returnToHomeLastFocus,
-      ),
-      TvSearchScreen(
-        focusTicket: _index == 2 ? _placeholderTicket : 0,
-        onMoveToNav: _peekOrFocusNav,
-        onBackToNav: _backToCurrentNav,
-        onBackToHome: _returnToHomeLastFocus,
+        onPlayerRouteOpen: _prepareContentPlayerRoute,
+        onPlayerRouteClosed: _restoreContentAfterPlayerRoute,
       ),
       TvLibraryScreen(
         title: 'Favorit',
         icon: Icons.favorite_rounded,
         favorites: true,
-        focusTicket: _index == 3 ? _placeholderTicket : 0,
+        focusTicket: _index == _favoriteIndex ? _placeholderTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _returnToHomeLastFocus,
-      ),
-      TvDownloadsScreen(
-        focusTicket: _index == 4 ? _placeholderTicket : 0,
-        onMoveToNav: _peekOrFocusNav,
-        onBackToNav: _backToCurrentNav,
-        onBackToHome: _returnToHomeLastFocus,
+        onPlayerRouteOpen: _prepareContentPlayerRoute,
+        onPlayerRouteClosed: _restoreContentAfterPlayerRoute,
       ),
       TvAccountScreen(
-        focusTicket: _index == 5 ? _accountTicket : 0,
+        focusTicket: _index == _accountIndex ? _accountTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onBackToNav: _backToCurrentNav,
         onBackToHome: _returnToHomeLastFocus,
         onOpenNavIndex: _openFromAccountMenu,
+      ),
+      TvSearchScreen(
+        focusTicket: _index == _searchIndex ? _placeholderTicket : 0,
+        onMoveToNav: _peekOrFocusNav,
+        onBackToNav: _backToCurrentNav,
+        onBackToHome: _returnToHomeLastFocus,
+        onPlayerRouteOpen: _prepareContentPlayerRoute,
+        onPlayerRouteClosed: _restoreContentAfterPlayerRoute,
       ),
     ];
   }

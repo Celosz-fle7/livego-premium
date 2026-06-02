@@ -7,6 +7,7 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
+import '../../services/content/content_health_service.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
@@ -370,6 +371,26 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (!mounted) return;
     widget.onPlayerRouteClosed?.call();
     _cancelPendingFocus();
+
+    final blockedPoster = zone == TvZone.grid &&
+        index >= 0 &&
+        index < _visibleGridItems.length &&
+        ContentHealthService.isBlocked(_visibleGridItems[index]);
+
+    if (blockedPoster) {
+      // If the player proved this poster is not playable, remove it from Home
+      // immediately instead of letting the user open the same broken item again.
+      setState(() {
+        _zone = TvZone.category;
+        _lastGrid = 0;
+        _gridDataReady = false;
+        _visibleGridItems = const <ContentItem>[];
+        _future = _load();
+      });
+      _queueFocusEntry(TvZone.category, index: _lastCategory);
+      return;
+    }
+
     _zone = zone;
     if (zone == TvZone.grid) _lastGrid = _safe(index, _gridNodes.length);
     if (zone == TvZone.category) _lastCategory = _safe(index, _categoryNodes.length);

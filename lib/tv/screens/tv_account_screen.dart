@@ -48,7 +48,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _AccountItem(
           icon: Icons.layers_rounded,
           title: 'Kelola Sumber Data',
-          subtitle: 'Atur Anichin, Dobda, bahasa, kategori, dan platform aktif.',
+          subtitle: 'Atur Anichin, bahasa, kategori, dan platform aktif.',
           badge: 'SOURCE',
           onTap: () => _pushScreen(const TvSourceManagerScreen()),
         ),
@@ -57,7 +57,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           title: 'Riwayat Tontonan',
           subtitle: 'Buka histori tontonan dari navbar TV.',
           badge: '${LiveGoLocalStore.history.length}',
-          onTap: () => widget.onOpenNavIndex?.call(1),
+          onTap: () => widget.onOpenNavIndex?.call(2),
         ),
         _AccountItem(
           icon: Icons.favorite_rounded,
@@ -71,7 +71,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           title: 'Download',
           subtitle: 'Kelola unduhan dan episode offline.',
           badge: '${LiveGoLocalStore.downloads.length}',
-          onTap: () => widget.onOpenNavIndex?.call(4),
+          onTap: () => widget.onOpenNavIndex?.call(1),
         ),
         _AccountItem(
           icon: Icons.tune_rounded,
@@ -267,7 +267,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                 ],
                 const SizedBox(height: 14),
                 Text(
-                  'Remote: ↑↓ pilih menu • OK/→ buka • ← tampilkan navbar • Back kembali ke navbar Akun',
+                  'Remote: ↑↓ pilih menu • OK/→ buka • ← navbar • Back kembali ke navbar Akun',
                   style: TextStyle(
                     color: AppTheme.textSoft.withOpacity(0.72),
                     fontSize: 11,
