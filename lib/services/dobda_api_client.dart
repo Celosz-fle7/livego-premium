@@ -20,12 +20,8 @@ class DobdaApiClient {
     String platform = 'dobda_freereels',
     String lang = 'id',
   }) async {
-    final config = LiveGoApiPlatforms.bySlug(platform);
-    final json = await _getJson(DobdaEndpoints.home, {
-      'category_p': config.apiSlug,
-      'lang': _providerLang(config.slug, lang),
-    });
-    return _parseItems(json, platform: config.slug, lang: _providerLang(config.slug, lang));
+    final rows = await _homeRaw(platform: platform, lang: lang);
+    return _cleanDobdaItems(rows);
   }
 
   static Future<List<ContentItem>> discover({
@@ -33,13 +29,8 @@ class DobdaApiClient {
     String lang = 'id',
     int page = 1,
   }) async {
-    final config = LiveGoApiPlatforms.bySlug(platform);
-    final json = await _getJson(DobdaEndpoints.discover, {
-      'category_p': config.apiSlug,
-      'lang': _providerLang(config.slug, lang),
-      'page': '$page',
-    });
-    return _parseItems(json, platform: config.slug, lang: _providerLang(config.slug, lang));
+    final rows = await _discoverRaw(platform: platform, lang: lang, page: page);
+    return _cleanDobdaItems(rows);
   }
 
   static Future<List<ContentItem>> collection({
@@ -49,13 +40,54 @@ class DobdaApiClient {
     int page = 1,
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, collection);
+    if (key == 'indonesia' || key == 'home') {
+      return indonesiaFeed(platform: platform, lang: lang, page: page);
+    }
     if (key == 'discover' || key == 'foryou' || key == 'latest') {
       return discover(platform: platform, lang: lang, page: page);
     }
     if (key == 'banner') {
-      return banner(platform: platform, lang: lang);
+      return _cleanDobdaItems(await banner(platform: platform, lang: lang));
     }
-    return home(platform: platform, lang: lang);
+    return indonesiaFeed(platform: platform, lang: lang, page: page);
+  }
+
+  static Future<List<ContentItem>> indonesiaFeed({
+    String platform = 'dobda_freereels',
+    String lang = 'id',
+    int page = 1,
+  }) async {
+    final results = await Future.wait<List<ContentItem>>([
+      _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home'),
+      _safeRows(_discoverRaw(platform: platform, lang: lang, page: page), '$platform/discover'),
+      _safeRows(_searchRaw(query: 'dub', platform: platform, lang: lang, page: page), '$platform/dub'),
+      _safeRows(_searchRaw(query: 'dubbing', platform: platform, lang: lang, page: page), '$platform/dubbing'),
+      _safeRows(_searchRaw(query: 'sulih', platform: platform, lang: lang, page: page), '$platform/sulih'),
+    ]);
+
+    final merged = <ContentItem>[];
+    final seen = <String>{};
+
+    void addRows(List<ContentItem> rows, {bool fromDubSearch = false}) {
+      for (final item in rows) {
+        if (!_isCleanDobdaItem(item, fromDubSearch: fromDubSearch)) continue;
+        final key = '${item.platformSlug}:${item.id}';
+        if (seen.add(key)) merged.add(item);
+      }
+    }
+
+    addRows(results[0]);
+    addRows(results[1]);
+    for (var i = 2; i < results.length; i++) {
+      addRows(results[i], fromDubSearch: true);
+    }
+
+    if (merged.isEmpty) {
+      addRows(results[0], fromDubSearch: true);
+      addRows(results[1], fromDubSearch: true);
+    }
+
+    return merged.take(60).toList();
   }
 
   static Future<List<ContentItem>> banner({
@@ -77,17 +109,76 @@ class DobdaApiClient {
     String lang = 'id',
     int page = 1,
   }) async {
+    final rows = await _searchRaw(query: query, platform: platform, lang: lang, page: page);
+    return _cleanDobdaItems(rows, fromDubSearch: true);
+  }
+
+  static Future<List<ContentItem>> _safeRows(
+    Future<List<ContentItem>> future,
+    String label,
+  ) async {
+    try {
+      return await future.timeout(const Duration(seconds: 6));
+    } catch (e) {
+      print('DOBDA CLEAN FEED ERROR $label: $e');
+      return const <ContentItem>[];
+    }
+  }
+
+  static Future<List<ContentItem>> _homeRaw({
+    required String platform,
+    required String lang,
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final apiLang = _providerLang(config.slug, lang);
+    final json = await _getJson(DobdaEndpoints.home, {
+      'category_p': config.apiSlug,
+      'lang': apiLang,
+    });
+    return _parseItems(json, platform: config.slug, lang: apiLang);
+  }
+
+  static Future<List<ContentItem>> _discoverRaw({
+    required String platform,
+    required String lang,
+    int page = 1,
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final apiLang = _providerLang(config.slug, lang);
+    final json = await _getJson(DobdaEndpoints.discover, {
+      'category_p': config.apiSlug,
+      'lang': apiLang,
+      'page': '$page',
+      'limit': '20',
+    });
+    return _parseItems(json, platform: config.slug, lang: apiLang);
+  }
+
+  static Future<List<ContentItem>> _searchRaw({
+    required String query,
+    required String platform,
+    required String lang,
+    int page = 1,
+  }) async {
     final clean = query.trim();
     if (clean.isEmpty) return const <ContentItem>[];
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await _getJson(DobdaEndpoints.search, {
-      'category_p': config.apiSlug,
-      'query': clean,
-      'lang': apiLang,
-      'page': '$page',
-    });
-    return _parseItems(json, platform: config.slug, lang: apiLang);
+
+    Future<List<ContentItem>> run(String param) async {
+      final json = await _getJson(DobdaEndpoints.search, {
+        'category_p': config.apiSlug,
+        param: clean,
+        'lang': apiLang,
+        'page': '$page',
+        'limit': '20',
+      });
+      return _parseItems(json, platform: config.slug, lang: apiLang);
+    }
+
+    final byQ = await run('q');
+    if (byQ.isNotEmpty) return byQ;
+    return run('query');
   }
 
   static Future<ContentItem?> detail(ContentItem item) async {
@@ -301,6 +392,89 @@ class DobdaApiClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  static List<ContentItem> _cleanDobdaItems(
+    List<ContentItem> rows, {
+    bool fromDubSearch = false,
+  }) {
+    final out = <ContentItem>[];
+    final seen = <String>{};
+    for (final item in rows) {
+      if (!_isCleanDobdaItem(item, fromDubSearch: fromDubSearch)) continue;
+      final key = '${item.platformSlug}:${item.id}';
+      if (seen.add(key)) out.add(item);
+    }
+    return out;
+  }
+
+  static bool _isCleanDobdaItem(
+    ContentItem item, {
+    bool fromDubSearch = false,
+  }) {
+    if (item.id.trim().isEmpty) return false;
+    if (item.title.trim().isEmpty || item.title == 'Untitled') return false;
+    if (item.posterUrl.trim().isEmpty) return false;
+    if (item.episodes <= 0) return false;
+    if (fromDubSearch) return true;
+    return _looksIndonesian(item) || _isDubbed(item);
+  }
+
+  static bool _isDubbed(ContentItem item) {
+    final text = _searchBlob(item);
+    return text.contains('(dub') ||
+        text.contains(' dubbing') ||
+        text.contains('[versi dub') ||
+        text.contains('sulih suara') ||
+        text.contains('sulih');
+  }
+
+  static bool _looksIndonesian(ContentItem item) {
+    final text = ' ${_searchBlob(item)} ';
+    const markers = [
+      ' yang ',
+      ' dan ',
+      ' dengan ',
+      ' setelah ',
+      ' karena ',
+      ' untuk ',
+      ' dari ',
+      ' jadi ',
+      ' menjadi ',
+      ' dalam ',
+      ' adalah ',
+      ' aku ',
+      ' kamu ',
+      ' dia ',
+      ' tak ',
+      ' tidak ',
+      ' cinta ',
+      ' keluarga ',
+      ' suami ',
+      ' istri ',
+      ' anak ',
+      ' bos ',
+      ' tuan ',
+      ' nona ',
+      ' menikah ',
+      ' pernikahan ',
+      ' rahasia ',
+      ' kembali ',
+      ' sang ',
+      ' balas ',
+      ' dendam ',
+      ' kuat ',
+      ' kontrak ',
+      ' sulih ',
+      ' selesai ',
+    ];
+    return markers.any(text.contains);
+  }
+
+  static String _searchBlob(ContentItem item) {
+    return '${item.title} ${item.description} ${item.category} ${item.source}'
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ');
   }
 
   static List<ContentItem> _parseItems(
@@ -521,10 +695,14 @@ class DobdaApiClient {
   static String _category(Map<String, dynamic> json) {
     final genres = json['genres'] ?? json['genre'] ?? json['categories'] ?? json['tags'];
     if (genres is List && genres.isNotEmpty) {
-      final first = '${genres.first}'.trim();
-      if (first.isNotEmpty) return first;
+      for (final raw in genres) {
+        final first = '$raw'.trim();
+        if (first.isNotEmpty && first != 'null') {
+          return first.split(',').first.trim().isEmpty ? first : first.split(',').first.trim();
+        }
+      }
     }
-    if (genres is String && genres.trim().isNotEmpty) return genres.trim();
+    if (genres is String && genres.trim().isNotEmpty) return genres.trim().split(',').first.trim();
     return 'Drama';
   }
 

@@ -65,9 +65,10 @@ class LiveGoCatalog {
   }
 
   static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
+    final endpoint = isDobdaPlatform(platform) ? 'indonesia' : 'home';
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
-      endpoint: 'home',
+      endpoint: endpoint,
       params: {'lang': languageFor(platform)},
     );
     if (cached != null && cached.isNotEmpty) return cached;
@@ -79,7 +80,7 @@ class LiveGoCatalog {
       if (rows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
-          endpoint: 'home',
+          endpoint: endpoint,
           params: {'lang': languageFor(platform)},
           items: rows,
         );
@@ -93,7 +94,7 @@ class LiveGoCatalog {
       if (rows.isNotEmpty) {
         await LiveGoContentCache.writeItems(
           platform: platform,
-          endpoint: 'home',
+          endpoint: endpoint,
           params: {'lang': languageFor(platform)},
           items: rows,
         );

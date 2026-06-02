@@ -108,8 +108,8 @@ class LiveGoApiPlatforms {
 
     // Dobda API kedua. Slug internal diberi prefix supaya tidak bentrok dengan
     // platform Anichin yang namanya sama. endpointSlug adalah category_p Dobda.
-    // Plan STARTER Dobda: 20 platform. Kategori Beranda hanya Beranda/Jelajah; Banner
-    // dipakai sebagai sumber banner saja, bukan tab kategori grid.
+    // Plan STARTER Dobda: 20 platform. Dobda dibuat satu feed bersih
+    // Indonesia supaya data Home/Discover/search yang campur tidak langsung tampil mentah.
     LiveGoApiPlatform(
       slug: 'dobda_melolo',
       endpointSlug: 'melolo',
@@ -120,7 +120,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_pinedrama',
@@ -132,7 +132,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_freereels',
@@ -144,7 +144,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_meloshort',
@@ -156,7 +156,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_reelshort',
@@ -168,7 +168,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_reelife',
@@ -180,7 +180,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramawave',
@@ -192,7 +192,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_stardusttv',
@@ -204,7 +204,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_netshort',
@@ -216,7 +216,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_goodshort',
@@ -228,7 +228,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_shortmax',
@@ -240,7 +240,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_flickreels',
@@ -252,7 +252,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_flextv',
@@ -264,7 +264,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramarush',
@@ -276,7 +276,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_rapidtv',
@@ -288,7 +288,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramanova',
@@ -300,7 +300,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_fundrama',
@@ -312,7 +312,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_starshort',
@@ -324,7 +324,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramapops',
@@ -336,7 +336,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_snackshort',
@@ -348,7 +348,7 @@ class LiveGoApiPlatforms {
       videoType: LiveGoVideoType.hls,
       supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
       supportsSubtitle: true,
-      categories: ['Beranda', 'Jelajah'],
+      categories: ['Indonesia'],
     ),
   ];
 
@@ -432,6 +432,10 @@ class LiveGoApiPlatforms {
       'terbaru': 'latest',
       'vip': 'vip',
       'dubindo': 'dubindo',
+      'indonesia': 'indonesia',
+      'indo': 'indonesia',
+      'indonesiafeed': 'indonesia',
+      'dubindonesia': 'indonesia',
       'discover': 'discover',
       'jelajah': 'discover',
     };
@@ -442,8 +446,7 @@ class LiveGoApiPlatforms {
     final config = bySlug(platform);
     final key = categoryKey(config.slug, category);
     if (config.isDobda) {
-      if (key == 'home') return 'Beranda';
-      if (key == 'discover') return 'Jelajah';
+      return 'Indonesia';
     }
     switch (key) {
       case 'trending':
