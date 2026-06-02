@@ -17,6 +17,8 @@ import 'tv_player_screen.dart';
 class TvHomeScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onRequestExit;
+  final VoidCallback? onPlayerRouteOpen;
+  final VoidCallback? onPlayerRouteClosed;
   final int focusTicket;
   final int bannerFocusTicket;
 
@@ -24,6 +26,8 @@ class TvHomeScreen extends StatefulWidget {
     super.key,
     this.onMoveToNav,
     this.onRequestExit,
+    this.onPlayerRouteOpen,
+    this.onPlayerRouteClosed,
     this.focusTicket = 0,
     this.bannerFocusTicket = 0,
   });
@@ -364,6 +368,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
   void _restoreAfterRoute(TvZone zone, int index) {
     if (!mounted) return;
+    widget.onPlayerRouteClosed?.call();
     _cancelPendingFocus();
     _zone = zone;
     if (zone == TvZone.grid) _lastGrid = _safe(index, _gridNodes.length);
@@ -372,18 +377,28 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
     void restore() {
       if (!mounted) return;
+      // Re-apply focus a few times because Android TV may deliver the BACK
+      // key to the root app immediately after the player route pops. This
+      // keeps the user on the poster/grid instead of falling into the navbar.
       _queueFocusEntry(zone, index: _indexForZone(zone));
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-    Future<void>.delayed(const Duration(milliseconds: 50), restore);
+    Future<void>.delayed(const Duration(milliseconds: 60), restore);
+    Future<void>.delayed(const Duration(milliseconds: 180), restore);
   }
 
   void _open(ContentItem item) {
     final returnZone = _zone == TvZone.nav ? TvZone.grid : _zone;
     final returnIndex = _indexForZone(returnZone);
+    widget.onPlayerRouteOpen?.call();
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item)))
+        .push(MaterialPageRoute(
+          builder: (_) => TvPlayerScreen(
+            item: item,
+            onExitToHome: widget.onPlayerRouteClosed,
+          ),
+        ))
         .then((_) => _restoreAfterRoute(returnZone, returnIndex));
   }
 

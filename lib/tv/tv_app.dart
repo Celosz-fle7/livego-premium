@@ -33,6 +33,7 @@ class _TvAppState extends State<TvApp> {
   bool _exitDialogOpen = false;
   bool _restoreHomeBannerAfterExitDialog = false;
   int _lastBackHandledMs = 0;
+  int _suppressBackUntilMs = 0;
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;
@@ -90,6 +91,29 @@ class _TvAppState extends State<TvApp> {
 
   void _markBackHandled() {
     _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  void _suppressBackFor([int milliseconds = 900]) {
+    final until = DateTime.now().millisecondsSinceEpoch + milliseconds;
+    if (until > _suppressBackUntilMs) _suppressBackUntilMs = until;
+    _markBackHandled();
+  }
+
+  void _prepareHomePlayerRoute() {
+    // Player is a full-screen route. While it is open, the root TV app must
+    // not interpret the same BACK press as a navbar command.
+    _suppressBackFor(1200);
+    _hideNav();
+  }
+
+  void _restoreHomeAfterPlayerRoute() {
+    _suppressBackFor(1100);
+    if (!mounted) return;
+    setState(() {
+      _returnToAccountMenuOnBack = false;
+      _index = 0;
+      _navMode = TvSideNavMode.hidden;
+    });
   }
 
   void _focusCurrentNav() {
@@ -262,6 +286,10 @@ class _TvAppState extends State<TvApp> {
     if (now - _lastBackHandledMs < 240) return;
     _lastBackHandledMs = now;
 
+    if (now < _suppressBackUntilMs) {
+      return;
+    }
+
     if (_exitDialogOpen) {
       _closeExitDialog();
       return;
@@ -270,6 +298,10 @@ class _TvAppState extends State<TvApp> {
     // If a content screen did not handle BACK itself, close it to the
     // active navbar item first. Do not jump straight to Home/banner.
     if (!_navHasFocus) {
+      if (_index == 0) {
+        _returnToHomeLastFocus();
+        return;
+      }
       if (_returnToAccountMenuOnBack && _index != 5) {
         _returnToAccountMenuOnBack = false;
         setState(() {
@@ -326,6 +358,8 @@ class _TvAppState extends State<TvApp> {
         bannerFocusTicket: _index == 0 ? _homeBannerTicket : 0,
         onMoveToNav: _peekOrFocusNav,
         onRequestExit: _showExitDialogFromHome,
+        onPlayerRouteOpen: _prepareHomePlayerRoute,
+        onPlayerRouteClosed: _restoreHomeAfterPlayerRoute,
       ),
       TvLibraryScreen(
         title: 'Histori',

@@ -8,22 +8,25 @@ class TvFocusStyle {
   static const Color focusBlueSoft = Color(0xFF58D7FF);
   static const Color focusText = Color(0xFFEAFBFF);
 
-  static const Duration fast = Duration(milliseconds: 25);
-  static const Duration normal = Duration(milliseconds: 35);
+  // TV remote focus must feel locked, not animated.
+  // Zero-duration focus changes remove the shimmer/jitter that can make
+  // fast remote navigation uncomfortable on large screens.
+  static const Duration fast = Duration.zero;
+  static const Duration normal = Duration.zero;
 
-  static BoxShadow glow([double opacity = 0.34, double blur = 20]) {
+  static BoxShadow glow([double opacity = 0.20, double blur = 10]) {
     return BoxShadow(
       color: focusBlue.withOpacity(opacity),
-      blurRadius: blur,
-      spreadRadius: 1,
+      blurRadius: blur > 12 ? 12 : blur,
+      spreadRadius: 0,
     );
   }
 
-  static BoxShadow softGlow([double opacity = 0.18, double blur = 30]) {
+  static BoxShadow softGlow([double opacity = 0.10, double blur = 14]) {
     return BoxShadow(
       color: focusBlueSoft.withOpacity(opacity),
-      blurRadius: blur,
-      spreadRadius: 1,
+      blurRadius: blur > 16 ? 16 : blur,
+      spreadRadius: 0,
     );
   }
 

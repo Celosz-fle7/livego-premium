@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -25,7 +23,9 @@ import '../../services/api/api_platform.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
-  const TvPlayerScreen({super.key, required this.item});
+  final VoidCallback? onExitToHome;
+
+  const TvPlayerScreen({super.key, required this.item, this.onExitToHome});
 
   @override
   State<TvPlayerScreen> createState() => _TvPlayerScreenState();
@@ -700,11 +700,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _hideOverlays();
       return;
     }
-    if (_mode == _PlayerMode.controlsVisible || _showControls) {
-      _hideOverlays();
-      return;
+
+    // BACK from normal watching/controls must return to the poster grid.
+    // Menus still close first, but the control bar itself should not trap BACK.
+    if (Navigator.canPop(context)) {
+      widget.onExitToHome?.call();
+      Navigator.pop(context);
     }
-    if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
   void _togglePlay() {
@@ -1144,25 +1146,17 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (!portrait) return video;
 
+    // Do not render the same VideoPlayer twice behind a blur layer. On Android
+    // TV that can shimmer/jitter and the blurred background is hard on the eyes.
     return Stack(
       fit: StackFit.expand,
       children: [
-        ImageFiltered(
-          imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Opacity(
-            opacity: 0.34,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(width: size.width, height: size.height, child: VideoPlayer(controller)),
-            ),
-          ),
-        ),
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Color(0xF2010409), Color(0x22071A2D), Color(0xF2010409)],
+              colors: [Color(0xFF010409), Color(0xFF07121F), Color(0xFF010409)],
             ),
           ),
         ),

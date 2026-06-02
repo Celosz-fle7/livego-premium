@@ -3,13 +3,12 @@ import 'package:flutter/widgets.dart';
 /// TV focus helper.
 ///
 /// Request focus immediately, then reveal the focused widget with explicit
-/// alignment. `keepVisibleAtEnd` was too one-way for TV grids: DOWN worked,
-/// but UP could leave the focused poster above the visible viewport. Explicit
-/// alignment keeps UP/DOWN predictable and makes the blue cursor visible.
+/// alignment when needed. Focus movement is intentionally instant on TV;
+/// animated scroll/focus can look like vibration when a remote key repeats.
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
-  Duration duration = const Duration(milliseconds: 35),
+  Duration duration = Duration.zero,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -23,7 +22,7 @@ bool tvFocus(
       duration: duration,
       curve: Curves.linear,
       alignment: alignment,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
     );
   });
 
