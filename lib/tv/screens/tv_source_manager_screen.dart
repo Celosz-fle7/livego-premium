@@ -768,7 +768,7 @@ class _SourceRow extends StatelessWidget {
                                 Text(
                                   active ? 'Kategori' : 'OFF',
                                   style: TextStyle(
-                                    color: active ? AppTheme.textSoft : Colors.white35,
+                                    color: active ? AppTheme.textSoft : Colors.white38,
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.w900,
                                     decoration: TextDecoration.none,
