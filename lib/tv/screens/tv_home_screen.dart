@@ -65,6 +65,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _entryRetry = 0;
   int _entryTicket = 0;
   int _lastBackHandledMs = 0;
+  bool _navMoveLocked = false;
+  int _navMoveTicket = 0;
   bool _gridDataReady = false;
   bool _openingPlayer = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
@@ -387,6 +389,41 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return tvFocusGrid(node, topMargin: 118, bottomMargin: 160, throttle: throttle);
   }
 
+  bool _isArrow(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown;
+  }
+
+  bool _ignoreNavWhileLocked(LogicalKeyboardKey key) {
+    return _isArrow(key) && _navMoveLocked;
+  }
+
+  void _lockNavMove({int frames = 2}) {
+    final ticket = ++_navMoveTicket;
+    _navMoveLocked = true;
+
+    void releaseAfter(int framesLeft) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || ticket != _navMoveTicket) return;
+        if (framesLeft > 1) {
+          releaseAfter(framesLeft - 1);
+          return;
+        }
+        _navMoveLocked = false;
+      });
+    }
+
+    releaseAfter(frames.clamp(1, 4).toInt());
+  }
+
+  bool _moveFocus(TvZone zone, {int? index, bool throttle = true, int lockFrames = 2}) {
+    final moved = _focusByZone(zone, index: index, throttle: throttle);
+    if (moved) _lockNavMove(frames: lockFrames);
+    return moved;
+  }
+
   void _focusEntry() {
     _queueFocusEntry(_zone, index: _indexForZone(_zone));
   }
@@ -653,6 +690,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -660,9 +698,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusByZone(TvZone.platform, index: _lastPlatform) &&
-          !_focusByZone(TvZone.category, index: _lastCategory)) {
-        _focusByZone(TvZone.grid, index: _lastGrid);
+      if (!_moveFocus(TvZone.platform, index: _lastPlatform) &&
+          !_moveFocus(TvZone.category, index: _lastCategory)) {
+        _moveFocus(TvZone.grid, index: _lastGrid);
       }
       return KeyEventResult.handled;
     }
@@ -684,38 +722,41 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
+    final current = _safe(_lastPlatform, _platformNodes.length);
+
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (index == 0) {
-        _moveToNav(TvZone.platform, platform: index);
+      if (current == 0) {
+        _moveToNav(TvZone.platform, platform: current);
       } else {
-        _focusByZone(TvZone.platform, index: index - 1);
+        _moveFocus(TvZone.platform, index: current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (index < _platformNodes.length - 1) {
-        _focusByZone(TvZone.platform, index: index + 1);
+      if (current < _platformNodes.length - 1) {
+        _moveFocus(TvZone.platform, index: current + 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _lastPlatform = index;
-      _focusByZone(TvZone.banner);
+      _lastPlatform = current;
+      _moveFocus(TvZone.banner);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _lastPlatform = index;
+      _lastPlatform = current;
       if (_categoryNodes.isNotEmpty) {
-        _focusByZone(TvZone.category, index: _lastCategory);
+        _moveFocus(TvZone.category, index: _lastCategory);
       } else if (_gridNodes.isNotEmpty) {
-        _focusByZone(TvZone.grid, index: _lastGrid);
+        _moveFocus(TvZone.grid, index: _lastGrid);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      _selectPlatform(index);
+      _selectPlatform(current);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -729,40 +770,43 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
+    final current = _safe(_lastCategory, _categoryNodes.length);
+
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (index == 0) {
-        _moveToNav(TvZone.category, category: index);
+      if (current == 0) {
+        _moveToNav(TvZone.category, category: current);
       } else {
-        _focusByZone(TvZone.category, index: index - 1);
+        _moveFocus(TvZone.category, index: current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (index < _categoryNodes.length - 1) {
-        _focusByZone(TvZone.category, index: index + 1);
+      if (current < _categoryNodes.length - 1) {
+        _moveFocus(TvZone.category, index: current + 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _lastCategory = index;
+      _lastCategory = current;
       if (_platformNodes.isNotEmpty) {
-        _focusByZone(TvZone.platform, index: _lastPlatform);
+        _moveFocus(TvZone.platform, index: _lastPlatform);
       } else {
-        _focusByZone(TvZone.banner);
+        _moveFocus(TvZone.banner);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _lastCategory = index;
+      _lastCategory = current;
       if (_gridNodes.isNotEmpty) {
-        _focusByZone(TvZone.grid, index: _lastGrid);
+        _moveFocus(TvZone.grid, index: _lastGrid);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      _selectCategory(index);
+      _selectCategory(current);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -776,55 +820,56 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
-    final col = index % _gridColumns;
-    final row = index ~/ _gridColumns;
+    final current = _safe(_lastGrid, _gridNodes.length);
+    final col = current % _gridColumns;
+    final row = current ~/ _gridColumns;
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
-        _moveToNav(TvZone.grid, grid: index);
+        _moveToNav(TvZone.grid, grid: current);
       } else {
-        _focusByZone(TvZone.grid, index: index - 1);
+        _moveFocus(TvZone.grid, index: current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (col < _gridColumns - 1 && index < _gridNodes.length - 1) {
-        _focusByZone(TvZone.grid, index: index + 1);
+      if (col < _gridColumns - 1 && current < _gridNodes.length - 1) {
+        _moveFocus(TvZone.grid, index: current + 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
         if (_categoryNodes.isNotEmpty) {
-          _focusByZone(TvZone.category, index: _lastCategory);
+          _moveFocus(TvZone.category, index: _lastCategory);
         } else if (_platformNodes.isNotEmpty) {
-          _focusByZone(TvZone.platform, index: _lastPlatform);
+          _moveFocus(TvZone.platform, index: _lastPlatform);
         } else {
-          _focusByZone(TvZone.banner);
+          _moveFocus(TvZone.banner);
         }
       } else {
-        _focusByZone(TvZone.grid, index: index - _gridColumns);
+        _moveFocus(TvZone.grid, index: current - _gridColumns);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      final next = index + _gridColumns;
+      final next = current + _gridColumns;
       if (next < _gridNodes.length) {
-        _focusByZone(TvZone.grid, index: next);
+        _moveFocus(TvZone.grid, index: next);
       }
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
       _zone = TvZone.grid;
-      _lastGrid = index;
-      if (index >= 0 && index < _visibleGridItems.length) _open(_visibleGridItems[index]);
+      _lastGrid = current;
+      if (current >= 0 && current < _visibleGridItems.length) _open(_visibleGridItems[current]);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
-
 
   @override
   Widget build(BuildContext context) {

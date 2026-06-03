@@ -35,6 +35,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   int _lastIndex = 0;
   int _lastBackHandledMs = 0;
+  bool _navMoveLocked = false;
+  int _navMoveTicket = 0;
 
   @override
   void initState() {
@@ -155,6 +157,35 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     widget.onBackToNav?.call();
   }
 
+  bool _isArrow(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight;
+  }
+
+  bool _ignoreNavWhileLocked(LogicalKeyboardKey key) {
+    return _isArrow(key) && _navMoveLocked;
+  }
+
+  void _lockNavMove({int frames = 2}) {
+    final ticket = ++_navMoveTicket;
+    _navMoveLocked = true;
+
+    void releaseAfter(int framesLeft) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || ticket != _navMoveTicket) return;
+        if (framesLeft > 1) {
+          releaseAfter(framesLeft - 1);
+          return;
+        }
+        _navMoveLocked = false;
+      });
+    }
+
+    releaseAfter(frames.clamp(1, 4).toInt());
+  }
+
   void _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return;
     final target = _safe(index);
@@ -166,6 +197,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     );
     if (!focused) return;
     _lastIndex = target;
+    _lockNavMove(frames: 2);
   }
 
   void _pushScreen(Widget screen) {
@@ -199,12 +231,20 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
 
+    if (_isBack(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
+
+    final current = _safe(_lastIndex);
+
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(index - 1, throttle: false);
+      _focusRow(current - 1, throttle: false);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(index + 1, throttle: false);
+      _focusRow(current + 1, throttle: false);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -212,12 +252,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
-      _lastIndex = _safe(index);
-      item.onTap();
-      return KeyEventResult.handled;
-    }
-    if (_isBack(key)) {
-      _handleBack();
+      _lastIndex = current;
+      _items[current].onTap();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
