@@ -64,16 +64,20 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
     void run() {
       if (!mounted) return;
       FocusManager.instance.primaryFocus?.unfocus();
-      if (_nodes.isNotEmpty) {
-        _focusRow(_index.clamp(0, _nodes.length - 1).toInt());
-      } else {
-        _focusSave();
-      }
+      _rootNode.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_nodes.isNotEmpty) {
+          _focusRow(_index.clamp(0, _nodes.length - 1).toInt());
+        } else {
+          _focusSave();
+        }
+      });
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => run());
     _focusRetryTimer?.cancel();
-    _focusRetryTimer = Timer(const Duration(milliseconds: 160), run);
+    _focusRetryTimer = Timer(const Duration(milliseconds: 220), run);
   }
 
   bool _isSelect(LogicalKeyboardKey key) =>

@@ -533,17 +533,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (zone == TvZone.category) _lastCategory = _safe(index, _categoryNodes.length);
     if (zone == TvZone.platform) _lastPlatform = _safe(index, _platformNodes.length);
 
-    void restore() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // Re-apply focus a few times because Android TV may deliver the BACK
-      // key to the root app immediately after the player route pops. This
-      // keeps the user on the poster/grid instead of falling into the navbar.
       _queueFocusEntry(zone, index: _indexForZone(zone));
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-    Future<void>.delayed(const Duration(milliseconds: 60), restore);
-    Future<void>.delayed(const Duration(milliseconds: 180), restore);
+    });
   }
 
   void _open(ContentItem item) {

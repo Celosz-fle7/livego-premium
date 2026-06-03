@@ -65,11 +65,11 @@ class TvSideNav extends StatelessWidget {
 
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
-      focusNodes[_safe(itemIndex - 1)].requestFocus();
+      tvFocusComfort(focusNodes[_safe(itemIndex - 1)], topMargin: 54, bottomMargin: 54);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      focusNodes[_safe(itemIndex + 1)].requestFocus();
+      tvFocusComfort(focusNodes[_safe(itemIndex + 1)], topMargin: 54, bottomMargin: 54);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {

@@ -143,11 +143,16 @@ class _TvAppState extends State<TvApp> {
 
   void _focusCurrentNav() {
     if (_navNodes.isEmpty) return;
+    final targetNode = _navNodes[_safeNav(_index)];
+    if (_navMode == TvSideNavMode.focused && targetNode.context != null) {
+      tvFocus(targetNode, alignment: 0.10);
+      return;
+    }
     if (_navMode != TvSideNavMode.focused) {
       setState(() => _navMode = TvSideNavMode.focused);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_navNodes[_safeNav(_index)], alignment: 0.10);
+      if (mounted) tvFocus(targetNode, alignment: 0.10);
     });
   }
 

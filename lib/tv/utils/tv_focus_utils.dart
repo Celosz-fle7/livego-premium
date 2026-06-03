@@ -17,7 +17,7 @@ import 'package:flutter/widgets.dart';
 
 final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
 DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
-const Duration _navInterval = Duration(milliseconds: 80);
+const Duration _navInterval = Duration(milliseconds: 120);
 
 bool _throttledFocus(
   FocusNode node,
@@ -36,6 +36,7 @@ bool _throttledFocus(
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (_focusFrameToken[node] != token) return;
     _focusFrameToken.remove(node);
+    if (node.context == null || !node.hasFocus) return;
     doScroll();
   });
 
