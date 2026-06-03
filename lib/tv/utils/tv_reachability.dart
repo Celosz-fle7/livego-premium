@@ -9,11 +9,11 @@ class TvReachability {
   const TvReachability._();
 
   // Margins used by focus helpers.
-  static const double zoneTopMargin = 72;
-  static const double listTopMargin = 72;
-  static const double listBottomMargin = 140;
-  static const double gridTopMargin = 118;
-  static const double gridBottomMargin = 170;
+  static const double zoneTopMargin = 64;
+  static const double listTopMargin = 56;
+  static const double listBottomMargin = 120;
+  static const double gridTopMargin = 92;
+  static const double gridBottomMargin = 132;
 
   // Minimum bottom reach for scrollables. Must stay >= the largest bottomMargin.
   static const double homeBottomPadding = 240;
