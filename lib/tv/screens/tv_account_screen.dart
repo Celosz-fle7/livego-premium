@@ -203,6 +203,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
+
     final current = _safe(_lastIndex);
 
     if (key == LogicalKeyboardKey.arrowUp) {

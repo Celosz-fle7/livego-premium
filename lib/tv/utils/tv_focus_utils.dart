@@ -10,7 +10,7 @@ import 'package:flutter/widgets.dart';
 // several items while the viewport is still revealing an older item.
 //
 // Rules:
-// - arrow navigation is limited to about 8 steps/second
+// - arrow navigation is limited to about 10 steps/second
 // - token per FocusNode: only the latest callback for that node may scroll
 // - scroll is post-frame, after the focused widget has a valid layout
 // - activation keys (OK/BACK/MENU) only ignore KeyRepeatEvent here;

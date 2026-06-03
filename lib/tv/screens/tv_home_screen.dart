@@ -387,6 +387,13 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return tvFocusGrid(node, topMargin: 118, bottomMargin: 160, throttle: throttle);
   }
 
+  bool _isArrow(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown;
+  }
+
   bool _moveFocus(TvZone zone, {int? index, bool throttle = true}) {
     final moved = _focusByZone(zone, index: index, throttle: throttle);
     return moved;
