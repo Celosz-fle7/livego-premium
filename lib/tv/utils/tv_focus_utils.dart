@@ -12,7 +12,7 @@ import 'tv_reachability.dart';
 // several items while the viewport is still revealing an older item.
 //
 // Rules:
-// - arrow navigation is limited to about 10 steps/second
+// - arrow navigation is limited to about 6 steps/second on slower Android TV devices
 // - token per FocusNode: only the latest callback for that node may scroll
 // - scroll is post-frame, after the focused widget has a valid layout
 // - activation keys (OK/BACK/MENU) only ignore KeyRepeatEvent here;
@@ -21,7 +21,8 @@ import 'tv_reachability.dart';
 
 final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
 DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
-const Duration _navInterval = Duration(milliseconds: 120);
+const Duration _navInterval = Duration(milliseconds: 165);
+bool _navRevealBusy = false;
 
 
 bool _throttledFocus(
@@ -32,9 +33,11 @@ bool _throttledFocus(
   int postFrameDelay = 1,
 }) {
   if (throttle) {
+    if (_navRevealBusy) return false;
     final now = DateTime.now();
     if (now.difference(_lastNavTime) < _navInterval) return false;
     _lastNavTime = now;
+    _navRevealBusy = true;
   }
 
   final token = (_focusFrameToken[node] ?? 0) + 1;
@@ -42,16 +45,27 @@ bool _throttledFocus(
 
   doFocus();
 
+  void finishThrottle() {
+    if (throttle) _navRevealBusy = false;
+  }
+
   void scheduleReveal(int framesLeft) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_focusFrameToken[node] != token) return;
+      if (_focusFrameToken[node] != token) {
+        finishThrottle();
+        return;
+      }
       if (framesLeft > 1) {
         scheduleReveal(framesLeft - 1);
         return;
       }
       _focusFrameToken.remove(node);
-      if (node.context == null || !node.hasFocus) return;
-      doScroll();
+      try {
+        if (node.context == null || !node.hasFocus) return;
+        doScroll();
+      } finally {
+        finishThrottle();
+      }
     });
   }
 
