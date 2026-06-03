@@ -13,16 +13,14 @@ import 'package:flutter/widgets.dart';
 // - arrow navigation is limited to about 8 steps/second
 // - token per FocusNode: only the latest callback for that node may scroll
 // - scroll is post-frame, after the focused widget has a valid layout
-// - activation keys (OK/BACK/MENU) have a separate cooldown so one physical
-//   press cannot stack routes, close two layers, or toggle settings twice
+// - activation keys (OK/BACK/MENU) only ignore KeyRepeatEvent here;
+//   BACK/OK cooldown must stay local to the active screen/owner
 // ---------------------------------------------------------------------------
 
 final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
 DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
 const Duration _navInterval = Duration(milliseconds: 120);
 
-final Map<LogicalKeyboardKey, DateTime> _lastActivationTime = <LogicalKeyboardKey, DateTime>{};
-const Duration _activationInterval = Duration(milliseconds: 320);
 
 bool _throttledFocus(
   FocusNode node,
@@ -203,20 +201,11 @@ bool tvIsMenuKey(LogicalKeyboardKey key) {
 /// the button. Arrow repeats are useful for navigation, but activation repeats
 /// can stack routes, double-pop screens, or toggle settings many times.
 ///
-/// This also suppresses very fast non-repeat activation key-downs, because some
-/// devices deliver duplicated activation events through multiple input paths.
+/// Keep this helper narrow: it ignores only actual KeyRepeatEvent activation.
+/// Cooldowns for BACK/OK must be handled by the active owner/screen so one
+/// screen cannot accidentally block another screen's valid activation.
 bool tvIgnoreRepeatActivation(KeyEvent event) {
+  if (event is! KeyRepeatEvent) return false;
   final key = event.logicalKey;
-  final isActivation = tvIsSelectKey(key) || tvIsBackKey(key) || tvIsMenuKey(key);
-  if (!isActivation) return false;
-  if (event is KeyRepeatEvent) return true;
-  if (event is! KeyDownEvent) return false;
-
-  final now = DateTime.now();
-  final last = _lastActivationTime[key];
-  if (last != null && now.difference(last) < _activationInterval) {
-    return true;
-  }
-  _lastActivationTime[key] = now;
-  return false;
+  return tvIsSelectKey(key) || tvIsBackKey(key) || tvIsMenuKey(key);
 }
