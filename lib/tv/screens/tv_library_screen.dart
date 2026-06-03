@@ -269,62 +269,77 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
               builder: (context, constraints) {
                 final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
                 return SafeArea(
-                  child: ListView(
+                  child: CustomScrollView(
                     controller: _scrollController,
-                    padding: TvReachability.contentPadding,
-                  children: [
-                    _LibraryHeader(title: widget.title, icon: widget.icon, count: items.length, favorites: widget.favorites),
-                    const SizedBox(height: 16),
-                    if (items.isEmpty)
-                      Focus(
-                        focusNode: _emptyNode,
-                        skipTraversal: true,
-                        autofocus: false,
-                        onKeyEvent: _emptyKey,
-                        child: _EmptyLibrary(node: _emptyNode, title: widget.title, favorites: widget.favorites),
-                      )
-                    else ...[
-                      Row(
-                        children: [
-                          Text(
-                            widget.favorites ? 'Judul tersimpan' : 'Terakhir diputar',
-                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-                          ),
-                          const Spacer(),
-                          Text(
-                            'Remote: OK buka • ← navbar • Back navbar',
-                            style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: items.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          mainAxisExtent: 224,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 16,
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          TvReachability.contentPadding.left,
+                          TvReachability.contentPadding.top,
+                          TvReachability.contentPadding.right,
+                          0,
                         ),
-                        itemBuilder: (_, i) {
-                          final item = items[i];
-                          return _TvLibraryPoster(
-                            node: _gridNodes[i],
-                            item: item,
-                            onTap: () {
-                              _lastGrid = i;
-                              _open(item);
-                            },
-                            onKey: (node, event) => _gridKey(i, item, columns, event),
-                          );
-                        },
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            _LibraryHeader(title: widget.title, icon: widget.icon, count: items.length, favorites: widget.favorites),
+                            const SizedBox(height: 16),
+                            if (items.isEmpty)
+                              Focus(
+                                focusNode: _emptyNode,
+                                skipTraversal: true,
+                                autofocus: false,
+                                onKeyEvent: _emptyKey,
+                                child: _EmptyLibrary(node: _emptyNode, title: widget.title, favorites: widget.favorites),
+                              )
+                            else ...[
+                              Row(
+                                children: [
+                                  Text(
+                                    widget.favorites ? 'Judul tersimpan' : 'Terakhir diputar',
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    'Remote: OK buka • ← navbar • Back navbar',
+                                    style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ]),
+                        ),
                       ),
+                      if (items.isNotEmpty)
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(TvReachability.contentPadding.left, 0, TvReachability.contentPadding.right, 0),
+                          sliver: SliverGrid(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) {
+                                final item = items[i];
+                                return _TvLibraryPoster(
+                                  node: _gridNodes[i],
+                                  item: item,
+                                  onTap: () {
+                                    _lastGrid = i;
+                                    _open(item);
+                                  },
+                                  onKey: (node, event) => _gridKey(i, item, columns, event),
+                                );
+                              },
+                              childCount: items.length,
+                            ),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              mainAxisExtent: 224,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 16,
+                            ),
+                          ),
+                        ),
+                      SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
                     ],
-                    TvReachability.tailSpacer,
-                  ],
-                ),
+                  ),
                 );
               },
             ),
@@ -417,8 +432,8 @@ class _TvLibraryPoster extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: AnimatedContainer(
-                      duration: TvFocusStyle.fast,
+                    child: RepaintBoundary(
+                    child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0),
@@ -444,6 +459,7 @@ class _TvLibraryPoster extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
                   const SizedBox(height: 8),
                   Text(
                     item.title,

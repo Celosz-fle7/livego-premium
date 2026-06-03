@@ -886,85 +886,98 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               bottom: false,
               left: false,
               right: false,
-              child: ListView(
+              child: CustomScrollView(
                 controller: _pageScroll,
-                padding: TvReachability.homePadding,
-                children: [
-            _FocusableBanner(
-              item: hero,
-              focusNode: _bannerNode,
-              onFocus: () => _zone = TvZone.banner,
-              onTap: hero == null ? null : () => _open(hero),
-              onKey: (node, event) => _bannerKey(hero, event),
-            ),
-            if (refreshing || hasError || fromCache)
-              _HomeStatusLine(
-                refreshing: refreshing,
-                hasError: hasError,
-                fromCache: fromCache,
-              ),
-            const SizedBox(height: 12),
-            _HeaderBox(
-              icon: Icons.apps_rounded,
-              label: 'Platform',
-              hint: LiveGoCatalog.label(_platform),
-              height: 76,
-              child: _ChipRow(
-                labels: platforms,
-                selected: source,
-                nodes: _platformNodes,
-                onFocus: (i) {
-                  _zone = TvZone.platform;
-                  _lastPlatform = i;
-                },
-                onTap: _selectPlatform,
-                onKey: _platformKey,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _HeaderBox(
-              icon: Icons.tune_rounded,
-              label: 'Kategori',
-              hint: categories.isEmpty ? 'Default' : categories[category],
-              height: 76,
-              child: _ChipRow(
-                labels: categories,
-                selected: category,
-                nodes: _categoryNodes,
-                onFocus: (i) {
-                  _zone = TvZone.category;
-                  _lastCategory = i;
-                },
-                onTap: _selectCategory,
-                onKey: _categoryKey,
-              ),
-            ),
-            const SizedBox(height: 14),
-            if (loading)
-              const _TvSkeleton(height: 260)
-            else if (gridItems.isEmpty)
-              _HomeEmptyState(hasError: hasError)
-            else
-              _ContentGrid(
-                title: categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[category]}',
-                columns: _gridColumns,
-                items: gridItems,
-                nodes: _gridNodes,
-                onFocus: (i) {
-                  _zone = TvZone.grid;
-                  _lastGrid = i;
-                },
-                onKey: _gridKey,
-                onTap: (item) {
-                  final idx = gridItems.indexOf(item);
-                  if (idx >= 0) {
-                    _zone = TvZone.grid;
-                    _lastGrid = idx;
-                  }
-                  _open(item);
-                },
-              ),
-                  const SizedBox(height: 32),
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      TvReachability.homePadding.left,
+                      TvReachability.homePadding.top,
+                      TvReachability.homePadding.right,
+                      0,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _FocusableBanner(
+                          item: hero,
+                          focusNode: _bannerNode,
+                          onFocus: () => _zone = TvZone.banner,
+                          onTap: hero == null ? null : () => _open(hero),
+                          onKey: (node, event) => _bannerKey(hero, event),
+                        ),
+                        if (refreshing || hasError || fromCache)
+                          _HomeStatusLine(
+                            refreshing: refreshing,
+                            hasError: hasError,
+                            fromCache: fromCache,
+                          ),
+                        const SizedBox(height: 12),
+                        _HeaderBox(
+                          icon: Icons.apps_rounded,
+                          label: 'Platform',
+                          hint: LiveGoCatalog.label(_platform),
+                          height: 76,
+                          child: _ChipRow(
+                            labels: platforms,
+                            selected: source,
+                            nodes: _platformNodes,
+                            onFocus: (i) {
+                              _zone = TvZone.platform;
+                              _lastPlatform = i;
+                            },
+                            onTap: _selectPlatform,
+                            onKey: _platformKey,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _HeaderBox(
+                          icon: Icons.tune_rounded,
+                          label: 'Kategori',
+                          hint: categories.isEmpty ? 'Default' : categories[category],
+                          height: 76,
+                          child: _ChipRow(
+                            labels: categories,
+                            selected: category,
+                            nodes: _categoryNodes,
+                            onFocus: (i) {
+                              _zone = TvZone.category;
+                              _lastCategory = i;
+                            },
+                            onTap: _selectCategory,
+                            onKey: _categoryKey,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        if (loading)
+                          const _TvSkeleton(height: 260)
+                        else if (gridItems.isEmpty)
+                          _HomeEmptyState(hasError: hasError)
+                        else
+                          _GridSectionTitle(title: categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[category]}'),
+                        if (!loading && gridItems.isNotEmpty) const SizedBox(height: 10),
+                      ]),
+                    ),
+                  ),
+                  if (!loading && gridItems.isNotEmpty)
+                    _ContentSliverGrid(
+                      columns: _gridColumns,
+                      items: gridItems,
+                      nodes: _gridNodes,
+                      onFocus: (i) {
+                        _zone = TvZone.grid;
+                        _lastGrid = i;
+                      },
+                      onKey: _gridKey,
+                      onTap: (item) {
+                        final idx = gridItems.indexOf(item);
+                        if (idx >= 0) {
+                          _zone = TvZone.grid;
+                          _lastGrid = idx;
+                        }
+                        _open(item);
+                      },
+                    ),
+                  SliverToBoxAdapter(child: SizedBox(height: TvReachability.homeBottomPadding)),
                 ],
               ),
             ),
@@ -1431,8 +1444,41 @@ double _tvPosterAspectFor(int count) {
   return 0.62;
 }
 
-class _ContentGrid extends StatelessWidget {
+
+class _GridSectionTitle extends StatelessWidget {
   final String title;
+  const _GridSectionTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    if (title.trim().isEmpty) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: TvFocusStyle.focusBlue.withOpacity(0.70),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.86),
+            letterSpacing: 1.4,
+            fontWeight: FontWeight.w900,
+            fontSize: 13.4,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ContentSliverGrid extends StatelessWidget {
   final int columns;
   final List<ContentItem> items;
   final List<FocusNode> nodes;
@@ -1440,8 +1486,7 @@ class _ContentGrid extends StatelessWidget {
   final KeyEventResult Function(int, KeyEvent) onKey;
   final ValueChanged<ContentItem> onTap;
 
-  const _ContentGrid({
-    required this.title,
+  const _ContentSliverGrid({
     required this.columns,
     required this.items,
     required this.nodes,
@@ -1452,43 +1497,31 @@ class _ContentGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty || nodes.isEmpty) return const SizedBox.shrink();
-    return RepaintBoundary(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title.trim().isNotEmpty) ...[
-            Row(
-              children: [
-                Container(width: 4, height: 18, decoration: BoxDecoration(color: TvFocusStyle.focusBlue.withOpacity(0.70), borderRadius: BorderRadius.circular(999))),
-                const SizedBox(width: 9),
-                Text(
-                  title.toUpperCase(),
-                  style: TextStyle(color: Colors.white.withOpacity(0.86), letterSpacing: 1.4, fontWeight: FontWeight.w900, fontSize: 13.4, decoration: TextDecoration.none),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-          ],
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns.clamp(4, 10),
-              crossAxisSpacing: 13,
-              mainAxisSpacing: 14,
-              childAspectRatio: _tvPosterAspectFor(columns),
-            ),
-            itemBuilder: (_, i) => _TvPosterTile(
-              item: items[i],
-              focusNode: nodes[i],
-              onFocus: () => onFocus(i),
-              onKey: (node, event) => onKey(i, event),
-              onTap: () => onTap(items[i]),
-            ),
+    if (items.isEmpty || nodes.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(
+        TvReachability.homePadding.left,
+        0,
+        TvReachability.homePadding.right,
+        0,
+      ),
+      sliver: SliverGrid(
+        delegate: SliverChildBuilderDelegate(
+          (context, i) => _TvPosterTile(
+            item: items[i],
+            focusNode: nodes[i],
+            onFocus: () => onFocus(i),
+            onKey: (node, event) => onKey(i, event),
+            onTap: () => onTap(items[i]),
           ),
-        ],
+          childCount: items.length,
+        ),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns.clamp(4, 10),
+          crossAxisSpacing: 13,
+          mainAxisSpacing: 14,
+          childAspectRatio: _tvPosterAspectFor(columns),
+        ),
       ),
     );
   }
@@ -1531,8 +1564,8 @@ class _TvPosterTile extends StatelessWidget {
             child: Column(
                 children: [
                   Expanded(
-                    child: AnimatedContainer(
-                      duration: TvFocusStyle.fast,
+                    child: RepaintBoundary(
+                    child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
@@ -1564,6 +1597,7 @@ class _TvPosterTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
                   const SizedBox(height: 6),
                   Text(
                     item.title,

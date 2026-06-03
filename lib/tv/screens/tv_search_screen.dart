@@ -267,95 +267,109 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
           builder: (context, constraints) {
             final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
             return SafeArea(
-              child: ListView(
+              child: CustomScrollView(
                 controller: _scrollController,
-                padding: TvReachability.contentPadding,
-              children: [
-                _SearchHeader(),
-                const SizedBox(height: 14),
-                Focus(
-                  canRequestFocus: false,
-                  skipTraversal: true,
-                  onKeyEvent: _searchKey,
-                  child: ListenableBuilder(
-                    listenable: _searchNode,
-                    builder: (context, _) {
-                      final focused = _searchNode.hasFocus;
-                      return AnimatedContainer(
-                        duration: TvFocusStyle.fast,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
-                        ),
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _searchNode,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: _search,
-                          onChanged: (v) => setState(() => _query = v.trim()),
-                          decoration: InputDecoration(
-                            hintText: 'Cari drama, CEO, cinta, balas dendam...',
-                            hintStyle: const TextStyle(color: Colors.white38),
-                            prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan),
-                            suffixIcon: _query.isEmpty
-                                ? null
-                                : IconButton(
-                                    onPressed: () {
-                                      _controller.clear();
-                                      _search('');
-                                    },
-                                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      TvReachability.contentPadding.left,
+                      TvReachability.contentPadding.top,
+                      TvReachability.contentPadding.right,
+                      0,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _SearchHeader(),
+                        const SizedBox(height: 14),
+                        Focus(
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                          onKeyEvent: _searchKey,
+                          child: ListenableBuilder(
+                            listenable: _searchNode,
+                            builder: (context, _) {
+                              final focused = _searchNode.hasFocus;
+                              return Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
+                                ),
+                                child: TextField(
+                                  controller: _controller,
+                                  focusNode: _searchNode,
+                                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                                  textInputAction: TextInputAction.search,
+                                  onSubmitted: _search,
+                                  onChanged: (v) => setState(() => _query = v.trim()),
+                                  decoration: InputDecoration(
+                                    hintText: 'Cari drama, CEO, cinta, balas dendam...',
+                                    hintStyle: const TextStyle(color: Colors.white38),
+                                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan),
+                                    suffixIcon: _query.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            onPressed: () {
+                                              _controller.clear();
+                                              _search('');
+                                            },
+                                            icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                                          ),
+                                    filled: true,
+                                    fillColor: AppTheme.surface,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: BorderSide.none),
                                   ),
-                            filled: true,
-                            fillColor: AppTheme.surface,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: BorderSide.none),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
+                        const SizedBox(height: 16),
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 70),
+                            child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+                          )
+                        else if (_results.isEmpty)
+                          _SearchEmpty(hasQuery: _query.isNotEmpty)
+                        else ...[
+                          Row(
+                            children: [
+                              Text('${_results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                              const Spacer(),
+                              Text('↑ input • OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ]),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 70),
-                    child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
-                  )
-                else if (_results.isEmpty)
-                  _SearchEmpty(hasQuery: _query.isNotEmpty)
-                else ...[
-                  Row(
-                    children: [
-                      Text('${_results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                      const Spacer(),
-                      Text('↑ input • OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _results.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 224, crossAxisSpacing: 14, mainAxisSpacing: 16),
-                    itemBuilder: (_, i) {
-                      final item = _results[i];
-                      return _SearchPoster(
-                        node: _resultNodes[i],
-                        item: item,
-                        onTap: () {
-                          _lastGrid = i;
-                          _open(item);
-                        },
-                        onKey: (node, event) => _gridKey(i, item, columns, event),
-                      );
-                    },
-                  ),
+                  if (!_loading && _results.isNotEmpty)
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(TvReachability.contentPadding.left, 0, TvReachability.contentPadding.right, 0),
+                      sliver: SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final item = _results[i];
+                            return _SearchPoster(
+                              node: _resultNodes[i],
+                              item: item,
+                              onTap: () {
+                                _lastGrid = i;
+                                _open(item);
+                              },
+                              onKey: (node, event) => _gridKey(i, item, columns, event),
+                            );
+                          },
+                          childCount: _results.length,
+                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 224, crossAxisSpacing: 14, mainAxisSpacing: 16),
+                      ),
+                    ),
+                  SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
                 ],
-                TvReachability.tailSpacer,
-              ],
-            ),
+              ),
             );
           },
         ),
@@ -453,8 +467,8 @@ class _SearchPoster extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: AnimatedContainer(
-                      duration: TvFocusStyle.fast,
+                    child: RepaintBoundary(
+                    child: Container(
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -464,6 +478,7 @@ class _SearchPoster extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
                   const SizedBox(height: 8),
                   Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.12, decoration: TextDecoration.none)),
                 ],
