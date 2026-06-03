@@ -6,6 +6,7 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
+import '../utils/tv_reachability.dart';
 import 'tv_settings_screen.dart';
 import 'tv_source_manager_screen.dart';
 
@@ -254,7 +255,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             builder: (context, _, __) {
               return ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(48, 24, 48, 240),
+                padding: TvReachability.accountPadding,
                 children: [
                 const _AccountHeader(),
                 const SizedBox(height: 14),

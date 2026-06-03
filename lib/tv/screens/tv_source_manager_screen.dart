@@ -7,6 +7,7 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
+import '../utils/tv_reachability.dart';
 import '../widgets/tv_focused_border.dart';
 
 class TvSourceManagerScreen extends StatefulWidget {
@@ -532,7 +533,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     style: const TextStyle(decoration: TextDecoration.none),
                     child: ListView(
                       controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
+                      padding: TvReachability.managerPadding,
                       children: [
                       _SourceHeader(
                         backNode: _backNode,
@@ -583,7 +584,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         'OK ON/OFF platform • RIGHT masuk kategori • OK di kategori ON/OFF • BACK keluar mode kategori',
                         style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                       ),
-                      const SizedBox(height: 120),
+                      TvReachability.tailSpacer,
                     ],
                   ),
                 ),

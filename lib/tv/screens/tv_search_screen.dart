@@ -10,6 +10,7 @@ import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
+import '../utils/tv_reachability.dart';
 import 'tv_player_screen.dart';
 
 class TvSearchScreen extends StatefulWidget {
@@ -268,7 +269,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
             return SafeArea(
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(32, 32, 44, 190),
+                padding: TvReachability.contentPadding,
               children: [
                 _SearchHeader(),
                 const SizedBox(height: 14),
@@ -352,7 +353,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     },
                   ),
                 ],
-                const SizedBox(height: 130),
+                TvReachability.tailSpacer,
               ],
             ),
             );

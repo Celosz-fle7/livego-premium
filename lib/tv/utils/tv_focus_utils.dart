@@ -2,6 +2,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'tv_reachability.dart';
+
 // ---------------------------------------------------------------------------
 // TV focus + scroll sync.
 //
@@ -100,8 +102,8 @@ bool tvFocus(
 /// near/outside the safe viewport edge.
 bool tvFocusComfort(
   FocusNode node, {
-  double topMargin = 72,
-  double bottomMargin = 120,
+  double topMargin = TvReachability.listTopMargin,
+  double bottomMargin = TvReachability.listBottomMargin,
   Duration duration = Duration.zero,
   bool throttle = true,
 }) {
@@ -130,8 +132,8 @@ bool tvFocusComfort(
 /// TV zone.
 bool tvFocusGrid(
   FocusNode node, {
-  double topMargin = 118,
-  double bottomMargin = 160,
+  double topMargin = TvReachability.gridTopMargin,
+  double bottomMargin = TvReachability.gridBottomMargin,
   Duration duration = Duration.zero,
   bool throttle = true,
 }) {

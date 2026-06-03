@@ -15,6 +15,7 @@ import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
+import '../utils/tv_reachability.dart';
 import 'tv_player_screen.dart';
 
 class TvHomeScreen extends StatefulWidget {
@@ -887,7 +888,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               right: false,
               child: ListView(
                 controller: _pageScroll,
-                padding: const EdgeInsets.fromLTRB(28, 28, 38, 240),
+                padding: TvReachability.homePadding,
                 children: [
             _FocusableBanner(
               item: hero,

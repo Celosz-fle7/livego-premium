@@ -9,6 +9,7 @@ import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
 import '../utils/tv_focus_utils.dart';
+import '../utils/tv_reachability.dart';
 import 'tv_player_screen.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
@@ -230,7 +231,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
             child: SafeArea(
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(32, 32, 44, 190),
+                padding: TvReachability.contentPadding,
               children: [
                 _DownloadHeader(count: rows.length),
                 const SizedBox(height: 16),
@@ -254,7 +255,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
                   for (var i = 0; i < rows.length; i++)
                     _DownloadRow(node: _rowNodes[i], record: rows[i], onTap: () => _open(rows[i]), onKey: (node, event) => _rowKey(i, rows[i], event)),
                 ],
-                const SizedBox(height: 130),
+                TvReachability.tailSpacer,
               ],
             ),
           ),
