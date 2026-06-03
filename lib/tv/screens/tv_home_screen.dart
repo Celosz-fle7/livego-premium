@@ -65,8 +65,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _entryRetry = 0;
   int _entryTicket = 0;
   int _lastBackHandledMs = 0;
-  int _lastNavMoveMs = 0;
-  static const int _homeNavMoveIntervalMs = 145;
   bool _gridDataReady = false;
   bool _openingPlayer = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
@@ -389,26 +387,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return tvFocusGrid(node, topMargin: 118, bottomMargin: 160, throttle: throttle);
   }
 
-  bool _isArrow(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.arrowLeft ||
-        key == LogicalKeyboardKey.arrowRight ||
-        key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.arrowDown;
-  }
-
-  bool _ignoreNavWhileLocked(LogicalKeyboardKey key) {
-    if (!_isArrow(key)) return false;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return now - _lastNavMoveMs < _homeNavMoveIntervalMs;
-  }
-
-  void _markNavMove() {
-    _lastNavMoveMs = DateTime.now().millisecondsSinceEpoch;
-  }
-
   bool _moveFocus(TvZone zone, {int? index, bool throttle = true}) {
     final moved = _focusByZone(zone, index: index, throttle: throttle);
-    if (moved) _markNavMove();
     return moved;
   }
 
@@ -678,7 +658,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -710,7 +689,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
     final current = _safe(_lastPlatform, _platformNodes.length);
@@ -758,7 +736,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
     final current = _safe(_lastCategory, _categoryNodes.length);
@@ -808,7 +785,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
     _cancelPendingFocus();
 
     final current = _safe(_lastGrid, _gridNodes.length);

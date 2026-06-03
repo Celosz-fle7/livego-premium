@@ -35,8 +35,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   int _lastIndex = 0;
   int _lastBackHandledMs = 0;
-  int _lastNavMoveMs = 0;
-  static const int _accountNavMoveIntervalMs = 105;
 
   @override
   void initState() {
@@ -157,21 +155,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     widget.onBackToNav?.call();
   }
 
-  bool _isArrow(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.arrowDown;
-  }
-
-  bool _ignoreNavWhileLocked(LogicalKeyboardKey key) {
-    if (!_isArrow(key)) return false;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return now - _lastNavMoveMs < _accountNavMoveIntervalMs;
-  }
-
-  void _markNavMove() {
-    _lastNavMoveMs = DateTime.now().millisecondsSinceEpoch;
-  }
-
   void _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return;
     final target = _safe(index);
@@ -183,7 +166,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     );
     if (!focused) return;
     _lastIndex = target;
-    _markNavMove();
   }
 
   void _pushScreen(Widget screen) {
@@ -221,16 +203,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _handleBack();
       return KeyEventResult.handled;
     }
-    if (_ignoreNavWhileLocked(key)) return KeyEventResult.handled;
-
     final current = _safe(_lastIndex);
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(current - 1, throttle: false);
+      _focusRow(current - 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(current + 1, throttle: false);
+      _focusRow(current + 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
