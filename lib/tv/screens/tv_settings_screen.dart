@@ -162,7 +162,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.settings;
     _lastRow = _safe(index);
-    tvFocusComfort(_rowNodes[_lastRow], topMargin: 104, bottomMargin: 180);
+    tvFocusComfort(_rowNodes[_lastRow]);
   }
 
   bool _ignoreRepeatedBack() {

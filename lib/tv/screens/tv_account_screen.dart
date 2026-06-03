@@ -161,8 +161,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final target = _safe(index);
     final focused = tvFocusComfort(
       _nodes[target],
-      topMargin: 104,
-      bottomMargin: 180,
       throttle: throttle,
     );
     if (!focused) return;

@@ -147,7 +147,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _focusBack() {
-    final focused = tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
+    final focused = tvFocusComfort(_backNode);
     if (!focused) return;
     _categoryMode = false;
     if (mounted) setState(() {});
@@ -165,8 +165,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (nextCategoryIndex < 0) nextCategoryIndex = 0;
     final focused = tvFocusComfort(
       _sourceNodes[target],
-      topMargin: 112,
-      bottomMargin: 180,
       throttle: throttle,
     );
     if (!focused) return;

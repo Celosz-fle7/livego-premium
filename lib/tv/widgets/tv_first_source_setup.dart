@@ -94,7 +94,7 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
   void _focusRow(int value) {
     if (_nodes.isEmpty) return;
     _index = value.clamp(0, _nodes.length - 1).toInt();
-    tvFocusComfort(_nodes[_index], topMargin: 132, bottomMargin: 178);
+    tvFocusComfort(_nodes[_index]);
     if (mounted) setState(() {});
   }
 

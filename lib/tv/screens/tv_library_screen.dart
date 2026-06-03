@@ -149,7 +149,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     final items = _items;
     if (items.isEmpty) {
       _entryPending = false;
-      tvFocusComfort(_emptyNode, topMargin: 110, bottomMargin: 180);
+      tvFocusComfort(_emptyNode);
       return;
     }
     if (_gridNodes.isEmpty) {

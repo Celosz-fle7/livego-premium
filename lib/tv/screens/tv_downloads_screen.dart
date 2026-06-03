@@ -128,7 +128,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     final rows = DownloadService.items;
     if (rows.isEmpty) {
       _entryPending = false;
-      tvFocusComfort(_emptyNode, topMargin: 110, bottomMargin: 180);
+      tvFocusComfort(_emptyNode);
       return;
     }
     if (_rowNodes.isEmpty) {
@@ -143,7 +143,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.list;
     _lastRow = _safe(index);
-    tvFocusComfort(_rowNodes[_lastRow], topMargin: 110, bottomMargin: 180);
+    tvFocusComfort(_rowNodes[_lastRow]);
   }
 
   void _open(DownloadRecord record) {
