@@ -134,7 +134,7 @@ bool tvFocusGrid(
   FocusNode node, {
   double topMargin = TvReachability.gridTopMargin,
   double bottomMargin = TvReachability.gridBottomMargin,
-  Duration duration = Duration.zero,
+  Duration duration = const Duration(milliseconds: 90),
   bool throttle = true,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
@@ -149,7 +149,7 @@ bool tvFocusGrid(
       duration: duration,
     ),
     throttle: throttle,
-    postFrameDelay: 1,
+    postFrameDelay: 2,
   );
 }
 
@@ -191,7 +191,7 @@ void _revealInViewport(
     if (duration == Duration.zero) {
       position.jumpTo(clamped);
     } else {
-      position.animateTo(clamped, duration: duration, curve: Curves.linear);
+      position.animateTo(clamped, duration: duration, curve: Curves.easeOut);
     }
   } catch (_) {
     // Screens can rebuild while a remote key repeats. Ignore; the next focus
