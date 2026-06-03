@@ -25,24 +25,35 @@ const Duration _navInterval = Duration(milliseconds: 120);
 bool _throttledFocus(
   FocusNode node,
   VoidCallback doFocus,
-  VoidCallback doScroll,
-) {
-  final now = DateTime.now();
-  if (now.difference(_lastNavTime) < _navInterval) return false;
-  _lastNavTime = now;
+  VoidCallback doScroll, {
+  bool throttle = true,
+  int postFrameDelay = 1,
+}) {
+  if (throttle) {
+    final now = DateTime.now();
+    if (now.difference(_lastNavTime) < _navInterval) return false;
+    _lastNavTime = now;
+  }
 
   final token = (_focusFrameToken[node] ?? 0) + 1;
   _focusFrameToken[node] = token;
 
   doFocus();
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (_focusFrameToken[node] != token) return;
-    _focusFrameToken.remove(node);
-    if (node.context == null || !node.hasFocus) return;
-    doScroll();
-  });
+  void scheduleReveal(int framesLeft) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_focusFrameToken[node] != token) return;
+      if (framesLeft > 1) {
+        scheduleReveal(framesLeft - 1);
+        return;
+      }
+      _focusFrameToken.remove(node);
+      if (node.context == null || !node.hasFocus) return;
+      doScroll();
+    });
+  }
 
+  scheduleReveal(postFrameDelay.clamp(1, 3).toInt());
   return true;
 }
 
@@ -55,6 +66,7 @@ bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
   Duration duration = Duration.zero,
+  bool throttle = true,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -77,6 +89,7 @@ bool tvFocus(
         // focus movement will correct the viewport if needed.
       }
     },
+    throttle: throttle,
   );
 }
 
@@ -90,6 +103,7 @@ bool tvFocusComfort(
   double topMargin = 72,
   double bottomMargin = 120,
   Duration duration = Duration.zero,
+  bool throttle = true,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -102,6 +116,7 @@ bool tvFocusComfort(
       bottomMargin: bottomMargin,
       duration: duration,
     ),
+    throttle: throttle,
   );
 }
 
@@ -118,6 +133,7 @@ bool tvFocusGrid(
   double topMargin = 118,
   double bottomMargin = 160,
   Duration duration = Duration.zero,
+  bool throttle = true,
 }) {
   if (!node.canRequestFocus || node.context == null) return false;
 
@@ -130,6 +146,8 @@ bool tvFocusGrid(
       bottomMargin: bottomMargin,
       duration: duration,
     ),
+    throttle: throttle,
+    postFrameDelay: 2,
   );
 }
 

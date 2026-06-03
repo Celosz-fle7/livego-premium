@@ -337,24 +337,24 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     // Category is changed with UP/DOWN, but it is not a required BACK stop.
     if (_zone == TvZone.grid) {
       if (_platformNodes.isNotEmpty &&
-          _focusByZone(TvZone.platform, index: _lastPlatform)) {
+          _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false)) {
         return;
       }
-      _focusByZone(TvZone.banner);
+      _focusByZone(TvZone.banner, throttle: false);
       return;
     }
 
     if (_zone == TvZone.category) {
       if (_platformNodes.isNotEmpty &&
-          _focusByZone(TvZone.platform, index: _lastPlatform)) {
+          _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false)) {
         return;
       }
-      _focusByZone(TvZone.banner);
+      _focusByZone(TvZone.banner, throttle: false);
       return;
     }
 
     if (_zone == TvZone.platform) {
-      _focusByZone(TvZone.banner);
+      _focusByZone(TvZone.banner, throttle: false);
       return;
     }
 
@@ -363,15 +363,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return;
     }
 
-    _focusByZone(TvZone.banner);
+    _focusByZone(TvZone.banner, throttle: false);
   }
 
-  void _focus(FocusNode node, {double alignment = 0.22}) {
-    tvFocus(node, alignment: alignment);
+  bool _focus(FocusNode node, {double alignment = 0.22, bool throttle = true}) {
+    return tvFocus(node, alignment: alignment, throttle: throttle);
   }
 
-  void _focusGrid(FocusNode node) {
-    tvFocusGrid(node, topMargin: 118, bottomMargin: 160);
+  bool _focusGrid(FocusNode node, {bool throttle = true}) {
+    return tvFocusGrid(node, topMargin: 118, bottomMargin: 160, throttle: throttle);
   }
 
   void _focusEntry() {
@@ -414,9 +414,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _entryRetry++;
     if (_entryRetry > 8) {
       final fallbackFocused =
-          _focusByZone(TvZone.category, index: _lastCategory) ||
-          _focusByZone(TvZone.platform, index: _lastPlatform) ||
-          _focusByZone(TvZone.banner);
+          _focusByZone(TvZone.category, index: _lastCategory, throttle: false) ||
+          _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false) ||
+          _focusByZone(TvZone.banner, throttle: false);
       if (fallbackFocused) {
         _entryPending = false;
         _entryRetry = 0;
@@ -436,9 +436,9 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
 
     if (_pendingZone == TvZone.grid && _gridDataReady && _gridNodes.isEmpty) {
       final fallbackFocused =
-          _focusByZone(TvZone.category, index: _lastCategory) ||
-          _focusByZone(TvZone.platform, index: _lastPlatform) ||
-          _focusByZone(TvZone.banner);
+          _focusByZone(TvZone.category, index: _lastCategory, throttle: false) ||
+          _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false) ||
+          _focusByZone(TvZone.banner, throttle: false);
       if (fallbackFocused) {
         _entryPending = false;
         _entryRetry = 0;
@@ -448,7 +448,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       return;
     }
 
-    final focused = _focusByZone(_pendingZone, index: _pendingIndex);
+    final focused = _focusByZone(_pendingZone, index: _pendingIndex, throttle: false);
     if (focused) {
       _entryPending = false;
       _entryRetry = 0;
@@ -462,15 +462,14 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return node.canRequestFocus && node.context != null;
   }
 
-  bool _focusByZone(TvZone zone, {int? index}) {
+  bool _focusByZone(TvZone zone, {int? index, bool throttle = true}) {
     if (zone == TvZone.grid && _gridNodes.isNotEmpty) {
       final target = _safe(index ?? _lastGrid, _gridNodes.length);
       final node = _gridNodes[target];
       if (!_ready(node)) return false;
       _zone = TvZone.grid;
       _lastGrid = target;
-      _focusGrid(node);
-      return true;
+      return _focusGrid(node, throttle: throttle);
     }
     if (zone == TvZone.category && _categoryNodes.isNotEmpty) {
       final target = _safe(index ?? _lastCategory, _categoryNodes.length);
@@ -478,8 +477,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!_ready(node)) return false;
       _zone = TvZone.category;
       _lastCategory = target;
-      _focus(node, alignment: 0.12);
-      return true;
+      return _focus(node, alignment: 0.12, throttle: throttle);
     }
     if (zone == TvZone.platform && _platformNodes.isNotEmpty) {
       final target = _safe(index ?? _lastPlatform, _platformNodes.length);
@@ -487,13 +485,11 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!_ready(node)) return false;
       _zone = TvZone.platform;
       _lastPlatform = target;
-      _focus(node, alignment: 0.08);
-      return true;
+      return _focus(node, alignment: 0.08, throttle: throttle);
     }
     if (zone == TvZone.banner && _ready(_bannerNode)) {
       _zone = TvZone.banner;
-      _focus(_bannerNode, alignment: 0.02);
-      return true;
+      return _focus(_bannerNode, alignment: 0.02, throttle: throttle);
     }
     return false;
   }
@@ -877,11 +873,6 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         _syncNodes(_categoryNodes, categories.length, 'tv-category');
         _syncNodes(_gridNodes, gridItems.length, 'tv-grid');
 
-        if (_entryPending) {
-          final ticket = _entryTicket;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry(ticket));
-        }
-
         return Shortcuts(
           shortcuts: const <ShortcutActivator, Intent>{
             SingleActivator(LogicalKeyboardKey.goBack): _HomeBackIntent(),
@@ -897,7 +888,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
             },
             child: ListView(
               controller: _pageScroll,
-              padding: const EdgeInsets.fromLTRB(28, 28, 38, 44),
+              padding: const EdgeInsets.fromLTRB(28, 28, 38, 190),
               children: [
             _FocusableBanner(
               item: hero,
