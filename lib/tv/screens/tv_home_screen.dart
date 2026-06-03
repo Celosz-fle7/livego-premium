@@ -385,7 +385,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   bool _focusGrid(FocusNode node, {bool throttle = true}) {
-    return tvFocusGrid(node, topMargin: 118, bottomMargin: 160, throttle: throttle);
+    return tvFocusGrid(node, throttle: throttle);
   }
 
   bool _isArrow(LogicalKeyboardKey key) {

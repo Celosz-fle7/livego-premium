@@ -163,7 +163,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     if (_resultNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocusGrid(_resultNodes[_lastGrid], topMargin: 118, bottomMargin: 160);
+    tvFocusGrid(_resultNodes[_lastGrid]);
   }
 
   void _open(ContentItem item) {

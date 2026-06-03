@@ -164,7 +164,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     if (_gridNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocusGrid(_gridNodes[_lastGrid], topMargin: 110, bottomMargin: 160);
+    tvFocusGrid(_gridNodes[_lastGrid]);
   }
 
   void _open(ContentItem item) {
