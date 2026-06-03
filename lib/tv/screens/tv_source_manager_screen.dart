@@ -48,7 +48,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _captureInitialSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _focusSource(0);
+      _focusSource(0, throttle: false);
       _autoPingOnce();
     });
   }
@@ -138,30 +138,40 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_categoryMode) {
-        _focusSource(_lastIndex, categoryMode: true, categoryIndex: _categoryIndex);
+        _focusSource(_lastIndex, categoryMode: true, categoryIndex: _categoryIndex, throttle: false);
       } else {
-        _focusSource(_lastIndex, categoryMode: false);
+        _focusSource(_lastIndex, categoryMode: false, throttle: false);
       }
     });
   }
 
   void _focusBack() {
+    final focused = tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
+    if (!focused) return;
     _categoryMode = false;
-    tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
     if (mounted) setState(() {});
   }
 
-  void _focusSource(int index, {bool categoryMode = false, int? categoryIndex}) {
+  void _focusSource(int index, {bool categoryMode = false, int? categoryIndex, bool throttle = true}) {
     if (_sourceNodes.isEmpty) return;
-    _lastIndex = _safeSource(index);
-    final slug = _platforms[_lastIndex];
+    final target = _safeSource(index);
+    final slug = _platforms[target];
     final categories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);
-    _categoryMode = categoryMode && active && categories.isNotEmpty;
-    if (categoryIndex != null) _categoryIndex = categoryIndex;
-    if (_categoryIndex >= categories.length) _categoryIndex = categories.length - 1;
-    if (_categoryIndex < 0) _categoryIndex = 0;
-    tvFocusComfort(_sourceNodes[_lastIndex], topMargin: 112, bottomMargin: 218);
+    final nextCategoryMode = categoryMode && active && categories.isNotEmpty;
+    var nextCategoryIndex = categoryIndex ?? _categoryIndex;
+    if (nextCategoryIndex >= categories.length) nextCategoryIndex = categories.length - 1;
+    if (nextCategoryIndex < 0) nextCategoryIndex = 0;
+    final focused = tvFocusComfort(
+      _sourceNodes[target],
+      topMargin: 112,
+      bottomMargin: 180,
+      throttle: throttle,
+    );
+    if (!focused) return;
+    _lastIndex = target;
+    _categoryMode = nextCategoryMode;
+    _categoryIndex = nextCategoryIndex;
     if (mounted) setState(() {});
   }
 
@@ -293,7 +303,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
 
     if (_categoryMode) {
-      _focusSource(_lastIndex, categoryMode: false);
+      _focusSource(_lastIndex, categoryMode: false, throttle: false);
       return;
     }
 
@@ -375,13 +385,13 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
     if (_categoryMode) {
       if (key == LogicalKeyboardKey.arrowLeft) {
-        _categoryIndex = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
-        _focusSource(index, categoryMode: true);
+        final targetCategory = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
+        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowRight) {
-        _categoryIndex = _categoryIndex < categories.length - 1 ? _categoryIndex + 1 : _categoryIndex;
-        _focusSource(index, categoryMode: true);
+        final targetCategory = _categoryIndex < categories.length - 1 ? _categoryIndex + 1 : _categoryIndex;
+        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
@@ -422,8 +432,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (active && categories.isNotEmpty) {
-        _categoryIndex = _categoryIndex.clamp(0, categories.length - 1).toInt();
-        _focusSource(index, categoryMode: true);
+        final targetCategory = _categoryIndex.clamp(0, categories.length - 1).toInt();
+        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
       } else {
         _showSnack('Aktifkan platform dulu dengan OK.');
       }
@@ -511,14 +521,19 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           },
           child: Scaffold(
             backgroundColor: AppTheme.bgDeep,
-            body: Stack(
-              children: [
-                DefaultTextStyle.merge(
-                  style: const TextStyle(decoration: TextDecoration.none),
-                  child: ListView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(28, 34, 40, 210),
-                    children: [
+            body: SafeArea(
+              top: true,
+              bottom: false,
+              left: false,
+              right: false,
+              child: Stack(
+                children: [
+                  DefaultTextStyle.merge(
+                    style: const TextStyle(decoration: TextDecoration.none),
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
+                      children: [
                       _SourceHeader(
                         backNode: _backNode,
                         onBackKey: _backKey,
@@ -572,15 +587,16 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     ],
                   ),
                 ),
-                if (_confirmOpen)
-                  _ConfirmSaveOverlay(
-                    stayNode: _stayNode,
-                    saveNode: _saveNode,
-                    onKey: _confirmKey,
-                    onStay: _closeConfirmPopup,
-                    onSave: _saveAndExit,
-                  ),
-              ],
+                  if (_confirmOpen)
+                    _ConfirmSaveOverlay(
+                      stayNode: _stayNode,
+                      saveNode: _saveNode,
+                      onKey: _confirmKey,
+                      onStay: _closeConfirmPopup,
+                      onSave: _saveAndExit,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

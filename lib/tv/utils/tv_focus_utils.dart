@@ -147,7 +147,7 @@ bool tvFocusGrid(
       duration: duration,
     ),
     throttle: throttle,
-    postFrameDelay: 2,
+    postFrameDelay: 1,
   );
 }
 

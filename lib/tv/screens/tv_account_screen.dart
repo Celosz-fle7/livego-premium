@@ -40,7 +40,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusRow(_lastIndex);
+      if (mounted) _focusRow(_lastIndex, throttle: false);
     });
   }
 
@@ -100,7 +100,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void didUpdateWidget(covariant TvAccountScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      _focusRow(_lastIndex);
+      _focusRow(_lastIndex, throttle: false);
     }
   }
 
@@ -155,15 +155,18 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     widget.onBackToNav?.call();
   }
 
-  void _focusRow(int index) {
+  void _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return;
-    _lastIndex = _safe(index);
+    final target = _safe(index);
+    final focused = tvFocusComfort(
+      _nodes[target],
+      topMargin: 104,
+      bottomMargin: 180,
+      throttle: throttle,
+    );
+    if (!focused) return;
+    _lastIndex = target;
     if (mounted) setState(() {});
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _nodes.isEmpty) return;
-      tvFocusComfort(_nodes[_lastIndex], topMargin: 104, bottomMargin: 188);
-    });
   }
 
   void _pushScreen(Widget screen) {
@@ -175,7 +178,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _restoreFocusAfterPop() {
     if (!mounted) return;
     _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
-    _focusRow(_lastIndex);
+    _focusRow(_lastIndex, throttle: false);
   }
 
   void _showMessage(String message) {
@@ -189,7 +192,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
-    _focusRow(_lastIndex);
+    _focusRow(_lastIndex, throttle: false);
   }
 
   KeyEventResult _rowKey(int index, _AccountItem item, KeyEvent event) {
@@ -239,13 +242,18 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             return null;
           }),
         },
-        child: ValueListenableBuilder<int>(
-          valueListenable: LiveGoLocalStore.version,
-          builder: (context, _, __) {
-            return ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 34, 40, 190),
-              children: [
+        child: SafeArea(
+          top: true,
+          bottom: false,
+          left: false,
+          right: false,
+          child: ValueListenableBuilder<int>(
+            valueListenable: LiveGoLocalStore.version,
+            builder: (context, _, __) {
+              return ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
+                children: [
                 const _AccountHeader(),
                 const SizedBox(height: 14),
                 for (var i = 0; i < items.length; i++) ...[
@@ -270,10 +278,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                     decoration: TextDecoration.none,
                   ),
                 ),
-                const SizedBox(height: 96),
-              ],
-            );
-          },
+                  const SizedBox(height: 32),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
