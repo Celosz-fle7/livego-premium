@@ -162,7 +162,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     if (_resultNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocusComfort(_resultNodes[_lastGrid], topMargin: 118, bottomMargin: 180);
+    tvFocusGrid(_resultNodes[_lastGrid], topMargin: 118, bottomMargin: 160);
   }
 
   void _open(ContentItem item) {
@@ -177,7 +177,6 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
         if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-      Future<void>.delayed(TvFocusStyle.normal, restore);
     });
   }
 

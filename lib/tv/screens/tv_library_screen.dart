@@ -163,7 +163,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     if (_gridNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocusComfort(_gridNodes[_lastGrid], topMargin: 110, bottomMargin: 180);
+    tvFocusGrid(_gridNodes[_lastGrid], topMargin: 110, bottomMargin: 160);
   }
 
   void _open(ContentItem item) {
@@ -180,7 +180,6 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
         if (mounted) _focusGrid(_lastGrid);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-      Future<void>.delayed(TvFocusStyle.normal, restore);
     });
   }
 

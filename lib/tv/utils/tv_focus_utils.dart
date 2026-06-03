@@ -3,21 +3,26 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 // ---------------------------------------------------------------------------
-// TV focus throttle.
+// TV focus + scroll sync.
 //
 // Android TV remotes can emit repeated arrow events faster than the UI can
 // complete requestFocus() + post-frame scroll. Without a guard, focus can move
 // several items while the viewport is still revealing an older item.
 //
-// This helper keeps navigation controlled:
-// - minimum interval for focus navigation: about 12 steps/second
-// - token per FocusNode so only the latest callback for that node may scroll
+// Rules:
+// - arrow navigation is limited to about 8 steps/second
+// - token per FocusNode: only the latest callback for that node may scroll
 // - scroll is post-frame, after the focused widget has a valid layout
+// - activation keys (OK/BACK/MENU) have a separate cooldown so one physical
+//   press cannot stack routes, close two layers, or toggle settings twice
 // ---------------------------------------------------------------------------
 
 final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
 DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
 const Duration _navInterval = Duration(milliseconds: 120);
+
+final Map<LogicalKeyboardKey, DateTime> _lastActivationTime = <LogicalKeyboardKey, DateTime>{};
+const Duration _activationInterval = Duration(milliseconds: 320);
 
 bool _throttledFocus(
   FocusNode node,
@@ -44,6 +49,10 @@ bool _throttledFocus(
 }
 
 /// TV focus helper for Home zone jumps and other explicit alignment movement.
+///
+/// Use for banner, platform/category chips, navbar, and popup buttons. For
+/// poster grids, use [tvFocusGrid] so the viewport is corrected from the real
+/// post-render scroll position.
 bool tvFocus(
   FocusNode node, {
   double alignment = 0.30,
@@ -76,8 +85,8 @@ bool tvFocus(
 /// Request focus without forcing the item into a fixed screen position.
 ///
 /// Use this for vertical menu/list screens such as Account, Source Manager,
-/// Search, History, Favorite, and Download. It only scrolls when the focused
-/// widget is near/outside the safe viewport edge.
+/// Settings, and Download rows. It only scrolls when the focused widget is
+/// near/outside the safe viewport edge.
 bool tvFocusComfort(
   FocusNode node, {
   double topMargin = 72,
@@ -89,47 +98,87 @@ bool tvFocusComfort(
   return _throttledFocus(
     node,
     () => node.requestFocus(),
-    () {
-      final context = node.context;
-      if (context == null || !node.hasFocus) return;
-      try {
-        final scrollable = Scrollable.maybeOf(context);
-        final renderObject = context.findRenderObject();
-        if (scrollable == null || renderObject == null) return;
-        final viewport = RenderAbstractViewport.maybeOf(renderObject);
-        if (viewport == null) return;
-
-        final position = scrollable.position;
-        if (!position.hasPixels || !position.hasViewportDimension) return;
-
-        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-        final current = position.pixels;
-        final viewportExtent = position.viewportDimension;
-
-        double? target;
-        if (leading < current + topMargin) {
-          target = leading - topMargin;
-        } else if (trailing > current + viewportExtent - bottomMargin) {
-          target = trailing - viewportExtent + bottomMargin;
-        }
-
-        if (target == null) return;
-        final clamped = target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
-        if ((clamped - current).abs() < 1) return;
-        if (duration == Duration.zero) {
-          position.jumpTo(clamped);
-        } else {
-          position.animateTo(clamped, duration: duration, curve: Curves.linear);
-        }
-      } catch (_) {
-        // Lists can rebuild while a remote key repeats. Ignore; the next focus
-        // movement will correct the viewport if needed.
-      }
-    },
+    () => _revealInViewport(
+      node,
+      topMargin: topMargin,
+      bottomMargin: bottomMargin,
+      duration: duration,
+    ),
   );
+}
+
+/// Focus helper for poster grids.
+///
+/// Poster cards often change their visual size when focused (border, scale,
+/// shadow, decoration). `ensureVisible(alignment: 0.35)` can land on the old
+/// estimated position and make the screen lag behind the cursor by 1-2 rows.
+/// This helper waits until the frame after focus, reads the real viewport
+/// offsets, and only nudges the scroll when the card is near/outside the safe
+/// TV zone.
+bool tvFocusGrid(
+  FocusNode node, {
+  double topMargin = 118,
+  double bottomMargin = 160,
+  Duration duration = Duration.zero,
+}) {
+  if (!node.canRequestFocus || node.context == null) return false;
+
+  return _throttledFocus(
+    node,
+    () => node.requestFocus(),
+    () => _revealInViewport(
+      node,
+      topMargin: topMargin,
+      bottomMargin: bottomMargin,
+      duration: duration,
+    ),
+  );
+}
+
+void _revealInViewport(
+  FocusNode node, {
+  required double topMargin,
+  required double bottomMargin,
+  required Duration duration,
+}) {
+  final context = node.context;
+  if (context == null || !node.hasFocus) return;
+  try {
+    final scrollable = Scrollable.maybeOf(context);
+    final renderObject = context.findRenderObject();
+    if (scrollable == null || renderObject == null) return;
+    final viewport = RenderAbstractViewport.maybeOf(renderObject);
+    if (viewport == null) return;
+
+    final position = scrollable.position;
+    if (!position.hasPixels || !position.hasViewportDimension) return;
+
+    final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+    final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+    final current = position.pixels;
+    final viewportExtent = position.viewportDimension;
+
+    double? target;
+    if (leading < current + topMargin) {
+      target = leading - topMargin;
+    } else if (trailing > current + viewportExtent - bottomMargin) {
+      target = trailing - viewportExtent + bottomMargin;
+    }
+
+    if (target == null) return;
+    final clamped = target
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((clamped - current).abs() < 1) return;
+    if (duration == Duration.zero) {
+      position.jumpTo(clamped);
+    } else {
+      position.animateTo(clamped, duration: duration, curve: Curves.linear);
+    }
+  } catch (_) {
+    // Screens can rebuild while a remote key repeats. Ignore; the next focus
+    // movement will correct the viewport if needed.
+  }
 }
 
 bool tvIsSelectKey(LogicalKeyboardKey key) {
@@ -153,8 +202,21 @@ bool tvIsMenuKey(LogicalKeyboardKey key) {
 /// Android TV remotes can emit repeated OK/BACK/MENU events when the user holds
 /// the button. Arrow repeats are useful for navigation, but activation repeats
 /// can stack routes, double-pop screens, or toggle settings many times.
+///
+/// This also suppresses very fast non-repeat activation key-downs, because some
+/// devices deliver duplicated activation events through multiple input paths.
 bool tvIgnoreRepeatActivation(KeyEvent event) {
-  if (event is! KeyRepeatEvent) return false;
   final key = event.logicalKey;
-  return tvIsSelectKey(key) || tvIsBackKey(key) || tvIsMenuKey(key);
+  final isActivation = tvIsSelectKey(key) || tvIsBackKey(key) || tvIsMenuKey(key);
+  if (!isActivation) return false;
+  if (event is KeyRepeatEvent) return true;
+  if (event is! KeyDownEvent) return false;
+
+  final now = DateTime.now();
+  final last = _lastActivationTime[key];
+  if (last != null && now.difference(last) < _activationInterval) {
+    return true;
+  }
+  _lastActivationTime[key] = now;
+  return false;
 }

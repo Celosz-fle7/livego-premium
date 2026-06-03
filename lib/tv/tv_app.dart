@@ -141,19 +141,26 @@ class _TvAppState extends State<TvApp> {
     _bumpContentTicket();
   }
 
-  void _focusCurrentNav() {
-    if (_navNodes.isEmpty) return;
-    final targetNode = _navNodes[_safeNav(_index)];
-    if (_navMode == TvSideNavMode.focused && targetNode.context != null) {
-      tvFocus(targetNode, alignment: 0.10);
+  void _focusNavNode(int navIndex) {
+    if (!mounted || _navNodes.isEmpty) return;
+    final node = _navNodes[_safeNav(navIndex)];
+    if (node.context != null) {
+      tvFocus(node, alignment: 0.10);
       return;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tvFocus(node, alignment: 0.10);
+    });
+  }
+
+  void _focusCurrentNav() {
+    if (_navNodes.isEmpty) return;
     if (_navMode != TvSideNavMode.focused) {
       setState(() => _navMode = TvSideNavMode.focused);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusNavNode(_index));
+      return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(targetNode, alignment: 0.10);
-    });
+    _focusNavNode(_index);
   }
 
   void _peekOrFocusNav() {
@@ -189,9 +196,7 @@ class _TvAppState extends State<TvApp> {
       _index = safe;
       _navMode = TvSideNavMode.focused;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_navNodes[safe], alignment: 0.10);
-    });
+    _focusNavNode(safe);
   }
 
   void _backToHomeNav() {
@@ -201,9 +206,7 @@ class _TvAppState extends State<TvApp> {
       _index = _homeIndex;
       _navMode = TvSideNavMode.focused;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_navNodes[_safeNav(_homeIndex)], alignment: 0.10);
-    });
+    _focusNavNode(_homeIndex);
   }
 
   void _backToHomeBanner() {
@@ -315,7 +318,7 @@ class _TvAppState extends State<TvApp> {
     // Android TV can deliver the same Back press through both Shortcuts
     // and PopScope. Guard it so one physical press produces one action.
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 240) return;
+    if (now - _lastBackHandledMs < 320) return;
     _lastBackHandledMs = now;
 
     if (now < _suppressBackUntilMs) {

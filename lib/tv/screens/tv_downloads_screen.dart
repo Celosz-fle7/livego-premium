@@ -157,7 +157,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
         if (mounted) _focusRow(_lastRow);
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-      Future<void>.delayed(TvFocusStyle.normal, restore);
     });
   }
 

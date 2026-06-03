@@ -370,6 +370,10 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     tvFocus(node, alignment: alignment);
   }
 
+  void _focusGrid(FocusNode node) {
+    tvFocusGrid(node, topMargin: 118, bottomMargin: 160);
+  }
+
   void _focusEntry() {
     _queueFocusEntry(_zone, index: _indexForZone(_zone));
   }
@@ -465,7 +469,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!_ready(node)) return false;
       _zone = TvZone.grid;
       _lastGrid = target;
-      _focus(node, alignment: 0.35);
+      _focusGrid(node);
       return true;
     }
     if (zone == TvZone.category && _categoryNodes.isNotEmpty) {
@@ -533,10 +537,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (zone == TvZone.category) _lastCategory = _safe(index, _categoryNodes.length);
     if (zone == TvZone.platform) _lastPlatform = _safe(index, _platformNodes.length);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    void restore() {
       if (!mounted) return;
+      // Re-apply focus a few times because Android TV may deliver the BACK
+      // key to the root app immediately after the player route pops. This
+      // keeps the user on the poster/grid instead of falling into the navbar.
       _queueFocusEntry(zone, index: _indexForZone(zone));
-    });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
   }
 
   void _open(ContentItem item) {
@@ -648,7 +657,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       } else if (_gridNodes.isNotEmpty) {
         _zone = TvZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -705,7 +714,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       } else if (_gridNodes.isNotEmpty) {
         _zone = TvZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -761,7 +770,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (_gridNodes.isNotEmpty) {
         _zone = TvZone.grid;
         _lastGrid = _safe(_lastGrid, _gridNodes.length);
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -791,7 +800,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       } else {
         _zone = TvZone.grid;
         _lastGrid = index - 1;
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -799,7 +808,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (col < _gridColumns - 1 && index < _gridNodes.length - 1) {
         _zone = TvZone.grid;
         _lastGrid = index + 1;
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -820,7 +829,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       } else {
         _zone = TvZone.grid;
         _lastGrid = _safe(index - _gridColumns, _gridNodes.length);
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
@@ -829,7 +838,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (next < _gridNodes.length) {
         _zone = TvZone.grid;
         _lastGrid = next;
-        _focus(_gridNodes[_lastGrid], alignment: 0.35);
+        _focusGrid(_gridNodes[_lastGrid]);
       }
       return KeyEventResult.handled;
     }
