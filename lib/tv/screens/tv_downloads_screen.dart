@@ -149,7 +149,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item))).whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;

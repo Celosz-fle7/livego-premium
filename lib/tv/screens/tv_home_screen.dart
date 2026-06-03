@@ -64,6 +64,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _pendingIndex = 0;
   int _entryRetry = 0;
   int _entryTicket = 0;
+  int _lastBackHandledMs = 0;
   bool _gridDataReady = false;
   bool _openingPlayer = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
@@ -329,13 +330,25 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     _entryTicket++;
   }
 
+  bool _ignoreRepeatedBack() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < 420) return true;
+    _lastBackHandledMs = now;
+    return false;
+  }
+
   void _handleBack() {
+    if (_ignoreRepeatedBack()) return;
     _cancelPendingFocus();
 
     // Back on TV must move one logical layer at a time.
-    // Grid -> Platform -> Banner -> Exit dialog.
-    // Category is changed with UP/DOWN, but it is not a required BACK stop.
+    // Grid -> Category -> Platform -> Banner -> Exit dialog.
+    // If a platform has no category row, Grid falls back to Platform.
     if (_zone == TvZone.grid) {
+      if (_categoryNodes.isNotEmpty &&
+          _focusByZone(TvZone.category, index: _lastCategory, throttle: false)) {
+        return;
+      }
       if (_platformNodes.isNotEmpty &&
           _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false)) {
         return;
@@ -552,10 +565,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     widget.onPlayerRouteOpen?.call();
     Navigator.of(context)
         .push(MaterialPageRoute(
-          builder: (_) => TvPlayerScreen(
-            item: item,
-            onExitToHome: widget.onPlayerRouteClosed,
-          ),
+          builder: (_) => TvPlayerScreen(item: item),
         ))
         .whenComplete(() {
           _openingPlayer = false;

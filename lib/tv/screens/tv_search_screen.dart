@@ -169,7 +169,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;

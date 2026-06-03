@@ -28,7 +28,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   bool _categoryMode = false;
   bool _dirty = false;
   bool _confirmOpen = false;
-  static const int _backGuardMs = 360;
+  static const int _backGuardMs = 420;
   int _lastBackHandledMs = 0;
   String? _pingingSlug;
 
@@ -62,6 +62,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _stayNode.dispose();
     _saveNode.dispose();
     _scrollController.dispose();
+    if (_dirty) _restoreInitialSettings();
     super.dispose();
   }
 
@@ -130,12 +131,18 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       });
   }
 
-  void _discardAndExit() {
+  void _closeConfirmPopup() {
     _markBackHandled();
-    _restoreInitialSettings();
-    _dirty = false;
-    _confirmOpen = false;
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    setState(() => _confirmOpen = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_categoryMode && _categoryNodes.isNotEmpty) {
+        _focusSource(_lastIndex, categoryMode: true, categoryIndex: _categoryIndex);
+      } else {
+        _focusSource(_lastIndex, categoryMode: false);
+      }
+    });
   }
 
   void _focusBack() {
@@ -281,7 +288,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (_ignoreRepeatedBack()) return;
 
     if (_confirmOpen) {
-      _discardAndExit();
+      _closeConfirmPopup();
       return;
     }
 
@@ -329,12 +336,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (node == _saveNode) {
         _saveAndExit();
       } else {
-        _discardAndExit();
+        _closeConfirmPopup();
       }
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _discardAndExit();
+      _closeConfirmPopup();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -570,7 +577,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     stayNode: _stayNode,
                     saveNode: _saveNode,
                     onKey: _confirmKey,
-                    onStay: _discardAndExit,
+                    onStay: _closeConfirmPopup,
                     onSave: _saveAndExit,
                   ),
               ],

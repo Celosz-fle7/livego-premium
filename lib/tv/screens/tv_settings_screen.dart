@@ -32,6 +32,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   TvZone _zone = TvZone.settings;
   int _lastRow = 0;
   bool _entryPending = false;
+  int _lastBackHandledMs = 0;
 
   List<_SettingsSection> get _sections => [
         _SettingsSection(
@@ -161,7 +162,14 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.settings;
     _lastRow = _safe(index);
-    tvFocus(_rowNodes[_lastRow], alignment: 0.32);
+    tvFocusComfort(_rowNodes[_lastRow], topMargin: 104, bottomMargin: 180);
+  }
+
+  bool _ignoreRepeatedBack() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < 420) return true;
+    _lastBackHandledMs = now;
+    return false;
   }
 
   void _goBack() {
@@ -169,6 +177,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   void _handleBack() {
+    if (_ignoreRepeatedBack()) return;
     if (widget.onMoveToNav != null) {
       _zone = TvZone.nav;
       widget.onMoveToNav?.call();
@@ -189,8 +198,12 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       widget.onMoveToNav?.call();
       return KeyEventResult.handled;
     }
-    if (_isSelect(key) || _isBack(key)) {
+    if (_isSelect(key)) {
       _goBack();
+      return KeyEventResult.handled;
+    }
+    if (_isBack(key)) {
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -382,33 +395,40 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         },
         child: Scaffold(
           backgroundColor: AppTheme.bgDeep,
-          body: DefaultTextStyle.merge(
-            style: const TextStyle(decoration: TextDecoration.none),
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(28, 32, 40, 44),
-              children: [
-                _Header(
-                  showBackButton: widget.showBackButton,
-                  backNode: _backNode,
-                  onBackKey: _backKey,
-                  onBackTap: _goBack,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: const [
-                    _HeaderPill('Display'),
-                    SizedBox(width: 10),
-                    _HeaderPill('Source'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                ...sectionWidgets,
-                Text(
-                  _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ←/Back kembali' : '',
-                  style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
-                ),
-              ],
+          body: SafeArea(
+            top: true,
+            bottom: false,
+            left: false,
+            right: false,
+            child: DefaultTextStyle.merge(
+              style: const TextStyle(decoration: TextDecoration.none),
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(48, 24, 48, 200),
+                children: [
+                  _Header(
+                    showBackButton: widget.showBackButton,
+                    backNode: _backNode,
+                    onBackKey: _backKey,
+                    onBackTap: _goBack,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: const [
+                      _HeaderPill('Display'),
+                      SizedBox(width: 10),
+                      _HeaderPill('Source'),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  ...sectionWidgets,
+                  Text(
+                    _zone == TvZone.settings ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ←/Back kembali' : '',
+                    style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
         ),

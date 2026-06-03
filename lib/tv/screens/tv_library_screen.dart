@@ -171,7 +171,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
     _openingPlayer = true;
     _zone = TvZone.player;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item, onExitToHome: widget.onPlayerRouteClosed))).whenComplete(() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;

@@ -24,9 +24,7 @@ import '../../services/api/api_platform.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
-  final VoidCallback? onExitToHome;
-
-  const TvPlayerScreen({super.key, required this.item, this.onExitToHome});
+  const TvPlayerScreen({super.key, required this.item});
 
   @override
   State<TvPlayerScreen> createState() => _TvPlayerScreenState();
@@ -805,7 +803,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   bool _backDebounced() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 280) return true;
+    if (now - _lastBackHandledMs < 420) return true;
     _lastBackHandledMs = now;
     return false;
   }
@@ -840,7 +838,6 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (Navigator.canPop(context)) {
       _saveCurrentProgress(force: true);
       _flushPendingSeek();
-      widget.onExitToHome?.call();
       Navigator.pop(context);
     }
   }

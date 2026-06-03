@@ -145,7 +145,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   bool _ignoreRepeatedBack() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 260) return true;
+    if (now - _lastBackHandledMs < 420) return true;
     _lastBackHandledMs = now;
     return false;
   }

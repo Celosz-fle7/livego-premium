@@ -308,7 +308,7 @@ class _TvAppState extends State<TvApp> {
     // Android TV can deliver the same Back press through both Shortcuts
     // and PopScope. Guard it so one physical press produces one action.
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 320) return;
+    if (now - _lastBackHandledMs < 420) return;
     _lastBackHandledMs = now;
 
     if (now < _suppressBackUntilMs) {
