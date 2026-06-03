@@ -137,7 +137,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     setState(() => _confirmOpen = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (_categoryMode && _categoryNodes.isNotEmpty) {
+      if (_categoryMode) {
         _focusSource(_lastIndex, categoryMode: true, categoryIndex: _categoryIndex);
       } else {
         _focusSource(_lastIndex, categoryMode: false);
