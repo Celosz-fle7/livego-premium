@@ -65,8 +65,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   int _entryRetry = 0;
   int _entryTicket = 0;
   int _lastBackHandledMs = 0;
-  bool _navMoveLocked = false;
-  int _navMoveTicket = 0;
+  int _lastNavMoveMs = 0;
+  static const int _homeNavMoveIntervalMs = 145;
   bool _gridDataReady = false;
   bool _openingPlayer = false;
   List<ContentItem> _visibleGridItems = const <ContentItem>[];
@@ -397,30 +397,18 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   bool _ignoreNavWhileLocked(LogicalKeyboardKey key) {
-    return _isArrow(key) && _navMoveLocked;
+    if (!_isArrow(key)) return false;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now - _lastNavMoveMs < _homeNavMoveIntervalMs;
   }
 
-  void _lockNavMove({int frames = 2}) {
-    final ticket = ++_navMoveTicket;
-    _navMoveLocked = true;
-
-    void releaseAfter(int framesLeft) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || ticket != _navMoveTicket) return;
-        if (framesLeft > 1) {
-          releaseAfter(framesLeft - 1);
-          return;
-        }
-        _navMoveLocked = false;
-      });
-    }
-
-    releaseAfter(frames.clamp(1, 4).toInt());
+  void _markNavMove() {
+    _lastNavMoveMs = DateTime.now().millisecondsSinceEpoch;
   }
 
-  bool _moveFocus(TvZone zone, {int? index, bool throttle = true, int lockFrames = 2}) {
+  bool _moveFocus(TvZone zone, {int? index, bool throttle = true}) {
     final moved = _focusByZone(zone, index: index, throttle: throttle);
-    if (moved) _lockNavMove(frames: lockFrames);
+    if (moved) _markNavMove();
     return moved;
   }
 
