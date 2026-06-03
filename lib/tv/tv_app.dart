@@ -106,12 +106,12 @@ class _TvAppState extends State<TvApp> {
   void _prepareHomePlayerRoute() {
     // Player is a full-screen route. While it is open, the root TV app must
     // not interpret the same BACK press as a navbar command.
-    _suppressBackFor(1200);
+    _suppressBackFor(600);
     _hideNav();
   }
 
   void _restoreHomeAfterPlayerRoute() {
-    _suppressBackFor(1100);
+    _suppressBackFor(500);
     if (!mounted) return;
     setState(() {
       _returnToAccountMenuOnBack = false;
@@ -122,12 +122,12 @@ class _TvAppState extends State<TvApp> {
 
   void _prepareContentPlayerRoute() {
     // Same guard as Home, but keep the current TV page selected.
-    _suppressBackFor(1200);
+    _suppressBackFor(600);
     _hideNav();
   }
 
   void _restoreContentAfterPlayerRoute() {
-    _suppressBackFor(1100);
+    _suppressBackFor(500);
     if (!mounted) return;
     setState(() => _navMode = TvSideNavMode.hidden);
     _bumpContentTicket();
@@ -137,11 +137,11 @@ class _TvAppState extends State<TvApp> {
     if (!mounted || _navNodes.isEmpty) return;
     final node = _navNodes[_safeNav(navIndex)];
     if (node.context != null) {
-      tvFocus(node, alignment: 0.10);
+      tvFocus(node, alignment: 0.10, throttle: false);
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(node, alignment: 0.10);
+      if (mounted) tvFocus(node, alignment: 0.10, throttle: false);
     });
   }
 
@@ -279,7 +279,7 @@ class _TvAppState extends State<TvApp> {
       _restoreHomeBannerAfterExitDialog = restoreHomeBanner;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_exitCancelNode, alignment: 0.50);
+      if (mounted) tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
     });
   }
 
@@ -360,7 +360,7 @@ class _TvAppState extends State<TvApp> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
-      tvFocus(node == _exitCancelNode ? _exitConfirmNode : _exitCancelNode, alignment: 0.50);
+      tvFocus(node == _exitCancelNode ? _exitConfirmNode : _exitCancelNode, alignment: 0.50, throttle: false);
       return KeyEventResult.handled;
     }
 
