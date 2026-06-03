@@ -425,7 +425,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   void _retryFocusEntry(int ticket) {
     if (!mounted || !_entryPending || ticket != _entryTicket) return;
     _entryRetry++;
-    if (_entryRetry > 8) {
+    if (_entryRetry > 5) {
       final fallbackFocused =
           _focusByZone(TvZone.category, index: _lastCategory, throttle: false) ||
           _focusByZone(TvZone.platform, index: _lastPlatform, throttle: false) ||
@@ -871,7 +871,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
               right: false,
               child: ListView(
                 controller: _pageScroll,
-                padding: const EdgeInsets.fromLTRB(28, 28, 38, 220),
+                padding: const EdgeInsets.fromLTRB(28, 28, 38, 240),
                 children: [
             _FocusableBanner(
               item: hero,

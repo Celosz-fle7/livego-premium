@@ -166,7 +166,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     );
     if (!focused) return;
     _lastIndex = target;
-    if (mounted) setState(() {});
   }
 
   void _pushScreen(Widget screen) {
@@ -201,11 +200,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(index - 1);
+      _focusRow(index - 1, throttle: false);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(index + 1);
+      _focusRow(index + 1, throttle: false);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -252,7 +251,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             builder: (context, _, __) {
               return ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
+                padding: const EdgeInsets.fromLTRB(48, 24, 48, 240),
                 children: [
                 const _AccountHeader(),
                 const SizedBox(height: 14),

@@ -10,7 +10,7 @@ import 'package:flutter/widgets.dart';
 // several items while the viewport is still revealing an older item.
 //
 // Rules:
-// - arrow navigation is limited to about 8 steps/second
+// - arrow navigation is limited to about 10 steps/second
 // - token per FocusNode: only the latest callback for that node may scroll
 // - scroll is post-frame, after the focused widget has a valid layout
 // - activation keys (OK/BACK/MENU) only ignore KeyRepeatEvent here;
@@ -19,7 +19,7 @@ import 'package:flutter/widgets.dart';
 
 final Map<FocusNode, int> _focusFrameToken = <FocusNode, int>{};
 DateTime _lastNavTime = DateTime.fromMillisecondsSinceEpoch(0);
-const Duration _navInterval = Duration(milliseconds: 120);
+const Duration _navInterval = Duration(milliseconds: 100);
 
 
 bool _throttledFocus(
@@ -147,7 +147,7 @@ bool tvFocusGrid(
       duration: duration,
     ),
     throttle: throttle,
-    postFrameDelay: 1,
+    postFrameDelay: 2,
   );
 }
 
