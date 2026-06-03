@@ -1569,12 +1569,10 @@ class _TvPosterTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.42),
-                          width: focused ? 2.0 : 0.6,
+                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.26),
+                          width: 1.4,
                         ),
-                        boxShadow: focused
-                            ? [TvFocusStyle.glow(0.075, 6), const BoxShadow(color: Colors.black54, blurRadius: 7)]
-                            : [const BoxShadow(color: Colors.black38, blurRadius: 5)],
+                        boxShadow: null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),

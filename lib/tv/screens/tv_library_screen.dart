@@ -436,8 +436,8 @@ class _TvLibraryPoster extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0),
-                        boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
+                        border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 1.5),
+                        boxShadow: null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),

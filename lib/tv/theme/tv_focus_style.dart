@@ -14,20 +14,15 @@ class TvFocusStyle {
   static const Duration fast = Duration.zero;
   static const Duration normal = Duration.zero;
 
+  // Render-light focus mode for Android TV boxes: use border/color for the
+  // cursor and avoid blurred shadows. Blur shadows are expensive during
+  // fast remote navigation and can make the screen feel late behind focus.
   static BoxShadow glow([double opacity = 0.14, double blur = 8]) {
-    return BoxShadow(
-      color: focusBlue.withOpacity(opacity > 0.18 ? 0.18 : opacity),
-      blurRadius: blur > 8 ? 8 : blur,
-      spreadRadius: 0,
-    );
+    return const BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0);
   }
 
   static BoxShadow softGlow([double opacity = 0.08, double blur = 10]) {
-    return BoxShadow(
-      color: focusBlueSoft.withOpacity(opacity > 0.12 ? 0.12 : opacity),
-      blurRadius: blur > 10 ? 10 : blur,
-      spreadRadius: 0,
-    );
+    return const BoxShadow(color: Colors.transparent, blurRadius: 0, spreadRadius: 0);
   }
 
   static Border focusedBorder({double width = 2.4}) {
