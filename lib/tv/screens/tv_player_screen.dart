@@ -1372,7 +1372,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
-    final selectPressed = selectPressed;
+    final selectPressed = _isSelect(key);
     if (selectPressed && _selectDebounced()) {
       return KeyEventResult.handled;
     }
