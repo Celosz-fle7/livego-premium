@@ -7,6 +7,7 @@ class TvEmptyPanel extends StatelessWidget {
   final String title;
   final String subtitle;
   final double height;
+  final bool focused;
 
   const TvEmptyPanel({
     super.key,
@@ -14,6 +15,7 @@ class TvEmptyPanel extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.height = 250,
+    this.focused = false,
   });
 
   @override

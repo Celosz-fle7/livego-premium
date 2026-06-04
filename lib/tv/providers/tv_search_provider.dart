@@ -8,18 +8,21 @@ class TvSearchState {
   final String query;
   final List<ContentItem> results;
   final bool loading;
+  final bool hasError;
 
   const TvSearchState({
     this.query = '',
     this.results = const <ContentItem>[],
     this.loading = false,
+    this.hasError = false,
   });
 
-  TvSearchState copyWith({String? query, List<ContentItem>? results, bool? loading}) {
+  TvSearchState copyWith({String? query, List<ContentItem>? results, bool? loading, bool? hasError}) {
     return TvSearchState(
       query: query ?? this.query,
       results: results ?? this.results,
       loading: loading ?? this.loading,
+      hasError: hasError ?? this.hasError,
     );
   }
 }
@@ -30,7 +33,7 @@ class TvSearchController extends StateNotifier<TvSearchState> {
   int _ticket = 0;
 
   void setDraft(String value) {
-    state = state.copyWith(query: value.trim());
+    state = state.copyWith(query: value.trim(), hasError: false);
   }
 
   Future<void> search(String value) async {
@@ -41,18 +44,21 @@ class TvSearchController extends StateNotifier<TvSearchState> {
       return;
     }
 
-    state = state.copyWith(query: clean, loading: true, results: const <ContentItem>[]);
+    state = state.copyWith(query: clean, loading: true, results: const <ContentItem>[], hasError: false);
     List<ContentItem> rows = const <ContentItem>[];
+    var hasError = false;
     try {
       rows = await LiveGoCatalog.searchAll(clean)
           .timeout(const Duration(seconds: 22), onTimeout: () => const <ContentItem>[]);
     } catch (_) {
+      hasError = true;
       rows = const <ContentItem>[];
     }
     if (ticket != _ticket) return;
     state = TvSearchState(
       query: clean,
       loading: false,
+      hasError: hasError,
       results: ContentHealthService.filterPlayable(rows),
     );
   }

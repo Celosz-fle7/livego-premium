@@ -41,6 +41,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _controller = TextEditingController();
   final FocusNode _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-input');
+  final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-empty-retry');
   final List<FocusNode> _resultNodes = <FocusNode>[];
   TvZone _zone = TvZone.list;
   int _gridIndex = 0;
@@ -63,6 +64,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   @override
   void dispose() {
     _searchNode.dispose();
+    _emptyNode.dispose();
     for (final node in _resultNodes) {
       node.dispose();
     }
@@ -103,8 +105,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     return ok;
   }
 
+  bool _focusEmpty({bool throttle = true}) {
+    if (_emptyNode.context == null) return false;
+    final ok = tvFocusComfort(_emptyNode, throttle: throttle);
+    if (ok) _zone = TvZone.placeholder;
+    return ok;
+  }
+
   void _handleBack() {
-    if (_zone == TvZone.grid) {
+    if (_zone == TvZone.grid || _zone == TvZone.placeholder) {
       _focusInput(throttle: false);
       return;
     }
@@ -122,7 +131,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       if (_resultNodes.isNotEmpty) {
         _focusGrid(0, throttle: false);
       } else {
-        _focusInput(throttle: false);
+        _focusEmpty(throttle: false) || _focusInput(throttle: false);
       }
     });
   }
@@ -161,10 +170,41 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_resultNodes.isNotEmpty) _focusGrid(_gridIndex);
+      if (_resultNodes.isNotEmpty) {
+        _focusGrid(_gridIndex);
+      } else {
+        _focusEmpty();
+      }
+      return KeyEventResult.handled;
+    }
+    if (tvIsSelectKey(key) || key == LogicalKeyboardKey.arrowRight) {
+      _submitSearch(_controller.text);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _emptyKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _focusInput(throttle: false);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
+      _submitSearch(_controller.text);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.handled;
   }
 
   KeyEventResult _gridKey(int index, ContentItem item, int columns, KeyEvent event) {
@@ -242,7 +282,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
               bottom: true,
               child: CustomScrollView(
                 controller: _scroll,
-                cacheExtent: 1200,
+                cacheExtent: 720,
                 slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
@@ -302,10 +342,30 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
                           )
                         else if (results.isEmpty)
-                          TvEmptyPanel(
-                            icon: search.query.isNotEmpty ? Icons.search_off_rounded : Icons.travel_explore_rounded,
-                            title: search.query.isNotEmpty ? 'Tidak ada hasil' : 'Cari dari source aktif LiveGo',
-                            subtitle: 'Ketik kata kunci lalu tekan Enter/Search.',
+                          ListenableBuilder(
+                            listenable: _emptyNode,
+                            builder: (context, _) {
+                              return Focus(
+                                focusNode: _emptyNode,
+                                skipTraversal: true,
+                                onKeyEvent: (node, event) => _emptyKey(event),
+                                onFocusChange: (focused) {
+                                  if (focused) _zone = TvZone.placeholder;
+                                },
+                                child: TvEmptyPanel(
+                                  focused: _emptyNode.hasFocus,
+                                  icon: search.hasError
+                                      ? Icons.wifi_off_rounded
+                                      : (search.query.isNotEmpty ? Icons.search_off_rounded : Icons.travel_explore_rounded),
+                                  title: search.hasError
+                                      ? 'Pencarian gagal dimuat'
+                                      : (search.query.isNotEmpty ? 'Tidak ada hasil' : 'Cari dari source aktif LiveGo'),
+                                  subtitle: search.query.isEmpty
+                                      ? 'Ketik kata kunci lalu tekan Enter/Search.'
+                                      : 'OK coba lagi • UP ke input • LEFT ke navbar',
+                                ),
+                              );
+                            },
                           )
                         else ...[
                           Row(
