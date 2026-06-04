@@ -146,6 +146,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       case TvZone.platform:
         if (_focusPlatform(_platformIndex, throttle: false)) return true;
         break;
+      case TvZone.nav:
+      case TvZone.list:
+      case TvZone.settings:
+      case TvZone.placeholder:
+      case TvZone.player:
       case TvZone.banner:
         break;
     }
