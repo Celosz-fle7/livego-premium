@@ -78,6 +78,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Future<List<LiveGoEpisode>>? _episodeListLoad;
   bool _episodeNavigationBusy = false;
   bool _resumePlaybackAfterFailedEpisode = true;
+  bool _routeClosing = false;
 
   double _speed = 1.0;
   String _audioTrack = 'Source';
@@ -819,8 +820,29 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   bool _selectDebounced([int ms = 280]) => _playerFocus.ignoreSelect(ms);
 
+  void _exitPlayerRoute() {
+    if (_routeClosing || !mounted) return;
+    _routeClosing = true;
+    _cancelAutoHide();
+    _statusTimer?.cancel();
+    _saveCurrentProgress(force: true);
+    _flushPendingSeek();
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      _routeClosing = false;
+    }
+  }
+
   void _handleBack() {
     if (_backDebounced()) return;
+
+    // Saat stream belum siap atau error, BACK berarti keluar dari player.
+    // Jangan sembunyikan overlay dulu karena itu terasa seperti BACK tertahan/dobel.
+    if ((_loading || _isPlayerErrorState) && !_hasReadyController) {
+      _exitPlayerRoute();
+      return;
+    }
 
     // BACK harus mundur satu langkah di player:
     // popup -> control dock -> layar video bersih -> keluar ke asal poster.
@@ -846,11 +868,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return;
     }
 
-    if (Navigator.canPop(context)) {
-      _saveCurrentProgress(force: true);
-      _flushPendingSeek();
-      Navigator.pop(context);
-    }
+    _exitPlayerRoute();
   }
 
   void _togglePlay() {
@@ -1557,7 +1575,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
-        if (!didPop) _handleBack();
+        if (!didPop && !_routeClosing) _handleBack();
       },
       child: Focus(
         focusNode: _rootFocus,
@@ -1565,18 +1583,22 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         skipTraversal: true,
         onKeyEvent: _handleRemoteKey,
         child: Scaffold(
-          backgroundColor: AppTheme.bg,
+          backgroundColor: Colors.black,
           body: Stack(
             fit: StackFit.expand,
             children: [
+              const ColoredBox(color: Colors.black),
               if (ready)
                 _buildVideoSurface(controller)
               else if (item.backdropUrl.isNotEmpty || item.posterUrl.isNotEmpty)
-                LiveGoCachedImage(
-                  url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
-                  fit: BoxFit.cover,
-                  role: LiveGoImageRole.banner,
-                  tv: true,
+                DecoratedBox(
+                  decoration: const BoxDecoration(color: Colors.black),
+                  child: LiveGoCachedImage(
+                    url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
+                    fit: BoxFit.cover,
+                    role: LiveGoImageRole.banner,
+                    tv: true,
+                  ),
                 ),
               Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
               if (_loading)
