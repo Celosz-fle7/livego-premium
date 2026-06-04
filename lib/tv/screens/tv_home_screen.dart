@@ -14,6 +14,8 @@ import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
+import '../navigation/tv_nav_index.dart';
+import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
 import '../providers/tv_home_provider.dart';
 import '../providers/tv_remote_owner.dart';
@@ -53,6 +55,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final List<FocusNode> _categoryNodes = <FocusNode>[];
   final List<FocusNode> _gridNodes = <FocusNode>[];
   final GlobalKey<TvHomeProfessionalRowsState> _rowsKey = GlobalKey<TvHomeProfessionalRowsState>();
+  final TvNavigationService _navService = TvNavigationService.instance;
+  late final VoidCallback _navListener;
+  final ValueNotifier<int> _homeNavTick = ValueNotifier<int>(0);
 
   int _platformIndex = 0;
   int _categoryIndex = 0;
@@ -83,11 +88,23 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _navListener = _onNavChanged;
+    _navService.addListener(_navListener);
     _restoreSavedSelection();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadHome(clearPrevious: false);
       _focusBanner(throttle: false);
+    });
+  }
+
+  void _onNavChanged() {
+    if (!mounted) return;
+    if (_navService.index != TvNavIndex.home) return;
+    _homeNavTick.value = _homeNavTick.value + 1;
+    if (_navService.navFocused) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _restoreZoneFocus(throttle: false);
     });
   }
 
@@ -105,6 +122,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   @override
   void dispose() {
+    _navService.removeListener(_navListener);
+    _homeNavTick.dispose();
     _bannerNode.dispose();
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
@@ -500,7 +519,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     final padding = TvReachability.homePadding;
     final gridTitle = categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[_categoryIndex]}';
 
-    return Shortcuts(
+    return ListenableBuilder(
+      listenable: _homeNavTick,
+      builder: (context, _) {
+        return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.goBack): _HomeBackIntent(),
         SingleActivator(LogicalKeyboardKey.escape): _HomeBackIntent(),
@@ -627,6 +649,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

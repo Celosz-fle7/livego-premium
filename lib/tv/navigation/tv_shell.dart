@@ -16,6 +16,7 @@ import '../screens/tv_search_screen.dart';
 import '../theme/tv_focus_style.dart';
 import '../widgets/tv_side_nav.dart';
 import 'tv_nav_index.dart';
+import 'tv_navigation_service.dart';
 
 class TvShell extends ConsumerStatefulWidget {
   const TvShell({super.key});
@@ -35,6 +36,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   int _suppressBackUntilMs = 0;
   bool _exitOpen = false;
   bool _returnToAccount = false;
+  final TvNavigationService _navService = TvNavigationService.instance;
 
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
@@ -83,16 +85,21 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _syncOwner({bool navFocused = false}) {
+    final owner = navFocused ? TvRemoteOwner.navbar : _ownerFor(_index);
     final nav = ref.read(tvNavigationProvider.notifier);
     if (navFocused) {
       nav.selectNav(_index);
-      ref.read(tvFocusProvider.notifier).setOwner(TvRemoteOwner.navbar);
     } else {
-      final owner = _ownerFor(_index);
       nav.enterContent(_index);
-      nav.setOwner(owner);
-      ref.read(tvFocusProvider.notifier).setOwner(owner);
     }
+    nav.setOwner(owner);
+    ref.read(tvFocusProvider.notifier).setOwner(owner);
+    _navService.update(
+      index: _index,
+      navFocused: navFocused,
+      owner: owner.name,
+      navMode: _navMode.name,
+    );
   }
 
   bool _backAllowed() {
