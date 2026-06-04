@@ -7,7 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/app_theme.dart';
 import '../theme/tv_focus_style.dart';
-import '../utils/tv_focus_utils.dart';
+import '../focus/tv_focus_utils.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';

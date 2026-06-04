@@ -6,7 +6,7 @@ import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../models/tv_zone.dart';
-import '../utils/tv_focus_utils.dart';
+import '../focus/tv_focus_utils.dart';
 
 class TvSettingsScreen extends StatefulWidget {
   final bool showBackButton;
@@ -162,7 +162,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (_rowNodes.isEmpty) return;
     _zone = TvZone.settings;
     _lastRow = _safe(index);
-    tvFocusComfort(_rowNodes[_lastRow]);
+    tvFocusComfort(_rowNodes[_lastRow], topMargin: 104, bottomMargin: 180);
   }
 
   bool _ignoreRepeatedBack() {

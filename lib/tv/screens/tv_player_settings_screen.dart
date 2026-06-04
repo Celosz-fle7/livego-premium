@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../services/player/player_preferences.dart';
-import '../utils/tv_focus_utils.dart';
+import '../focus/tv_focus_utils.dart';
 import '../widgets/tv_focused_border.dart';
 
 class TvPlayerSettingsScreen extends StatefulWidget {

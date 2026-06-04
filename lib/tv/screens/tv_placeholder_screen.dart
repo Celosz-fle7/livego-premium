@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
-import '../utils/tv_focus_utils.dart';
+import '../focus/tv_focus_utils.dart';
 
 class TvPlaceholderScreen extends StatefulWidget {
   final String title;

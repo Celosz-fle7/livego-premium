@@ -5,8 +5,8 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../theme/tv_focus_style.dart';
-import '../utils/tv_focus_utils.dart';
-import '../utils/tv_reachability.dart';
+import '../focus/tv_focus_utils.dart';
+import '../focus/tv_reachability.dart';
 import 'tv_settings_screen.dart';
 import 'tv_source_manager_screen.dart';
 
@@ -161,6 +161,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final target = _safe(index);
     final focused = tvFocusComfort(
       _nodes[target],
+      topMargin: 104,
+      bottomMargin: 180,
       throttle: throttle,
     );
     if (!focused) return;

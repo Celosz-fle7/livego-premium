@@ -6,8 +6,8 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../theme/tv_focus_style.dart';
-import '../utils/tv_focus_utils.dart';
-import '../utils/tv_reachability.dart';
+import '../focus/tv_focus_utils.dart';
+import '../focus/tv_reachability.dart';
 import '../widgets/tv_focused_border.dart';
 
 class TvSourceManagerScreen extends StatefulWidget {
@@ -147,7 +147,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _focusBack() {
-    final focused = tvFocusComfort(_backNode);
+    final focused = tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
     if (!focused) return;
     _categoryMode = false;
     if (mounted) setState(() {});
@@ -165,6 +165,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (nextCategoryIndex < 0) nextCategoryIndex = 0;
     final focused = tvFocusComfort(
       _sourceNodes[target],
+      topMargin: 112,
+      bottomMargin: 180,
       throttle: throttle,
     );
     if (!focused) return;

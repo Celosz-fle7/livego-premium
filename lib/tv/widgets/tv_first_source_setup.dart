@@ -9,7 +9,7 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../services/api/api_platform.dart';
 import '../theme/tv_focus_style.dart';
-import '../utils/tv_focus_utils.dart';
+import '../focus/tv_focus_utils.dart';
 
 class TvFirstSourceSetup extends StatefulWidget {
   final VoidCallback onDone;
@@ -94,7 +94,7 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
   void _focusRow(int value) {
     if (_nodes.isEmpty) return;
     _index = value.clamp(0, _nodes.length - 1).toInt();
-    tvFocusComfort(_nodes[_index]);
+    tvFocusComfort(_nodes[_index], topMargin: 132, bottomMargin: 178);
     if (mounted) setState(() {});
   }
 

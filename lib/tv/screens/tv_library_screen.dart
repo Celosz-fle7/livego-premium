@@ -9,8 +9,8 @@ import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
-import '../utils/tv_focus_utils.dart';
-import '../utils/tv_reachability.dart';
+import '../focus/tv_focus_utils.dart';
+import '../focus/tv_reachability.dart';
 import 'tv_player_screen.dart';
 
 class TvLibraryScreen extends StatefulWidget {
