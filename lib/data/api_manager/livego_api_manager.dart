@@ -24,6 +24,17 @@ class LiveGoApiManager {
 
   static bool isInCooldown(String platform) => healthOf(platform).isInCooldown;
 
+  static List<String> fallbackPlatformsFor(String platform, {int max = 4}) {
+    // Kept here as a public hook for UI/service diagnostics.
+    final clean = _normalizePlatform(platform);
+    final active = LiveGoSettings.activePlatforms
+        .where((slug) => _normalizePlatform(slug) != clean)
+        .where((slug) => !isInCooldown(slug))
+        .take(max)
+        .toList(growable: false);
+    return active;
+  }
+
   static String statusFor(String platform) {
     final entry = healthOf(platform);
     if (entry.isInCooldown) return 'cooldown';

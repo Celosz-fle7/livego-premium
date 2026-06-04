@@ -12,6 +12,7 @@ import '../services/player/playback_resolver.dart';
 import '../models/livego_episode.dart';
 import 'api_manager/livego_api_manager.dart';
 import 'api_manager/api_timeout_policy.dart';
+import 'api_manager/api_platform_fallback_router.dart';
 import 'mock_catalog.dart';
 
 class LiveGoCatalog {
@@ -56,6 +57,57 @@ class LiveGoCatalog {
       request: () => LiveGoApiGateway.ping(platform, languageFor(platform)),
       fallbackStatus: 'offline',
     );
+  }
+
+  static Future<List<ContentItem>> _readExpiredItems({
+    required String platform,
+    required String endpoint,
+    required Map<String, String> params,
+  }) async {
+    final expired = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: endpoint,
+      params: params,
+      allowExpired: true,
+    );
+    return ContentHealthService.filterPlayable(expired ?? const <ContentItem>[]);
+  }
+
+  static Future<List<ContentItem>> _fallbackHomeFromOtherPlatforms({
+    required String preferredPlatform,
+    required String operation,
+  }) async {
+    for (final candidate in ApiPlatformFallbackRouter.fallbackOnly(preferredPlatform, max: 3)) {
+      final lang = languageFor(candidate);
+      final endpoint = isDobdaPlatform(candidate) ? 'home_clean_v2' : 'home';
+      final cached = await _readExpiredItems(
+        platform: candidate,
+        endpoint: endpoint,
+        params: {'lang': lang},
+      );
+      if (cached.isNotEmpty) {
+        print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate cached=${cached.length}');
+        return cached;
+      }
+
+      final rows = await LiveGoApiManager.fetchItems(
+        platform: candidate,
+        operation: '$operation:fallback:$candidate',
+        timeout: ApiTimeoutPolicy.home,
+        request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
+      );
+      if (rows.isNotEmpty) {
+        print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
+        await LiveGoContentCache.writeItems(
+          platform: candidate,
+          endpoint: endpoint,
+          params: {'lang': lang},
+          items: rows,
+        );
+        return rows;
+      }
+    }
+    return const <ContentItem>[];
   }
 
   static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
@@ -103,13 +155,17 @@ class LiveGoCatalog {
       return discoverRows;
     }
 
-    final expired = await LiveGoContentCache.readItems(
+    final expired = await _readExpiredItems(
       platform: platform,
       endpoint: endpoint,
       params: {'lang': lang},
-      allowExpired: true,
     );
-    return ContentHealthService.filterPlayable(expired ?? const <ContentItem>[]);
+    if (expired.isNotEmpty) return expired;
+
+    return _fallbackHomeFromOtherPlatforms(
+      preferredPlatform: platform,
+      operation: 'home',
+    );
   }
 
 
@@ -213,18 +269,30 @@ class LiveGoCatalog {
         params: {'lang': lang},
         items: rows,
       );
+      return FeedLimiter.prepare(rows, visitSeed: visitSeed);
     }
-    return FeedLimiter.prepare(rows, visitSeed: visitSeed);
+
+    final fallbackRows = await _fallbackHomeFromOtherPlatforms(
+      preferredPlatform: platform,
+      operation: 'category:$endpoint',
+    );
+    return FeedLimiter.prepare(fallbackRows, visitSeed: visitSeed);
   }
 
   static Future<Map<String, List<ContentItem>>> homeSections() async {
     await LiveGoContentCache.cleanExpiredAndTrim();
-    final futures = platforms.take(6).map((platform) async {
+    final entries = <MapEntry<String, List<ContentItem>>>[];
+    final seenKeys = <String>{};
+    for (final platform in platforms.take(6)) {
       final rows = await home(platform: platform);
-      return MapEntry(label(platform), rows);
-    });
-    final entries = await Future.wait(futures);
-    return Map.fromEntries(entries.where((e) => e.value.isNotEmpty));
+      final clean = <ContentItem>[];
+      for (final item in rows) {
+        final key = ContentHealthService.contentKey(item);
+        if (seenKeys.add(key)) clean.add(item);
+      }
+      if (clean.isNotEmpty) entries.add(MapEntry(label(platform), clean));
+    }
+    return Map.fromEntries(entries);
   }
 
   static Future<List<ContentItem>> banners({String platform = 'shortmax'}) async {
@@ -280,14 +348,26 @@ class LiveGoCatalog {
     if (clean.isEmpty) return [];
     final merged = <ContentItem>[];
     final seen = <String>{};
-    for (final platform in platforms) {
-      if (LiveGoApiManager.isInCooldown(platform) && merged.isNotEmpty) continue;
-      final rows = await search(clean, platform: platform);
+    void mergeRows(List<ContentItem> rows) {
       for (final item in ContentHealthService.filterPlayable(rows)) {
         final key = ContentHealthService.contentKey(item);
         if (seen.add(key)) merged.add(item);
       }
     }
+
+    for (final platform in platforms) {
+      if (LiveGoApiManager.isInCooldown(platform) && merged.isNotEmpty) continue;
+      mergeRows(await search(clean, platform: platform));
+    }
+
+    if (merged.isEmpty) {
+      for (final platform in ApiPlatformFallbackRouter.candidates(platforms.isEmpty ? 'shortmax' : platforms.first, max: 5)) {
+        if (platforms.contains(platform)) continue;
+        mergeRows(await search(clean, platform: platform));
+        if (merged.isNotEmpty) break;
+      }
+    }
+
     return merged;
   }
 
