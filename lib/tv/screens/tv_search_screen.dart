@@ -266,19 +266,16 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
+            final padding = TvReachability.contentPadding;
             return SafeArea(
               child: CustomScrollView(
                 controller: _scrollController,
+                cacheExtent: 1200,
                 slivers: [
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      TvReachability.contentPadding.left,
-                      TvReachability.contentPadding.top,
-                      TvReachability.contentPadding.right,
-                      0,
-                    ),
+                    padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                     sliver: SliverList(
-                      delegate: SliverChildListDelegate([
+                      delegate: SliverChildListDelegate.fixed([
                         _SearchHeader(),
                         const SizedBox(height: 14),
                         Focus(
@@ -289,7 +286,8 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                             listenable: _searchNode,
                             builder: (context, _) {
                               final focused = _searchNode.hasFocus;
-                              return Container(
+                              return AnimatedContainer(
+                                duration: TvFocusStyle.fast,
                                 padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(22),
@@ -347,7 +345,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                   ),
                   if (!_loading && _results.isNotEmpty)
                     SliverPadding(
-                      padding: EdgeInsets.fromLTRB(TvReachability.contentPadding.left, 0, TvReachability.contentPadding.right, 0),
+                      padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
                       sliver: SliverGrid(
                         delegate: SliverChildBuilderDelegate(
                           (context, i) {
@@ -363,11 +361,19 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                             );
                           },
                           childCount: _results.length,
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          addSemanticIndexes: false,
                         ),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 224, crossAxisSpacing: 14, mainAxisSpacing: 16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          mainAxisExtent: 224,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 16,
+                        ),
                       ),
                     ),
-                  SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
+                  const SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
                 ],
               ),
             );
@@ -467,9 +473,9 @@ class _SearchPoster extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: RepaintBoundary(
-                    child: Container(
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 1.5), boxShadow: null),
+                    child: AnimatedContainer(
+                      duration: TvFocusStyle.fast,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: item.posterUrl.isEmpty
@@ -478,7 +484,6 @@ class _SearchPoster extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
                   const SizedBox(height: 8),
                   Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.12, decoration: TextDecoration.none)),
                 ],

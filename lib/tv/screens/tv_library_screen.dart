@@ -248,10 +248,6 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       builder: (context, _, __) {
         final items = _items;
         _syncGridNodes(items.length);
-        if (_entryPending) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
-        }
-
         return Shortcuts(
           shortcuts: const <ShortcutActivator, Intent>{
             SingleActivator(LogicalKeyboardKey.goBack): _TvLibraryBackIntent(),
@@ -268,19 +264,16 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
+                final padding = TvReachability.contentPadding;
                 return SafeArea(
                   child: CustomScrollView(
                     controller: _scrollController,
+                    cacheExtent: 1200,
                     slivers: [
                       SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          TvReachability.contentPadding.left,
-                          TvReachability.contentPadding.top,
-                          TvReachability.contentPadding.right,
-                          0,
-                        ),
+                        padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                         sliver: SliverList(
-                          delegate: SliverChildListDelegate([
+                          delegate: SliverChildListDelegate.fixed([
                             _LibraryHeader(title: widget.title, icon: widget.icon, count: items.length, favorites: widget.favorites),
                             const SizedBox(height: 16),
                             if (items.isEmpty)
@@ -312,7 +305,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                       ),
                       if (items.isNotEmpty)
                         SliverPadding(
-                          padding: EdgeInsets.fromLTRB(TvReachability.contentPadding.left, 0, TvReachability.contentPadding.right, 0),
+                          padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
                           sliver: SliverGrid(
                             delegate: SliverChildBuilderDelegate(
                               (context, i) {
@@ -328,6 +321,9 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                                 );
                               },
                               childCount: items.length,
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              addSemanticIndexes: false,
                             ),
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
@@ -337,7 +333,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                             ),
                           ),
                         ),
-                      SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
+                      const SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
                     ],
                   ),
                 );
@@ -432,12 +428,12 @@ class _TvLibraryPoster extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: RepaintBoundary(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: TvFocusStyle.fast,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 1.5),
-                        boxShadow: null,
+                        border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0),
+                        boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -459,7 +455,6 @@ class _TvLibraryPoster extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
                   const SizedBox(height: 8),
                   Text(
                     item.title,
