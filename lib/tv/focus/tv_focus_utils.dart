@@ -133,7 +133,7 @@ bool tvFocusComfort(
 bool tvFocusGrid(
   FocusNode node, {
   double topMargin = TvReachability.gridTopMargin,
-  double bottomMargin = TvReachability.gridBottomMargin,
+  double bottomMargin = TvReachability.gridBottomMargin + 24,
   Duration duration = Duration.zero,
   bool throttle = true,
 }) {
@@ -154,6 +154,45 @@ bool tvFocusGrid(
     // after focus decoration has a layout and keeps scroll closer to remote.
     postFrameDelay: 1,
   );
+}
+
+/// Keep the current focused node inside the safe TV window without moving focus.
+///
+/// Use this when a D-pad direction has no valid target. The focused item stays
+/// owned by the current screen, but the viewport is corrected so the user does
+/// not land in a dead/cropped zone.
+bool tvRevealFocused(
+  FocusNode node, {
+  double topMargin = TvReachability.gridTopMargin,
+  double bottomMargin = TvReachability.gridBottomMargin,
+  Duration duration = Duration.zero,
+  int postFrameDelay = 1,
+}) {
+  if (node.context == null || !node.hasFocus) return false;
+
+  final token = (_focusFrameToken[node] ?? 0) + 1;
+  _focusFrameToken[node] = token;
+
+  void scheduleReveal(int framesLeft) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_focusFrameToken[node] != token) return;
+      if (framesLeft > 1) {
+        scheduleReveal(framesLeft - 1);
+        return;
+      }
+      _focusFrameToken.remove(node);
+      if (node.context == null || !node.hasFocus) return;
+      _revealInViewport(
+        node,
+        topMargin: topMargin,
+        bottomMargin: bottomMargin,
+        duration: duration,
+      );
+    });
+  }
+
+  scheduleReveal(postFrameDelay.clamp(1, 3).toInt());
+  return true;
 }
 
 void _revealInViewport(

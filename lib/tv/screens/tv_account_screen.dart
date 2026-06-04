@@ -153,11 +153,19 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(current - 1);
+      if (current > 0) {
+        _focusRow(current - 1);
+      } else {
+        _focusRow(current, throttle: false);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(current + 1);
+      if (current < _nodes.length - 1) {
+        _focusRow(current + 1);
+      } else {
+        _focusRow(current, throttle: false);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {

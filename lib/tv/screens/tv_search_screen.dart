@@ -114,6 +114,24 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     return ok;
   }
 
+  bool _holdCurrentFocusVisible() {
+    switch (_zone) {
+      case TvZone.grid:
+        if (_resultNodes.isNotEmpty) {
+          final target = _safe(_gridIndex);
+          final node = _resultNodes[target];
+          return tvRevealFocused(node) || _focusGrid(target, throttle: false);
+        }
+        break;
+      case TvZone.placeholder:
+        return _focusEmpty(throttle: false);
+      case TvZone.list:
+      default:
+        return _focusInput(throttle: false);
+    }
+    return _focusInput(throttle: false);
+  }
+
   void _handleBack() {
     if (_zone == TvZone.grid || _zone == TvZone.placeholder) {
       _focusInput(throttle: false);
@@ -192,8 +210,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     if (key == LogicalKeyboardKey.arrowDown) {
       if (_resultNodes.isNotEmpty) {
         _focusGrid(_gridIndex);
-      } else {
-        _focusEmpty();
+      } else if (!_focusEmpty()) {
+        _holdCurrentFocusVisible();
       }
       return KeyEventResult.handled;
     }
@@ -252,7 +270,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _resultNodes.length - 1) _focusGrid(current + 1);
+      if (current < _resultNodes.length - 1) {
+        _focusGrid(current + 1);
+      } else {
+        _holdCurrentFocusVisible();
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -265,7 +287,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = current + columns;
-      if (next < _resultNodes.length) _focusGrid(next);
+      if (next < _resultNodes.length) {
+        _focusGrid(next);
+      } else {
+        _holdCurrentFocusVisible();
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
