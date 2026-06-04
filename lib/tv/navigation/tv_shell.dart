@@ -53,8 +53,10 @@ class _TvShellState extends ConsumerState<TvShell> {
   final TvNavigationService _navService = TvNavigationService.instance;
 
   // Keep this intentionally conservative for low-end Android TV boxes.
-  // Add TvNavIndex.search or TvNavIndex.account only after real-device testing.
-  Set<int> get _keptAliveScreens => const <int>{TvNavIndex.home};
+  // Home stays warm for main focus memory. Account is also kept alive because
+  // real-device tests showed Account/navbar BACK and restore are sensitive to
+  // full rebuilds. Search stays disposable until testing proves it needs cache.
+  Set<int> get _keptAliveScreens => const <int>{TvNavIndex.home, TvNavIndex.account};
 
 
   late final FocusNode _rootFocusNode;
