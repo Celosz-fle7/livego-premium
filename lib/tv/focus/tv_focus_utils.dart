@@ -179,18 +179,7 @@ bool tvFocusGrid(
   );
 }
 
-/// Keep the current focused node inside the safe TV window without moving focus.
-///
-/// Use this when a D-pad direction has no valid target. The focused item stays
-/// owned by the current screen, but the viewport is corrected so the user does
-/// not land in a dead/cropped zone.
-bool tvRevealFocused(
-  FocusNode node, {
-  double topMargin = TvReachability.gridTopMargin,
-  double bottomMargin = TvReachability.gridBottomMargin,
-  Duration duration = Duration.zero,
-  int postFrameDelay = 1,
-}) {
+) {
   if (node.context == null || !node.hasFocus) return false;
 
   final token = (_focusFrameToken[node] ?? 0) + 1;
