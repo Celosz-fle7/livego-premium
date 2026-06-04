@@ -45,17 +45,25 @@ class _TvShellState extends ConsumerState<TvShell> {
   @override
   void initState() {
     super.initState();
+    _rootFocusNode = FocusNode(skipTraversal: true, debugLabel: 'tv-shell-root');
     _navNodes = List.generate(TvSideNav.items.length, (i) => FocusNode(skipTraversal: true, debugLabel: 'tv-nav-$i'));
     _exitCancelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-cancel');
     _exitConfirmNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-confirm');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _homeBannerTicket++);
+      if (!mounted) return;
+      _rootFocusNode.requestFocus();
+      _syncOwner();
+      setState(() => _homeBannerTicket++);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _bootstrapActiveFocus(forceBanner: true);
+      });
     });
   }
 
   @override
   void dispose() {
+    _rootFocusNode.dispose();
     for (final node in _navNodes) {
       node.dispose();
     }
@@ -215,6 +223,66 @@ class _TvShellState extends ConsumerState<TvShell> {
     _suppressBack(650);
     _hideNav();
     _bumpFocusForCurrent();
+  }
+
+
+  bool _isDpadOrActivation(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        tvIsSelectKey(key) ||
+        tvIsMenuKey(key);
+  }
+
+  bool _primaryFocusMissing() {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return true;
+    if (primary == _rootFocusNode) return true;
+    if (primary.context == null) return true;
+    return false;
+  }
+
+  void _bootstrapActiveFocus({bool forceBanner = false}) {
+    if (!mounted) return;
+    if (_exitOpen) {
+      tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
+      return;
+    }
+
+    if (_navMode == TvSideNavMode.focused || _navHasFocus) {
+      _syncOwner(navFocused: true);
+      _focusNav(_index);
+      return;
+    }
+
+    _syncOwner();
+    _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
+  }
+
+  KeyEventResult _rootKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+
+    final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+
+    if (!_isDpadOrActivation(key)) return KeyEventResult.ignored;
+
+    // If no child has claimed focus, TV remotes send arrows/OK into the void.
+    // Keep the root shell focused as a safety net and push focus back into the
+    // active screen on the first D-Pad/OK press.
+    if (_primaryFocusMissing()) {
+      _bootstrapActiveFocus(forceBanner: key != LogicalKeyboardKey.arrowLeft);
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
   }
 
   void _showExit() {
@@ -391,7 +459,12 @@ class _TvShellState extends ConsumerState<TvShell> {
         child: Scaffold(
           backgroundColor: AppTheme.bgDeep,
           body: PremiumShell(
-            child: Shortcuts(
+            child: Focus(
+              focusNode: _rootFocusNode,
+              autofocus: true,
+              skipTraversal: true,
+              onKeyEvent: _rootKey,
+              child: Shortcuts(
               shortcuts: const <ShortcutActivator, Intent>{
                 SingleActivator(LogicalKeyboardKey.goBack): _TvBackIntent(),
                 SingleActivator(LogicalKeyboardKey.escape): _TvBackIntent(),
@@ -417,6 +490,7 @@ class _TvShellState extends ConsumerState<TvShell> {
                   ],
                 ),
               ),
+            ),
             ),
           ),
         ),

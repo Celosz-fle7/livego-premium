@@ -15,6 +15,8 @@ import '../focus/tv_reachability.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
 import '../navigation/tv_nav_index.dart';
+import '../providers/tv_navigation_provider.dart';
+import '../navigation/tv_nav_index.dart';
 import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
 import '../providers/tv_home_provider.dart';
@@ -65,6 +67,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
   bool _openingDetail = false;
+  int _focusBootstrapTicket = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
@@ -95,8 +98,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadHome(clearPrevious: false);
-      _focusBanner(throttle: false);
     });
+    _scheduleFocusEntry(preferBanner: true);
   }
 
   void _onNavChanged() {
@@ -114,10 +117,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.bannerFocusTicket > 0 && widget.bannerFocusTicket != oldWidget.bannerFocusTicket) {
       _refreshIfSettingsChanged();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusBanner(throttle: false));
+      _scheduleFocusEntry(preferBanner: true);
     } else if (widget.focusTicket > 0 && widget.focusTicket != oldWidget.focusTicket) {
       _refreshIfSettingsChanged();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _restoreZoneFocus(throttle: false));
+      _scheduleFocusEntry(preferBanner: _zone == TvZone.banner);
     }
   }
 
@@ -502,6 +505,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<TvNavigationState>(tvNavigationProvider, (previous, next) {
+      _handleNavigationSync(next);
+    });
+
     final home = ref.watch(tvHomeContentProvider);
     final platforms = LiveGoCatalog.platformLabels;
     final categories = _categories;
