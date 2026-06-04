@@ -34,9 +34,12 @@ class TvPosterGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty || nodes.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (items.isEmpty || nodes.isEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+
     final usableCount = items.length < nodes.length ? items.length : nodes.length;
-    final delegate = mainAxisExtent != null
+    final gridDelegate = mainAxisExtent != null
         ? SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             mainAxisExtent: mainAxisExtent!,
@@ -52,9 +55,8 @@ class TvPosterGrid extends StatelessWidget {
 
     return SliverPadding(
       padding: padding,
-      sliver: SliverLayoutBuilder(
-        builder: (context, constraints) {
-          return SliverGrid(
+      sliver: SliverGrid(
+        gridDelegate: gridDelegate,
         delegate: SliverChildBuilderDelegate(
           (context, i) {
             final item = items[i];
@@ -71,8 +73,7 @@ class TvPosterGrid extends StatelessWidget {
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
-          );
-        },
+        ),
       ),
     );
   }
