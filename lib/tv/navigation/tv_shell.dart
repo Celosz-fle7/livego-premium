@@ -522,7 +522,13 @@ class _TvShellState extends ConsumerState<TvShell> {
                       children: [
                         TvSideNav(index: _index, mode: _navMode, focusNodes: _navNodes, onChanged: _openNavIndex, onOpenContent: _enterContent),
                         AnimatedContainer(duration: TvFocusStyle.normal, width: _navMode == TvSideNavMode.hidden ? 0 : 1, margin: const EdgeInsets.symmetric(vertical: 30), color: Colors.white.withOpacity(0.035)),
-                        Expanded(child: TvLazyIndexedStack(index: _index, builders: _pageBuilders())),
+                        Expanded(
+                          child: TvLazyIndexedStack(
+                            index: _index,
+                            builders: _pageBuilders(),
+                            keepAliveIndexes: const <int>{TvNavIndex.home},
+                          ),
+                        ),
                       ],
                     ),
                     _exitDialog(),

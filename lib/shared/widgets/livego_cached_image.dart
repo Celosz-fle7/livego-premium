@@ -172,6 +172,9 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
     required bool showPlaceholder,
     Duration fadeInDuration = const Duration(milliseconds: 120),
   }) {
+    final effectiveFadeIn = widget.tv ? Duration.zero : fadeInDuration;
+    final effectiveFadeOut = widget.tv ? Duration.zero : const Duration(milliseconds: 80);
+    final diskWidth = _diskCacheWidth(decodeWidth);
     return CachedNetworkImage(
       imageUrl: cleanUrl,
       cacheManager: LiveGoImageCacheManager.instance,
@@ -179,10 +182,10 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       width: widget.width,
       height: widget.height,
       fit: widget.fit,
-      fadeInDuration: fadeInDuration,
-      fadeOutDuration: const Duration(milliseconds: 80),
+      fadeInDuration: effectiveFadeIn,
+      fadeOutDuration: effectiveFadeOut,
       memCacheWidth: decodeWidth,
-      maxWidthDiskCache: decodeWidth,
+      maxWidthDiskCache: diskWidth,
       placeholder: showPlaceholder
           ? (_, __) => widget.placeholder ?? _placeholder()
           : null,
@@ -215,6 +218,22 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       hash = (hash + url.codeUnitAt(i) * (i + 1)) & 0x7fffffff;
     }
     return hash % max;
+  }
+
+  int? _diskCacheWidth(int? decodeWidth) {
+    if (decodeWidth == null) return null;
+    if (!widget.tv) return decodeWidth;
+
+    switch (widget.role) {
+      case LiveGoImageRole.thumbnail:
+        return decodeWidth.clamp(120, 320).toInt();
+      case LiveGoImageRole.poster:
+        return decodeWidth.clamp(160, 400).toInt();
+      case LiveGoImageRole.detail:
+        return decodeWidth.clamp(240, 640).toInt();
+      case LiveGoImageRole.banner:
+        return decodeWidth.clamp(320, 960).toInt();
+    }
   }
 
   int? _decodeWidth(BuildContext context, {int? preferredWidth}) {

@@ -200,9 +200,11 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 360,
+                  cacheExtent: 220,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.continueWatching.length,
+                  addAutomaticKeepAlives: false,
+                  addSemanticIndexes: false,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
                   itemBuilder: (context, i) => _ContinueCard(
                     node: _continueNodes[i],
@@ -223,9 +225,11 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 360,
+                  cacheExtent: 220,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.myList.length,
+                  addAutomaticKeepAlives: false,
+                  addSemanticIndexes: false,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
                   itemBuilder: (context, i) => _PosterRailCard(
                     node: _myListNodes[i],
