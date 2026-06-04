@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -9,18 +10,21 @@ import '../screens/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
 import '../focus/tv_focus_utils.dart';
+import '../providers/tv_focus_provider.dart';
+import '../providers/tv_navigation_provider.dart';
+import '../providers/tv_remote_owner.dart';
 import '../theme/tv_focus_style.dart';
 import '../widgets/tv_side_nav.dart';
 import 'tv_nav_index.dart';
 
-class TvShell extends StatefulWidget {
+class TvShell extends ConsumerStatefulWidget {
   const TvShell({super.key});
 
   @override
-  State<TvShell> createState() => _TvShellState();
+  ConsumerState<TvShell> createState() => _TvShellState();
 }
 
-class _TvShellState extends State<TvShell> {
+class _TvShellState extends ConsumerState<TvShell> {
   static const int _homeIndex = TvNavIndex.home;
   static const int _downloadIndex = TvNavIndex.download;
   static const int _historyIndex = TvNavIndex.history;
@@ -79,6 +83,36 @@ class _TvShellState extends State<TvShell> {
     return value;
   }
 
+  TvRemoteOwner _ownerForIndex(int index) {
+    switch (index) {
+      case _accountIndex:
+        return TvRemoteOwner.account;
+      case _searchIndex:
+        return TvRemoteOwner.search;
+      case _downloadIndex:
+        return TvRemoteOwner.downloads;
+      case _historyIndex:
+      case _favoriteIndex:
+        return TvRemoteOwner.library;
+      case _homeIndex:
+      default:
+        return TvRemoteOwner.home;
+    }
+  }
+
+  void _syncNavigationState({int? index, TvRemoteOwner? owner, bool? navFocused}) {
+    final nav = ref.read(tvNavigationProvider.notifier);
+    if (index != null && navFocused == true) {
+      nav.selectNav(index);
+    } else if (index != null) {
+      nav.enterContent(index);
+    }
+    if (owner != null) {
+      nav.setOwner(owner);
+      ref.read(tvFocusProvider.notifier).setOwner(owner);
+    }
+  }
+
   bool get _navHasFocus => _navNodes.any((node) => node.hasFocus);
 
   bool _isSelect(LogicalKeyboardKey key) {
@@ -131,6 +165,7 @@ class _TvShellState extends State<TvShell> {
     _suppressBackFor(500);
     if (!mounted) return;
     setState(() => _navMode = TvSideNavMode.hidden);
+    _syncNavigationState(index: _index, owner: _ownerForIndex(_index), navFocused: false);
     _bumpContentTicket();
   }
 
@@ -150,6 +185,7 @@ class _TvShellState extends State<TvShell> {
     if (_navNodes.isEmpty) return;
     if (_navMode != TvSideNavMode.focused) {
       setState(() => _navMode = TvSideNavMode.focused);
+      _syncNavigationState(index: _index, owner: TvRemoteOwner.navbar, navFocused: true);
       WidgetsBinding.instance.addPostFrameCallback((_) => _focusNavNode(_index));
       return;
     }
@@ -165,6 +201,7 @@ class _TvShellState extends State<TvShell> {
   void _hideNav() {
     if (_navMode != TvSideNavMode.hidden) {
       setState(() => _navMode = TvSideNavMode.hidden);
+    _syncNavigationState(index: _index, owner: _ownerForIndex(_index), navFocused: false);
     }
   }
 
@@ -189,6 +226,7 @@ class _TvShellState extends State<TvShell> {
       _index = safe;
       _navMode = TvSideNavMode.focused;
     });
+    _syncNavigationState(index: safe, owner: TvRemoteOwner.navbar, navFocused: true);
     _focusNavNode(safe);
   }
 
@@ -225,6 +263,7 @@ class _TvShellState extends State<TvShell> {
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
     _returnToAccountMenuOnBack = false;
+    _syncNavigationState(index: safe, owner: _ownerForIndex(safe), navFocused: false);
     if (safe != _index) {
       setState(() {
         _index = safe;
@@ -252,6 +291,7 @@ class _TvShellState extends State<TvShell> {
   void _openFromAccountMenu(int navIndex) {
     final safe = _safeNav(navIndex);
     if (safe == _accountIndex) return;
+    _syncNavigationState(index: safe, owner: _ownerForIndex(safe), navFocused: false);
     setState(() {
       _returnToAccountMenuOnBack = true;
       _index = safe;

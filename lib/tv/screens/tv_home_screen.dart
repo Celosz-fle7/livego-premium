@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -8,17 +9,20 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
-import '../../services/image/image_quality_config.dart';
 import '../../services/content/content_health_service.dart';
-import '../../shared/widgets/hero_banner.dart';
-import '../../shared/widgets/livego_cached_image.dart';
 import '../models/tv_zone.dart';
+import '../providers/tv_focus_provider.dart';
+import '../providers/tv_home_provider.dart';
+import '../providers/tv_remote_owner.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
+import '../widgets/tv_chip_row.dart';
+import '../widgets/tv_hero_banner_focus.dart';
+import '../widgets/tv_poster_tile.dart';
 import 'tv_player_screen.dart';
 
-class TvHomeScreen extends StatefulWidget {
+class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onRequestExit;
   final VoidCallback? onPlayerRouteOpen;
@@ -37,10 +41,10 @@ class TvHomeScreen extends StatefulWidget {
   });
 
   @override
-  State<TvHomeScreen> createState() => _TvHomeScreenState();
+  ConsumerState<TvHomeScreen> createState() => _TvHomeScreenState();
 }
 
-class _TvHomeScreenState extends State<TvHomeScreen> {
+class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(4, 10);
 
   int source = 0;
@@ -388,6 +392,20 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     return tvFocusGrid(node, throttle: throttle);
   }
 
+  void _rememberFocusState(TvZone zone, int index) {
+    final focus = ref.read(tvFocusProvider.notifier);
+    focus.setOwner(TvRemoteOwner.home);
+    focus.setZone(zone.index);
+    focus.setIndex(index);
+  }
+
+  void _rememberHomeUi() {
+    final home = ref.read(tvHomeProvider.notifier);
+    home.rememberPlatform(_lastPlatform);
+    home.rememberCategory(_lastCategory);
+    home.rememberGrid(_lastGrid);
+  }
+
   bool _isArrow(LogicalKeyboardKey key) {
     return key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight ||
@@ -497,6 +515,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!focused) return false;
       _zone = TvZone.grid;
       _lastGrid = target;
+      _rememberFocusState(TvZone.grid, target);
+      _rememberHomeUi();
       return true;
     }
     if (zone == TvZone.category && _categoryNodes.isNotEmpty) {
@@ -507,6 +527,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!focused) return false;
       _zone = TvZone.category;
       _lastCategory = target;
+      _rememberFocusState(TvZone.category, target);
+      _rememberHomeUi();
       return true;
     }
     if (zone == TvZone.platform && _platformNodes.isNotEmpty) {
@@ -517,12 +539,16 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       if (!focused) return false;
       _zone = TvZone.platform;
       _lastPlatform = target;
+      _rememberFocusState(TvZone.platform, target);
+      _rememberHomeUi();
       return true;
     }
     if (zone == TvZone.banner && _ready(_bannerNode)) {
       final focused = _focus(_bannerNode, alignment: 0.02, throttle: throttle);
       if (!focused) return false;
       _zone = TvZone.banner;
+      _rememberFocusState(TvZone.banner, 0);
+      _rememberHomeUi();
       return true;
     }
     return false;
@@ -902,7 +928,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate.fixed([
-                        _FocusableBanner(
+                        TvHeroBannerFocus(
                           item: hero,
                           focusNode: _bannerNode,
                           onFocus: () => _zone = TvZone.banner,
@@ -921,13 +947,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                           label: 'Platform',
                           hint: LiveGoCatalog.label(_platform),
                           height: 76,
-                          child: _ChipRow(
+                          child: TvChipRow(
                             labels: platforms,
                             selected: source,
                             nodes: _platformNodes,
                             onFocus: (i) {
                               _zone = TvZone.platform;
                               _lastPlatform = i;
+                              _rememberFocusState(TvZone.platform, i);
+                              _rememberHomeUi();
                             },
                             onTap: _selectPlatform,
                             onKey: _platformKey,
@@ -939,13 +967,15 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                           label: 'Kategori',
                           hint: categories.isEmpty ? 'Default' : categories[category],
                           height: 76,
-                          child: _ChipRow(
+                          child: TvChipRow(
                             labels: categories,
                             selected: category,
                             nodes: _categoryNodes,
                             onFocus: (i) {
                               _zone = TvZone.category;
                               _lastCategory = i;
+                              _rememberFocusState(TvZone.category, i);
+                              _rememberHomeUi();
                             },
                             onTap: _selectCategory,
                             onKey: _categoryKey,
@@ -966,17 +996,21 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                       padding: EdgeInsets.fromLTRB(homePadding.left, 0, homePadding.right, 0),
                       sliver: SliverGrid(
                         delegate: SliverChildBuilderDelegate(
-                          (context, i) => _TvPosterTile(
+                          (context, i) => TvPosterTile(
                             item: gridItems[i],
                             focusNode: _gridNodes[i],
                             onFocus: () {
                               _zone = TvZone.grid;
                               _lastGrid = i;
+                              _rememberFocusState(TvZone.grid, i);
+                              _rememberHomeUi();
                             },
                             onKey: (node, event) => _gridKey(i, event),
                             onTap: () {
                               _zone = TvZone.grid;
                               _lastGrid = i;
+                              _rememberFocusState(TvZone.grid, i);
+                              _rememberHomeUi();
                               _open(gridItems[i]);
                             },
                           ),
@@ -1139,77 +1173,6 @@ class _HomeEmptyState extends StatelessWidget {
   }
 }
 
-class _FocusableBanner extends StatelessWidget {
-  final ContentItem? item;
-  final FocusNode focusNode;
-  final VoidCallback onFocus;
-  final VoidCallback? onTap;
-  final FocusOnKeyEventCallback onKey;
-
-  const _FocusableBanner({
-    required this.item,
-    required this.focusNode,
-    required this.onFocus,
-    required this.onTap,
-    required this.onKey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: focusNode,
-      builder: (context, _) {
-        final focused = focusNode.hasFocus;
-        return Focus(
-          focusNode: focusNode,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          onFocusChange: (v) {
-            if (v) onFocus();
-          },
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(28),
-            focusColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: TvFocusStyle.normal,
-              curve: Curves.easeOutCubic,
-              height: 208,
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppTheme.surface2, AppTheme.bgDeep],
-                ),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.92),
-                  width: focused ? 2.2 : 1.0,
-                ),
-                boxShadow: [
-                  const BoxShadow(color: Colors.black87, blurRadius: 18),
-                  BoxShadow(color: AppTheme.cyan.withOpacity(focused ? 0.12 : 0.045), blurRadius: focused ? 18 : 10),
-                ],
-              ),
-              child: AnimatedContainer(
-                duration: TvFocusStyle.normal,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: focused ? Colors.white.withOpacity(0.13) : Colors.white.withOpacity(0.045)),
-                ),
-                child: item != null ? HeroBanner(item: item!, tv: true) : const _TvSkeleton(height: 182),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _HeaderBox extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1305,154 +1268,6 @@ class _HeaderBox extends StatelessWidget {
   }
 }
 
-class _ChipRow extends StatelessWidget {
-  final List<String> labels;
-  final int selected;
-  final List<FocusNode> nodes;
-  final ValueChanged<int> onTap;
-  final ValueChanged<int> onFocus;
-  final KeyEventResult Function(int, KeyEvent) onKey;
-
-  const _ChipRow({
-    required this.labels,
-    required this.selected,
-    required this.nodes,
-    required this.onTap,
-    required this.onFocus,
-    required this.onKey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (labels.isEmpty || nodes.isEmpty) return const SizedBox.shrink();
-    final count = labels.length;
-    Widget chipAt(int i) => _TvChip(
-          text: labels[i],
-          active: i == selected,
-          focusNode: nodes[i],
-          onTap: () => onTap(i),
-          onFocus: () => onFocus(i),
-          onKey: (node, event) => onKey(i, event),
-        );
-
-    if (count <= 5) {
-      return Row(
-        children: List.generate(count, (i) {
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: i == count - 1 ? 0 : 10),
-              child: chipAt(i),
-            ),
-          );
-        }),
-      );
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(count, (i) {
-          return Padding(
-            padding: EdgeInsets.only(right: i == count - 1 ? 0 : 8),
-            child: SizedBox(width: 144, child: chipAt(i)),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _TvChip extends StatelessWidget {
-  final String text;
-  final bool active;
-  final FocusNode focusNode;
-  final VoidCallback onTap;
-  final VoidCallback onFocus;
-  final FocusOnKeyEventCallback onKey;
-
-  const _TvChip({
-    required this.text,
-    required this.active,
-    required this.focusNode,
-    required this.onTap,
-    required this.onFocus,
-    required this.onKey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: focusNode,
-      builder: (context, _) {
-        final focused = focusNode.hasFocus;
-        final selected = active || focused;
-        return Focus(
-          focusNode: focusNode,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          onFocusChange: (v) {
-            if (v) onFocus();
-          },
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(999),
-            focusColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: TvFocusStyle.fast,
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: active
-                    ? AppTheme.activeGradient
-                    : (focused
-                        ? LinearGradient(colors: [AppTheme.cyan.withOpacity(0.13), AppTheme.surface3.withOpacity(0.98)])
-                        : null),
-                color: active || focused ? null : AppTheme.surface2.withOpacity(0.82),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white.withOpacity(0.075)),
-                  width: focused ? 2.0 : 1.0,
-                ),
-                boxShadow: focused ? [TvFocusStyle.glow(0.075, 6)] : null,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (active) ...[
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 7),
-                  ],
-                  Flexible(
-                    child: Text(
-                      text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: selected ? Colors.white : AppTheme.textSoft,
-                        fontSize: 12.4,
-                        fontWeight: FontWeight.w900,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 double _tvPosterAspectFor(int count) {
   if (count >= 9) return 0.58;
   if (count >= 7) return 0.60;
@@ -1496,112 +1311,6 @@ class _ContentGridHeader extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TvPosterTile extends StatelessWidget {
-  final ContentItem item;
-  final FocusNode focusNode;
-  final VoidCallback onFocus;
-  final VoidCallback onTap;
-  final FocusOnKeyEventCallback onKey;
-
-  const _TvPosterTile({
-    required this.item,
-    required this.focusNode,
-    required this.onFocus,
-    required this.onTap,
-    required this.onKey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: focusNode,
-      builder: (context, _) {
-        final focused = focusNode.hasFocus;
-        return Focus(
-          focusNode: focusNode,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          onFocusChange: (v) {
-            if (v) onFocus();
-          },
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            focusColor: Colors.transparent,
-            child: Column(
-                children: [
-                  Expanded(
-                    child: AnimatedContainer(
-                      duration: TvFocusStyle.fast,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.42),
-                          width: focused ? 2.0 : 0.6,
-                        ),
-                        boxShadow: focused
-                            ? [TvFocusStyle.glow(0.075, 6), const BoxShadow(color: Colors.black54, blurRadius: 7)]
-                            : [const BoxShadow(color: Colors.black38, blurRadius: 5)],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            item.posterUrl.isEmpty
-                                ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 44))
-                                : LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
-                            const DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xCC010409)]),
-                              ),
-                            ),
-                            Positioned(top: 8, left: 8, child: _Badge(text: '${item.episodes} Ep')),
-                            if (item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
-                            Positioned(right: 8, bottom: 12, child: _Badge(text: item.rating.toStringAsFixed(1))),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 11.4, fontWeight: FontWeight.w800, height: 1.1, decoration: TextDecoration.none),
-                  ),
-                ],
-              ),
-            ),
-          );
-      },
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String text;
-  const _Badge({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.86),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: TvFocusStyle.focusBlue.withOpacity(0.20)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 6)],
-      ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 8.4, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }
 }
