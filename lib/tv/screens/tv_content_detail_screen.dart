@@ -531,6 +531,76 @@ class _DetailBody extends StatelessWidget {
   }
 }
 
+class _DetailDegradedNotice extends StatelessWidget {
+  const _DetailDegradedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: Colors.orangeAccent.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orangeAccent.withOpacity(0.32)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, color: Colors.orangeAccent, size: 19),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Detail lengkap/episode sedang lambat. Data dasar tetap bisa dipakai, Play masih bisa dicoba.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailEpisodeFallbackHint extends StatelessWidget {
+  const _DetailEpisodeFallbackHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppTheme.cyan, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Episode list belum tersedia. Tekan Play untuk lanjut dari episode tersimpan, atau Coba Detail untuk refresh.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppTheme.textSoft,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RoundIconButton extends StatelessWidget {
   final FocusNode node;
   final IconData icon;
