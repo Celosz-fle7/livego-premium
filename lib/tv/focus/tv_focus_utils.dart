@@ -158,7 +158,7 @@ bool tvFocusComfort(
 bool tvFocusGrid(
   FocusNode node, {
   double topMargin = TvReachability.gridTopMargin,
-  double bottomMargin = TvReachability.gridBottomMargin + 24,
+  double bottomMargin = TvReachability.gridBottomMargin,
   Duration duration = Duration.zero,
   bool throttle = true,
 }) {
