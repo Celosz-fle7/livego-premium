@@ -10,6 +10,8 @@ import 'api_health_state.dart';
 import 'api_request_queue.dart';
 import 'api_result.dart';
 import 'api_timeout_policy.dart';
+import 'api_provider_contract.dart';
+import 'api_provider_registry.dart';
 
 class LiveGoApiManager {
   const LiveGoApiManager._();
@@ -33,6 +35,14 @@ class LiveGoApiManager {
         .take(max)
         .toList(growable: false);
     return active;
+  }
+
+  static bool supportsFeature(String platform, ApiProviderFeature feature) {
+    return LiveGoApiProviderRegistry.supports(platform, feature);
+  }
+
+  static List<String> capabilityBadgesFor(String platform) {
+    return LiveGoApiProviderRegistry.capabilityBadgesFor(platform);
   }
 
   static String statusFor(String platform) {

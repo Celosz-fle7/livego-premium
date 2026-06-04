@@ -6,6 +6,7 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../data/api_manager/livego_api_manager.dart';
+import '../../data/api_manager/api_endpoint_registry.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';

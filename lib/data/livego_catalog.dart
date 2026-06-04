@@ -13,6 +13,7 @@ import '../models/livego_episode.dart';
 import 'api_manager/livego_api_manager.dart';
 import 'api_manager/api_timeout_policy.dart';
 import 'api_manager/api_platform_fallback_router.dart';
+import 'api_manager/api_provider_registry.dart';
 import 'mock_catalog.dart';
 
 class LiveGoCatalog {
@@ -54,7 +55,7 @@ class LiveGoCatalog {
       platform: platform,
       operation: 'ping',
       timeout: ApiTimeoutPolicy.ping,
-      request: () => LiveGoApiGateway.ping(platform, languageFor(platform)),
+      request: () => LiveGoApiProviderRegistry.providerFor(platform).ping(languageFor(platform)),
       fallbackStatus: 'offline',
     );
   }
@@ -126,7 +127,7 @@ class LiveGoCatalog {
       platform: platform,
       operation: 'home',
       timeout: ApiTimeoutPolicy.home,
-      request: () => LiveGoApiGateway.home(platform: platform, lang: lang),
+      request: () => LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang),
     );
     print('CATALOG HOME $platform -> ${rows.length}');
     if (rows.isNotEmpty) {
@@ -143,7 +144,7 @@ class LiveGoCatalog {
       platform: platform,
       operation: 'discover',
       timeout: ApiTimeoutPolicy.home,
-      request: () => LiveGoApiGateway.discover(platform: platform, lang: lang),
+      request: () => LiveGoApiProviderRegistry.providerFor(platform).discover(lang: lang),
     );
     if (discoverRows.isNotEmpty) {
       await LiveGoContentCache.writeItems(
@@ -232,10 +233,9 @@ class LiveGoCatalog {
       timeout: ApiTimeoutPolicy.collection,
       request: () {
         if (key == 'trending' || key.isEmpty || key == 'home') {
-          return LiveGoApiGateway.home(platform: platform, lang: lang);
+          return LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang);
         }
-        return LiveGoApiGateway.collection(
-          platform: platform,
+        return LiveGoApiProviderRegistry.providerFor(platform).collection(
           collection: key,
           lang: lang,
         );
@@ -323,7 +323,7 @@ class LiveGoCatalog {
       platform: platform,
       operation: 'search',
       timeout: ApiTimeoutPolicy.search,
-      request: () => LiveGoApiGateway.search(query: clean, platform: platform, lang: lang),
+      request: () => LiveGoApiProviderRegistry.providerFor(platform).search(query: clean, lang: lang),
     );
     await LiveGoContentCache.writeItems(
       platform: platform,
@@ -379,7 +379,7 @@ class LiveGoCatalog {
     }
     final detail = await LiveGoApiManager.fetchDetail(
       item: item,
-      request: () => LiveGoApiGateway.detail(item),
+      request: () => LiveGoApiProviderRegistry.providerFor(item.platformSlug).detail(item),
       fallback: item,
     );
     final resolved = _preservePlayableIdentity(detail ?? item, item);
@@ -417,7 +417,7 @@ class LiveGoCatalog {
 
     final rows = await LiveGoApiManager.fetchEpisodes(
       item: item,
-      request: () => LiveGoApiGateway.episodes(item),
+      request: () => LiveGoApiProviderRegistry.providerFor(item.platformSlug).episodes(item),
       fallback: cached ?? const <LiveGoEpisode>[],
     );
     if (rows.length > 1) {
