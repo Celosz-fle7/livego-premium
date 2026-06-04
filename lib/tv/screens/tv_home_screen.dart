@@ -371,6 +371,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     if (_openingDetail || !mounted) return;
     _openingDetail = true;
     final returnZone = _zone;
+    final returnPlatform = _platformIndex;
+    final returnCategory = _categoryIndex;
     final returnGrid = _gridIndex;
     TvDetailRoute.open(
       context,
@@ -381,8 +383,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       _openingDetail = false;
       if (!mounted) return;
       _zone = returnZone;
+      _platformIndex = returnPlatform;
+      _categoryIndex = returnCategory;
       _gridIndex = returnGrid;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _restoreZoneFocus(throttle: false));
+      _scheduleFocusEntry(preferBanner: returnZone == TvZone.banner);
     });
   }
 

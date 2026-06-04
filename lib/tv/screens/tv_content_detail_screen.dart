@@ -43,6 +43,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   final List<FocusNode> _episodeNodes = <FocusNode>[];
   int _buttonIndex = 0;
   int _episodeCursor = 0;
+  int _playerReturnTicket = 0;
   bool _openingPlayer = false;
   bool _favoriteBusy = false;
 
@@ -111,14 +112,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
         .whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (episode != null && _episodeNodes.isNotEmpty) {
-          tvFocusComfort(_episodeNodes[_episodeCursor.clamp(0, _episodeNodes.length - 1).toInt()], throttle: false);
-        } else {
-          tvFocus(_playNode, alignment: 0.18, throttle: false);
-        }
-      });
+      _schedulePlayerReturnFocus(preferEpisode: episode != null);
     });
   }
 
