@@ -78,6 +78,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
   }
 
   bool get hasRows => _continueNodes.isNotEmpty || _myListNodes.isNotEmpty;
+  bool get hasFocus => _continueNodes.any((node) => node.hasFocus) || _myListNodes.any((node) => node.hasFocus);
 
   bool focusFirst() {
     if (_continueNodes.isNotEmpty) return _focusContinue(_continueIndex, throttle: false);
@@ -183,9 +184,13 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
         _syncNodes(_myListNodes, rows.myList.length, 'tv-home-mylist');
         if (!rows.hasAny) return const SizedBox.shrink();
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        return FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: FocusScope(
+            debugLabel: 'tv-home-rows-scope',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             if (rows.continueWatching.isNotEmpty) ...[
               _RailHeader(
                 title: 'Lanjut Menonton',
@@ -230,7 +235,9 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               ),
               const SizedBox(height: 14),
             ],
-          ],
+              ],
+            ),
+          ),
         );
       },
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,6 +44,8 @@ class _TvShellState extends ConsumerState<TvShell> {
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;
+  int _lastBootstrapMs = 0;
+  int _bootstrapSerial = 0;
 
   @override
   void initState() {
@@ -244,7 +248,56 @@ class _TvShellState extends ConsumerState<TvShell> {
     return false;
   }
 
-  void _bootstrapActiveFocus({bool forceBanner = false}) {
+  void _scheduleBootstrapRetry({bool forceBanner = false, int attempt = 0}) {
+    if (!mounted || attempt > 3) return;
+    final token = ++_bootstrapSerial;
+    final delay = attempt == 0
+        ? Duration.zero
+        : attempt == 1
+            ? const Duration(milliseconds: 50)
+            : attempt == 2
+                ? const Duration(milliseconds: 150)
+                : const Duration(milliseconds: 300);
+
+    Future<void>.delayed(delay, () {
+      if (!mounted || token != _bootstrapSerial) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || token != _bootstrapSerial) return;
+        _bootstrapActiveFocus(forceBanner: forceBanner, bypassThrottle: true, allowRetry: false);
+        if (_primaryFocusMissing() && attempt < 3) {
+          _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: attempt + 1);
+        }
+      });
+    });
+  }
+
+  void _bootstrapActiveFocus({bool forceBanner = false, bool bypassThrottle = false, bool allowRetry = true}) {
+    if (!mounted) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!bypassThrottle && now - _lastBootstrapMs < 150) {
+      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+      return;
+    }
+    _lastBootstrapMs = now;
+
+    if (_exitOpen) {
+      tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
+      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+      return;
+    }
+
+    if (_navMode == TvSideNavMode.focused || _navHasFocus) {
+      _syncOwner(navFocused: true);
+      _focusNav(_index);
+      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+      return;
+    }
+
+    _syncOwner();
+    _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
+    if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+  }
+) {
     if (!mounted) return;
     if (_exitOpen) {
       tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);

@@ -67,6 +67,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   TvZone _zone = TvZone.banner;
   bool _openingDetail = false;
   int _focusBootstrapTicket = 0;
+  int _lastFocusEntryMs = 0;
+  int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
@@ -128,6 +130,30 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
     _bannerNode.dispose();
+
+  bool _focusPreferredEntry({bool preferBanner = false}) {
+    if (preferBanner && _focusBanner(throttle: false)) return true;
+    switch (_zone) {
+      case TvZone.grid:
+        if (_focusGrid(_gridIndex, throttle: false)) return true;
+        if (_focusRows(preferMyList: true)) return true;
+        if (_focusCategory(_categoryIndex, throttle: false)) return true;
+        break;
+      case TvZone.category:
+        if (_focusCategory(_categoryIndex, throttle: false)) return true;
+        if (_focusPlatform(_platformIndex, throttle: false)) return true;
+        break;
+      case TvZone.platform:
+        if (_focusPlatform(_platformIndex, throttle: false)) return true;
+        break;
+      case TvZone.banner:
+        break;
+    }
+    if (_focusBanner(throttle: false)) return true;
+    if (_focusRows()) return true;
+    return _focusGrid(_gridIndex, throttle: false);
+  }
+
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
     _disposeNodes(_gridNodes);
@@ -256,18 +282,43 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     return preferMyList ? rows.focusMyList() : rows.focusFirst();
   }
 
-
   bool _hasAnyHomeFocus() {
-    final primary = FocusManager.instance.primaryFocus;
-    if (primary == null) return false;
-    if (primary == _bannerNode) return true;
-    if (_platformNodes.contains(primary)) return true;
-    if (_categoryNodes.contains(primary)) return true;
-    if (_gridNodes.contains(primary)) return true;
-    return false;
+    return _bannerNode.hasFocus ||
+        _platformNodes.any((node) => node.hasFocus) ||
+        _categoryNodes.any((node) => node.hasFocus) ||
+        _gridNodes.any((node) => node.hasFocus) ||
+        (_rowsKey.currentState?.hasFocus ?? false);
   }
 
-  void _scheduleFocusEntry({required bool preferBanner}) {
+  void _scheduleFocusEntry({bool preferBanner = false, int attempt = 0}) {
+    if (!mounted || attempt > 3) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (attempt == 0 && now - _lastFocusEntryMs < 140) return;
+    if (attempt == 0) _lastFocusEntryMs = now;
+
+    final token = ++_focusEntryToken;
+    _focusBootstrapTicket = token;
+    final delay = attempt == 0
+        ? Duration.zero
+        : attempt == 1
+            ? const Duration(milliseconds: 50)
+            : attempt == 2
+                ? const Duration(milliseconds: 150)
+                : const Duration(milliseconds: 300);
+
+    Future<void>.delayed(delay, () {
+      if (!mounted || token != _focusEntryToken) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || token != _focusEntryToken) return;
+        if (_hasAnyHomeFocus()) return;
+        final focused = _focusPreferredEntry(preferBanner: preferBanner);
+        if (!focused && attempt < 3) {
+          _scheduleFocusEntry(preferBanner: preferBanner, attempt: attempt + 1);
+        }
+      });
+    });
+  }
+) {
     final ticket = ++_focusBootstrapTicket;
     const delays = <Duration>[
       Duration(milliseconds: 0),
@@ -301,11 +352,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   void _handleNavigationSync(TvNavigationState next) {
     if (!mounted) return;
-    if (next.navIndex != TvNavIndex.home) return;
-    if (next.navFocused) return;
-    _homeNavTick.value = _homeNavTick.value + 1;
+    if (next.navIndex != TvNavIndex.home || next.navFocused) return;
+    if (_hasAnyHomeFocus()) return;
     _scheduleFocusEntry(preferBanner: _zone == TvZone.banner);
   }
+
 
   void _restoreZoneFocus({bool throttle = true}) {
     switch (_zone) {
