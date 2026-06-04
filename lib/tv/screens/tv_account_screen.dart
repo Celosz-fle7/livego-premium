@@ -35,6 +35,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   final List<FocusNode> _nodes = <FocusNode>[];
   int _index = 0;
   int _lastBackMs = 0;
+  int _lastSelectMs = 0;
+  int _focusRetryToken = 0;
 
   List<_AccountItem> get _items => <_AccountItem>[
         _AccountItem(Icons.layers_rounded, 'Kelola Sumber Data', 'Atur Anichin, bahasa, kategori, dan platform aktif.', 'SOURCE', () => _push(const TvSourceManagerScreen())),
@@ -49,14 +51,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_index, throttle: false));
+    _scheduleFocusRow(_index);
   }
 
   @override
   void didUpdateWidget(covariant TvAccountScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_index, throttle: false));
+      _scheduleFocusRow(_index);
     }
   }
 
@@ -98,11 +100,38 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     widget.onBackToNav?.call();
   }
 
+  bool _selectAllowed([int ms = 300]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSelectMs < ms) return false;
+    _lastSelectMs = now;
+    return true;
+  }
+
+  void _scheduleFocusRow(int index, {int attempt = 0}) {
+    if (!mounted || attempt > 3) return;
+    final token = ++_focusRetryToken;
+    final delay = attempt == 0
+        ? Duration.zero
+        : attempt == 1
+            ? const Duration(milliseconds: 50)
+            : attempt == 2
+                ? const Duration(milliseconds: 150)
+                : const Duration(milliseconds: 300);
+    Future<void>.delayed(delay, () {
+      if (!mounted || token != _focusRetryToken) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || token != _focusRetryToken) return;
+        final ok = _focusRow(index, throttle: false);
+        if (!ok && attempt < 3) _scheduleFocusRow(index, attempt: attempt + 1);
+      });
+    });
+  }
+
   void _push(Widget screen) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).whenComplete(() {
       if (!mounted) return;
       _lastBackMs = DateTime.now().millisecondsSinceEpoch;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusRow(_index, throttle: false));
+      _scheduleFocusRow(_index);
     });
   }
 
@@ -136,7 +165,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      item.onTap();
+      if (_selectAllowed()) item.onTap();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

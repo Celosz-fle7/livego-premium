@@ -39,6 +39,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   late final Map<String, List<String>> _initialCategories;
 
   List<String> get _platforms => LiveGoCatalog.allPlatforms;
+  bool get _hasPlatforms => _platforms.isNotEmpty;
 
   @override
   void initState() {
@@ -49,8 +50,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _captureInitialSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _focusSource(0, throttle: false);
-      _autoPingOnce();
+      if (_hasPlatforms) {
+        _focusSource(0, throttle: false);
+        _autoPingOnce();
+      } else {
+        _focusBack();
+      }
     });
   }
 
@@ -154,7 +159,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _focusSource(int index, {bool categoryMode = false, int? categoryIndex, bool throttle = true}) {
-    if (_sourceNodes.isEmpty) return;
+    if (_sourceNodes.isEmpty || _platforms.isEmpty) return;
     final target = _safeSource(index);
     final slug = _platforms[target];
     final categories = _allCategoriesFor(slug);
@@ -182,6 +187,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     // Jangan ping semua source Dobda sekaligus. Setelah Dobda masuk daftar,
     // ping seluruh platform bisa membuat Source Manager terasa berat. Cukup
     // cek platform yang sedang aktif, maksimal 6, dan tandai Dobda sebagai BETA.
+    if (_platforms.isEmpty) return;
     for (final slug in _platforms) {
       if (LiveGoCatalog.isDobdaPlatform(slug)) {
         LiveGoSettings.setPlatformStatus(slug, 'beta');
@@ -601,6 +607,41 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SourceEmptyPanel extends StatelessWidget {
+  const _SourceEmptyPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 250,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.source_outlined, color: AppTheme.cyan, size: 48),
+          SizedBox(height: 14),
+          Text(
+            'Source belum tersedia',
+            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Data platform kosong. BACK untuk kembali, lalu coba buka lagi setelah data siap.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+          ),
+        ],
       ),
     );
   }

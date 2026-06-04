@@ -41,6 +41,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
 
   TvZone _zone = TvZone.list;
   int _lastRow = 0;
+  int _lastSelectMs = 0;
   bool _entryPending = false;
   bool _openingPlayer = false;
 
@@ -118,6 +119,13 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     }
   }
 
+  bool _selectAllowed([int ms = 300]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSelectMs < ms) return false;
+    _lastSelectMs = now;
+    return true;
+  }
+
   void _focusEntry() {
     _entryPending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
@@ -173,6 +181,10 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
       _backToNav();
       return KeyEventResult.handled;
     }
+    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      _backToHome();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.handled;
   }
 
@@ -195,7 +207,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
       _lastRow = index;
-      _open(record);
+      if (_selectAllowed()) _open(record);
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
@@ -409,7 +421,7 @@ class _EmptyDownloads extends StatelessWidget {
               SizedBox(height: 14),
               Text('Download masih kosong', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               SizedBox(height: 8),
-              Text('Episode yang diunduh dari player akan muncul di sini.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              Text('OK ke Home untuk cari konten • LEFT navbar • BACK navbar.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
             ],
           ),
         );

@@ -118,7 +118,14 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
     ).whenComplete(() {
       _openingDetail = false;
       if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusGrid(_gridIndex, throttle: false));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_nodes.isNotEmpty) {
+          _focusGrid(_gridIndex, throttle: false);
+        } else if (_emptyNode.context != null) {
+          tvFocusComfort(_emptyNode, throttle: false);
+        }
+      });
     });
   }
 
@@ -137,6 +144,10 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       widget.onMoveToNav?.call();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
+      widget.onBackToHome?.call();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -208,7 +219,7 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
               bottom: true,
               child: CustomScrollView(
                 controller: _scroll,
-                cacheExtent: 1200,
+                cacheExtent: 720,
                 slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
@@ -222,16 +233,24 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
                         ),
                         const SizedBox(height: 16),
                         if (items.isEmpty)
-                          Focus(
-                            focusNode: _emptyNode,
-                            skipTraversal: true,
-                            onKeyEvent: _emptyKey,
-                            child: TvEmptyPanel(
-                              icon: widget.favorites ? Icons.favorite_rounded : Icons.history_rounded,
-                              title: '${widget.title} masih kosong',
-                              subtitle: widget.favorites ? 'Favorit dari detail/player akan tampil di sini.' : 'Judul yang dibuka akan otomatis tersimpan di sini.',
-                              height: 260,
-                            ),
+                          ListenableBuilder(
+                            listenable: _emptyNode,
+                            builder: (context, _) {
+                              return Focus(
+                                focusNode: _emptyNode,
+                                skipTraversal: true,
+                                onKeyEvent: _emptyKey,
+                                child: TvEmptyPanel(
+                                  focused: _emptyNode.hasFocus,
+                                  icon: widget.favorites ? Icons.favorite_rounded : Icons.history_rounded,
+                                  title: '${widget.title} masih kosong',
+                                  subtitle: widget.favorites
+                                      ? 'OK ke Home untuk cari tontonan • LEFT navbar • BACK navbar'
+                                      : 'OK ke Home untuk mulai menonton • LEFT navbar • BACK navbar',
+                                  height: 260,
+                                ),
+                              );
+                            },
                           )
                         else ...[
                           Row(
