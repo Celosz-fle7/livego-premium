@@ -74,6 +74,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   bool _openingDetail = false;
   int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
+  int _lastEmptyFocusMs = 0;
   int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
   List<ContentItem> _gridItems = const <ContentItem>[];
@@ -315,7 +316,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   }
 
   void _scheduleFocusEntry({bool preferBanner = false, int attempt = 0}) {
-    if (!mounted || attempt > 3) return;
+    if (!mounted || attempt > 4) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (attempt == 0 && now - _lastFocusEntryMs < 140) return;
     if (attempt == 0) _lastFocusEntryMs = now;
@@ -328,7 +329,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             ? const Duration(milliseconds: 50)
             : attempt == 2
                 ? const Duration(milliseconds: 150)
-                : const Duration(milliseconds: 300);
+                : attempt == 3
+                    ? const Duration(milliseconds: 300)
+                    : const Duration(milliseconds: 450);
 
     Future<void>.delayed(delay, () {
       if (!mounted || token != _focusEntryToken) return;
@@ -336,10 +339,27 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
         if (!mounted || token != _focusEntryToken) return;
         if (_hasAnyHomeFocus()) return;
         final focused = _focusPreferredEntry(preferBanner: preferBanner);
-        if (!focused && attempt < 3) {
+        if (!focused && attempt < 4) {
           _scheduleFocusEntry(preferBanner: preferBanner, attempt: attempt + 1);
         }
       });
+    });
+  }
+
+  void _scheduleEmptyFocusIfNeeded(TvHomeContentState home, List<ContentItem> gridItems) {
+    if (!mounted) return;
+    if (home.loading || home.refreshing) return;
+    if (gridItems.isNotEmpty) return;
+    if (_emptyNode.hasFocus) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastEmptyFocusMs < 420) return;
+    _lastEmptyFocusMs = now;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_emptyNode.context == null || _hasAnyHomeFocus()) return;
+      _focusEmpty(throttle: false);
     });
   }
 
@@ -657,6 +677,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     if (_platformNodes.isNotEmpty) _platformIndex = _safe(_platformIndex, _platformNodes.length);
     if (_categoryNodes.isNotEmpty) _categoryIndex = _safe(_categoryIndex, _categoryNodes.length);
     if (_gridNodes.isNotEmpty) _gridIndex = _safe(_gridIndex, _gridNodes.length);
+
+    _scheduleEmptyFocusIfNeeded(home, gridItems);
 
     final padding = TvReachability.homePadding;
     final gridTitle = categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[_categoryIndex]}';

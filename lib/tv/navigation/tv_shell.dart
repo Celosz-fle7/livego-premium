@@ -21,6 +21,17 @@ import '../widgets/tv_lazy_indexed_stack.dart';
 import 'tv_nav_index.dart';
 import 'tv_navigation_service.dart';
 
+/// ARCHITECTURE LOCK:
+/// TvShell owns only app-level TV navigation:
+/// - left nav visibility
+/// - active screen index
+/// - bootstrap recovery when focus is lost
+/// - player route open/close preparation
+///
+/// Heavy screens are created through TvLazyIndexedStack. KeepAlive must stay
+/// small. Home is kept warm because it owns the main TV focus/scroll memory.
+/// Secondary screens should be kept alive only if real device testing proves
+/// that rebuilding them feels worse than the extra memory cost.
 class TvShell extends ConsumerStatefulWidget {
   const TvShell({super.key});
 
@@ -40,6 +51,11 @@ class _TvShellState extends ConsumerState<TvShell> {
   bool _exitOpen = false;
   bool _returnToAccount = false;
   final TvNavigationService _navService = TvNavigationService.instance;
+
+  // Keep this intentionally conservative for low-end Android TV boxes.
+  // Add TvNavIndex.search or TvNavIndex.account only after real-device testing.
+  Set<int> get _keptAliveScreens => const <int>{TvNavIndex.home};
+
 
   late final FocusNode _rootFocusNode;
   late final List<FocusNode> _navNodes;
@@ -526,7 +542,7 @@ class _TvShellState extends ConsumerState<TvShell> {
                           child: TvLazyIndexedStack(
                             index: _index,
                             builders: _pageBuilders(),
-                            keepAliveIndexes: const <int>{TvNavIndex.home},
+                            keepAliveIndexes: _keptAliveScreens,
                           ),
                         ),
                       ],

@@ -32,3 +32,19 @@ This folder is intentionally split so Home does not become a dumping ground agai
 
 One remote key must produce one action.
 Focus moves first, scroll follows, image loading happens later.
+
+## Shell keep-alive rule
+
+`TvLazyIndexedStack` must not keep every screen alive by default.
+
+Current rule:
+- Home stays alive.
+- Secondary screens are disposed when inactive unless testing proves otherwise.
+
+Reason:
+Low-end Android TV boxes can become slow if Search, Library, Download, Account,
+and Home all stay mounted with images/lists/focus nodes.
+
+Potential future adjustment after real device testing:
+- Add Search to keepAlive if keyboard/search rebuild feels slow.
+- Add Account to keepAlive only if account menu restore feels rough.
