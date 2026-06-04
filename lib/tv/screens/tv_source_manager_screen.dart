@@ -574,6 +574,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                                 active: LiveGoSettings.isPlatformActive(_platforms[i]),
                                 statusColor: _statusColor(_platforms[i]),
                                 statusText: _statusText(_platforms[i]),
+                                capabilityBadges: ApiCapabilityLock.badgesFor(_platforms[i]),
                                 categories: _allCategoriesFor(_platforms[i]),
                                 selectedCategories: _selectedCategoriesFor(_platforms[i]),
                                 categoryMode: _categoryMode && _lastIndex == i,
@@ -960,6 +961,71 @@ class _SourceRow extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CapabilityBadgeRow extends StatelessWidget {
+  final List<String> badges;
+  final bool active;
+  final bool focused;
+
+  const _CapabilityBadgeRow({
+    required this.badges,
+    required this.active,
+    required this.focused,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (badges.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 6,
+      runSpacing: 5,
+      children: [
+        for (final badge in badges.take(6))
+          _CapabilityBadge(text: badge, active: active, focused: focused),
+      ],
+    );
+  }
+}
+
+class _CapabilityBadge extends StatelessWidget {
+  final String text;
+  final bool active;
+  final bool focused;
+
+  const _CapabilityBadge({
+    required this.text,
+    required this.active,
+    required this.focused,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = text == 'DRM' || text == 'BETA';
+    final color = !active
+        ? Colors.white38
+        : danger
+            ? Colors.orangeAccent
+            : AppTheme.cyan;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(focused ? 0.14 : 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(focused ? 0.34 : 0.20)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 9.2,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.3,
+          decoration: TextDecoration.none,
+        ),
+      ),
     );
   }
 }
