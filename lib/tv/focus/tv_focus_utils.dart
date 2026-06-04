@@ -14,7 +14,7 @@ import 'tv_reachability.dart';
 // Rules:
 // - arrow navigation is limited to about 10 steps/second
 // - token per FocusNode: only the latest callback for that node may scroll
-// - scroll is post-frame, after the focused widget has a valid layout
+// - scroll uses dual-phase reveal: fast reveal + correction reveal
 // - activation keys (OK/BACK/MENU) only ignore KeyRepeatEvent here;
 //   BACK/OK cooldown must stay local to the active screen/owner
 // ---------------------------------------------------------------------------
@@ -31,6 +31,60 @@ bool _throttledFocus(
   bool throttle = true,
   int postFrameDelay = 1,
 }) {
+  if (throttle) {
+    final now = DateTime.now();
+    if (now.difference(_lastNavTime) < _navInterval) return false;
+    _lastNavTime = now;
+  }
+
+  final token = (_focusFrameToken[node] ?? 0) + 1;
+  _focusFrameToken[node] = token;
+
+  // Focus must move immediately. The viewport correction can follow.
+  doFocus();
+
+  void runReveal({required bool finalPass}) {
+    if (_focusFrameToken[node] != token) return;
+
+    if (node.context == null || !node.hasFocus) {
+      if (finalPass) _focusFrameToken.remove(node);
+      return;
+    }
+
+    doScroll();
+
+    if (finalPass) {
+      _focusFrameToken.remove(node);
+    }
+  }
+
+  void scheduleReveal(int framesLeft, {required bool finalPass}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_focusFrameToken[node] != token) return;
+      if (framesLeft > 1) {
+        scheduleReveal(framesLeft - 1, finalPass: finalPass);
+        return;
+      }
+      runReveal(finalPass: finalPass);
+    });
+  }
+
+  // Dual-phase reveal:
+  // 1) Fast reveal keeps the screen close to the remote immediately.
+  // 2) Correction reveal runs after the focus decoration/card scale has had
+  //    time to settle, fixing the last one-row/one-layer offset on low-end STB.
+  //
+  // This is not per-zone throttling and does not block key handlers with async
+  // waits. Latest-token-only still prevents old scroll passes from winning.
+  final fastFrames = postFrameDelay.clamp(1, 3).toInt();
+  final correctionFrames = (fastFrames + 2).clamp(3, 4).toInt();
+
+  scheduleReveal(fastFrames, finalPass: false);
+  scheduleReveal(correctionFrames, finalPass: true);
+
+  return true;
+}
+) {
   if (throttle) {
     final now = DateTime.now();
     if (now.difference(_lastNavTime) < _navInterval) return false;
@@ -149,9 +203,7 @@ bool tvFocusGrid(
       duration: duration,
     ),
     throttle: throttle,
-    // Real-device test: 2 frames fixed the old 2-layer lag, but still left
-    // one visible row/section behind on low-end STB. One post-frame is enough
-    // after focus decoration has a layout and keeps scroll closer to remote.
+    // Dual-phase reveal handles fast scroll + settle correction centrally.
     postFrameDelay: 1,
   );
 }
