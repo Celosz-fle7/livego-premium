@@ -28,6 +28,8 @@ class TvSearchState {
 }
 
 class TvSearchController extends StateNotifier<TvSearchState> {
+  static const Duration _searchTimeout = Duration(seconds: 9);
+
   TvSearchController() : super(const TvSearchState());
 
   int _ticket = 0;
@@ -44,12 +46,13 @@ class TvSearchController extends StateNotifier<TvSearchState> {
       return;
     }
 
-    state = state.copyWith(query: clean, loading: true, results: const <ContentItem>[], hasError: false);
+    // Search must never feel like it freezes the TV. Keep the old result list
+    // while a new query is loading so remote focus has something stable to own.
+    state = state.copyWith(query: clean, loading: true, hasError: false);
     List<ContentItem> rows = const <ContentItem>[];
     var hasError = false;
     try {
-      rows = await LiveGoCatalog.searchAll(clean)
-          .timeout(const Duration(seconds: 22), onTimeout: () => const <ContentItem>[]);
+      rows = await LiveGoCatalog.searchAll(clean).timeout(_searchTimeout);
     } catch (_) {
       hasError = true;
       rows = const <ContentItem>[];

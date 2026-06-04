@@ -149,7 +149,10 @@ bool tvFocusGrid(
       duration: duration,
     ),
     throttle: throttle,
-    postFrameDelay: 2,
+    // Real-device test: 2 frames fixed the old 2-layer lag, but still left
+    // one visible row/section behind on low-end STB. One post-frame is enough
+    // after focus decoration has a layout and keeps scroll closer to remote.
+    postFrameDelay: 1,
   );
 }
 

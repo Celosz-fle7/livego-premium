@@ -46,6 +46,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   TvZone _zone = TvZone.list;
   int _gridIndex = 0;
   bool _openingDetail = false;
+  bool _searchSubmitBusy = false;
+  int _lastSearchSubmitMs = 0;
 
   @override
   void initState() {
@@ -121,10 +123,28 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   }
 
   Future<void> _submitSearch(String value) async {
+    final clean = value.trim();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (_searchSubmitBusy || now - _lastSearchSubmitMs < 650) return;
+    _lastSearchSubmitMs = now;
+
+    if (clean.isEmpty) {
+      _gridIndex = 0;
+      await ref.read(tvSearchProvider.notifier).search('');
+      if (mounted) _focusInput(throttle: false);
+      return;
+    }
+
+    _searchSubmitBusy = true;
     _gridIndex = 0;
-    await ref.read(tvSearchProvider.notifier).search(value);
-    final resultCount = ref.read(tvSearchProvider).results.length;
-    LiveGoAnalytics.search(value.trim(), resultCount);
+    try {
+      await ref.read(tvSearchProvider.notifier).search(clean);
+      final resultCount = ref.read(tvSearchProvider).results.length;
+      LiveGoAnalytics.search(clean, resultCount);
+    } finally {
+      _searchSubmitBusy = false;
+    }
+
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -178,7 +198,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key) || key == LogicalKeyboardKey.arrowRight) {
-      _submitSearch(_controller.text);
+      if (!ref.read(tvSearchProvider).loading) {
+        _submitSearch(_controller.text);
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -201,7 +223,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      _submitSearch(_controller.text);
+      if (!ref.read(tvSearchProvider).loading) {
+        _submitSearch(_controller.text);
+      }
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -337,9 +361,26 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                         const TvSearchKeyboardPanel(),
                         const SizedBox(height: 16),
                         if (search.loading)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 70),
-                            child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 70),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  CircularProgressIndicator(color: AppTheme.cyan),
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Mencari... remote tetap aktif',
+                                    style: TextStyle(
+                                      color: AppTheme.textSoft,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           )
                         else if (results.isEmpty)
                           ListenableBuilder(
