@@ -24,10 +24,7 @@ class TvPlayerEpisodePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalSafe = total.clamp(1, 120).toInt();
     final ordered = episodes.isEmpty
-        ? List.generate(
-            totalSafe,
-            (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'),
-          )
+        ? List.generate(totalSafe, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'))
         : episodes;
     final activePos = ordered.indexWhere((e) => e.index == cursor);
     final center = activePos >= 0 ? activePos : ordered.indexWhere((e) => e.index == selected);
@@ -50,30 +47,15 @@ class TvPlayerEpisodePanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Daftar Episode',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-            ),
+            const Text('Daftar Episode', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                color: Colors.white.withOpacity(0.06),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Text(
-                '$totalSafe Ep • UP/DOWN pilih • OK putar • BACK tutup',
-                style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-              ),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), color: Colors.white.withOpacity(0.06), border: Border.all(color: Colors.white12)),
+              child: Text('$totalSafe Ep • UP/DOWN pilih • OK putar • BACK tutup', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Aktif: Episode $selected • Cursor: Episode $cursor',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
-            ),
+            Text('Aktif: Episode $selected • Cursor: Episode $cursor', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
             const SizedBox(height: 14),
             Expanded(
               child: ListView.builder(
@@ -110,13 +92,7 @@ class _EpisodeListRow extends StatelessWidget {
   final bool focused;
   final bool broken;
 
-  const _EpisodeListRow({
-    required this.ep,
-    required this.title,
-    required this.selected,
-    required this.focused,
-    this.broken = false,
-  });
+  const _EpisodeListRow({required this.ep, required this.title, required this.selected, required this.focused, this.broken = false});
 
   @override
   Widget build(BuildContext context) {
@@ -127,10 +103,7 @@ class _EpisodeListRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12),
-          width: focused ? 2 : 1,
-        ),
+        border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
         boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Row(
@@ -141,23 +114,9 @@ class _EpisodeListRow extends StatelessWidget {
             size: 18,
           ),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              title.trim().isEmpty ? 'Episode $ep' : title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: focused || selected ? Colors.white : AppTheme.textSoft,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          if (broken)
-            const Text('GAGAL', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none))
-          else if (selected)
-            const Text('DIPUTAR', style: TextStyle(color: AppTheme.cyan, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          Expanded(child: Text(title.trim().isEmpty ? 'Episode $ep' : title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused || selected ? Colors.white : AppTheme.textSoft, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none))),
+          if (broken) const Text('GAGAL', style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none))
+          else if (selected) const Text('DIPUTAR', style: TextStyle(color: AppTheme.cyan, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );

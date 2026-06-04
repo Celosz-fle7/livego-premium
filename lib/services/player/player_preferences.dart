@@ -6,12 +6,14 @@ class PlayerPreferences {
   static const _subtitleLanguageKey = 'player.subtitle.language';
   static const _audioTrackKey = 'player.audio.track';
   static const _speedKey = 'player.speed';
+  static const _fitCoverKey = 'player.fit.cover';
 
   static String quality = 'Auto';
   static bool subtitleEnabled = true;
   static String subtitleLanguage = 'Auto';
   static String audioTrack = 'Source';
   static double speed = 1.0;
+  static bool fitCover = false;
 
   static bool _loaded = false;
 
@@ -23,6 +25,7 @@ class PlayerPreferences {
     subtitleLanguage = prefs.getString(_subtitleLanguageKey) ?? subtitleLanguage;
     audioTrack = prefs.getString(_audioTrackKey) ?? audioTrack;
     speed = prefs.getDouble(_speedKey) ?? speed;
+    fitCover = prefs.getBool(_fitCoverKey) ?? fitCover;
     _loaded = true;
   }
 
@@ -52,3 +55,10 @@ class PlayerPreferences {
     await prefs.setDouble(_speedKey, speed);
   }
 }
+
+
+  static Future<void> setFitCover(bool value) async {
+    fitCover = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_fitCoverKey, value);
+  }

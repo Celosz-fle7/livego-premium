@@ -57,15 +57,7 @@ class TvPlayerControlDock extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  _fmt(value.position),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+                Text(_fmt(value.position), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 const SizedBox(width: 18),
                 Expanded(
                   child: AnimatedContainer(
@@ -73,13 +65,8 @@ class TvPlayerControlDock extends StatelessWidget {
                     padding: EdgeInsets.all(progressFocused ? 4 : 0),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: progressFocused ? AppTheme.cyan : Colors.transparent,
-                        width: 2,
-                      ),
-                      boxShadow: progressFocused
-                          ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)]
-                          : null,
+                      border: Border.all(color: progressFocused ? AppTheme.cyan : Colors.transparent, width: 2),
+                      boxShadow: progressFocused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
                     ),
                     child: VideoProgressIndicator(
                       controller,
@@ -93,15 +80,7 @@ class TvPlayerControlDock extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 18),
-                Text(
-                  _fmt(value.duration),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+                Text(_fmt(value.duration), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               ],
             ),
             const SizedBox(height: 14),
@@ -131,12 +110,7 @@ class _DockButton extends StatelessWidget {
   final bool active;
   final bool focused;
 
-  const _DockButton({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.focused = false,
-  });
+  const _DockButton({required this.icon, required this.label, this.active = false, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -146,16 +120,9 @@ class _DockButton extends StatelessWidget {
       height: 48,
       margin: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
-        color: focused
-            ? AppTheme.cyan.withOpacity(0.20)
-            : (active ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.055)),
+        color: focused ? AppTheme.cyan.withOpacity(0.20) : (active ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.055)),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: focused
-              ? AppTheme.cyan
-              : (active ? AppTheme.cyan.withOpacity(0.75) : Colors.white12),
-          width: focused ? 2.5 : 1,
-        ),
+        border: Border.all(color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.75) : Colors.white12), width: focused ? 2.5 : 1),
         boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Column(
@@ -163,17 +130,7 @@ class _DockButton extends StatelessWidget {
         children: [
           Icon(icon, color: focused || active ? Colors.white : Colors.white70, size: 23),
           const SizedBox(height: 1),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: focused ? Colors.white : AppTheme.textSoft,
-              fontSize: 8.5,
-              fontWeight: FontWeight.w900,
-              decoration: TextDecoration.none,
-            ),
-          ),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: focused ? Colors.white : AppTheme.textSoft, fontSize: 8.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );
@@ -183,11 +140,7 @@ class _DockButton extends StatelessWidget {
 class _DockTextButton extends StatelessWidget {
   final String text;
   final bool focused;
-
-  const _DockTextButton({
-    required this.text,
-    this.focused = false,
-  });
+  const _DockTextButton({required this.text, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -204,15 +157,7 @@ class _DockTextButton extends StatelessWidget {
         border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2.5 : 1),
         boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: focused ? Colors.white : Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w900,
-          decoration: TextDecoration.none,
-        ),
-      ),
+      child: Text(text, style: TextStyle(color: focused ? Colors.white : Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
   }
 }

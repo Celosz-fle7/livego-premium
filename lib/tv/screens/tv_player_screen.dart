@@ -172,6 +172,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _speed = PlayerPreferences.speed;
       _audioTrack = PlayerPreferences.audioTrack.toLowerCase() == 'mute' ? 'Source' : PlayerPreferences.audioTrack;
       _muted = PlayerPreferences.audioTrack.toLowerCase() == 'mute';
+      _fitCover = PlayerPreferences.fitCover;
       LiveGoSettings.quality = PlayerPreferences.quality;
       LiveGoSettings.subtitlesEnabled = PlayerPreferences.subtitleEnabled;
       _qualityCursor = _qualityIndexFor(PlayerPreferences.quality);
@@ -1352,7 +1353,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     } else if (_optionCursor == 2) {
       unawaited(_toggleAutoNext());
     } else if (_optionCursor == 3) {
-      setState(() => _fitCover = !_fitCover);
+      final next = !_fitCover;
+      setState(() => _fitCover = next);
+      unawaited(PlayerPreferences.setFitCover(next));
     } else if (_optionCursor == 4) {
       unawaited(_toggleFavorite());
     } else if (_optionCursor == 5) {

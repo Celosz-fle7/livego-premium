@@ -23,9 +23,8 @@ class TvPlayerStreamResolveResult {
 
 /// Player data/service boundary.
 ///
-/// Phase 1 kept video_player controller ownership inside the screen.
-/// This service now owns stream resolving/fallback so player screen no longer
-/// decides which API path to try first.
+/// VideoPlayerController ownership still stays in TvPlayerScreen for stability.
+/// Stream resolving/fallback is owned here so the screen does not decide API order.
 class TvPlayerService {
   const TvPlayerService();
 
@@ -52,7 +51,7 @@ class TvPlayerService {
       }
     }
 
-    // 1) Fast direct episode path: fastest route for TV remote episode switching.
+    // 1) Fast direct episode path: best for quick TV remote episode switching.
     var result = await wrap(
       'fastStream',
       () => PlaybackResolver.fastStreamInfo(
@@ -63,7 +62,7 @@ class TvPlayerService {
     );
     if (result.hasStream) return result;
 
-    // 2) Catalog stream path: goes through API manager/contract/fallback layer.
+    // 2) Catalog stream path: goes through API manager/contract/fallback.
     result = await wrap(
       'catalogStreamInfo',
       () => LiveGoCatalog.streamInfo(item, chapterId: chapterId)
@@ -71,8 +70,7 @@ class TvPlayerService {
     );
     if (result.hasStream) return result;
 
-    // 3) Fast catalog fallback with a shorter timeout. Useful when the first
-    // resolver path is stale but catalog can still provide a stream quickly.
+    // 3) Catalog fast stream fallback, useful if current resolver branch was stale.
     result = await wrap(
       'catalogFastStream',
       () => LiveGoCatalog.fastStreamInfo(
@@ -80,6 +78,23 @@ class TvPlayerService {
         chapterId: chapterId,
         timeout: const Duration(seconds: 7),
       ),
+    );
+    if (result.hasStream) return result;
+
+    // 4) Last detail warm-up fallback. Some APIs need detail/episode cache filled
+    // before a stream becomes available.
+    await wrap(
+      'detailWarmup',
+      () async {
+        await LiveGoCatalog.detail(item).timeout(PlaybackTimeoutConfig.detailBackground);
+        return StreamInfo.empty;
+      },
+    );
+
+    result = await wrap(
+      'postDetailStreamInfo',
+      () => LiveGoCatalog.streamInfo(item, chapterId: chapterId)
+          .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty),
     );
     if (result.hasStream) return result;
 
