@@ -54,6 +54,7 @@ class TvHomeScreen extends ConsumerStatefulWidget {
 class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final ScrollController _scroll = ScrollController();
   final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
+  final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-empty-retry');
   final List<FocusNode> _platformNodes = <FocusNode>[];
   final List<FocusNode> _categoryNodes = <FocusNode>[];
   final List<FocusNode> _gridNodes = <FocusNode>[];
@@ -132,6 +133,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
     _bannerNode.dispose();
+    _emptyNode.dispose();
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
     _disposeNodes(_gridNodes);
@@ -167,7 +169,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     if (_focusRows()) return true;
     if (_focusCategory(_categoryIndex, throttle: false)) return true;
     if (_focusPlatform(_platformIndex, throttle: false)) return true;
-    return _focusGrid(_gridIndex, throttle: false);
+    if (_focusGrid(_gridIndex, throttle: false)) return true;
+    return _focusEmpty(throttle: false);
   }
 
   void _disposeNodes(List<FocusNode> nodes) {
@@ -291,12 +294,20 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     return preferMyList ? rows.focusMyList() : rows.focusFirst();
   }
 
+  bool _focusEmpty({bool throttle = true}) {
+    if (_emptyNode.context == null) return false;
+    final ok = tvFocusComfort(_emptyNode, throttle: throttle);
+    if (ok) _rememberFocus(TvZone.placeholder, 0);
+    return ok;
+  }
+
   bool _hasAnyHomeFocus() {
     return _bannerNode.hasFocus ||
         _platformNodes.any((node) => node.hasFocus) ||
         _categoryNodes.any((node) => node.hasFocus) ||
         _gridNodes.any((node) => node.hasFocus) ||
-        (_rowsKey.currentState?.hasFocus ?? false);
+        (_rowsKey.currentState?.hasFocus ?? false) ||
+        _emptyNode.hasFocus;
   }
 
   void _scheduleFocusEntry({bool preferBanner = false, int attempt = 0}) {
@@ -540,7 +551,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusRows()) _focusGrid(_gridIndex);
+      if (!_focusRows()) {
+        if (!_focusGrid(_gridIndex)) _focusEmpty();
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
@@ -594,6 +607,30 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _emptyKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveToNav();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (!_focusCategory(_categoryIndex, throttle: false)) _focusPlatform(_platformIndex, throttle: false);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
+      _loadHome(clearPrevious: true);
+      _scheduleFocusEntry(preferBanner: false);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.handled;
   }
 
   @override
@@ -722,7 +759,23 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     if (home.loading && gridItems.isEmpty)
                       const TvProfessionalGridSkeleton(columns: 6, rows: 2)
                     else if (gridItems.isEmpty)
-                      TvHomeEmptyState(hasError: home.hasError)
+                      ListenableBuilder(
+                        listenable: _emptyNode,
+                        builder: (context, _) {
+                          return Focus(
+                            focusNode: _emptyNode,
+                            skipTraversal: true,
+                            onKeyEvent: (node, event) => _emptyKey(event),
+                            onFocusChange: (focused) {
+                              if (focused) _rememberFocus(TvZone.placeholder, 0);
+                            },
+                            child: TvHomeEmptyState(
+                              hasError: home.hasError,
+                              focused: _emptyNode.hasFocus,
+                            ),
+                          );
+                        },
+                      )
                     else
                       const SizedBox.shrink(),
                   ]),

@@ -56,8 +56,9 @@ class TvHomeStatusLine extends StatelessWidget {
 
 class TvHomeEmptyState extends StatelessWidget {
   final bool hasError;
+  final bool focused;
 
-  const TvHomeEmptyState({super.key, required this.hasError});
+  const TvHomeEmptyState({super.key, required this.hasError, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -65,16 +66,17 @@ class TvHomeEmptyState extends StatelessWidget {
       height: 238,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppTheme.surface2.withOpacity(0.72),
+        color: focused ? AppTheme.surface3.withOpacity(0.88) : AppTheme.surface2.withOpacity(0.72),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2 : 1),
+        boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             hasError ? Icons.cloud_off_rounded : Icons.movie_filter_rounded,
-            color: Colors.white30,
+            color: focused ? Colors.white70 : Colors.white30,
             size: 46,
           ),
           const SizedBox(height: 12),
@@ -88,8 +90,8 @@ class TvHomeEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Gunakan Platform/Kategori, atau coba lagi nanti.',
+          Text(
+            hasError ? 'OK coba lagi • LEFT ke menu • UP ke kategori' : 'OK refresh • LEFT ke menu • UP ke kategori',
             style: TextStyle(
               color: Colors.white38,
               fontSize: 12.5,
