@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
-import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
-import '../../services/content/content_health_service.dart';
-import '../../services/image/image_quality_config.dart';
-import '../../shared/widgets/livego_cached_image.dart';
-import '../models/tv_zone.dart';
-import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
+import '../models/tv_zone.dart';
+import '../providers/tv_search_provider.dart';
+import '../widgets/tv_empty_panel.dart';
+import '../widgets/tv_poster_grid.dart';
+import '../widgets/tv_screen_header.dart';
 import 'tv_player_screen.dart';
 
-class TvSearchScreen extends StatefulWidget {
+class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onBackToNav;
   final VoidCallback? onBackToHome;
@@ -32,35 +32,31 @@ class TvSearchScreen extends StatefulWidget {
   });
 
   @override
-  State<TvSearchScreen> createState() => _TvSearchScreenState();
+  ConsumerState<TvSearchScreen> createState() => _TvSearchScreenState();
 }
 
-class _TvSearchScreenState extends State<TvSearchScreen> {
+class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _controller = TextEditingController();
   late final FocusNode _searchNode;
   final List<FocusNode> _resultNodes = [];
 
   TvZone _zone = TvZone.list;
-  String _query = '';
-  bool _loading = false;
   int _lastGrid = 0;
-  int _searchTicket = 0;
   bool _openingPlayer = false;
-  List<ContentItem> _results = [];
 
   @override
   void initState() {
     super.initState();
     _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-field');
-    WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06));
+    WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06, throttle: false));
   }
 
   @override
   void didUpdateWidget(covariant TvSearchScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06));
+      WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06, throttle: false));
     }
   }
 
@@ -117,53 +113,25 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     }
   }
 
-  void _backToHome() {
-    _zone = TvZone.banner;
-    if (widget.onBackToHome != null) {
-      widget.onBackToHome?.call();
-    } else if (Navigator.of(context).canPop()) {
-      Navigator.of(context).maybePop();
-    }
-  }
-
   Future<void> _search(String value) async {
-    final clean = value.trim();
-    final ticket = ++_searchTicket;
-    setState(() {
-      _query = clean;
-      if (clean.isEmpty) _results = [];
-      _loading = clean.isNotEmpty;
-      _lastGrid = 0;
-    });
-    if (clean.isEmpty) return;
-
-    List<ContentItem> rows = const <ContentItem>[];
-    try {
-      rows = await LiveGoCatalog.searchAll(clean)
-          .timeout(const Duration(seconds: 22), onTimeout: () => const <ContentItem>[]);
-    } catch (_) {
-      rows = const <ContentItem>[];
-    }
-    if (!mounted || ticket != _searchTicket || clean != _query) return;
-    setState(() {
-      _results = ContentHealthService.filterPlayable(rows);
-      _loading = false;
-    });
+    _lastGrid = 0;
+    await ref.read(tvSearchProvider.notifier).search(value);
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || ticket != _searchTicket) return;
+      if (!mounted) return;
       if (_resultNodes.isNotEmpty) {
-        _focusGrid(0);
+        _focusGrid(0, throttle: false);
       } else {
-        tvFocus(_searchNode, alignment: 0.06);
+        tvFocus(_searchNode, alignment: 0.06, throttle: false);
       }
     });
   }
 
-  void _focusGrid(int index) {
+  void _focusGrid(int index, {bool throttle = true}) {
     if (_resultNodes.isEmpty) return;
     _zone = TvZone.grid;
     _lastGrid = _safe(index);
-    tvFocusGrid(_resultNodes[_lastGrid]);
+    tvFocusGrid(_resultNodes[_lastGrid], throttle: throttle);
   }
 
   void _open(ContentItem item) {
@@ -174,10 +142,9 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
-      void restore() {
-        if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid);
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid, throttle: false);
+      });
     });
   }
 
@@ -223,7 +190,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
         _zone = TvZone.list;
-        tvFocus(_searchNode, alignment: 0.06);
+        tvFocus(_searchNode, alignment: 0.06, throttle: false);
       } else {
         _focusGrid(index - columns);
       }
@@ -249,7 +216,12 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _syncResultNodes(_results.length);
+    final search = ref.watch(tvSearchProvider);
+    final results = search.results;
+    _syncResultNodes(results.length);
+    if (_controller.text.trim() != search.query && !_searchNode.hasFocus) {
+      _controller.text = search.query;
+    }
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.goBack): _SearchBackIntent(),
@@ -276,7 +248,11 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate.fixed([
-                        _SearchHeader(),
+                        const TvScreenHeader(
+                          title: 'Pencarian',
+                          subtitle: 'Cari semua sumber aktif LiveGo.',
+                          icon: Icons.search_rounded,
+                        ),
                         const SizedBox(height: 14),
                         Focus(
                           canRequestFocus: false,
@@ -286,8 +262,7 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                             listenable: _searchNode,
                             builder: (context, _) {
                               final focused = _searchNode.hasFocus;
-                              return AnimatedContainer(
-                                duration: TvFocusStyle.fast,
+                              return Container(
                                 padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(22),
@@ -299,12 +274,12 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                                   textInputAction: TextInputAction.search,
                                   onSubmitted: _search,
-                                  onChanged: (v) => setState(() => _query = v.trim()),
+                                  onChanged: (v) => ref.read(tvSearchProvider.notifier).setDraft(v),
                                   decoration: InputDecoration(
                                     hintText: 'Cari drama, CEO, cinta, balas dendam...',
                                     hintStyle: const TextStyle(color: Colors.white38),
                                     prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan),
-                                    suffixIcon: _query.isEmpty
+                                    suffixIcon: search.query.isEmpty
                                         ? null
                                         : IconButton(
                                             onPressed: () {
@@ -323,17 +298,21 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        if (_loading)
+                        if (search.loading)
                           const Padding(
                             padding: EdgeInsets.only(top: 70),
                             child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
                           )
-                        else if (_results.isEmpty)
-                          _SearchEmpty(hasQuery: _query.isNotEmpty)
+                        else if (results.isEmpty)
+                          TvEmptyPanel(
+                            icon: search.query.isNotEmpty ? Icons.search_off_rounded : Icons.travel_explore_rounded,
+                            title: search.query.isNotEmpty ? 'Tidak ada hasil' : 'Cari dari source aktif LiveGo',
+                            subtitle: 'Ketik kata kunci lalu tekan Enter/Search.',
+                          )
                         else ...[
                           Row(
                             children: [
-                              Text('${_results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                              Text('${results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                               const Spacer(),
                               Text('↑ input • OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                             ],
@@ -343,35 +322,22 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                       ]),
                     ),
                   ),
-                  if (!_loading && _results.isNotEmpty)
-                    SliverPadding(
+                  if (!search.loading && results.isNotEmpty)
+                    TvPosterGrid(
+                      items: results,
+                      nodes: _resultNodes,
+                      columns: columns,
                       padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
-                      sliver: SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) {
-                            final item = _results[i];
-                            return _SearchPoster(
-                              node: _resultNodes[i],
-                              item: item,
-                              onTap: () {
-                                _lastGrid = i;
-                                _open(item);
-                              },
-                              onKey: (node, event) => _gridKey(i, item, columns, event),
-                            );
-                          },
-                          childCount: _results.length,
-                          addAutomaticKeepAlives: false,
-                          addRepaintBoundaries: true,
-                          addSemanticIndexes: false,
-                        ),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          mainAxisExtent: 224,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 16,
-                        ),
-                      ),
+                      mainAxisExtent: 224,
+                      onFocus: (i) {
+                        _zone = TvZone.grid;
+                        _lastGrid = i;
+                      },
+                      onTap: (i, item) {
+                        _lastGrid = i;
+                        _open(item);
+                      },
+                      onKey: (i, item, node, event) => _gridKey(i, item, columns, event),
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
                 ],
@@ -386,111 +352,4 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
 
 class _SearchBackIntent extends Intent {
   const _SearchBackIntent();
-}
-
-class _SearchHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 88,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.94), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.border)),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(gradient: AppTheme.activeGradient, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.search_rounded, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pencarian', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                SizedBox(height: 4),
-                Text('Cari semua sumber aktif LiveGo.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchEmpty extends StatelessWidget {
-  final bool hasQuery;
-  const _SearchEmpty({required this.hasQuery});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 250,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.86), borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.border)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(hasQuery ? Icons.search_off_rounded : Icons.travel_explore_rounded, color: AppTheme.cyan.withOpacity(0.8), size: 54),
-          const SizedBox(height: 14),
-          Text(hasQuery ? 'Tidak ada hasil' : 'Cari dari source aktif LiveGo', style: const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-          const SizedBox(height: 8),
-          const Text('Ketik kata kunci lalu tekan Enter/Search.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SearchPoster extends StatelessWidget {
-  final FocusNode node;
-  final ContentItem item;
-  final FocusOnKeyEventCallback onKey;
-  final VoidCallback onTap;
-
-  const _SearchPoster({required this.node, required this.item, required this.onKey, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            focusColor: Colors.transparent,
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: AnimatedContainer(
-                      duration: TvFocusStyle.fast,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: focused ? 2.4 : 0), boxShadow: focused ? [TvFocusStyle.glow(0.08, 6)] : null),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: item.posterUrl.isEmpty
-                            ? Container(color: AppTheme.surface2, child: const Icon(Icons.movie_rounded, color: Colors.white38, size: 40))
-                            : LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800, height: 1.12, decoration: TextDecoration.none)),
-                ],
-              ),
-          ),
-        );
-      },
-    );
-  }
 }

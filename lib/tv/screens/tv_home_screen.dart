@@ -20,7 +20,7 @@ import '../focus/tv_reachability.dart';
 import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
-import '../widgets/tv_poster_tile.dart';
+import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import 'tv_player_screen.dart';
 
@@ -880,40 +880,28 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     ),
                   ),
                   if (!loading && gridItems.isNotEmpty)
-                    SliverPadding(
+                    TvPosterGrid(
+                      items: gridItems,
+                      nodes: _gridNodes,
+                      columns: _gridColumns.clamp(4, 10),
                       padding: EdgeInsets.fromLTRB(homePadding.left, 0, homePadding.right, 0),
-                      sliver: SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) => TvPosterTile(
-                            item: gridItems[i],
-                            focusNode: _gridNodes[i],
-                            onFocus: () {
-                              _zone = TvZone.grid;
-                              _lastGrid = i;
-                              _rememberFocusState(TvZone.grid, i);
-                              _rememberHomeUi();
-                            },
-                            onKey: (node, event) => _gridKey(i, event),
-                            onTap: () {
-                              _zone = TvZone.grid;
-                              _lastGrid = i;
-                              _rememberFocusState(TvZone.grid, i);
-                              _rememberHomeUi();
-                              _open(gridItems[i]);
-                            },
-                          ),
-                          childCount: gridItems.length,
-                          addAutomaticKeepAlives: false,
-                          addRepaintBoundaries: true,
-                          addSemanticIndexes: false,
-                        ),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: _gridColumns.clamp(4, 10),
-                          crossAxisSpacing: 13,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: _tvPosterAspectFor(_gridColumns),
-                        ),
-                      ),
+                      crossAxisSpacing: 13,
+                      mainAxisSpacing: 14,
+                      childAspectRatio: _tvPosterAspectFor(_gridColumns),
+                      onFocus: (i) {
+                        _zone = TvZone.grid;
+                        _lastGrid = i;
+                        _rememberFocusState(TvZone.grid, i);
+                        _rememberHomeUi();
+                      },
+                      onTap: (i, item) {
+                        _zone = TvZone.grid;
+                        _lastGrid = i;
+                        _rememberFocusState(TvZone.grid, i);
+                        _rememberHomeUi();
+                        _open(item);
+                      },
+                      onKey: (i, item, node, event) => _gridKey(i, event),
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: TvReachability.homeBottomPadding)),
                 ],
