@@ -179,34 +179,6 @@ bool tvFocusGrid(
   );
 }
 
-) {
-  if (node.context == null || !node.hasFocus) return false;
-
-  final token = (_focusFrameToken[node] ?? 0) + 1;
-  _focusFrameToken[node] = token;
-
-  void scheduleReveal(int framesLeft) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_focusFrameToken[node] != token) return;
-      if (framesLeft > 1) {
-        scheduleReveal(framesLeft - 1);
-        return;
-      }
-      _focusFrameToken.remove(node);
-      if (node.context == null || !node.hasFocus) return;
-      _revealInViewport(
-        node,
-        topMargin: topMargin,
-        bottomMargin: bottomMargin,
-        duration: duration,
-      );
-    });
-  }
-
-  scheduleReveal(postFrameDelay.clamp(1, 3).toInt());
-  return true;
-}
-
 void _revealInViewport(
   FocusNode node, {
   required double topMargin,
