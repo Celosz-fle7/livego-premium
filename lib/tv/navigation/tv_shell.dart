@@ -38,6 +38,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   bool _returnToAccount = false;
   final TvNavigationService _navService = TvNavigationService.instance;
 
+  late final FocusNode _rootFocusNode;
   late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;

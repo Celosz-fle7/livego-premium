@@ -16,7 +16,6 @@ import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
 import '../navigation/tv_nav_index.dart';
 import '../providers/tv_navigation_provider.dart';
-import '../navigation/tv_nav_index.dart';
 import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
 import '../providers/tv_home_provider.dart';
@@ -255,6 +254,57 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     final rows = _rowsKey.currentState;
     if (rows == null) return false;
     return preferMyList ? rows.focusMyList() : rows.focusFirst();
+  }
+
+
+  bool _hasAnyHomeFocus() {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return false;
+    if (primary == _bannerNode) return true;
+    if (_platformNodes.contains(primary)) return true;
+    if (_categoryNodes.contains(primary)) return true;
+    if (_gridNodes.contains(primary)) return true;
+    return false;
+  }
+
+  void _scheduleFocusEntry({required bool preferBanner}) {
+    final ticket = ++_focusBootstrapTicket;
+    const delays = <Duration>[
+      Duration(milliseconds: 0),
+      Duration(milliseconds: 50),
+      Duration(milliseconds: 150),
+      Duration(milliseconds: 300),
+    ];
+
+    void attempt(int index) {
+      if (!mounted || ticket != _focusBootstrapTicket) return;
+      void run() {
+        if (!mounted || ticket != _focusBootstrapTicket) return;
+        if (preferBanner) {
+          if (_focusBanner(throttle: false)) return;
+        }
+        _restoreZoneFocus(throttle: false);
+        if (_hasAnyHomeFocus()) return;
+        if (index + 1 < delays.length) attempt(index + 1);
+      }
+
+      final delay = delays[index];
+      if (delay == Duration.zero) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => run());
+      } else {
+        Future<void>.delayed(delay, run);
+      }
+    }
+
+    attempt(0);
+  }
+
+  void _handleNavigationSync(TvNavigationState next) {
+    if (!mounted) return;
+    if (next.navIndex != TvNavIndex.home) return;
+    if (next.navFocused) return;
+    _homeNavTick.value = _homeNavTick.value + 1;
+    _scheduleFocusEntry(preferBanner: _zone == TvZone.banner);
   }
 
   void _restoreZoneFocus({bool throttle = true}) {
