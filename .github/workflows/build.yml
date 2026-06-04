@@ -30,17 +30,87 @@ jobs:
         run: |
           flutter create --platforms=android --project-name livego_premium .
           rm -rf test
-          python3 - << 'FIX'
+          python3 - << 'FIX_ANDROID_TV'
           from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          if "android.permission.INTERNET" not in s:
-              s = s.replace(
-                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
-                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />'
-              )
-          p.write_text(s)
-          FIX
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          if not manifest.exists():
+              raise SystemExit(f"AndroidManifest.xml not found: {manifest}")
+
+          s = manifest.read_text()
+
+          def add_after_manifest_open(text, snippet):
+              if snippet.strip() in text:
+                  return text
+              needle = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+              if needle not in text:
+                  raise SystemExit("Unsupported AndroidManifest.xml root")
+              return text.replace(needle, needle + "\n" + snippet.rstrip(), 1)
+
+          manifest_inserts = [
+              '    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-feature android:name="android.software.leanback" android:required="false" />',
+              '    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />',
+          ]
+          for snippet in reversed(manifest_inserts):
+              s = add_after_manifest_open(s, snippet)
+
+          if 'android:banner="@drawable/tv_banner"' not in s:
+              s = s.replace('<application', '<application android:banner="@drawable/tv_banner"', 1)
+
+          leanback_filter = '''
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>'''
+
+          https_deeplink_filter = '''
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="livego.app" android:pathPrefix="/content" />
+            </intent-filter>'''
+
+          app_deeplink_filter = '''
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="livego" android:host="content" />
+            </intent-filter>'''
+
+          activity_match = re.search(r'(<activity[\s\S]*?</activity>)', s)
+          if not activity_match:
+              raise SystemExit("No activity block found in AndroidManifest.xml")
+          activity = activity_match.group(1)
+          updated_activity = activity
+          for block, marker in [
+              (leanback_filter, 'android.intent.category.LEANBACK_LAUNCHER'),
+              (https_deeplink_filter, 'android:host="livego.app"'),
+              (app_deeplink_filter, 'android:scheme="livego"'),
+          ]:
+              if marker not in updated_activity:
+                  updated_activity = updated_activity.replace('</activity>', block + '\n        </activity>', 1)
+          if updated_activity != activity:
+              s = s.replace(activity, updated_activity, 1)
+
+          manifest.write_text(s)
+
+          drawable_dir = Path("android/app/src/main/res/drawable")
+          drawable_dir.mkdir(parents=True, exist_ok=True)
+          (drawable_dir / "tv_banner.xml").write_text('''<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:startColor="#020617"
+        android:centerColor="#06324A"
+        android:endColor="#00D4FF"
+        android:angle="0" />
+    <corners android:radius="0dp" />
+</shape>
+''')
+          FIX_ANDROID_TV
 
       - name: Pub get
         run: flutter pub get
