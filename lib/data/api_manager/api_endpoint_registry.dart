@@ -2,6 +2,7 @@ import '../../services/api/api_backend.dart';
 import '../../services/api/api_platform.dart';
 import 'api_provider_contract.dart';
 import 'api_provider_registry.dart';
+import 'api_capability_lock.dart';
 
 class ApiEndpointRegistry {
   const ApiEndpointRegistry._();
@@ -19,7 +20,7 @@ class ApiEndpointRegistry {
   }
 
   static String featureSummaryFor(String platform) {
-    final badges = LiveGoApiProviderRegistry.capabilityBadgesFor(platform);
+    final badges = ApiCapabilityLock.badgesFor(platform);
     if (badges.isEmpty) return 'STD';
     return badges.join(' • ');
   }
@@ -39,6 +40,8 @@ class ApiEndpointRegistry {
       'audio': capability.audio,
       'encryptedVideo': capability.encryptedVideo,
       'streamFromAllEpisodes': capability.streamFromAllEpisodes,
+      'capabilityBadges': ApiCapabilityLock.badgesFor(platform),
+      'warning': ApiCapabilityLock.warningFor(platform),
     };
   }
 }

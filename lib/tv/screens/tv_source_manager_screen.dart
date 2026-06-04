@@ -7,6 +7,7 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../data/api_manager/livego_api_manager.dart';
 import '../../data/api_manager/api_endpoint_registry.dart';
+import '../../data/api_manager/api_capability_lock.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
@@ -461,6 +462,11 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   Color _statusColor(String slug) {
     if (_pingingSlug == slug) return AppTheme.cyan;
+    final managerStatus = LiveGoApiManager.statusFor(slug);
+    if (managerStatus == 'cooldown') return Colors.orangeAccent;
+    if (managerStatus == 'online') return Colors.greenAccent;
+    if (managerStatus == 'slow') return Colors.orangeAccent;
+    if (managerStatus == 'offline') return Colors.redAccent;
     switch (LiveGoSettings.statusFor(slug)) {
       case 'online':
         return Colors.greenAccent;
@@ -494,18 +500,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   String _sourceDescription(String slug) {
-    final map = <String, String>{
-      'shortmax': 'MP4 multi-quality. Aman untuk player native.',
-      'netshort': 'Direct CDN + subtitle VTT. Bahasa default IN.',
-      'pinedrama': 'Direct MP4. Aman untuk player native.',
-      'dramabox': 'HLS signed. List bisa lebih lambat.',
-      'flickreels': 'HLS signed dari episode/all episode.',
-      'melolo': 'Opsional. DRM/CENC belum dipasang di player native.',
-    };
-    if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Dobda beta. Aktifkan seperlunya agar Home tetap ringan.';
-    }
-    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
+    final warning = ApiCapabilityLock.warningFor(slug);
+    final summary = ApiCapabilityLock.dashboardSubtitleFor(slug);
+    return warning.isEmpty ? summary : '$summary • $warning';
   }
 
   @override
@@ -765,6 +762,7 @@ class _SourceRow extends StatelessWidget {
   final bool active;
   final Color statusColor;
   final String statusText;
+  final List<String> capabilityBadges;
   final List<String> categories;
   final List<String> selectedCategories;
   final bool categoryMode;
@@ -780,6 +778,7 @@ class _SourceRow extends StatelessWidget {
     required this.active,
     required this.statusColor,
     required this.statusText,
+    required this.capabilityBadges,
     required this.categories,
     required this.selectedCategories,
     required this.categoryMode,
@@ -884,6 +883,12 @@ class _SourceRow extends StatelessWidget {
                                       fontWeight: FontWeight.w700,
                                       decoration: TextDecoration.none,
                                     ),
+                                  ),
+                                  const SizedBox(height: 7),
+                                  _CapabilityBadgeRow(
+                                    badges: capabilityBadges,
+                                    active: active,
+                                    focused: focused && !categoryMode,
                                   ),
                                 ],
                               ),
