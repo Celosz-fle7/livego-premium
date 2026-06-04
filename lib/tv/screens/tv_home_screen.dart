@@ -130,35 +130,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
     _bannerNode.dispose();
-
-) {
-    if (preferBanner && _focusBanner(throttle: false)) return true;
-    switch (_zone) {
-      case TvZone.grid:
-        if (_focusGrid(_gridIndex, throttle: false)) return true;
-        if (_focusRows(preferMyList: true)) return true;
-        if (_focusCategory(_categoryIndex, throttle: false)) return true;
-        break;
-      case TvZone.category:
-        if (_focusCategory(_categoryIndex, throttle: false)) return true;
-        if (_focusPlatform(_platformIndex, throttle: false)) return true;
-        break;
-      case TvZone.platform:
-        if (_focusPlatform(_platformIndex, throttle: false)) return true;
-        break;
-      case TvZone.nav:
-      case TvZone.list:
-      case TvZone.settings:
-      case TvZone.placeholder:
-      case TvZone.player:
-      case TvZone.banner:
-        break;
-    }
-    if (_focusBanner(throttle: false)) return true;
-    if (_focusRows()) return true;
-    return _focusGrid(_gridIndex, throttle: false);
-  }
-
     _disposeNodes(_platformNodes);
     _disposeNodes(_categoryNodes);
     _disposeNodes(_gridNodes);
@@ -196,7 +167,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     if (_focusPlatform(_platformIndex, throttle: false)) return true;
     return _focusGrid(_gridIndex, throttle: false);
   }
-
 
   void _disposeNodes(List<FocusNode> nodes) {
     for (final node in nodes) {
