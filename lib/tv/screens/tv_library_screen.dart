@@ -11,8 +11,7 @@ import '../providers/tv_local_store_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
-import 'tv_player_screen.dart';
-import 'tv_content_detail_screen.dart';
+import '../navigation/tv_detail_route.dart';
 
 class TvLibraryScreen extends ConsumerStatefulWidget {
   final String title;
@@ -154,10 +153,13 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     _zone = TvZone.player;
-    widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvContentDetailScreen(item: item, onPlayerRouteOpen: widget.onPlayerRouteOpen, onPlayerRouteClosed: widget.onPlayerRouteClosed))).whenComplete(() {
+    TvDetailRoute.open(
+      context,
+      item: item,
+      onPlayerRouteOpen: widget.onPlayerRouteOpen,
+      onPlayerRouteClosed: widget.onPlayerRouteClosed,
+    ).whenComplete(() {
       _openingPlayer = false;
-      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       _zone = TvZone.grid;
       WidgetsBinding.instance.addPostFrameCallback((_) {

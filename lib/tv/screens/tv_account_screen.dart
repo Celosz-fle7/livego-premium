@@ -205,7 +205,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
 
-    final current = _safe(_lastIndex);
+    final current = _safe(index);
+    _lastIndex = current;
 
     if (key == LogicalKeyboardKey.arrowUp) {
       _focusRow(current - 1);
@@ -247,7 +248,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         },
         child: SafeArea(
           top: true,
-          bottom: false,
+          bottom: true,
           left: false,
           right: false,
           child: ValueListenableBuilder<int>(

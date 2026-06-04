@@ -23,8 +23,7 @@ import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_home_rail_section.dart';
-import 'tv_content_detail_screen.dart';
-import 'tv_player_screen.dart';
+import '../navigation/tv_detail_route.dart';
 
 class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -470,7 +469,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   void _restoreAfterRoute(TvZone zone, int index) {
     if (!mounted) return;
-    widget.onPlayerRouteClosed?.call();
     _cancelPendingFocus();
 
     final blockedPoster = zone == TvZone.grid &&
@@ -513,19 +511,15 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _openingPlayer = true;
     final returnZone = _zone == TvZone.nav ? TvZone.grid : _zone;
     final returnIndex = _indexForZone(returnZone);
-    widget.onPlayerRouteOpen?.call();
-    Navigator.of(context)
-        .push(MaterialPageRoute(
-          builder: (_) => TvContentDetailScreen(
-            item: item,
-            onPlayerRouteOpen: widget.onPlayerRouteOpen,
-            onPlayerRouteClosed: widget.onPlayerRouteClosed,
-          ),
-        ))
-        .whenComplete(() {
-          _openingPlayer = false;
-          _restoreAfterRoute(returnZone, returnIndex);
-        });
+    TvDetailRoute.open(
+      context,
+      item: item,
+      onPlayerRouteOpen: widget.onPlayerRouteOpen,
+      onPlayerRouteClosed: widget.onPlayerRouteClosed,
+    ).whenComplete(() {
+      _openingPlayer = false;
+      _restoreAfterRoute(returnZone, returnIndex);
+    });
   }
 
   void _selectPlatform(int index) {
@@ -631,7 +625,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     }
     _cancelPendingFocus();
 
-    final current = _safe(_lastPlatform, _platformNodes.length);
+    final current = _safe(index, _platformNodes.length);
+    _lastPlatform = current;
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (current == 0) {
@@ -678,7 +673,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     }
     _cancelPendingFocus();
 
-    final current = _safe(_lastCategory, _categoryNodes.length);
+    final current = _safe(index, _categoryNodes.length);
+    _lastCategory = current;
 
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (current == 0) {
@@ -730,7 +726,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     }
     _cancelPendingFocus();
 
-    final current = _safe(_lastGrid, _gridNodes.length);
+    final current = _safe(index, _gridNodes.length);
+    _lastGrid = current;
     final col = current % _gridColumns;
     final row = current ~/ _gridColumns;
 
@@ -819,7 +816,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             },
             child: SafeArea(
               top: true,
-              bottom: false,
+              bottom: true,
               left: false,
               right: false,
               child: CustomScrollView(

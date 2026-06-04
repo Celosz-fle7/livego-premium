@@ -11,8 +11,7 @@ import '../providers/tv_search_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
-import 'tv_player_screen.dart';
-import 'tv_content_detail_screen.dart';
+import '../navigation/tv_detail_route.dart';
 
 class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -114,6 +113,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
   }
 
+  void _handleBack() {
+    if (_zone == TvZone.grid) {
+      _zone = TvZone.list;
+      tvFocus(_searchNode, alignment: 0.06, throttle: false);
+      return;
+    }
+    _backToNav();
+  }
+
   Future<void> _search(String value) async {
     _lastGrid = 0;
     await ref.read(tvSearchProvider.notifier).search(value);
@@ -138,10 +146,13 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   void _open(ContentItem item) {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
-    widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvContentDetailScreen(item: item, onPlayerRouteOpen: widget.onPlayerRouteOpen, onPlayerRouteClosed: widget.onPlayerRouteClosed))).whenComplete(() {
+    TvDetailRoute.open(
+      context,
+      item: item,
+      onPlayerRouteOpen: widget.onPlayerRouteOpen,
+      onPlayerRouteClosed: widget.onPlayerRouteClosed,
+    ).whenComplete(() {
       _openingPlayer = false;
-      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid, throttle: false);
@@ -209,7 +220,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     if (_isBack(key)) {
       _lastGrid = index;
-      _backToNav();
+      _handleBack();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -232,7 +243,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       child: Actions(
         actions: <Type, Action<Intent>>{
           _SearchBackIntent: CallbackAction<_SearchBackIntent>(onInvoke: (_) {
-            _backToNav();
+            _handleBack();
             return null;
           }),
         },

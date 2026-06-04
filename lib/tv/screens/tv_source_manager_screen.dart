@@ -524,7 +524,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
             backgroundColor: AppTheme.bgDeep,
             body: SafeArea(
               top: true,
-              bottom: false,
+              bottom: true,
               left: false,
               right: false,
               child: Stack(
