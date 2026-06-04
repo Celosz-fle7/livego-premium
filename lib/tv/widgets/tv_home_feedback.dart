@@ -50,6 +50,7 @@ class TvHomeStatusLine extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -57,12 +58,19 @@ class TvHomeStatusLine extends StatelessWidget {
 class TvHomeEmptyState extends StatelessWidget {
   final bool hasError;
   final bool focused;
+  final String retryHint;
 
-  const TvHomeEmptyState({super.key, required this.hasError, this.focused = false});
+  const TvHomeEmptyState({
+    super.key,
+    required this.hasError,
+    this.focused = false,
+    this.retryHint = 'OK coba lagi • LEFT ke menu • UP ke kategori',
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return RepaintBoundary(
+      child: Container(
       height: 238,
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -91,7 +99,7 @@ class TvHomeEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            hasError ? 'OK coba lagi • LEFT ke menu • UP ke kategori' : 'OK refresh • LEFT ke menu • UP ke kategori',
+            hasError ? retryHint : 'OK refresh • LEFT ke menu • UP ke kategori',
             style: TextStyle(
               color: Colors.white38,
               fontSize: 12.5,

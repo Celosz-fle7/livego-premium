@@ -8,6 +8,7 @@ import '../../../models/content_item.dart';
 
 /// Cache-first TV Home content state.
 ///
+///
 /// This replaces the old FutureBuilder-wrapped Home body. Data refresh now lives
 /// in Riverpod, so Home can rebuild from one stable state object and focus
 /// movement no longer recreates FutureBuilder work.
@@ -47,17 +48,26 @@ class TvHomeContentState {
   }
 }
 
+/// ARCHITECTURE LOCK:
+/// This controller owns Home data/loading/error/retry state only.
+/// Focus index and TV zones stay in `tv_home_focus_state.dart`.
+/// UI layout stays in `tv_home_screen.dart`.
 class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentController() : super(const TvHomeContentState());
 
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
+  String _lastPlatform = 'shortmax';
+  String _lastCategory = 'Populer';
+
 
   Future<void> load({
     required String platform,
     required String selectedCategory,
     bool clearPrevious = false,
   }) async {
+    _lastPlatform = platform;
+    _lastCategory = selectedCategory;
     final token = ++_loadToken;
     if (clearPrevious) {
       state = const TvHomeContentState(loading: true);
@@ -138,6 +148,14 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     } else {
       state = const TvHomeContentState(loading: false, hasError: true);
     }
+  }
+
+  Future<void> retry() {
+    return load(
+      platform: _lastPlatform,
+      selectedCategory: _lastCategory,
+      clearPrevious: false,
+    );
   }
 
   Future<void> _refreshInBackground(String platform, String selectedCategory, int token) async {

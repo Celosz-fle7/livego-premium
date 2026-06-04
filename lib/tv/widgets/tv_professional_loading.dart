@@ -161,3 +161,82 @@ class TvFriendlyErrorPanel extends StatelessWidget {
     );
   }
 }
+
+
+class TvFocusableRetryPanel extends StatelessWidget {
+  final FocusNode focusNode;
+  final String title;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onRetry;
+  final FocusOnKeyEventCallback? onKey;
+
+  const TvFocusableRetryPanel({
+    super.key,
+    required this.focusNode,
+    required this.title,
+    required this.message,
+    required this.onRetry,
+    this.actionLabel = 'Coba lagi',
+    this.onKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return Focus(
+          focusNode: focusNode,
+          skipTraversal: true,
+          onKeyEvent: onKey,
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: onRetry,
+            borderRadius: BorderRadius.circular(24),
+            focusColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 90),
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: focused ? AppTheme.surface3.withOpacity(0.92) : AppTheme.surface.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
+                boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 12)] : null,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.activeGradient,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                        const SizedBox(height: 6),
+                        Text(message, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(actionLabel, style: TextStyle(color: focused ? AppTheme.cyan : Colors.white70, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

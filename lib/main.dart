@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
@@ -5,10 +8,23 @@ import 'core/livego_local_store.dart';
 import 'mobile/mobile_app.dart';
 import 'tv/tv_app.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await LiveGoLocalStore.init();
-  runApp(const LiveGoPremiumApp());
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('LIVEGO FLUTTER ERROR: ${details.exception}');
+      final stack = details.stack;
+      if (stack != null) debugPrint(stack.toString());
+    };
+
+    await LiveGoLocalStore.init();
+    runApp(const LiveGoPremiumApp());
+  }, (Object error, StackTrace stackTrace) {
+    debugPrint('LIVEGO ZONE ERROR: $error');
+    debugPrint(stackTrace.toString());
+  });
 }
 
 class LiveGoPremiumApp extends StatelessWidget {

@@ -29,6 +29,10 @@ import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_professional_loading.dart';
 
+/// ARCHITECTURE LOCK:
+/// Home screen is layout + remote event passing only.
+/// Data/loading/error/retry state lives in `providers/tv_home_provider.dart`.
+/// Focus/zone/index memory lives in `focus/tv_home_focus_state.dart`.
 class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onRequestExit;
@@ -626,7 +630,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      _loadHome(clearPrevious: true);
+      ref.read(tvHomeContentProvider.notifier).retry();
       _scheduleFocusEntry(preferBanner: false);
       return KeyEventResult.handled;
     }
@@ -750,7 +754,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         Text(gridTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                         const Spacer(),
                         if (home.loading && gridItems.isEmpty)
-                          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppTheme.cyan, strokeWidth: 2)),
+                          const SizedBox(width: 96, child: TvSkeletonBlock(height: 20, radius: 999)),
                         if (gridItems.isNotEmpty)
                           Text('${gridItems.length} judul', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                       ],
