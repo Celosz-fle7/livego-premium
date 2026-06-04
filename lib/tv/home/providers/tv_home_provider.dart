@@ -3,42 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/livego_catalog.dart';
-import '../../models/content_item.dart';
-
-/// Home UI selection state. This state is intentionally separated from Home
-/// content so focus/selection changes do not force a network/data rebuild.
-class TvHomeUiState {
-  final int platformIndex;
-  final int categoryIndex;
-  final int gridIndex;
-
-  const TvHomeUiState({
-    this.platformIndex = 0,
-    this.categoryIndex = 0,
-    this.gridIndex = 0,
-  });
-
-  TvHomeUiState copyWith({int? platformIndex, int? categoryIndex, int? gridIndex}) {
-    return TvHomeUiState(
-      platformIndex: platformIndex ?? this.platformIndex,
-      categoryIndex: categoryIndex ?? this.categoryIndex,
-      gridIndex: gridIndex ?? this.gridIndex,
-    );
-  }
-}
-
-class TvHomeController extends StateNotifier<TvHomeUiState> {
-  TvHomeController() : super(const TvHomeUiState());
-
-  void rememberPlatform(int index) => state = state.copyWith(platformIndex: index);
-  void rememberCategory(int index) => state = state.copyWith(categoryIndex: index);
-  void rememberGrid(int index) => state = state.copyWith(gridIndex: index);
-}
-
-final tvHomeProvider = StateNotifierProvider<TvHomeController, TvHomeUiState>(
-  (ref) => TvHomeController(),
-);
+import '../../../data/livego_catalog.dart';
+import '../../../models/content_item.dart';
 
 /// Cache-first TV Home content state.
 ///

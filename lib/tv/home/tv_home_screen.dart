@@ -18,7 +18,8 @@ import '../navigation/tv_nav_index.dart';
 import '../providers/tv_navigation_provider.dart';
 import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
-import '../providers/tv_home_provider.dart';
+import 'providers/tv_home_provider.dart';
+import 'focus/tv_home_focus_state.dart';
 import '../providers/tv_remote_owner.dart';
 import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
@@ -386,6 +387,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       _platformIndex = returnPlatform;
       _categoryIndex = returnCategory;
       _gridIndex = returnGrid;
+      ref.read(tvHomeProvider.notifier).restore(
+            zone: returnZone,
+            platformIndex: returnPlatform,
+            categoryIndex: returnCategory,
+            gridIndex: returnGrid,
+          );
       _scheduleFocusEntry(preferBanner: returnZone == TvZone.banner);
     });
   }

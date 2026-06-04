@@ -12,7 +12,7 @@ import '../providers/tv_navigation_provider.dart';
 import '../providers/tv_remote_owner.dart';
 import '../screens/tv_account_screen.dart';
 import '../screens/tv_downloads_screen.dart';
-import '../screens/tv_home_screen.dart';
+import '../home/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
 import '../theme/tv_focus_style.dart';
