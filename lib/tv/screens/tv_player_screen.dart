@@ -57,6 +57,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _subtitleCursor = 0;
   int _lastSavedProgressSecond = -1;
   int _lastBackHandledMs = 0;
+  int _lastSelectHandledMs = 0;
   int _loadTicket = 0;
   int _lastPlayableEpisode = 1;
   int _brokenEpisodeSkips = 0;
@@ -730,6 +731,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _showEpisodeList({bool returnToControls = false}) {
+    _showStatus('Episode list • BACK kembali', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.episodeList;
@@ -744,6 +746,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _showQualityPopup() {
+    _showStatus('Pilih kualitas • OK terapkan', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.qualityPopup;
@@ -758,6 +761,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _showSubtitlePopup() {
+    _showStatus('Pilih subtitle • OK aktifkan', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.subtitlePopup;
@@ -774,6 +778,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _showOptionsPanel({int cursor = 0}) {
+    _showStatus('Opsi player • LEFT/RIGHT ubah', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
     setState(() {
       _mode = _PlayerMode.options;
@@ -805,6 +810,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastBackHandledMs < 420) return true;
     _lastBackHandledMs = now;
+    return false;
+  }
+
+  bool _selectDebounced([int ms = 280]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSelectHandledMs < ms) return true;
+    _lastSelectHandledMs = now;
     return false;
   }
 
@@ -1360,6 +1372,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
+    final selectPressed = selectPressed;
+    if (selectPressed && _selectDebounced()) {
+      return KeyEventResult.handled;
+    }
+
     if (_isMenu(key) && _mode != _PlayerMode.episodeList) {
       _showOptionsPanel();
       return KeyEventResult.handled;
@@ -1376,7 +1393,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _moveEpisodeCursor(-1);
       } else if (key == LogicalKeyboardKey.arrowDown) {
         _moveEpisodeCursor(1);
-      } else if (_isSelect(key)) {
+      } else if (selectPressed) {
         unawaited(_selectEpisode(_episodeCursor));
       }
       return KeyEventResult.handled;
@@ -1389,7 +1406,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _moveQualityCursor(1);
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _showControlsMode();
-      } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
         unawaited(_applyQualityChoice(_qualityCursor));
       }
       return KeyEventResult.handled;
@@ -1403,7 +1420,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         setState(() => _subtitleCursor = (_subtitleCursor + 1).clamp(0, choices.length - 1).toInt());
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _showControlsMode();
-      } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
         unawaited(_selectSubtitleChoice());
       }
       return KeyEventResult.handled;
@@ -1416,7 +1433,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         setState(() => _optionCursor = (_optionCursor + 1).clamp(0, _optionCount - 1).toInt());
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _changeOption(-1);
-      } else if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
         _changeOption(1);
       }
       return KeyEventResult.handled;
@@ -1433,7 +1450,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         } else if (key == LogicalKeyboardKey.arrowUp) {
           _hideOverlays();
           return KeyEventResult.handled;
-        } else if (_isSelect(key)) {
+        } else if (selectPressed) {
           _togglePlay();
         }
         _scheduleAutoHide();
@@ -1448,17 +1465,16 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         setState(() => _progressFocused = true);
         _scheduleAutoHide();
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        // Saat control dock tampil, arah remote dipakai untuk navigasi focus.
-        // Episode list dibuka lewat tombol EPISODE/OK, bukan setiap DOWN.
-        _scheduleAutoHide();
-      } else if (_isSelect(key)) {
+        _showEpisodeList(returnToControls: true);
+        return KeyEventResult.handled;
+      } else if (selectPressed) {
         _activateControl();
       }
       return KeyEventResult.handled;
     }
 
     // watching mode: clean video screen.
-    if (_isSelect(key)) {
+    if (selectPressed) {
       _togglePlay();
     } else if (key == LogicalKeyboardKey.arrowLeft) {
       _seekRelative(const Duration(seconds: -10));
