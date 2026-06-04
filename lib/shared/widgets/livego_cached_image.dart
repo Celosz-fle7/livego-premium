@@ -95,8 +95,10 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
                 showPlaceholder: true,
               );
 
-    if (widget.borderRadius == null) return image;
-    return ClipRRect(borderRadius: widget.borderRadius!, child: image);
+    final body = widget.borderRadius == null
+        ? image
+        : ClipRRect(borderRadius: widget.borderRadius!, child: image);
+    return RepaintBoundary(child: body);
   }
 
   void _scheduleHighQualityLoad() {
@@ -109,7 +111,8 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
     // TV remote focus must stay responsive. Let low-res posters settle first,
     // then upgrade quality a little later so image decoding does not fight
     // rapid UP/DOWN/LEFT/RIGHT focus moves.
-    final delayMs = widget.tv ? baseDelayMs + 220 : baseDelayMs;
+    final jitter = widget.tv ? _tvDecodeJitterMs(widget.url, widget.role) : 0;
+    final delayMs = widget.tv ? baseDelayMs + 280 + jitter : baseDelayMs;
     _highQualityTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!mounted) return;
       setState(() => _loadHighQuality = true);
@@ -125,6 +128,17 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       ),
     );
     final highWidth = _decodeWidth(context);
+
+    if (lowWidth == highWidth) {
+      return _networkImage(
+        context,
+        cleanUrl,
+        decodeWidth: highWidth,
+        cacheSuffix: 'full',
+        showPlaceholder: true,
+        fadeInDuration: const Duration(milliseconds: 90),
+      );
+    }
 
     return Stack(
       fit: StackFit.passthrough,
@@ -191,6 +205,16 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
     } catch (_) {
       return clean;
     }
+  }
+
+  int _tvDecodeJitterMs(String url, LiveGoImageRole role) {
+    final max = ImageQualityConfig.tvProgressiveJitterMsFor(role);
+    if (max <= 0) return 0;
+    var hash = 0;
+    for (var i = 0; i < url.length; i++) {
+      hash = (hash + url.codeUnitAt(i) * (i + 1)) & 0x7fffffff;
+    }
+    return hash % max;
   }
 
   int? _decodeWidth(BuildContext context, {int? preferredWidth}) {

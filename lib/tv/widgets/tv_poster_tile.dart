@@ -59,8 +59,8 @@ class TvPosterTile extends StatelessWidget {
                           width: focused ? 2.0 : 0.6,
                         ),
                         boxShadow: focused
-                            ? [TvFocusStyle.glow(0.055, 4)]
-                            : const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+                            ? [TvFocusStyle.glow(0.065, 5)]
+                            : null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
@@ -79,7 +79,7 @@ class TvPosterTile extends StatelessWidget {
                                 : LiveGoCachedImage(
                                     url: item.posterUrl,
                                     fit: BoxFit.cover,
-                                    role: LiveGoImageRole.poster,
+                                    role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
                                     tv: true,
                                   ),
                             const DecoratedBox(

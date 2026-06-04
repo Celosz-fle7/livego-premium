@@ -52,7 +52,9 @@ class TvPosterGrid extends StatelessWidget {
 
     return SliverPadding(
       padding: padding,
-      sliver: SliverGrid(
+      sliver: SliverLayoutBuilder(
+        builder: (context, constraints) {
+          return SliverGrid(
         delegate: SliverChildBuilderDelegate(
           (context, i) {
             final item = items[i];
@@ -69,8 +71,8 @@ class TvPosterGrid extends StatelessWidget {
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
-        ),
-        gridDelegate: delegate,
+          );
+        },
       ),
     );
   }

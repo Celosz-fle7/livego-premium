@@ -8,22 +8,22 @@ enum LiveGoImageRole {
 class ImageQualityConfig {
   // Ubah angka di file ini saja kalau gambar terasa burik / terlalu berat.
   static const int posterWidth = 360;
-  static const int tvPosterWidth = 460;
+  static const int tvPosterWidth = 340;
   static const int bannerWidth = 960;
-  static const int tvBannerWidth = 1280;
-  static const int detailWidth = 720;
-  static const int thumbnailWidth = 640;
+  static const int tvBannerWidth = 960;
+  static const int detailWidth = 640;
+  static const int thumbnailWidth = 320;
 
   // Tahap awal: decode/cache ringan dulu supaya list/grid cepat kelihatan.
   static const int posterLowWidth = 180;
-  static const int tvPosterLowWidth = 220;
+  static const int tvPosterLowWidth = 160;
   static const int bannerLowWidth = 480;
-  static const int tvBannerLowWidth = 640;
-  static const int detailLowWidth = 360;
-  static const int thumbnailLowWidth = 240;
+  static const int tvBannerLowWidth = 480;
+  static const int detailLowWidth = 320;
+  static const int thumbnailLowWidth = 180;
 
   static const int minDecodeWidth = 160;
-  static const int maxDecodeWidth = 1280;
+  static const int maxDecodeWidth = 960;
 
   static int widthFor({
     required LiveGoImageRole role,
@@ -61,13 +61,26 @@ class ImageQualityConfig {
   static int progressiveDelayMsFor(LiveGoImageRole role) {
     switch (role) {
       case LiveGoImageRole.poster:
-        return 260;
+        return 520;
       case LiveGoImageRole.banner:
-        return 420;
+        return 650;
       case LiveGoImageRole.detail:
-        return 320;
+        return 480;
       case LiveGoImageRole.thumbnail:
-        return 220;
+        return 360;
+    }
+  }
+
+  static int tvProgressiveJitterMsFor(LiveGoImageRole role) {
+    switch (role) {
+      case LiveGoImageRole.poster:
+        return 520;
+      case LiveGoImageRole.banner:
+        return 240;
+      case LiveGoImageRole.detail:
+        return 180;
+      case LiveGoImageRole.thumbnail:
+        return 320;
     }
   }
 }

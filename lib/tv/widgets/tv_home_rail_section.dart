@@ -200,7 +200,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 520,
+                  cacheExtent: 360,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.continueWatching.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -223,7 +223,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 520,
+                  cacheExtent: 360,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.myList.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -410,7 +410,12 @@ class _RailPoster extends StatelessWidget {
       child: SizedBox(
         width: 76,
         height: 116,
-        child: LiveGoCachedImage(url: url, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
+        child: LiveGoCachedImage(
+          url: url,
+          fit: BoxFit.cover,
+          role: LiveGoImageRole.thumbnail,
+          tv: true,
+        ),
       ),
     );
   }
