@@ -21,6 +21,8 @@ import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_resolver.dart';
 import '../../services/api/api_platform.dart';
+import '../player/tv_player_focus_controller.dart';
+import '../player/tv_player_route_context.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -34,6 +36,8 @@ enum _PlayerMode { watching, controlsVisible, progress, episodeList, qualityPopu
 
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
   final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-root');
+  late final TvPlayerFocusController _playerFocus = TvPlayerFocusController(rootFocus: _rootFocus);
+  late final TvPlayerRouteContext _routeContext;
 
   VideoPlayerController? _controller;
   ContentItem? _detail;
@@ -145,10 +149,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void initState() {
     super.initState();
     _episode = LiveGoLocalStore.continueEpisode(widget.item).clamp(1, 999).toInt();
+    _routeContext = TvPlayerRouteContext.fromItem(widget.item, source: 'tv', episode: _episode);
+    debugPrint('LIVEGO TV PLAYER OPEN ${_routeContext.debugLabel}');
     _lastPlayableEpisode = _episode;
     _episodeCursor = _episode;
     LiveGoLocalStore.addHistory(widget.item);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusPostFrame();
     _loadPreferences();
     _load();
   }
@@ -677,20 +683,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return total.clamp(1, 120).toInt();
   }
 
-  bool _isSelect(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.select ||
-      key == LogicalKeyboardKey.enter ||
-      key == LogicalKeyboardKey.numpadEnter ||
-      key == LogicalKeyboardKey.space ||
-      key == LogicalKeyboardKey.mediaPlayPause;
+  bool _isSelect(LogicalKeyboardKey key) => _playerFocus.isSelectKey(key);
 
-  bool _isBack(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.goBack ||
-      key == LogicalKeyboardKey.escape ||
-      key == LogicalKeyboardKey.browserBack;
+  bool _isBack(LogicalKeyboardKey key) => _playerFocus.isBackKey(key);
 
-  bool _isMenu(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
+  bool _isMenu(LogicalKeyboardKey key) => _playerFocus.isMenuKey(key);
 
   bool get _hasReadyController {
     final c = _controller;
@@ -742,7 +739,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = false;
       if (defaultPlay) _controlCursor = 1;
     });
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusSoon();
     _scheduleAutoHide();
   }
 
@@ -758,7 +755,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = returnToControls;
       _episodeCursor = _episode;
     });
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusSoon();
   }
 
   void _showQualityPopup() {
@@ -773,7 +770,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = true;
       _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
     });
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusSoon();
   }
 
   void _showSubtitlePopup() {
@@ -790,7 +787,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           ? _selectedSubtitleIndex + 1
           : 0;
     });
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusSoon();
   }
 
   void _showOptionsPanel({int cursor = 0}) {
@@ -805,7 +802,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = true;
       _optionCursor = cursor;
     });
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.requestRootFocusSoon();
   }
 
   void _hideOverlays() {
@@ -818,23 +815,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _progressFocused = false;
       _returnControlsAfterPanel = false;
     });
-    _rootFocus.unfocus();
-    Future.microtask(() => _rootFocus.requestFocus());
+    _playerFocus.releaseAndRequestRootSoon();
   }
 
-  bool _backDebounced() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 420) return true;
-    _lastBackHandledMs = now;
-    return false;
-  }
+  bool _backDebounced() => _playerFocus.ignoreBack();
 
-  bool _selectDebounced([int ms = 280]) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSelectHandledMs < ms) return true;
-    _lastSelectHandledMs = now;
-    return false;
-  }
+  bool _selectDebounced([int ms = 280]) => _playerFocus.ignoreSelect(ms);
 
   void _handleBack() {
     if (_backDebounced()) return;
@@ -1557,6 +1543,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _statusTimer?.cancel();
     _saveCurrentProgress(force: true);
     _cancelPendingSeek();
+    _playerFocus.dispose();
     _rootFocus.dispose();
     _controller?.dispose();
     super.dispose();
