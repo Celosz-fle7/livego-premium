@@ -692,6 +692,22 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _isMenu(LogicalKeyboardKey key) =>
       key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
 
+  bool get _hasReadyController {
+    final c = _controller;
+    return c != null && c.value.isInitialized;
+  }
+
+  bool get _isPlayerErrorState => !_loading && _error.isNotEmpty && !_hasReadyController;
+
+  Future<void> _retryCurrentEpisode() async {
+    if (_loading) return;
+    _showStatus('Mencoba ulang Episode $_episode...');
+    _brokenEpisodeSkips = 0;
+    _lastBrokenReason = '';
+    _brokenEpisodes.remove(_episode);
+    await _load();
+  }
+
   void _cancelAutoHide() {
     _autoHideTimer?.cancel();
     _autoHideTimer = null;
@@ -1377,6 +1393,21 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
+    if (_isPlayerErrorState) {
+      if (selectPressed) {
+        unawaited(_retryCurrentEpisode());
+      } else if (key == LogicalKeyboardKey.arrowRight) {
+        unawaited(_nextEpisode());
+      } else if (key == LogicalKeyboardKey.arrowLeft) {
+        unawaited(_previousEpisode());
+      } else if (key == LogicalKeyboardKey.arrowUp) {
+        _showControlsMode(defaultPlay: true);
+      } else {
+        _showStatus('OK ulang • RIGHT episode berikut • BACK keluar');
+      }
+      return KeyEventResult.handled;
+    }
+
     if (_isMenu(key) && _mode != _PlayerMode.episodeList) {
       _showOptionsPanel();
       return KeyEventResult.handled;
@@ -1859,7 +1890,7 @@ class _PlayerErrorOverlay extends StatelessWidget {
                   border: Border.all(color: Colors.white12),
                 ),
                 child: const Text(
-                  'BACK kembali • NEXT akan skip episode rusak',
+                  'OK ulang • RIGHT next • LEFT prev • BACK kembali',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
