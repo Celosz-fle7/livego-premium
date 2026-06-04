@@ -19,7 +19,9 @@ import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
 import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
+import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_poster_tile.dart';
+import '../widgets/tv_section_box.dart';
 import 'tv_player_screen.dart';
 
 class TvHomeScreen extends ConsumerStatefulWidget {
@@ -50,9 +52,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int source = 0;
   int category = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
-  int _loadToken = 0;
-  late Future<_TvHomeState> _future;
-  _TvHomeState? _lastGoodState;
 
   final ScrollController _pageScroll = ScrollController();
   final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
@@ -85,7 +84,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   void initState() {
     super.initState();
     _restoreSavedHomeSelection();
-    _future = _startLoad();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadHomeContent(clearPrevious: false);
+    });
   }
 
   void _restoreSavedHomeSelection() {
@@ -148,122 +150,19 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     super.dispose();
   }
 
-  Future<_TvHomeState> _startLoad() {
-    final platforms = LiveGoCatalog.platforms;
-    if (platforms.isEmpty) {
-      source = 0;
-      category = 0;
-    } else {
-      source = source.clamp(0, platforms.length - 1).toInt();
-    }
-
-    final platform = _platform;
-    final categories = LiveGoCatalog.categoriesFor(platform);
+  String _selectedCategoryLabel() {
+    final categories = LiveGoCatalog.categoriesFor(_platform);
+    if (categories.isEmpty) return 'Populer';
     if (category >= categories.length) category = 0;
-    final selectedCategory = categories.isEmpty ? 'Populer' : categories[category];
-    final token = ++_loadToken;
-    return _load(platform: platform, selectedCategory: selectedCategory, token: token);
+    return categories[category];
   }
 
-  Future<_TvHomeState> _load({
-    required String platform,
-    required String selectedCategory,
-    required int token,
-  }) async {
-    try {
-      final cached = await LiveGoCatalog.cachedHomeByCategory(
-        platform: platform,
-        category: selectedCategory,
-        allowExpired: true,
-      ).timeout(const Duration(milliseconds: 650), onTimeout: () => const <ContentItem>[]);
-
-      if (token != _loadToken) return _lastGoodState ?? const _TvHomeState(hero: null, items: <ContentItem>[]);
-      if (cached.isNotEmpty) {
-        final state = _TvHomeState(
-          hero: cached.first,
-          items: cached,
-          fromCache: true,
-          refreshing: true,
+  void _loadHomeContent({bool clearPrevious = false}) {
+    ref.read(tvHomeContentProvider.notifier).load(
+          platform: _platform,
+          selectedCategory: _selectedCategoryLabel(),
+          clearPrevious: clearPrevious,
         );
-        _lastGoodState = state;
-        unawaited(_refreshHomeInBackground(platform, selectedCategory, token));
-        return state;
-      }
-    } catch (e) {
-      debugPrint('TV HOME CACHE LOAD ERROR: $e');
-    }
-
-    try {
-      final items = await LiveGoCatalog.homeByCategory(
-        platform: platform,
-        category: selectedCategory,
-      ).timeout(const Duration(seconds: 10), onTimeout: () => const <ContentItem>[]);
-      if (token != _loadToken) return _lastGoodState ?? const _TvHomeState(hero: null, items: <ContentItem>[]);
-      if (items.isNotEmpty) {
-        final state = _TvHomeState(hero: items.first, items: items);
-        _lastGoodState = state;
-        return state;
-      }
-    } catch (e) {
-      debugPrint('TV HOME NETWORK LOAD ERROR: $e');
-    }
-
-    try {
-      final fallback = await LiveGoCatalog.cachedHomeByCategory(
-        platform: platform,
-        category: selectedCategory,
-        allowExpired: true,
-      ).timeout(const Duration(milliseconds: 800), onTimeout: () => const <ContentItem>[]);
-      if (token != _loadToken) return _lastGoodState ?? const _TvHomeState(hero: null, items: <ContentItem>[]);
-      if (fallback.isNotEmpty) {
-        final state = _TvHomeState(
-          hero: fallback.first,
-          items: fallback,
-          hasError: true,
-          fromCache: true,
-        );
-        _lastGoodState = state;
-        return state;
-      }
-    } catch (_) {}
-
-    if (token != _loadToken) return _lastGoodState ?? const _TvHomeState(hero: null, items: <ContentItem>[]);
-    return _lastGoodState?.copyWith(hasError: true, refreshing: false) ??
-        const _TvHomeState(hero: null, items: <ContentItem>[], hasError: true);
-  }
-
-  Future<void> _refreshHomeInBackground(String platform, String selectedCategory, int token) async {
-    try {
-      final fresh = await LiveGoCatalog.homeByCategory(
-        platform: platform,
-        category: selectedCategory,
-      ).timeout(const Duration(seconds: 12), onTimeout: () => const <ContentItem>[]);
-
-      if (!mounted || token != _loadToken || fresh.isEmpty) {
-        if (mounted && token == _loadToken && _lastGoodState != null) {
-          setState(() {
-            final state = _lastGoodState!.copyWith(refreshing: false, hasError: fresh.isEmpty);
-            _lastGoodState = state;
-            _future = Future<_TvHomeState>.value(state);
-          });
-        }
-        return;
-      }
-
-      final state = _TvHomeState(hero: fresh.first, items: fresh);
-      setState(() {
-        _lastGoodState = state;
-        _future = Future<_TvHomeState>.value(state);
-      });
-    } catch (e) {
-      debugPrint('TV HOME BACKGROUND REFRESH ERROR: $e');
-      if (!mounted || token != _loadToken || _lastGoodState == null) return;
-      setState(() {
-        final state = _lastGoodState!.copyWith(refreshing: false, hasError: true);
-        _lastGoodState = state;
-        _future = Future<_TvHomeState>.value(state);
-      });
-    }
   }
 
   void _refreshIfSettingsChanged() {
@@ -285,13 +184,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _lastGrid = 0;
     _gridDataReady = false;
     _visibleGridItems = const <ContentItem>[];
-    _lastGoodState = null;
-    setState(() => _future = _startLoad());
+    setState(() {});
+    _loadHomeContent(clearPrevious: true);
   }
 
-  void _reload() {
-    setState(() => _future = _startLoad());
-  }
 
   void _disposeNodes(List<FocusNode> nodes) {
     for (final node in nodes) {
@@ -581,9 +477,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
         _lastGrid = 0;
         _gridDataReady = false;
         _visibleGridItems = const <ContentItem>[];
-        _lastGoodState = null;
-        _future = _startLoad();
       });
+      _loadHomeContent(clearPrevious: true);
       _queueFocusEntry(TvZone.category, index: _lastCategory);
       return;
     }
@@ -648,9 +543,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       _lastGrid = 0;
       _gridDataReady = false;
       _visibleGridItems = const <ContentItem>[];
-      _lastGoodState = null;
-      _future = _startLoad();
     });
+    _loadHomeContent(clearPrevious: true);
     _queueFocusEntry(TvZone.category, index: nextCategory);
   }
 
@@ -678,9 +572,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       _lastGrid = 0;
       _gridDataReady = false;
       _visibleGridItems = const <ContentItem>[];
-      _lastGoodState = null;
-      _future = _startLoad();
     });
+    _loadHomeContent(clearPrevious: true);
     _queueFocusEntry(TvZone.category, index: targetCategory);
   }
 
@@ -871,18 +764,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_TvHomeState>(
-      future: _future,
-      initialData: _lastGoodState,
-      builder: (context, snap) {
-        final state = snap.data;
-        final loading = state == null && snap.connectionState != ConnectionState.done;
-        final refreshing = (state?.refreshing ?? false) ||
-            (state != null && snap.connectionState != ConnectionState.done);
-        final hero = state?.hero;
-        final hasError = state?.hasError ?? false;
-        final fromCache = state?.fromCache ?? false;
-        final items = state?.items ?? const <ContentItem>[];
+    final state = ref.watch(tvHomeContentProvider);
+    final loading = state.loading && state.items.isEmpty;
+    final refreshing = state.refreshing;
+    final hero = state.hero;
+    final hasError = state.hasError;
+    final fromCache = state.fromCache;
+    final items = state.items;
         final platforms = LiveGoCatalog.platformLabels;
         final categories = LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
@@ -936,13 +824,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           onKey: (node, event) => _bannerKey(hero, event),
                         ),
                         if (refreshing || hasError || fromCache)
-                          _HomeStatusLine(
+                          TvHomeStatusLine(
                             refreshing: refreshing,
                             hasError: hasError,
                             fromCache: fromCache,
                           ),
                         const SizedBox(height: 12),
-                        _HeaderBox(
+                        TvSectionBox(
                           icon: Icons.apps_rounded,
                           label: 'Platform',
                           hint: LiveGoCatalog.label(_platform),
@@ -962,7 +850,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        _HeaderBox(
+                        TvSectionBox(
                           icon: Icons.tune_rounded,
                           label: 'Kategori',
                           hint: categories.isEmpty ? 'Default' : categories[category],
@@ -983,11 +871,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         ),
                         const SizedBox(height: 14),
                         if (loading)
-                          const _TvSkeleton(height: 260)
+                          const TvSkeletonBlock(height: 260)
                         else if (gridItems.isEmpty)
-                          _HomeEmptyState(hasError: hasError)
+                          TvHomeEmptyState(hasError: hasError)
                         else
-                          _ContentGridHeader(title: gridTitle),
+                          TvContentGridHeader(title: gridTitle),
                       ]),
                     ),
                   ),
@@ -1033,8 +921,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             ),
           ),
         );
-      },
-    );
   }
 }
 
@@ -1042,292 +928,9 @@ class _HomeBackIntent extends Intent {
   const _HomeBackIntent();
 }
 
-class _TvHomeState {
-  final ContentItem? hero;
-  final List<ContentItem> items;
-  final bool hasError;
-  final bool fromCache;
-  final bool refreshing;
-
-  const _TvHomeState({
-    required this.hero,
-    required this.items,
-    this.hasError = false,
-    this.fromCache = false,
-    this.refreshing = false,
-  });
-
-  _TvHomeState copyWith({
-    ContentItem? hero,
-    List<ContentItem>? items,
-    bool? hasError,
-    bool? fromCache,
-    bool? refreshing,
-  }) {
-    return _TvHomeState(
-      hero: hero ?? this.hero,
-      items: items ?? this.items,
-      hasError: hasError ?? this.hasError,
-      fromCache: fromCache ?? this.fromCache,
-      refreshing: refreshing ?? this.refreshing,
-    );
-  }
-}
-
-class _HomeStatusLine extends StatelessWidget {
-  final bool refreshing;
-  final bool hasError;
-  final bool fromCache;
-
-  const _HomeStatusLine({
-    required this.refreshing,
-    required this.hasError,
-    required this.fromCache,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final text = hasError
-        ? (fromCache
-            ? 'Konten cache ditampilkan. Source sedang lambat, remote tetap bisa dipakai.'
-            : 'Sebagian data gagal dimuat. Coba ganti platform atau refresh nanti.')
-        : (refreshing
-            ? 'Konten tampil dulu, pembaruan berjalan di belakang.'
-            : 'Konten dari cache.');
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Icon(
-            hasError ? Icons.wifi_off_rounded : Icons.sync_rounded,
-            size: 15,
-            color: hasError ? Colors.orangeAccent.withOpacity(0.86) : TvFocusStyle.focusBlue.withOpacity(0.72),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white60,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeEmptyState extends StatelessWidget {
-  final bool hasError;
-
-  const _HomeEmptyState({required this.hasError});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 238,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppTheme.surface2.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasError ? Icons.cloud_off_rounded : Icons.movie_filter_rounded,
-            color: Colors.white30,
-            size: 46,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            hasError ? 'Konten belum bisa dimuat' : 'Belum ada konten di kategori ini',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              decoration: TextDecoration.none,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Gunakan Platform/Kategori, atau coba lagi nanti.',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderBox extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String hint;
-  final double height;
-  final Widget child;
-
-  const _HeaderBox({required this.icon, required this.label, required this.hint, required this.height, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xF4071326), Color(0xF0010409)],
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.92), width: 1.0),
-        boxShadow: [
-          const BoxShadow(color: Colors.black54, blurRadius: 11),
-          BoxShadow(color: AppTheme.cyan.withOpacity(0.035), blurRadius: 18),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 116,
-            height: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.035),
-              borderRadius: BorderRadius.circular(17),
-              border: Border.all(color: Colors.white.withOpacity(0.055)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppTheme.cyan.withOpacity(0.11),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
-                  ),
-                  child: Icon(icon, color: AppTheme.cyan.withOpacity(0.92), size: 17),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: TvFocusStyle.focusBlue.withOpacity(0.78),
-                          fontSize: 9.4,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.3,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        hint,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10.8,
-                          fontWeight: FontWeight.w800,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: child),
-        ],
-      ),
-    );
-  }
-}
-
 double _tvPosterAspectFor(int count) {
   if (count >= 9) return 0.58;
   if (count >= 7) return 0.60;
   if (count <= 4) return 0.66;
   return 0.62;
-}
-
-
-class _ContentGridHeader extends StatelessWidget {
-  final String title;
-
-  const _ContentGridHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    if (title.trim().isEmpty) return const SizedBox.shrink();
-    return RepaintBoundary(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                color: TvFocusStyle.focusBlue.withOpacity(0.70),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(width: 9),
-            Text(
-              title.toUpperCase(),
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.86),
-                letterSpacing: 1.4,
-                fontWeight: FontWeight.w900,
-                fontSize: 13.4,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TvSkeleton extends StatelessWidget {
-  final double height;
-  const _TvSkeleton({required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: AppTheme.surface2,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.border),
-      ),
-    );
-  }
 }
