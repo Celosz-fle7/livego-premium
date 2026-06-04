@@ -31,6 +31,7 @@ class AdaptiveRoot extends StatelessWidget {
   bool _isTvLayout(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
+    if (const bool.fromEnvironment('LIVEGO_FORCE_TV')) return true;
     if (LiveGoSettings.layoutMode == 'TV') return true;
     if (LiveGoSettings.layoutMode == 'Mobile') return false;
 
