@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
+import '../../data/api_manager/livego_api_manager.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
@@ -475,6 +476,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   String _statusText(String slug) {
     if (_pingingSlug == slug) return 'PING';
+    final managerStatus = LiveGoApiManager.statusFor(slug);
+    if (managerStatus == 'cooldown') return 'COOLDOWN';
     switch (LiveGoSettings.statusFor(slug)) {
       case 'online':
         return 'AMAN';

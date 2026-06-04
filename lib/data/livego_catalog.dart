@@ -10,6 +10,8 @@ import '../services/feed/feed_limiter.dart';
 import '../services/feed/feed_session_state.dart';
 import '../services/player/playback_resolver.dart';
 import '../models/livego_episode.dart';
+import 'api_manager/livego_api_manager.dart';
+import 'api_manager/api_timeout_policy.dart';
 import 'mock_catalog.dart';
 
 class LiveGoCatalog {
@@ -47,65 +49,67 @@ class LiveGoCatalog {
   }
 
   static Future<String> pingPlatform(String platform) async {
-    final start = DateTime.now();
-    try {
-      final rows = await LiveGoApiGateway.home(platform: platform, lang: languageFor(platform));
-      if (rows.isEmpty) {
-        LiveGoSettings.setPlatformStatus(platform, 'offline');
-        return 'offline';
-      }
-      final ms = DateTime.now().difference(start).inMilliseconds;
-      final status = ms > 2500 ? 'slow' : 'online';
-      LiveGoSettings.setPlatformStatus(platform, status);
-      return status;
-    } catch (e) {
-      print('LIVEGO PING ERROR $platform: $e');
-      LiveGoSettings.setPlatformStatus(platform, 'offline');
-      return 'offline';
-    }
+    return LiveGoApiManager.runStatus(
+      platform: platform,
+      operation: 'ping',
+      timeout: ApiTimeoutPolicy.ping,
+      request: () => LiveGoApiGateway.ping(platform, languageFor(platform)),
+      fallbackStatus: 'offline',
+    );
   }
 
   static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
     final endpoint = isDobdaPlatform(platform) ? 'home_clean_v2' : 'home';
+    final lang = languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
       endpoint: endpoint,
-      params: {'lang': languageFor(platform)},
+      params: {'lang': lang},
+      allowExpired: true,
     );
-    if (cached != null && cached.isNotEmpty) return ContentHealthService.filterPlayable(cached);
+    final cleanCached = ContentHealthService.filterPlayable(cached ?? const <ContentItem>[]);
+    if (cleanCached.isNotEmpty) return cleanCached;
 
-    try {
-      final rows = await LiveGoApiGateway.home(platform: platform, lang: languageFor(platform))
-          .timeout(const Duration(seconds: 12));
-      print('CATALOG HOME $platform -> ${rows.length}');
-      final cleanRows = ContentHealthService.filterPlayable(rows);
-      if (cleanRows.isNotEmpty) {
-        await LiveGoContentCache.writeItems(
-          platform: platform,
-          endpoint: endpoint,
-          params: {'lang': languageFor(platform)},
-          items: cleanRows,
-        );
-        return cleanRows;
-      }
-    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
+    final rows = await LiveGoApiManager.fetchItems(
+      platform: platform,
+      operation: 'home',
+      timeout: ApiTimeoutPolicy.home,
+      request: () => LiveGoApiGateway.home(platform: platform, lang: lang),
+    );
+    print('CATALOG HOME $platform -> ${rows.length}');
+    if (rows.isNotEmpty) {
+      await LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: endpoint,
+        params: {'lang': lang},
+        items: rows,
+      );
+      return rows;
+    }
 
-    try {
-      final rows = await LiveGoApiGateway.discover(platform: platform, lang: languageFor(platform))
-          .timeout(const Duration(seconds: 12));
-      final cleanRows = ContentHealthService.filterPlayable(rows);
-      if (cleanRows.isNotEmpty) {
-        await LiveGoContentCache.writeItems(
-          platform: platform,
-          endpoint: endpoint,
-          params: {'lang': languageFor(platform)},
-          items: cleanRows,
-        );
-        return cleanRows;
-      }
-    } catch (e) { print('LIVEGO CATALOG ERROR: $e'); }
+    final discoverRows = await LiveGoApiManager.fetchItems(
+      platform: platform,
+      operation: 'discover',
+      timeout: ApiTimeoutPolicy.home,
+      request: () => LiveGoApiGateway.discover(platform: platform, lang: lang),
+    );
+    if (discoverRows.isNotEmpty) {
+      await LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: endpoint,
+        params: {'lang': lang},
+        items: discoverRows,
+      );
+      return discoverRows;
+    }
 
-    return [];
+    final expired = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: endpoint,
+      params: {'lang': lang},
+      allowExpired: true,
+    );
+    return ContentHealthService.filterPlayable(expired ?? const <ContentItem>[]);
   }
 
 
@@ -166,31 +170,31 @@ class LiveGoCatalog {
       }
     }
 
-    try {
-      List<ContentItem> rows = const <ContentItem>[];
-      if (key == 'trending' || key.isEmpty || key == 'home') {
-        rows = await LiveGoApiGateway.home(platform: platform, lang: lang)
-            .timeout(const Duration(seconds: 12));
-      } else {
-        rows = await LiveGoApiGateway.collection(
+    final cleanRows = await LiveGoApiManager.fetchItems(
+      platform: platform,
+      operation: 'category:$endpoint',
+      timeout: ApiTimeoutPolicy.collection,
+      request: () {
+        if (key == 'trending' || key.isEmpty || key == 'home') {
+          return LiveGoApiGateway.home(platform: platform, lang: lang);
+        }
+        return LiveGoApiGateway.collection(
           platform: platform,
           collection: key,
           lang: lang,
-        ).timeout(const Duration(seconds: 12));
-      }
-
-      final cleanRows = ContentHealthService.filterPlayable(rows);
-      if (cleanRows.isNotEmpty) {
-        FeedSessionState.markNetworkRefresh(sessionKey);
-        await LiveGoContentCache.writeItems(
-          platform: platform,
-          endpoint: endpoint,
-          params: {'lang': lang},
-          items: cleanRows,
         );
-        return FeedLimiter.prepare(cleanRows, visitSeed: visitSeed);
-      }
-    } catch (e) { print('LIVEGO CATEGORY ERROR: $e'); }
+      },
+    );
+    if (cleanRows.isNotEmpty) {
+      FeedSessionState.markNetworkRefresh(sessionKey);
+      await LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: endpoint,
+        params: {'lang': lang},
+        items: cleanRows,
+      );
+      return FeedLimiter.prepare(cleanRows, visitSeed: visitSeed);
+    }
 
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
@@ -246,21 +250,29 @@ class LiveGoCatalog {
       params: {'q': clean, 'lang': languageFor(platform)},
     );
     if (cached != null) return ContentHealthService.filterPlayable(cached);
-    try {
-      final rows = await LiveGoApiGateway.search(query: clean, platform: platform, lang: languageFor(platform));
-      final cleanRows = ContentHealthService.filterPlayable(rows);
-      await LiveGoContentCache.writeItems(
-        platform: platform,
-        endpoint: 'search',
-        params: {'q': clean, 'lang': languageFor(platform)},
-        items: cleanRows,
-        ttl: LiveGoContentCache.searchTtl,
-      );
-      return cleanRows;
-    } catch (e) {
-      print('LIVEGO SEARCH ERROR: $e');
-      return [];
-    }
+    final lang = languageFor(platform);
+    final cleanRows = await LiveGoApiManager.fetchItems(
+      platform: platform,
+      operation: 'search',
+      timeout: ApiTimeoutPolicy.search,
+      request: () => LiveGoApiGateway.search(query: clean, platform: platform, lang: lang),
+    );
+    await LiveGoContentCache.writeItems(
+      platform: platform,
+      endpoint: 'search',
+      params: {'q': clean, 'lang': lang},
+      items: cleanRows,
+      ttl: LiveGoContentCache.searchTtl,
+    );
+    if (cleanRows.isNotEmpty) return cleanRows;
+
+    final expired = await LiveGoContentCache.readItems(
+      platform: platform,
+      endpoint: 'search',
+      params: {'q': clean, 'lang': lang},
+      allowExpired: true,
+    );
+    return ContentHealthService.filterPlayable(expired ?? const <ContentItem>[]);
   }
 
   static Future<List<ContentItem>> searchAll(String query) async {
@@ -269,6 +281,7 @@ class LiveGoCatalog {
     final merged = <ContentItem>[];
     final seen = <String>{};
     for (final platform in platforms) {
+      if (LiveGoApiManager.isInCooldown(platform) && merged.isNotEmpty) continue;
       final rows = await search(clean, platform: platform);
       for (final item in ContentHealthService.filterPlayable(rows)) {
         final key = ContentHealthService.contentKey(item);
@@ -284,15 +297,14 @@ class LiveGoCatalog {
       final resolvedCached = _preservePlayableIdentity(cached, item);
       if (resolvedCached.id.isNotEmpty) return resolvedCached;
     }
-    try {
-      final detail = await LiveGoApiGateway.detail(item);
-      final resolved = _preservePlayableIdentity(detail ?? item, item);
-      await LiveGoContentCache.writeDetail(resolved);
-      return resolved;
-    } catch (e) {
-      print('LIVEGO DETAIL ERROR: $e');
-      return item;
-    }
+    final detail = await LiveGoApiManager.fetchDetail(
+      item: item,
+      request: () => LiveGoApiGateway.detail(item),
+      fallback: item,
+    );
+    final resolved = _preservePlayableIdentity(detail ?? item, item);
+    await LiveGoContentCache.writeDetail(resolved);
+    return resolved;
   }
 
   static ContentItem _preservePlayableIdentity(ContentItem detail, ContentItem original) {
@@ -323,22 +335,21 @@ class LiveGoCatalog {
     // from Anichin so the player sheet shows all episodes again.
     if (cached != null && cached.length > 1) return cached;
 
-    try {
-      final rows = await LiveGoApiGateway.episodes(item).timeout(const Duration(seconds: 22));
-      if (rows.length > 1) {
-        await LiveGoContentCache.writeEpisodes(item, rows);
-        return rows;
-      }
-
-      // If the network still cannot provide the full list, only then fall back
-      // to the old cached single episode or item.episodes. Never overwrite a
-      // good future cache with this one-row fallback.
-      if (cached != null && cached.isNotEmpty) return cached;
-      if (rows.isNotEmpty) return rows;
-    } catch (e) {
-      print('LIVEGO EPISODES ERROR: $e');
-      if (cached != null && cached.isNotEmpty) return cached;
+    final rows = await LiveGoApiManager.fetchEpisodes(
+      item: item,
+      request: () => LiveGoApiGateway.episodes(item),
+      fallback: cached ?? const <LiveGoEpisode>[],
+    );
+    if (rows.length > 1) {
+      await LiveGoContentCache.writeEpisodes(item, rows);
+      return rows;
     }
+
+    // If the network still cannot provide the full list, only then fall back
+    // to the old cached single episode or item.episodes. Never overwrite a
+    // good future cache with this one-row fallback.
+    if (cached != null && cached.isNotEmpty) return cached;
+    if (rows.isNotEmpty) return rows;
 
     final total = item.episodes <= 0 ? 1 : item.episodes;
     return List.generate(total, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'));
@@ -350,12 +361,11 @@ class LiveGoCatalog {
   }
 
   static Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) async {
-    try {
-      return await PlaybackResolver.resolveStreamInfo(item, chapterId: chapterId ?? item.chapterId);
-    } catch (e) {
-      print('LIVEGO STREAM ERROR: $e');
-      return StreamInfo.empty;
-    }
+    return LiveGoApiManager.fetchStreamInfo(
+      item: item,
+      timeout: ApiTimeoutPolicy.video,
+      request: () => PlaybackResolver.resolveStreamInfo(item, chapterId: chapterId ?? item.chapterId),
+    );
   }
 
   static Future<StreamInfo> fastStreamInfo(
@@ -363,16 +373,15 @@ class LiveGoCatalog {
     String? chapterId,
     Duration? timeout,
   }) async {
-    try {
-      return await PlaybackResolver.fastStreamInfo(
+    return LiveGoApiManager.fetchStreamInfo(
+      item: item,
+      timeout: timeout ?? const Duration(seconds: 6),
+      request: () => PlaybackResolver.fastStreamInfo(
         item,
         chapterId: chapterId ?? item.chapterId,
         timeout: timeout ?? const Duration(seconds: 6),
-      );
-    } catch (e) {
-      print('LIVEGO FAST STREAM ERROR: $e');
-      return StreamInfo.empty;
-    }
+      ),
+    );
   }
 
   static Future<String> videoUrl(ContentItem item) async {
