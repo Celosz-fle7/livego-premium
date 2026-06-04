@@ -54,13 +54,16 @@ class TvPosterTile extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
+                        // TV remote sync rule:
+                        // Focus paint must be cheap and layout-stable. Do not
+                        // change border width or add glow per move; low-end STB
+                        // can paint that one frame late and make the cursor feel
+                        // behind the remote.
                         border: Border.all(
                           color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.42),
-                          width: focused ? 2.0 : 0.6,
+                          width: 1.4,
                         ),
-                        boxShadow: focused
-                            ? [TvFocusStyle.glow(0.065, 5)]
-                            : null,
+                        boxShadow: null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
@@ -79,7 +82,11 @@ class TvPosterTile extends StatelessWidget {
                                 : LiveGoCachedImage(
                                     url: item.posterUrl,
                                     fit: BoxFit.cover,
-                                    role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
+                                    // Do not switch image role on focus. Changing
+                                    // thumbnail -> poster while moving the remote
+                                    // can reload/repaint the image and make the
+                                    // screen look one step behind the cursor.
+                                    role: LiveGoImageRole.thumbnail,
                                     tv: true,
                                   ),
                             const DecoratedBox(
