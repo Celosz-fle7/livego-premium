@@ -59,3 +59,7 @@ Current rule:
 - This file is a `part` of `tv_home_screen.dart` so it can safely access private focus nodes and context without turning Home into a fragile dependency graph.
 
 Do not move FocusNode ownership out of the screen until real-device tests prove the split is stable.
+
+## Boundary guardrails
+
+Detailed current Home boundary rules live in `BOUNDARY.md`.

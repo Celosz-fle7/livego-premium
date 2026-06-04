@@ -8,6 +8,10 @@ import '../../../models/content_item.dart';
 
 /// Cache-first TV Home content state.
 ///
+/// Provider responsibility:
+/// - Home data
+/// - loading / refreshing / error / fromCache
+/// - retry and cache-first loading through LiveGoCatalog
 ///
 /// This replaces the old FutureBuilder-wrapped Home body. Data refresh now lives
 /// in Riverpod, so Home can rebuild from one stable state object and focus
@@ -49,8 +53,9 @@ class TvHomeContentState {
 }
 
 /// ARCHITECTURE LOCK:
-/// This controller owns Home data/loading/error/retry state only.
+/// This controller owns Home data/loading/error/retry/cache state only.
 /// Focus index and TV zones stay in `tv_home_focus_state.dart`.
+/// Key handling and BACK ladder stay in `tv_home_interaction_controller.dart`.
 /// UI layout stays in `tv_home_screen.dart`.
 class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentController() : super(const TvHomeContentState());
@@ -59,7 +64,6 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentState? _lastGoodState;
   String _lastPlatform = 'shortmax';
   String _lastCategory = 'Populer';
-
 
   Future<void> load({
     required String platform,

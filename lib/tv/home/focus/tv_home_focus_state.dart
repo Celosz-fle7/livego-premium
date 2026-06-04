@@ -2,10 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/tv_zone.dart';
 
-/// TV Home focus/navigation state.
+/// TV Home focus/index memory only.
 ///
-/// This stores lightweight indexes and active zone only. It intentionally does
-/// not own FocusNode objects because FocusNode lifecycle belongs to widgets.
+/// Owns:
+/// - active zone
+/// - platform index
+/// - category index
+/// - grid index
+///
+/// Must not own FocusNode lifecycle, API/data fetching, or widget layout.
 class TvHomeUiState {
   final int platformIndex;
   final int categoryIndex;

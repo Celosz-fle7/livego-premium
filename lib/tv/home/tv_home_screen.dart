@@ -31,10 +31,15 @@ import '../widgets/tv_professional_loading.dart';
 
 
 part 'tv_home_interaction_controller.dart';
+
 /// ARCHITECTURE LOCK:
-/// Home screen is layout + remote event passing only.
-/// Data/loading/error/retry state lives in `providers/tv_home_provider.dart`.
-/// Focus/zone/index memory lives in `focus/tv_home_focus_state.dart`.
+/// Home screen owns layout, FocusNode lifecycle, ScrollController lifecycle,
+/// init/dispose, and widget callback wiring only.
+///
+/// Do not add API/cache policy, BACK ladder logic, or long key handlers here.
+/// Put interaction logic in `tv_home_interaction_controller.dart`.
+/// Data/loading/error/retry stays in `providers/tv_home_provider.dart`.
+/// Zone/index memory stays in `focus/tv_home_focus_state.dart`.
 class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
   final VoidCallback? onRequestExit;
@@ -59,6 +64,10 @@ class TvHomeScreen extends ConsumerStatefulWidget {
 
 class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final ScrollController _scroll = ScrollController();
+
+  // FOCUSNODE OWNERSHIP RULE:
+  // FocusNodes stay in the screen because their lifecycle is tied to widgets
+  // and dispose(). Interaction decisions live in the part-extension controller.
   final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
   final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-empty-retry');
   final List<FocusNode> _platformNodes = <FocusNode>[];

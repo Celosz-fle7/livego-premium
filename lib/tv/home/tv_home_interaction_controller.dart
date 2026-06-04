@@ -2,9 +2,19 @@ part of 'tv_home_screen.dart';
 
 /// Interaction layer for TV Home.
 ///
-/// This file keeps `tv_home_screen.dart` thin while still safely accessing
-/// private FocusNode fields, BuildContext, Riverpod ref, mounted, and setState
-/// through a Dart `part` extension.
+/// Owns:
+/// - DPAD / OK / BACK handlers
+/// - focus movement
+/// - BACK ladder
+/// - retry focus recovery
+/// - restore-zone decisions
+/// - platform/category/grid index movement
+///
+/// This file intentionally remains a Dart `part` extension for now so it can
+/// safely access private FocusNodes, BuildContext, Riverpod ref, mounted, and
+/// setState owned by `_TvHomeScreenState`.
+///
+/// Do not put raw API endpoint logic, image/cache policy, or heavy UI layout here.
 extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusPreferredEntry({bool preferBanner = false}) {
     if (preferBanner && _focusBanner(throttle: false)) return true;
