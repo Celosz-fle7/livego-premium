@@ -54,11 +54,10 @@ class PlayerPreferences {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_speedKey, speed);
   }
-}
-
 
   static Future<void> setFitCover(bool value) async {
     fitCover = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_fitCoverKey, value);
   }
+}
