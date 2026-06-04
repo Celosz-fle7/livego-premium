@@ -280,7 +280,7 @@ class _AccountActionCard extends StatelessWidget {
             focusColor: Colors.transparent,
             child: AnimatedContainer(
               duration: TvFocusStyle.fast,
-              minHeight: 78,
+              constraints: const BoxConstraints(minHeight: 78),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92), borderRadius: BorderRadius.circular(22), border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1), boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null),
               child: Row(
