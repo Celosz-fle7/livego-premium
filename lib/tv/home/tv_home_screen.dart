@@ -754,7 +754,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         Text(gridTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                         const Spacer(),
                         if (home.loading && gridItems.isEmpty)
-                          const SizedBox(width: 96, child: TvSkeletonBlock(height: 20, radius: 999)),
+                          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppTheme.cyan, strokeWidth: 2)),
                         if (gridItems.isNotEmpty)
                           Text('${gridItems.length} judul', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                       ],

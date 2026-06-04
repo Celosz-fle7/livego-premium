@@ -50,7 +50,6 @@ class TvHomeStatusLine extends StatelessWidget {
           ),
         ],
       ),
-    ),
     );
   }
 }
@@ -71,60 +70,44 @@ class TvHomeEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: Container(
-      height: 238,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: focused ? AppTheme.surface3.withOpacity(0.88) : AppTheme.surface2.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2 : 1),
-        boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasError ? Icons.cloud_off_rounded : Icons.movie_filter_rounded,
-            color: focused ? Colors.white70 : Colors.white30,
-            size: 46,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            hasError ? 'Konten belum bisa dimuat' : 'Belum ada konten di kategori ini',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              decoration: TextDecoration.none,
+        height: 238,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: focused ? AppTheme.surface3.withOpacity(0.88) : AppTheme.surface2.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2 : 1),
+          boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              hasError ? Icons.cloud_off_rounded : Icons.movie_filter_rounded,
+              color: focused ? Colors.white70 : Colors.white30,
+              size: 46,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            hasError ? retryHint : 'OK refresh • LEFT ke menu • UP ke kategori',
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              decoration: TextDecoration.none,
+            const SizedBox(height: 12),
+            Text(
+              hasError ? 'Konten belum bisa dimuat' : 'Belum ada konten di kategori ini',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class TvSkeletonBlock extends StatelessWidget {
-  final double height;
-  const TvSkeletonBlock({super.key, required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: AppTheme.surface2,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.border),
+            const SizedBox(height: 6),
+            Text(
+              hasError ? retryHint : 'OK refresh • LEFT ke menu • UP ke kategori',
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
