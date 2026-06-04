@@ -73,6 +73,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   List<ContentItem> _gridItems = const <ContentItem>[];
 
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(4, 10).toInt();
+  int get _homeGridLimit => (_gridColumns * 5).clamp(24, 40).toInt();
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -594,7 +595,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     final platforms = LiveGoCatalog.platformLabels;
     final categories = _categories;
     final rawItems = home.items;
-    final gridItems = ContentHealthService.filterPlayable(rawItems).take(42).toList(growable: false);
+    final gridItems = ContentHealthService.filterPlayable(rawItems).take(_homeGridLimit).toList(growable: false);
     _gridItems = gridItems;
 
     _syncNodes(_platformNodes, platforms.length, 'tv-home-platform');
@@ -631,7 +632,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
           right: false,
           child: CustomScrollView(
             controller: _scroll,
-            cacheExtent: 1200,
+            cacheExtent: 720,
             slivers: [
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),

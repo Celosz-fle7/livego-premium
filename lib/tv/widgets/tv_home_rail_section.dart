@@ -200,6 +200,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
+                  cacheExtent: 520,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.continueWatching.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -222,6 +223,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
+                  cacheExtent: 520,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.myList.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -363,34 +365,36 @@ class _RailCardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            focusColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: TvFocusStyle.fast,
-              width: width,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
-                boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
+    return RepaintBoundary(
+      child: ListenableBuilder(
+        listenable: node,
+        builder: (context, _) {
+          final focused = node.hasFocus;
+          return Focus(
+            focusNode: node,
+            skipTraversal: true,
+            onKeyEvent: onKey,
+            child: InkWell(
+              canRequestFocus: false,
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              focusColor: Colors.transparent,
+              child: AnimatedContainer(
+                duration: TvFocusStyle.fast,
+                width: width,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
+                  boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
+                ),
+                child: childBuilder(focused),
               ),
-              child: childBuilder(focused),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
