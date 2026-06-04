@@ -23,6 +23,8 @@ import '../../services/player/playback_resolver.dart';
 import '../../services/api/api_platform.dart';
 import '../player/tv_player_focus_controller.dart';
 import '../player/tv_player_route_context.dart';
+import '../player/widgets/tv_player_error_overlay.dart';
+import '../player/widgets/tv_player_choice_panel.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -1598,7 +1600,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   ),
                 ),
               if (!_loading && !ready)
-                _PlayerErrorOverlay(
+                TvPlayerErrorOverlay(
                   title: item.title,
                   episode: _episode,
                   message: _error.isNotEmpty ? _error : 'Player belum siap. Coba kembali lalu buka lagi.',
@@ -1672,7 +1674,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   child: SafeArea(
                     bottom: true,
                     minimum: const EdgeInsets.only(bottom: 176),
-                    child: _ChoicePanel(
+                    child: TvPlayerChoicePanel(
                       title: 'Pilih Kualitas',
                       hint: _qualityChoices.length > 1 ? 'OK pilih kualitas video' : 'Kualitas API tidak tersedia',
                       choices: _qualityChoices,
@@ -1688,7 +1690,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   child: SafeArea(
                     bottom: true,
                     minimum: const EdgeInsets.only(bottom: 176),
-                    child: _ChoicePanel(
+                    child: TvPlayerChoicePanel(
                       title: 'Pilih Subtitle',
                       hint: _streamInfo.subtitles.isEmpty ? 'Subtitle API tidak tersedia' : 'OK aktifkan subtitle',
                       choices: _subtitleChoices,
