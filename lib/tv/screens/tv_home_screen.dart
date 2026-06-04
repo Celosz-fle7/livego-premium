@@ -318,37 +318,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       });
     });
   }
-) {
-    final ticket = ++_focusBootstrapTicket;
-    const delays = <Duration>[
-      Duration(milliseconds: 0),
-      Duration(milliseconds: 50),
-      Duration(milliseconds: 150),
-      Duration(milliseconds: 300),
-    ];
-
-    void attempt(int index) {
-      if (!mounted || ticket != _focusBootstrapTicket) return;
-      void run() {
-        if (!mounted || ticket != _focusBootstrapTicket) return;
-        if (preferBanner) {
-          if (_focusBanner(throttle: false)) return;
-        }
-        _restoreZoneFocus(throttle: false);
-        if (_hasAnyHomeFocus()) return;
-        if (index + 1 < delays.length) attempt(index + 1);
-      }
-
-      final delay = delays[index];
-      if (delay == Duration.zero) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => run());
-      } else {
-        Future<void>.delayed(delay, run);
-      }
-    }
-
-    attempt(0);
-  }
 
   void _handleNavigationSync(TvNavigationState next) {
     if (!mounted) return;
@@ -372,7 +341,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
         if (_focusPlatform(_platformIndex, throttle: throttle)) return;
         break;
       case TvZone.banner:
-      default:
+      case TvZone.nav:
+      case TvZone.list:
+      case TvZone.settings:
+      case TvZone.placeholder:
+      case TvZone.player:
         break;
     }
     _focusBanner(throttle: throttle);

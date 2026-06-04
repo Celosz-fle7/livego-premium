@@ -297,22 +297,6 @@ class _TvShellState extends ConsumerState<TvShell> {
     _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
     if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
   }
-) {
-    if (!mounted) return;
-    if (_exitOpen) {
-      tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
-      return;
-    }
-
-    if (_navMode == TvSideNavMode.focused || _navHasFocus) {
-      _syncOwner(navFocused: true);
-      _focusNav(_index);
-      return;
-    }
-
-    _syncOwner();
-    _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
-  }
 
   KeyEventResult _rootKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
