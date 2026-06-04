@@ -22,6 +22,8 @@ import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
+import '../widgets/tv_home_rail_section.dart';
+import 'tv_content_detail_screen.dart';
 import 'tv_player_screen.dart';
 
 class TvHomeScreen extends ConsumerStatefulWidget {
@@ -58,6 +60,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final List<FocusNode> _platformNodes = [];
   final List<FocusNode> _categoryNodes = [];
   final List<FocusNode> _gridNodes = [];
+  final GlobalKey<TvHomeProfessionalRowsState> _homeRowsKey = GlobalKey<TvHomeProfessionalRowsState>();
 
   TvZone _zone = TvZone.banner;
   int _lastPlatform = 0;
@@ -314,6 +317,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     return moved;
   }
 
+  bool _focusHomeRows({bool preferMyList = false}) {
+    final rows = _homeRowsKey.currentState;
+    if (rows == null) return false;
+    return preferMyList ? rows.focusMyList() : rows.focusFirst();
+  }
+
   void _focusEntry() {
     _queueFocusEntry(_zone, index: _indexForZone(_zone));
   }
@@ -507,7 +516,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     widget.onPlayerRouteOpen?.call();
     Navigator.of(context)
         .push(MaterialPageRoute(
-          builder: (_) => TvPlayerScreen(item: item),
+          builder: (_) => TvContentDetailScreen(
+            item: item,
+            onPlayerRouteOpen: widget.onPlayerRouteOpen,
+            onPlayerRouteClosed: widget.onPlayerRouteClosed,
+          ),
         ))
         .whenComplete(() {
           _openingPlayer = false;
@@ -692,6 +705,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       _lastCategory = current;
+      if (_focusHomeRows()) {
+        return KeyEventResult.handled;
+      }
       if (_gridNodes.isNotEmpty) {
         _moveFocus(TvZone.grid, index: _lastGrid);
       }
@@ -734,6 +750,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
+        if (_focusHomeRows(preferMyList: true)) {
+          return KeyEventResult.handled;
+        }
         if (_categoryNodes.isNotEmpty) {
           _moveFocus(TvZone.category, index: _lastCategory);
         } else if (_platformNodes.isNotEmpty) {
@@ -870,6 +889,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
+                        TvHomeProfessionalRows(
+                          key: _homeRowsKey,
+                          onOpen: _open,
+                          onMoveToNav: () => _moveToNav(TvZone.list),
+                          onBackToCategory: () => _moveFocus(TvZone.category, index: _lastCategory, throttle: false),
+                          onMoveToGrid: () => _moveFocus(TvZone.grid, index: _lastGrid, throttle: false),
+                        ),
                         if (loading)
                           const TvSkeletonBlock(height: 260)
                         else if (gridItems.isEmpty)

@@ -12,6 +12,7 @@ import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
 import 'tv_player_screen.dart';
+import 'tv_content_detail_screen.dart';
 
 class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -138,7 +139,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: item))).whenComplete(() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvContentDetailScreen(item: item, onPlayerRouteOpen: widget.onPlayerRouteOpen, onPlayerRouteClosed: widget.onPlayerRouteClosed))).whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
