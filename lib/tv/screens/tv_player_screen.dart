@@ -23,8 +23,11 @@ import '../../services/player/playback_resolver.dart';
 import '../../services/api/api_platform.dart';
 import '../player/tv_player_focus_controller.dart';
 import '../player/tv_player_route_context.dart';
+import '../player/tv_player_service.dart';
 import '../player/widgets/tv_player_error_overlay.dart';
 import '../player/widgets/tv_player_choice_panel.dart';
+import '../player/widgets/tv_player_control_dock.dart';
+import '../player/widgets/tv_player_episode_panel.dart';
 
 class TvPlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -40,6 +43,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-root');
   late final TvPlayerFocusController _playerFocus = TvPlayerFocusController(rootFocus: _rootFocus);
   late final TvPlayerRouteContext _routeContext;
+  final TvPlayerService _playerService = const TvPlayerService();
 
   VideoPlayerController? _controller;
   ContentItem? _detail;
@@ -234,27 +238,17 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     try {
       final requestChapter = _isDobdaPlayer ? playable.chapterId : '$ep';
-      debugPrint('LIVEGO TV DIRECT EP START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter ticket=$ticket');
-      final started = DateTime.now();
-      var stream = await PlaybackResolver.fastStreamInfo(
+      debugPrint('LIVEGO TV STREAM RESOLVE START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter ticket=$ticket');
+      final resolved = await _playerService.resolveStream(
         playable,
         chapterId: requestChapter,
-        timeout: PlaybackTimeoutConfig.directEpisode,
+        episode: ep,
       );
-      debugPrint('LIVEGO TV DIRECT EP DONE ${DateTime.now().difference(started).inMilliseconds}ms stream=${stream.url.isNotEmpty} ticket=$ticket');
+      final stream = resolved.stream;
+      debugPrint('LIVEGO TV STREAM RESOLVE DONE source=${resolved.source} ${resolved.elapsedMs}ms stream=${stream.url.isNotEmpty} ticket=$ticket');
 
       if (!_isCurrentLoad(ticket, ep)) {
-        debugPrint('LIVEGO TV DIRECT EP STALE SKIP ep=$ep current=$_episode ticket=$ticket active=$_loadTicket');
-        return;
-      }
-
-      if (stream.url.isEmpty) {
-        stream = await LiveGoCatalog.streamInfo(playable, chapterId: requestChapter)
-            .timeout(PlaybackTimeoutConfig.fallbackStream, onTimeout: () => StreamInfo.empty);
-      }
-
-      if (!_isCurrentLoad(ticket, ep)) {
-        debugPrint('LIVEGO TV FALLBACK EP STALE SKIP ep=$ep current=$_episode ticket=$ticket active=$_loadTicket');
+        debugPrint('LIVEGO TV STREAM RESOLVE STALE SKIP ep=$ep current=$_episode ticket=$ticket active=$_loadTicket');
         return;
       }
 
@@ -1634,7 +1628,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   child: SafeArea(
                     bottom: true,
                     minimum: const EdgeInsets.only(bottom: 18),
-                    child: _PlayerControlDock(
+                    child: TvPlayerControlDock(
                       controller: controller,
                       playing: controller.value.isPlaying,
                       speed: _speed,
@@ -1658,7 +1652,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     top: true,
                     bottom: true,
                     minimum: const EdgeInsets.only(top: 26, bottom: 30),
-                    child: _EpisodeSidePanel(
+                    child: TvPlayerEpisodePanel(
                       episodes: _orderedEpisodes(),
                       total: _episodeTotal(item),
                       selected: _episode,
