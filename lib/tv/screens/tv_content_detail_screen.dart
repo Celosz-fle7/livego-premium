@@ -128,6 +128,43 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     if (Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
 
+  bool _focusPlayerReturnTarget({required bool preferEpisode}) {
+    if (preferEpisode && _episodeNodes.isNotEmpty) {
+      final target = _episodeCursor.clamp(0, _episodeNodes.length - 1).toInt();
+      if (tvFocusComfort(_episodeNodes[target], throttle: false)) return true;
+    }
+    if (tvFocus(_playNode, alignment: 0.18, throttle: false)) return true;
+    if (_episodeNodes.isNotEmpty) {
+      final target = _episodeCursor.clamp(0, _episodeNodes.length - 1).toInt();
+      if (tvFocusComfort(_episodeNodes[target], throttle: false)) return true;
+    }
+    return tvFocus(_backNode, alignment: 0.06, throttle: false);
+  }
+
+  void _schedulePlayerReturnFocus({required bool preferEpisode, int attempt = 0}) {
+    if (!mounted || attempt > 3) return;
+    final token = ++_playerReturnTicket;
+    final delay = attempt == 0
+        ? Duration.zero
+        : attempt == 1
+            ? const Duration(milliseconds: 50)
+            : attempt == 2
+                ? const Duration(milliseconds: 150)
+                : const Duration(milliseconds: 300);
+
+    Future<void>.delayed(delay, () {
+      if (!mounted || token != _playerReturnTicket) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || token != _playerReturnTicket) return;
+        final ok = _focusPlayerReturnTarget(preferEpisode: preferEpisode);
+        if (!ok && attempt < 3) {
+          _schedulePlayerReturnFocus(preferEpisode: preferEpisode, attempt: attempt + 1);
+        }
+      });
+    });
+  }
+
+
   KeyEventResult _backButtonKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
