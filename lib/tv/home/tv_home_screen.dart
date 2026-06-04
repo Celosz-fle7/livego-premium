@@ -25,6 +25,7 @@ import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_home_rail_section.dart';
+import '../widgets/tv_offline_banner.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_professional_loading.dart';
@@ -225,6 +226,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         hasError: home.hasError,
                         fromCache: home.fromCache,
                       ),
+                    TvOfflineBanner(
+                      visible: home.offline || (home.hasError && home.fromCache),
+                      fromCache: home.fromCache,
+                      refreshing: home.refreshing,
+                    ),
                     const SizedBox(height: 12),
                     TvSectionBox(
                       icon: Icons.apps_rounded,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/livego_catalog.dart';
 import '../../../models/content_item.dart';
+import '../../../services/network/livego_network_status.dart';
 
 /// Cache-first TV Home content state.
 ///
@@ -23,6 +24,7 @@ class TvHomeContentState {
   final bool refreshing;
   final bool hasError;
   final bool fromCache;
+  final bool offline;
 
   const TvHomeContentState({
     this.hero,
@@ -31,6 +33,7 @@ class TvHomeContentState {
     this.refreshing = false,
     this.hasError = false,
     this.fromCache = false,
+    this.offline = false,
   });
 
   TvHomeContentState copyWith({
@@ -40,6 +43,7 @@ class TvHomeContentState {
     bool? refreshing,
     bool? hasError,
     bool? fromCache,
+    bool? offline,
   }) {
     return TvHomeContentState(
       hero: hero ?? this.hero,
@@ -48,6 +52,7 @@ class TvHomeContentState {
       refreshing: refreshing ?? this.refreshing,
       hasError: hasError ?? this.hasError,
       fromCache: fromCache ?? this.fromCache,
+      offline: offline ?? this.offline,
     );
   }
 }
@@ -76,9 +81,32 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     if (clearPrevious) {
       state = const TvHomeContentState(loading: true);
     } else if (state.items.isEmpty) {
-      state = state.copyWith(loading: true, refreshing: false, hasError: false);
+      state = state.copyWith(loading: true, refreshing: false, hasError: false, offline: false);
     } else {
-      state = state.copyWith(refreshing: true, hasError: false);
+      state = state.copyWith(refreshing: true, hasError: false, offline: false);
+    }
+
+    final online = await LiveGoNetworkStatus.isProbablyOnline();
+    if (token != _loadToken) return;
+    if (!online) {
+      final last = _lastGoodState;
+      if (last != null) {
+        state = last.copyWith(
+          loading: false,
+          refreshing: false,
+          hasError: true,
+          fromCache: true,
+          offline: true,
+        );
+      } else {
+        state = const TvHomeContentState(
+          loading: false,
+          hasError: true,
+          fromCache: false,
+          offline: true,
+        );
+      }
+      return;
     }
 
     try {
@@ -114,6 +142,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
 
       if (token != _loadToken) return;
       if (items.isNotEmpty) {
+        LiveGoNetworkStatus.markOnline();
         final next = TvHomeContentState(hero: items.first, items: items, loading: false);
         _lastGoodState = next;
         state = next;
@@ -148,9 +177,11 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     if (token != _loadToken) return;
     final last = _lastGoodState;
     if (last != null) {
-      state = last.copyWith(loading: false, refreshing: false, hasError: true);
+      LiveGoNetworkStatus.markOffline();
+      state = last.copyWith(loading: false, refreshing: false, hasError: true, offline: true);
     } else {
-      state = const TvHomeContentState(loading: false, hasError: true);
+      LiveGoNetworkStatus.markOffline();
+      state = const TvHomeContentState(loading: false, hasError: true, offline: true);
     }
   }
 
@@ -180,6 +211,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
         return;
       }
 
+      LiveGoNetworkStatus.markOnline();
       final next = TvHomeContentState(hero: fresh.first, items: fresh, loading: false);
       _lastGoodState = next;
       state = next;

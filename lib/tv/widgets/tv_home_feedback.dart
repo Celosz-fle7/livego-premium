@@ -88,7 +88,7 @@ class TvHomeEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              hasError ? 'Konten belum bisa dimuat' : 'Belum ada konten di kategori ini',
+              hasError ? 'Konten belum bisa dimuat / offline' : 'Belum ada konten di kategori ini',
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 15,
