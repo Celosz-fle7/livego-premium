@@ -17,6 +17,7 @@ import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
 import '../theme/tv_focus_style.dart';
 import '../widgets/tv_side_nav.dart';
+import '../widgets/tv_lazy_indexed_stack.dart';
 import 'tv_nav_index.dart';
 import 'tv_navigation_service.dart';
 
@@ -387,61 +388,61 @@ class _TvShellState extends ConsumerState<TvShell> {
     return KeyEventResult.ignored;
   }
 
-  List<Widget> _pages() {
-    return <Widget>[
-      TvHomeScreen(
-        focusTicket: _index == TvNavIndex.home ? _homeTicket : 0,
-        bannerFocusTicket: _index == TvNavIndex.home ? _homeBannerTicket : 0,
-        onMoveToNav: _showNav,
-        onRequestExit: _showExit,
-        onPlayerRouteOpen: _preparePlayerRoute,
-        onPlayerRouteClosed: _restorePlayerRoute,
-      ),
-      TvDownloadsScreen(
-        focusTicket: _index == TvNavIndex.download ? _contentTicket : 0,
-        onMoveToNav: _showNav,
-        onBackToNav: _returnToAccountMenuOrNav,
-        onBackToHome: () => _enterContent(TvNavIndex.home),
-        onPlayerRouteOpen: _preparePlayerRoute,
-        onPlayerRouteClosed: _restorePlayerRoute,
-      ),
-      TvLibraryScreen(
-        title: 'Histori',
-        icon: Icons.history_rounded,
-        favorites: false,
-        focusTicket: _index == TvNavIndex.history ? _contentTicket : 0,
-        onMoveToNav: _showNav,
-        onBackToNav: _returnToAccountMenuOrNav,
-        onBackToHome: () => _enterContent(TvNavIndex.home),
-        onPlayerRouteOpen: _preparePlayerRoute,
-        onPlayerRouteClosed: _restorePlayerRoute,
-      ),
-      TvLibraryScreen(
-        title: 'Favorit',
-        icon: Icons.favorite_rounded,
-        favorites: true,
-        focusTicket: _index == TvNavIndex.favorite ? _contentTicket : 0,
-        onMoveToNav: _showNav,
-        onBackToNav: _returnToAccountMenuOrNav,
-        onBackToHome: () => _enterContent(TvNavIndex.home),
-        onPlayerRouteOpen: _preparePlayerRoute,
-        onPlayerRouteClosed: _restorePlayerRoute,
-      ),
-      TvAccountScreen(
-        focusTicket: _index == TvNavIndex.account ? _accountTicket : 0,
-        onMoveToNav: _showNav,
-        onBackToNav: _showNav,
-        onBackToHome: () => _enterContent(TvNavIndex.home),
-        onOpenNavIndex: _openFromAccount,
-      ),
-      TvSearchScreen(
-        focusTicket: _index == TvNavIndex.search ? _contentTicket : 0,
-        onMoveToNav: _showNav,
-        onBackToNav: _returnToAccountMenuOrNav,
-        onBackToHome: () => _enterContent(TvNavIndex.home),
-        onPlayerRouteOpen: _preparePlayerRoute,
-        onPlayerRouteClosed: _restorePlayerRoute,
-      ),
+  List<WidgetBuilder> _pageBuilders() {
+    return <WidgetBuilder>[
+      (_) => TvHomeScreen(
+            focusTicket: _index == TvNavIndex.home ? _homeTicket : 0,
+            bannerFocusTicket: _index == TvNavIndex.home ? _homeBannerTicket : 0,
+            onMoveToNav: _showNav,
+            onRequestExit: _showExit,
+            onPlayerRouteOpen: _preparePlayerRoute,
+            onPlayerRouteClosed: _restorePlayerRoute,
+          ),
+      (_) => TvDownloadsScreen(
+            focusTicket: _index == TvNavIndex.download ? _contentTicket : 0,
+            onMoveToNav: _showNav,
+            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onPlayerRouteOpen: _preparePlayerRoute,
+            onPlayerRouteClosed: _restorePlayerRoute,
+          ),
+      (_) => TvLibraryScreen(
+            title: 'Histori',
+            icon: Icons.history_rounded,
+            favorites: false,
+            focusTicket: _index == TvNavIndex.history ? _contentTicket : 0,
+            onMoveToNav: _showNav,
+            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onPlayerRouteOpen: _preparePlayerRoute,
+            onPlayerRouteClosed: _restorePlayerRoute,
+          ),
+      (_) => TvLibraryScreen(
+            title: 'Favorit',
+            icon: Icons.favorite_rounded,
+            favorites: true,
+            focusTicket: _index == TvNavIndex.favorite ? _contentTicket : 0,
+            onMoveToNav: _showNav,
+            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onPlayerRouteOpen: _preparePlayerRoute,
+            onPlayerRouteClosed: _restorePlayerRoute,
+          ),
+      (_) => TvAccountScreen(
+            focusTicket: _index == TvNavIndex.account ? _accountTicket : 0,
+            onMoveToNav: _showNav,
+            onBackToNav: _showNav,
+            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onOpenNavIndex: _openFromAccount,
+          ),
+      (_) => TvSearchScreen(
+            focusTicket: _index == TvNavIndex.search ? _contentTicket : 0,
+            onMoveToNav: _showNav,
+            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onPlayerRouteOpen: _preparePlayerRoute,
+            onPlayerRouteClosed: _restorePlayerRoute,
+          ),
     ];
   }
 
@@ -521,7 +522,7 @@ class _TvShellState extends ConsumerState<TvShell> {
                       children: [
                         TvSideNav(index: _index, mode: _navMode, focusNodes: _navNodes, onChanged: _openNavIndex, onOpenContent: _enterContent),
                         AnimatedContainer(duration: TvFocusStyle.normal, width: _navMode == TvSideNavMode.hidden ? 0 : 1, margin: const EdgeInsets.symmetric(vertical: 30), color: Colors.white.withOpacity(0.035)),
-                        Expanded(child: RepaintBoundary(child: IndexedStack(index: _index, children: _pages()))),
+                        Expanded(child: TvLazyIndexedStack(index: _index, builders: _pageBuilders())),
                       ],
                     ),
                     _exitDialog(),
