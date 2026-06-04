@@ -65,6 +65,8 @@ class _TvShellState extends ConsumerState<TvShell> {
   late final FocusNode _exitConfirmNode;
   int _lastBootstrapMs = 0;
   int _bootstrapSerial = 0;
+  Timer? _focusObserverTimer;
+  String _lastObservedFocusSignature = '';
 
   @override
   void initState() {
@@ -74,6 +76,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     _exitCancelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-cancel');
     _exitConfirmNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-confirm');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    FocusManager.instance.addListener(_handlePrimaryFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _rootFocusNode.requestFocus();
@@ -87,6 +90,8 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_handlePrimaryFocusChanged);
+    _focusObserverTimer?.cancel();
     _rootFocusNode.dispose();
     for (final node in _navNodes) {
       node.dispose();
@@ -132,6 +137,94 @@ class _TvShellState extends ConsumerState<TvShell> {
       owner: owner.name,
       navMode: _navMode.name,
     );
+    _lastObservedFocusSignature = '$owner:$navFocused:$_index:${_navMode.name}';
+  }
+
+
+  TvRemoteOwner? _ownerFromFocusLabel(String label) {
+    if (label.isEmpty) return null;
+
+    if (label.startsWith('tv-exit-')) return TvRemoteOwner.popup;
+    if (label.startsWith('tv-player-')) return TvRemoteOwner.player;
+    if (label.startsWith('tv-nav-')) return TvRemoteOwner.navbar;
+
+    if (label.startsWith('tv-home-') ||
+        label.contains('home') ||
+        label.contains('banner') ||
+        label.contains('platform') ||
+        label.contains('category') ||
+        label.contains('grid')) {
+      return TvRemoteOwner.home;
+    }
+
+    if (label.startsWith('tv-account') || label.contains('account')) {
+      return TvRemoteOwner.account;
+    }
+
+    if (label.startsWith('tv-search') || label.contains('search')) {
+      return TvRemoteOwner.search;
+    }
+
+    if (label.startsWith('tv-download') || label.contains('download')) {
+      return TvRemoteOwner.downloads;
+    }
+
+    if (label.contains('source')) return TvRemoteOwner.sourceManager;
+    if (label.contains('library') || label.contains('history') || label.contains('favorite')) {
+      return TvRemoteOwner.library;
+    }
+
+    return null;
+  }
+
+  TvRemoteOwner _observedOwnerForPrimaryFocus(FocusNode primary) {
+    if (_exitOpen) return TvRemoteOwner.popup;
+
+    final label = primary.debugLabel ?? '';
+    final observed = _ownerFromFocusLabel(label);
+    if (observed != null) return observed;
+
+    // Unknown content node: keep the active nav page as the owner. Shell should
+    // not track poster indexes or rebuild screens from the observer.
+    return _ownerFor(_index);
+  }
+
+  void _syncObservedOwner(TvRemoteOwner owner, {required bool navFocused}) {
+    final signature = '$owner:$navFocused:$_index:${_navMode.name}';
+    if (_lastObservedFocusSignature == signature) return;
+    _lastObservedFocusSignature = signature;
+
+    final nav = ref.read(tvNavigationProvider.notifier);
+    if (navFocused) {
+      nav.selectNav(_index);
+    } else {
+      nav.enterContent(_index);
+    }
+    nav.setOwner(owner);
+    ref.read(tvFocusProvider.notifier).setOwner(owner);
+    _navService.update(
+      index: _index,
+      navFocused: navFocused,
+      owner: owner.name,
+      navMode: _navMode.name,
+    );
+  }
+
+  void _handlePrimaryFocusChanged() {
+    if (!mounted) return;
+
+    // Debounce only the observer update. Focus movement itself stays immediate
+    // and screen-owned. This prevents provider/service churn on rapid grid moves.
+    _focusObserverTimer?.cancel();
+    _focusObserverTimer = Timer(const Duration(milliseconds: 45), () {
+      if (!mounted) return;
+      final primary = FocusManager.instance.primaryFocus;
+      if (primary == null || primary == _rootFocusNode || primary.context == null) return;
+
+      final owner = _observedOwnerForPrimaryFocus(primary);
+      final navFocused = owner == TvRemoteOwner.navbar;
+      _syncObservedOwner(owner, navFocused: navFocused);
+    });
   }
 
   bool _backAllowed() {
