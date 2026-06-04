@@ -12,6 +12,8 @@ import '../providers/tv_search_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
+import '../../services/analytics/livego_analytics.dart';
+import '../widgets/tv_search_keyboard_panel.dart';
 
 class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -112,6 +114,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Future<void> _submitSearch(String value) async {
     _gridIndex = 0;
     await ref.read(tvSearchProvider.notifier).search(value);
+    final resultCount = ref.read(tvSearchProvider).results.length;
+    LiveGoAnalytics.search(value.trim(), resultCount);
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -289,6 +293,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        const TvSearchKeyboardPanel(),
                         const SizedBox(height: 16),
                         if (search.loading)
                           const Padding(

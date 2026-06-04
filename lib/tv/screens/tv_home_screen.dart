@@ -25,6 +25,7 @@ import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_home_rail_section.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
+import '../widgets/tv_professional_loading.dart';
 
 class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -619,7 +620,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     ),
                     const SizedBox(height: 12),
                     if (home.loading && gridItems.isEmpty)
-                      const TvSkeletonBlock(height: 238)
+                      const TvProfessionalGridSkeleton(columns: 6, rows: 2)
                     else if (gridItems.isEmpty)
                       TvHomeEmptyState(hasError: home.hasError)
                     else

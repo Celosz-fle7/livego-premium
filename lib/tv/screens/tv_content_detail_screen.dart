@@ -16,6 +16,8 @@ import '../focus/tv_reachability.dart';
 import '../providers/tv_detail_provider.dart';
 import '../theme/tv_focus_style.dart';
 import 'tv_player_screen.dart';
+import '../../services/analytics/livego_analytics.dart';
+import '../widgets/tv_professional_loading.dart';
 
 class TvContentDetailScreen extends ConsumerStatefulWidget {
   final ContentItem item;
@@ -47,6 +49,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   @override
   void initState() {
     super.initState();
+    LiveGoAnalytics.contentOpen(widget.item.platformSlug, widget.item.id, widget.item.title);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) tvFocus(_playNode, alignment: 0.18, throttle: false);
     });
@@ -77,7 +80,9 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   bool _isSelect(LogicalKeyboardKey key) => tvIsSelectKey(key);
 
   ContentItem _episodeItem(ContentItem item, LiveGoEpisode? episode) {
-    final chapter = episode?.id.trim().isNotEmpty == true ? episode!.id.trim() : '${episode?.index ?? 1}';
+    final fallbackEpisode = LiveGoLocalStore.continueEpisode(item);
+    final itemChapter = int.tryParse(item.chapterId) ?? fallbackEpisode;
+    final chapter = episode?.id.trim().isNotEmpty == true ? episode!.id.trim() : '${episode?.index ?? itemChapter}';
     return ContentItem(
       id: item.id,
       title: item.title,
@@ -98,6 +103,8 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   void _openPlayer(ContentItem detail, {LiveGoEpisode? episode}) {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
+    final episodeNumber = episode?.index ?? (int.tryParse(detail.chapterId) ?? LiveGoLocalStore.continueEpisode(detail));
+    LiveGoAnalytics.play(detail.platformSlug, detail.id, detail.title, episodeNumber);
     widget.onPlayerRouteOpen?.call();
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: _episodeItem(detail, episode))))
@@ -237,7 +244,9 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
         backgroundColor: AppTheme.bgDeep,
         body: asyncData.when(
           loading: () => _DetailLoading(item: widget.item),
-          error: (_, __) => _DetailBody(
+          error: (error, __) {
+            LiveGoAnalytics.error('detail', error);
+            return _DetailBody(
             scroll: _scroll,
             item: widget.item,
             episodes: const <LiveGoEpisode>[],
@@ -250,7 +259,8 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
             onEpisodeKey: (i, event) => _episodeKey(widget.item, const <LiveGoEpisode>[], i, event),
             onPlay: () => _openPlayer(widget.item),
             onToggleFavorite: () => unawaited(_toggleFavorite(widget.item)),
-          ),
+          );
+          },
           data: (data) {
             final detail = data.detail;
             final episodes = data.episodes.take(80).toList(growable: false);
@@ -288,7 +298,7 @@ class _DetailLoading extends StatelessWidget {
         if (item.backdropUrl.isNotEmpty || item.posterUrl.isNotEmpty)
           LiveGoCachedImage(url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.banner, tv: true),
         Container(color: Colors.black.withOpacity(0.70)),
-        const SafeArea(child: Center(child: CircularProgressIndicator(color: AppTheme.cyan))),
+        const TvDetailSkeleton(),
       ],
     );
   }

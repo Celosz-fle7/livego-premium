@@ -10,6 +10,26 @@ import '../focus/tv_focus_utils.dart';
 import '../providers/tv_home_rows_provider.dart';
 import '../theme/tv_focus_style.dart';
 
+ContentItem _tvResumeItemFromProgress(WatchProgress progress) {
+  final item = progress.item;
+  return ContentItem(
+    id: item.id,
+    title: item.title,
+    source: item.source,
+    category: item.category,
+    description: item.description,
+    posterUrl: item.posterUrl,
+    backdropUrl: item.backdropUrl,
+    rating: item.rating,
+    episodes: item.episodes,
+    updated: item.updated,
+    platformSlug: item.platformSlug,
+    chapterId: '${progress.episode <= 0 ? 1 : progress.episode}',
+    lang: item.lang,
+  );
+}
+
+
 class TvHomeProfessionalRows extends StatefulWidget {
   final ValueChanged<ContentItem> onOpen;
   final VoidCallback onMoveToNav;
@@ -112,7 +132,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
-      widget.onOpen(progress.item);
+      widget.onOpen(_tvResumeItemFromProgress(progress));
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -182,7 +202,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
                     node: _continueNodes[i],
                     progress: rows.continueWatching[i],
                     onKey: (node, event) => _continueKey(i, rows.continueWatching[i], event),
-                    onTap: () => widget.onOpen(rows.continueWatching[i].item),
+                    onTap: () => widget.onOpen(_tvResumeItemFromProgress(rows.continueWatching[i])),
                   ),
                 ),
               ),
