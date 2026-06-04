@@ -84,35 +84,6 @@ bool _throttledFocus(
 
   return true;
 }
-) {
-  if (throttle) {
-    final now = DateTime.now();
-    if (now.difference(_lastNavTime) < _navInterval) return false;
-    _lastNavTime = now;
-  }
-
-  final token = (_focusFrameToken[node] ?? 0) + 1;
-  _focusFrameToken[node] = token;
-
-  doFocus();
-
-  void scheduleReveal(int framesLeft) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_focusFrameToken[node] != token) return;
-      if (framesLeft > 1) {
-        scheduleReveal(framesLeft - 1);
-        return;
-      }
-      _focusFrameToken.remove(node);
-      if (node.context == null || !node.hasFocus) return;
-      doScroll();
-    });
-  }
-
-  scheduleReveal(postFrameDelay.clamp(1, 3).toInt());
-  return true;
-}
-
 /// TV focus helper for Home zone jumps and other explicit alignment movement.
 ///
 /// Use for banner, platform/category chips, navbar, and popup buttons. For
