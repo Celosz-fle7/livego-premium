@@ -40,6 +40,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   final FocusNode _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-detail-back');
   final FocusNode _playNode = FocusNode(skipTraversal: true, debugLabel: 'tv-detail-play');
   final FocusNode _favoriteNode = FocusNode(skipTraversal: true, debugLabel: 'tv-detail-favorite');
+  final FocusNode _retryNode = FocusNode(skipTraversal: true, debugLabel: 'tv-detail-retry');
   final List<FocusNode> _episodeNodes = <FocusNode>[];
   int _buttonIndex = 0;
   int _episodeCursor = 0;
@@ -61,6 +62,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     _backNode.dispose();
     _playNode.dispose();
     _favoriteNode.dispose();
+    _retryNode.dispose();
     for (final node in _episodeNodes) {
       node.dispose();
     }
@@ -128,6 +130,13 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     if (Navigator.of(context).canPop()) Navigator.of(context).pop();
   }
 
+  void _retryDetail() {
+    ref.invalidate(tvDetailProvider(widget.item));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) tvFocus(_playNode, alignment: 0.18, throttle: false);
+    });
+  }
+
   bool _focusPlayerReturnTarget({required bool preferEpisode}) {
     if (preferEpisode && _episodeNodes.isNotEmpty) {
       final target = _episodeCursor.clamp(0, _episodeNodes.length - 1).toInt();
@@ -180,7 +189,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     return KeyEventResult.ignored;
   }
 
-  KeyEventResult _buttonKey(ContentItem detail, bool favorite, KeyEvent event) {
+  KeyEventResult _buttonKey(ContentItem detail, bool favorite, bool canRetry, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
@@ -191,6 +200,9 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (_buttonIndex == 0) {
         tvFocus(_backNode, alignment: 0.06);
+      } else if (_buttonIndex == 2) {
+        _buttonIndex = 1;
+        tvFocus(_favoriteNode, alignment: 0.18);
       } else {
         _buttonIndex = 0;
         tvFocus(_playNode, alignment: 0.18);
@@ -198,8 +210,13 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _buttonIndex = 1;
-      tvFocus(_favoriteNode, alignment: 0.18);
+      if (_buttonIndex == 0) {
+        _buttonIndex = 1;
+        tvFocus(_favoriteNode, alignment: 0.18);
+      } else if (canRetry) {
+        _buttonIndex = 2;
+        tvFocus(_retryNode, alignment: 0.18);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -211,6 +228,8 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     if (_isSelect(key)) {
       if (_buttonIndex == 0) {
         _openPlayer(detail);
+      } else if (_buttonIndex == 2 && canRetry) {
+        _retryDetail();
       } else {
         unawaited(_toggleFavorite(detail));
       }
@@ -277,20 +296,24 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
           loading: () => _DetailLoading(item: widget.item),
           error: (error, __) {
             LiveGoAnalytics.error('detail', error);
+            _syncEpisodes(0);
             return _DetailBody(
-            scroll: _scroll,
-            item: widget.item,
-            episodes: const <LiveGoEpisode>[],
-            backNode: _backNode,
-            playNode: _playNode,
-            favoriteNode: _favoriteNode,
-            episodeNodes: _episodeNodes,
-            onBackKey: _backButtonKey,
-            onButtonKey: (event) => _buttonKey(widget.item, LiveGoLocalStore.isFavorite(widget.item), event),
-            onEpisodeKey: (i, event) => _episodeKey(widget.item, const <LiveGoEpisode>[], i, event),
-            onPlay: () => _openPlayer(widget.item),
-            onToggleFavorite: () => unawaited(_toggleFavorite(widget.item)),
-          );
+              scroll: _scroll,
+              item: widget.item,
+              episodes: const <LiveGoEpisode>[],
+              backNode: _backNode,
+              playNode: _playNode,
+              favoriteNode: _favoriteNode,
+              retryNode: _retryNode,
+              degraded: true,
+              episodeNodes: _episodeNodes,
+              onBackKey: _backButtonKey,
+              onButtonKey: (event) => _buttonKey(widget.item, LiveGoLocalStore.isFavorite(widget.item), true, event),
+              onEpisodeKey: (i, event) => _episodeKey(widget.item, const <LiveGoEpisode>[], i, event),
+              onPlay: () => _openPlayer(widget.item),
+              onToggleFavorite: () => unawaited(_toggleFavorite(widget.item)),
+              onRetryDetail: _retryDetail,
+            );
           },
           data: (data) {
             final detail = data.detail;
@@ -303,12 +326,15 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
               backNode: _backNode,
               playNode: _playNode,
               favoriteNode: _favoriteNode,
+              retryNode: _retryNode,
+              degraded: false,
               episodeNodes: _episodeNodes,
               onBackKey: _backButtonKey,
-              onButtonKey: (event) => _buttonKey(detail, LiveGoLocalStore.isFavorite(detail), event),
+              onButtonKey: (event) => _buttonKey(detail, LiveGoLocalStore.isFavorite(detail), false, event),
               onEpisodeKey: (i, event) => _episodeKey(detail, episodes, i, event),
               onPlay: () => _openPlayer(detail),
               onToggleFavorite: () => unawaited(_toggleFavorite(detail)),
+              onRetryDetail: _retryDetail,
             );
           },
         ),
@@ -342,12 +368,15 @@ class _DetailBody extends StatelessWidget {
   final FocusNode backNode;
   final FocusNode playNode;
   final FocusNode favoriteNode;
+  final FocusNode retryNode;
+  final bool degraded;
   final List<FocusNode> episodeNodes;
   final FocusOnKeyEventCallback onBackKey;
   final KeyEventResult Function(KeyEvent event) onButtonKey;
   final KeyEventResult Function(int index, KeyEvent event) onEpisodeKey;
   final VoidCallback onPlay;
   final VoidCallback onToggleFavorite;
+  final VoidCallback onRetryDetail;
 
   const _DetailBody({
     required this.scroll,
@@ -356,12 +385,15 @@ class _DetailBody extends StatelessWidget {
     required this.backNode,
     required this.playNode,
     required this.favoriteNode,
+    required this.retryNode,
+    required this.degraded,
     required this.episodeNodes,
     required this.onBackKey,
     required this.onButtonKey,
     required this.onEpisodeKey,
     required this.onPlay,
     required this.onToggleFavorite,
+    required this.onRetryDetail,
   });
 
   @override
@@ -429,6 +461,10 @@ class _DetailBody extends StatelessWidget {
                             _InfoPill(Icons.star_rounded, item.rating.toStringAsFixed(1)),
                           ],
                         ),
+                        if (degraded) ...[
+                          const SizedBox(height: 14),
+                          const _DetailDegradedNotice(),
+                        ],
                         const SizedBox(height: 18),
                         Text(
                           item.description.trim().isEmpty ? 'Deskripsi belum tersedia dari API.' : item.description.trim(),
