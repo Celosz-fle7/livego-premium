@@ -110,7 +110,18 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     LiveGoAnalytics.play(detail.platformSlug, detail.id, detail.title, episodeNumber);
     widget.onPlayerRouteOpen?.call();
     Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: _episodeItem(detail, episode))))
+        .push(
+          PageRouteBuilder<void>(
+            opaque: true,
+            barrierColor: Colors.black,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, __, ___) => ColoredBox(
+              color: Colors.black,
+              child: TvPlayerScreen(item: _episodeItem(detail, episode)),
+            ),
+          ),
+        )
         .whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
