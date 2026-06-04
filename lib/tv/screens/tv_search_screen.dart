@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
 import '../models/tv_zone.dart';
+import '../navigation/tv_detail_route.dart';
 import '../providers/tv_search_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
-import '../navigation/tv_detail_route.dart';
 
 class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -36,42 +36,40 @@ class TvSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scroll = ScrollController();
   final TextEditingController _controller = TextEditingController();
-  late final FocusNode _searchNode;
-  final List<FocusNode> _resultNodes = [];
-
+  final FocusNode _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-input');
+  final List<FocusNode> _resultNodes = <FocusNode>[];
   TvZone _zone = TvZone.list;
-  int _lastGrid = 0;
-  bool _openingPlayer = false;
+  int _gridIndex = 0;
+  bool _openingDetail = false;
 
   @override
   void initState() {
     super.initState();
-    _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-field');
-    WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06, throttle: false));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusInput(throttle: false));
   }
 
   @override
   void didUpdateWidget(covariant TvSearchScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => tvFocus(_searchNode, alignment: 0.06, throttle: false));
+    if (widget.focusTicket > 0 && widget.focusTicket != oldWidget.focusTicket) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusInput(throttle: false));
     }
   }
 
   @override
   void dispose() {
+    _searchNode.dispose();
     for (final node in _resultNodes) {
       node.dispose();
     }
-    _searchNode.dispose();
     _controller.dispose();
-    _scrollController.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  void _syncResultNodes(int count) {
+  void _syncNodes(int count) {
     while (_resultNodes.length < count) {
       _resultNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-search-result-${_resultNodes.length}'));
     }
@@ -82,48 +80,37 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
 
   int _safe(int value) {
     if (_resultNodes.isEmpty) return 0;
-    if (value < 0) return 0;
-    final max = _resultNodes.length - 1;
-    return value > max ? max : value;
+    return value.clamp(0, _resultNodes.length - 1).toInt();
   }
 
-  bool _isSelect(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.space;
+  bool _focusInput({bool throttle = true}) {
+    if (_searchNode.context == null) return false;
+    final ok = tvFocus(_searchNode, alignment: 0.06, throttle: throttle);
+    if (ok) _zone = TvZone.list;
+    return ok;
   }
 
-  bool _isBack(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.goBack || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack;
-  }
-
-  void _moveToNav() {
-    _zone = TvZone.nav;
-    if (widget.onMoveToNav != null) {
-      widget.onMoveToNav?.call();
-    } else if (Navigator.of(context).canPop()) {
-      Navigator.of(context).maybePop();
+  bool _focusGrid(int index, {bool throttle = true}) {
+    if (_resultNodes.isEmpty) return false;
+    final target = _safe(index);
+    final ok = tvFocusGrid(_resultNodes[target], throttle: throttle);
+    if (ok) {
+      _zone = TvZone.grid;
+      _gridIndex = target;
     }
-  }
-
-  void _backToNav() {
-    _zone = TvZone.nav;
-    if (widget.onBackToNav != null) {
-      widget.onBackToNav?.call();
-    } else {
-      _moveToNav();
-    }
+    return ok;
   }
 
   void _handleBack() {
     if (_zone == TvZone.grid) {
-      _zone = TvZone.list;
-      tvFocus(_searchNode, alignment: 0.06, throttle: false);
+      _focusInput(throttle: false);
       return;
     }
-    _backToNav();
+    widget.onBackToNav?.call();
   }
 
-  Future<void> _search(String value) async {
-    _lastGrid = 0;
+  Future<void> _submitSearch(String value) async {
+    _gridIndex = 0;
     await ref.read(tvSearchProvider.notifier).search(value);
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -131,49 +118,46 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       if (_resultNodes.isNotEmpty) {
         _focusGrid(0, throttle: false);
       } else {
-        tvFocus(_searchNode, alignment: 0.06, throttle: false);
+        _focusInput(throttle: false);
       }
     });
   }
 
-  void _focusGrid(int index, {bool throttle = true}) {
-    if (_resultNodes.isEmpty) return;
-    _zone = TvZone.grid;
-    _lastGrid = _safe(index);
-    tvFocusGrid(_resultNodes[_lastGrid], throttle: throttle);
-  }
-
-  void _open(ContentItem item) {
-    if (_openingPlayer || !mounted) return;
-    _openingPlayer = true;
+  void _openDetail(ContentItem item) {
+    if (_openingDetail || !mounted) return;
+    _openingDetail = true;
     TvDetailRoute.open(
       context,
       item: item,
       onPlayerRouteOpen: widget.onPlayerRouteOpen,
       onPlayerRouteClosed: widget.onPlayerRouteClosed,
     ).whenComplete(() {
-      _openingPlayer = false;
+      _openingDetail = false;
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _resultNodes.isNotEmpty) _focusGrid(_lastGrid, throttle: false);
+        if (_resultNodes.isNotEmpty) {
+          _focusGrid(_gridIndex, throttle: false);
+        } else {
+          _focusInput(throttle: false);
+        }
       });
     });
   }
 
-  KeyEventResult _searchKey(FocusNode node, KeyEvent event) {
+  KeyEventResult _inputKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
+      widget.onMoveToNav?.call();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_resultNodes.isNotEmpty) _focusGrid(_lastGrid);
-      return KeyEventResult.handled;
-    }
-    if (_isBack(key)) {
-      _backToNav();
+      if (_resultNodes.isNotEmpty) _focusGrid(_gridIndex);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -183,44 +167,41 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
-    final col = index % columns;
-    final row = index ~/ columns;
-
+    final current = _safe(index);
+    _gridIndex = current;
+    final row = current ~/ columns;
+    final col = current % columns;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (col == 0) {
-        _lastGrid = index;
-        _moveToNav();
+        widget.onMoveToNav?.call();
       } else {
-        _focusGrid(index - 1);
+        _focusGrid(current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (index < _resultNodes.length - 1) _focusGrid(index + 1);
+      if (current < _resultNodes.length - 1) _focusGrid(current + 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        _zone = TvZone.list;
-        tvFocus(_searchNode, alignment: 0.06, throttle: false);
+        _focusInput(throttle: false);
       } else {
-        _focusGrid(index - columns);
+        _focusGrid(current - columns);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      final next = index + columns;
+      final next = current + columns;
       if (next < _resultNodes.length) _focusGrid(next);
       return KeyEventResult.handled;
     }
-    if (_isSelect(key)) {
-      _lastGrid = index;
-      _open(item);
-      return KeyEventResult.handled;
-    }
-    if (_isBack(key)) {
-      _lastGrid = index;
-      _handleBack();
+    if (tvIsSelectKey(key)) {
+      _openDetail(item);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -230,10 +211,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Widget build(BuildContext context) {
     final search = ref.watch(tvSearchProvider);
     final results = search.results;
-    _syncResultNodes(results.length);
-    if (_controller.text.trim() != search.query && !_searchNode.hasFocus) {
+    _syncNodes(results.length);
+    if (!_searchNode.hasFocus && _controller.text.trim() != search.query) {
       _controller.text = search.query;
     }
+
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.goBack): _SearchBackIntent(),
@@ -252,24 +234,22 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
             final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
             final padding = TvReachability.contentPadding;
             return SafeArea(
+              top: true,
+              bottom: true,
               child: CustomScrollView(
-                controller: _scrollController,
+                controller: _scroll,
                 cacheExtent: 1200,
                 slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate.fixed([
-                        const TvScreenHeader(
-                          title: 'Pencarian',
-                          subtitle: 'Cari semua sumber aktif LiveGo.',
-                          icon: Icons.search_rounded,
-                        ),
+                        const TvScreenHeader(title: 'Pencarian', subtitle: 'Cari semua sumber aktif LiveGo.', icon: Icons.search_rounded),
                         const SizedBox(height: 14),
                         Focus(
-                          canRequestFocus: false,
+                          focusNode: _searchNode,
                           skipTraversal: true,
-                          onKeyEvent: _searchKey,
+                          onKeyEvent: _inputKey,
                           child: ListenableBuilder(
                             listenable: _searchNode,
                             builder: (context, _) {
@@ -285,7 +265,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                   focusNode: _searchNode,
                                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                                   textInputAction: TextInputAction.search,
-                                  onSubmitted: _search,
+                                  onSubmitted: _submitSearch,
                                   onChanged: (v) => ref.read(tvSearchProvider.notifier).setDraft(v),
                                   decoration: InputDecoration(
                                     hintText: 'Cari drama, CEO, cinta, balas dendam...',
@@ -296,7 +276,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                         : IconButton(
                                             onPressed: () {
                                               _controller.clear();
-                                              _search('');
+                                              _submitSearch('');
                                             },
                                             icon: const Icon(Icons.close_rounded, color: Colors.white70),
                                           ),
@@ -326,7 +306,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             children: [
                               Text('${results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                               const Spacer(),
-                              Text('↑ input • OK buka • ← navbar • Back navbar', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                              Text('↑ input • OK detail • ← navbar • Back input', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -343,11 +323,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                       mainAxisExtent: 224,
                       onFocus: (i) {
                         _zone = TvZone.grid;
-                        _lastGrid = i;
+                        _gridIndex = i;
                       },
                       onTap: (i, item) {
-                        _lastGrid = i;
-                        _open(item);
+                        _gridIndex = i;
+                        _openDetail(item);
                       },
                       onKey: (i, item, node, event) => _gridKey(i, item, columns, event),
                     ),
