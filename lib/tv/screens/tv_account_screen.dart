@@ -85,41 +85,12 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     return value.clamp(0, _nodes.length - 1).toInt();
   }
 
-  bool _focusRow(
-    int index, {
-    bool throttle = true,
-    bool anchor = false,
-    double alignment = 0.50,
-  }) {
+  bool _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return false;
     final target = _safe(index);
-    final node = _nodes[target];
-    final ok = tvFocusComfort(node, topMargin: 72, bottomMargin: 120, throttle: throttle);
-    if (ok) {
-      _index = target;
-      if (anchor) _anchorRow(node, alignment: alignment);
-    }
+    final ok = tvFocusComfort(_nodes[target], topMargin: 104, bottomMargin: 180, throttle: throttle);
+    if (ok) _index = target;
     return ok;
-  }
-
-  void _anchorRow(FocusNode node, {required double alignment}) {
-    // Account is a plain vertical ListView. When UP/DOWN changes rows, the list
-    // should follow the focused row directly instead of waiting for reveal edge.
-    // This is only used for remote vertical row movement, not for restore/tap.
-    void run() {
-      if (!mounted || node.context == null || !node.hasFocus) return;
-      try {
-        Scrollable.ensureVisible(
-          node.context!,
-          alignment: alignment,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-          duration: Duration.zero,
-          curve: Curves.linear,
-        );
-      } catch (_) {}
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => run());
   }
 
   void _backToNav() {
@@ -182,11 +153,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (current > 0) _focusRow(current - 1, anchor: true, alignment: 0.42);
+      if (current > 0) _focusRow(current - 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (current < _nodes.length - 1) _focusRow(current + 1, anchor: true, alignment: 0.56);
+      if (current < _nodes.length - 1) _focusRow(current + 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -340,12 +311,7 @@ class _AccountActionCard extends StatelessWidget {
               duration: TvFocusStyle.fast,
               constraints: const BoxConstraints(minHeight: 78),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: 1.5),
-                boxShadow: null,
-              ),
+              decoration: BoxDecoration(color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92), borderRadius: BorderRadius.circular(22), border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1), boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null),
               child: Row(
                 children: [
                   Container(width: 46, height: 46, decoration: BoxDecoration(gradient: focused ? AppTheme.activeGradient : null, color: focused ? null : AppTheme.surface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: focused ? Colors.white.withOpacity(0.18) : AppTheme.borderSoft)), child: Icon(item.icon, color: focused ? Colors.white : AppTheme.cyan, size: 25)),
