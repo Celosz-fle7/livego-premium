@@ -88,7 +88,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   bool _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return false;
     final target = _safe(index);
-    final ok = tvFocusComfort(_nodes[target], topMargin: 104, bottomMargin: 180, throttle: throttle);
+    final ok = tvFocusComfort(_nodes[target], topMargin: 72, bottomMargin: 120, throttle: throttle);
     if (ok) _index = target;
     return ok;
   }
@@ -307,11 +307,15 @@ class _AccountActionCard extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(22),
             focusColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: TvFocusStyle.fast,
+            child: Container(
               constraints: const BoxConstraints(minHeight: 78),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92), borderRadius: BorderRadius.circular(22), border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1), boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null),
+              decoration: BoxDecoration(
+                color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: 1.5),
+                boxShadow: null,
+              ),
               child: Row(
                 children: [
                   Container(width: 46, height: 46, decoration: BoxDecoration(gradient: focused ? AppTheme.activeGradient : null, color: focused ? null : AppTheme.surface2, borderRadius: BorderRadius.circular(16), border: Border.all(color: focused ? Colors.white.withOpacity(0.18) : AppTheme.borderSoft)), child: Icon(item.icon, color: focused ? Colors.white : AppTheme.cyan, size: 25)),
