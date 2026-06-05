@@ -36,13 +36,6 @@ class TvAccountMenuData {
 
   static List<TvAccountMenuItem> build() {
     return <TvAccountMenuItem>[
-      const TvAccountMenuItem(
-        icon: Icons.layers_rounded,
-        title: 'Kelola Sumber Data',
-        subtitle: 'Atur Anichin, bahasa, kategori, dan platform aktif.',
-        badge: 'SOURCE',
-        action: TvAccountAction.sourceManager,
-      ),
       TvAccountMenuItem(
         icon: Icons.history_rounded,
         title: 'Riwayat Tontonan',
@@ -70,6 +63,13 @@ class TvAccountMenuData {
         subtitle: 'Mode tampilan, grid, ukuran poster, dan preferensi layar.',
         badge: 'DISPLAY',
         action: TvAccountAction.displaySettings,
+      ),
+      const TvAccountMenuItem(
+        icon: Icons.layers_rounded,
+        title: 'Kelola Sumber Data',
+        subtitle: 'Atur Anichin, bahasa, kategori, dan platform aktif.',
+        badge: 'SOURCE',
+        action: TvAccountAction.sourceManager,
       ),
       const TvAccountMenuItem(
         icon: Icons.info_outline_rounded,

@@ -434,15 +434,13 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (_navHasFocus) {
       _suppressBack(650);
       _holdRootFocusDuringBackHandoff();
-      if (_index == TvNavIndex.home) {
-        setState(() => _navMode = TvSideNavMode.hidden);
-        _syncOwner();
-        _restoreActiveContentAfterBack(banner: true);
-      } else {
-        setState(() => _navMode = TvSideNavMode.hidden);
-        _syncOwner();
-        _restoreActiveContentAfterBack();
-      }
+
+      // BACK while the navbar owns focus must return to the active screen's
+      // last remembered focus. Do not force Home to Banner, otherwise entering
+      // navbar from Grid/Platform makes BACK feel like it forgot the source.
+      setState(() => _navMode = TvSideNavMode.hidden);
+      _syncOwner();
+      _restoreActiveContentAfterBack();
       return;
     }
     if (_index == TvNavIndex.home) {
