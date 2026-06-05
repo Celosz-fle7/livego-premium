@@ -14,7 +14,7 @@ class LiveGoImageCacheManager {
     Config(
       key,
       stalePeriod: const Duration(days: 7),
-      maxNrOfCacheObjects: 2400,
+      maxNrOfCacheObjects: 1200,
       repo: JsonCacheInfoRepository(databaseName: key),
       fileService: HttpFileService(),
     ),
@@ -98,7 +98,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
     final body = widget.borderRadius == null
         ? image
         : ClipRRect(borderRadius: widget.borderRadius!, child: image);
-    return RepaintBoundary(child: body);
+    return body;
   }
 
   void _scheduleHighQualityLoad() {
@@ -107,12 +107,19 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return;
     }
 
+    // TV grid thumbnails stay low-only. They are many, small, and usually
+    // non-focused; upgrading all of them to high quality wastes RAM/GPU budget.
+    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
+      _loadHighQuality = false;
+      return;
+    }
+
     final baseDelayMs = ImageQualityConfig.progressiveDelayMsFor(widget.role);
     // TV remote focus must stay responsive. Let low-res posters settle first,
     // then upgrade quality a little later so image decoding does not fight
     // rapid UP/DOWN/LEFT/RIGHT focus moves.
     final jitter = widget.tv ? _tvDecodeJitterMs(widget.url, widget.role) : 0;
-    final delayMs = widget.tv ? baseDelayMs + 280 + jitter : baseDelayMs;
+    final delayMs = widget.tv ? baseDelayMs + 620 + jitter : baseDelayMs;
     _highQualityTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!mounted) return;
       setState(() => _loadHighQuality = true);
@@ -127,6 +134,18 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
         tv: widget.tv,
       ),
     );
+
+    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
+      return _networkImage(
+        context,
+        cleanUrl,
+        decodeWidth: lowWidth,
+        cacheSuffix: 'tv-low-$lowWidth',
+        showPlaceholder: true,
+        fadeInDuration: Duration.zero,
+      );
+    }
+
     final highWidth = _decodeWidth(context);
 
     if (lowWidth == highWidth) {
@@ -226,13 +245,13 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
 
     switch (widget.role) {
       case LiveGoImageRole.thumbnail:
-        return decodeWidth.clamp(120, 320).toInt();
+        return decodeWidth.clamp(120, 240).toInt();
       case LiveGoImageRole.poster:
-        return decodeWidth.clamp(160, 400).toInt();
+        return decodeWidth.clamp(150, 320).toInt();
       case LiveGoImageRole.detail:
-        return decodeWidth.clamp(240, 640).toInt();
+        return decodeWidth.clamp(220, 560).toInt();
       case LiveGoImageRole.banner:
-        return decodeWidth.clamp(320, 960).toInt();
+        return decodeWidth.clamp(300, 860).toInt();
     }
   }
 
@@ -250,7 +269,8 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return maxConfigured;
     }
 
-    final dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.5).toDouble();
+    final maxDpr = widget.tv ? 1.45 : 2.5;
+    final dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, maxDpr).toDouble();
     final px = (logicalWidth * dpr).round();
     return _clampInt(px, ImageQualityConfig.minDecodeWidth, maxConfigured);
   }

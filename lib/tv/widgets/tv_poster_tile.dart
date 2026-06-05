@@ -5,7 +5,6 @@ import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
-import '../theme/tv_focus_style.dart';
 
 /// Lightweight reusable TV poster tile.
 ///
@@ -30,12 +29,11 @@ class TvPosterTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: ListenableBuilder(
-        listenable: focusNode,
-        builder: (context, _) {
-          final focused = focusNode.hasFocus;
-          return Focus(
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return Focus(
             focusNode: focusNode,
             skipTraversal: true,
             autofocus: false,
@@ -55,12 +53,9 @@ class TvPosterTile extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.42),
+                          color: focused ? AppTheme.cyan : AppTheme.borderSoft.withOpacity(0.42),
                           width: focused ? 2.0 : 0.6,
                         ),
-                        boxShadow: focused
-                            ? [TvFocusStyle.glow(0.065, 5)]
-                            : null,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(15),
@@ -82,15 +77,6 @@ class TvPosterTile extends StatelessWidget {
                                     role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
                                     tv: true,
                                   ),
-                            const DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [Colors.transparent, Color(0xCC010409)],
-                                ),
-                              ),
-                            ),
                             Positioned(top: 8, left: 8, child: _TvPosterBadge(text: '${item.episodes} Ep')),
                             if (item.updated) const Positioned(top: 8, right: 8, child: _TvPosterBadge(text: 'UPDATE')),
                             Positioned(right: 8, bottom: 12, child: _TvPosterBadge(text: item.rating.toStringAsFixed(1))),
@@ -116,9 +102,8 @@ class TvPosterTile extends StatelessWidget {
                 ],
               ),
             ),
-          );
-        },
-      ),
+        );
+      },
     );
   }
 }
@@ -134,7 +119,7 @@ class _TvPosterBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.86),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: TvFocusStyle.focusBlue.withOpacity(0.20)),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
       ),
       child: Text(
         text,
