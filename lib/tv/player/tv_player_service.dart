@@ -4,6 +4,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../../models/stream_info.dart';
+import '../../services/player/playback_contract.dart';
 import '../../services/player/playback_resolver.dart';
 import '../../services/player/playback_timeout_config.dart';
 
@@ -25,7 +26,7 @@ class TvPlayerStreamResolveResult {
 ///
 /// VideoPlayerController ownership still stays in TvPlayerScreen for stability.
 /// Stream resolving/fallback is owned here so the screen does not decide API order.
-class TvPlayerService {
+class TvPlayerService implements PlaybackContract {
   const TvPlayerService();
 
   Future<TvPlayerStreamResolveResult> resolveStream(
@@ -101,7 +102,11 @@ class TvPlayerService {
     return result;
   }
 
-  Future<StreamInfo> fastStream(
+  /// Stable fast stream entry for TV Player.
+  ///
+  /// API/provider migrations must keep returning normalized StreamInfo here.
+  @override
+  Future<StreamInfo> fastStreamInfo(
     ContentItem item, {
     String? chapterId,
     Duration timeout = const Duration(seconds: 7),
@@ -109,6 +114,19 @@ class TvPlayerService {
     return LiveGoCatalog.fastStreamInfo(item, chapterId: chapterId, timeout: timeout);
   }
 
+  /// Backward-compatible alias used by older player code.
+  Future<StreamInfo> fastStream(
+    ContentItem item, {
+    String? chapterId,
+    Duration timeout = const Duration(seconds: 7),
+  }) {
+    return fastStreamInfo(item, chapterId: chapterId, timeout: timeout);
+  }
+
+  /// Stable stream entry for TV Player.
+  ///
+  /// Player UI must not know API baseUrl/key/raw JSON/endpoint details.
+  @override
   Future<StreamInfo> streamInfo(ContentItem item, {String? chapterId}) {
     return LiveGoCatalog.streamInfo(item, chapterId: chapterId);
   }
