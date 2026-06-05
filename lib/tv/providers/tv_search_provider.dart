@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../services/content/content_health_service.dart';
+import '../cache/tv_ram_cache.dart';
 
 class TvSearchState {
   final String query;
@@ -46,6 +47,18 @@ class TvSearchController extends StateNotifier<TvSearchState> {
       return;
     }
 
+    final cacheKey = TvRamCache.key('search', [clean]);
+    final cached = TvRamCache.instance.read<List<ContentItem>>(cacheKey);
+    if (cached != null) {
+      state = TvSearchState(
+        query: clean,
+        loading: false,
+        hasError: false,
+        results: cached,
+      );
+      return;
+    }
+
     // Search must never feel like it freezes the TV. Keep the old result list
     // while a new query is loading so remote focus has something stable to own.
     state = state.copyWith(query: clean, loading: true, hasError: false);
@@ -58,11 +71,15 @@ class TvSearchController extends StateNotifier<TvSearchState> {
       rows = const <ContentItem>[];
     }
     if (ticket != _ticket) return;
+    final cleanRows = ContentHealthService.filterPlayable(rows);
+    if (cleanRows.isNotEmpty && !hasError) {
+      TvRamCache.instance.write(cacheKey, cleanRows, ttl: TvRamCache.searchTtl);
+    }
     state = TvSearchState(
       query: clean,
       loading: false,
       hasError: hasError,
-      results: ContentHealthService.filterPlayable(rows),
+      results: cleanRows,
     );
   }
 }

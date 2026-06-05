@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/livego_catalog.dart';
 import '../../../models/content_item.dart';
 import '../../../services/network/livego_network_status.dart';
+import '../../cache/tv_ram_cache.dart';
 
 /// Cache-first TV Home content state.
 ///
@@ -78,7 +79,19 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     _lastPlatform = platform;
     _lastCategory = selectedCategory;
     final token = ++_loadToken;
-    if (clearPrevious) {
+    final ramKey = TvRamCache.key('home', [platform, selectedCategory]);
+    final ramState = clearPrevious ? null : TvRamCache.instance.read<TvHomeContentState>(ramKey);
+    if (ramState != null && ramState.items.isNotEmpty) {
+      final next = ramState.copyWith(
+        loading: false,
+        refreshing: true,
+        hasError: false,
+        fromCache: true,
+        offline: false,
+      );
+      _lastGoodState = next;
+      state = next;
+    } else if (clearPrevious) {
       state = const TvHomeContentState(loading: true);
     } else if (state.items.isEmpty) {
       state = state.copyWith(loading: true, refreshing: false, hasError: false, offline: false);
@@ -126,6 +139,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
           fromCache: true,
         );
         _lastGoodState = next;
+        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
         state = next;
         unawaited(_refreshInBackground(platform, selectedCategory, token));
         return;
@@ -145,6 +159,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
         LiveGoNetworkStatus.markOnline();
         final next = TvHomeContentState(hero: items.first, items: items, loading: false);
         _lastGoodState = next;
+        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
         state = next;
         return;
       }
@@ -169,6 +184,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
           fromCache: true,
         );
         _lastGoodState = next;
+        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
         state = next;
         return;
       }
@@ -214,6 +230,11 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       LiveGoNetworkStatus.markOnline();
       final next = TvHomeContentState(hero: fresh.first, items: fresh, loading: false);
       _lastGoodState = next;
+      TvRamCache.instance.write(
+        TvRamCache.key('home', [platform, selectedCategory]),
+        next,
+        ttl: TvRamCache.homeTtl,
+      );
       state = next;
     } catch (e) {
       debugPrint('TV HOME BACKGROUND REFRESH ERROR: $e');
