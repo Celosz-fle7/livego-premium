@@ -157,6 +157,15 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       case TvAccountAction.sourceManager:
         _push(const TvSourceManagerScreen());
         break;
+      case TvAccountAction.history:
+        widget.onOpenNavIndex?.call(2);
+        break;
+      case TvAccountAction.favorite:
+        widget.onOpenNavIndex?.call(3);
+        break;
+      case TvAccountAction.download:
+        widget.onOpenNavIndex?.call(1);
+        break;
       case TvAccountAction.displaySettings:
         _push(const TvSettingsScreen());
         break;

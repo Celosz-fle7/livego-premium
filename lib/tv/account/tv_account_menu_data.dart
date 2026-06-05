@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 enum TvAccountAction {
   sourceManager,
+  history,
+  favorite,
+  download,
   displaySettings,
   about,
   update,
