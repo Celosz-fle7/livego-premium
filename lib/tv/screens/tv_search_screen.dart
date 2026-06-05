@@ -148,6 +148,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final search = ref.read(tvSearchProvider);
+      if (search.loading) {
+        _focusInput(throttle: false);
+        return;
+      }
       if (_resultNodes.isNotEmpty) {
         _focusGrid(0, throttle: false);
       } else {
@@ -190,7 +195,10 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_resultNodes.isNotEmpty) {
+      final search = ref.read(tvSearchProvider);
+      if (search.loading) {
+        _focusInput(throttle: false);
+      } else if (_resultNodes.isNotEmpty) {
         _focusGrid(_gridIndex);
       } else {
         _focusEmpty();
@@ -279,7 +287,13 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Widget build(BuildContext context) {
     final search = ref.watch(tvSearchProvider);
     final results = search.results;
-    _syncNodes(results.length);
+    final visibleResults = search.loading ? const <ContentItem>[] : results;
+    _syncNodes(visibleResults.length);
+    if (visibleResults.isEmpty) {
+      _gridIndex = 0;
+    } else if (_gridIndex >= visibleResults.length) {
+      _gridIndex = visibleResults.length - 1;
+    }
     if (!_searchNode.hasFocus && _controller.text.trim() != search.query) {
       _controller.text = search.query;
     }
@@ -382,7 +396,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                               ),
                             ),
                           )
-                        else if (results.isEmpty)
+                        else if (visibleResults.isEmpty)
                           ListenableBuilder(
                             listenable: _emptyNode,
                             builder: (context, _) {
@@ -411,7 +425,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                         else ...[
                           Row(
                             children: [
-                              Text('${results.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                              Text('${visibleResults.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                               const Spacer(),
                               Text('↑ input • OK detail • ← navbar • Back input', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                             ],
@@ -421,9 +435,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                       ]),
                     ),
                   ),
-                  if (!search.loading && results.isNotEmpty)
+                  if (visibleResults.isNotEmpty)
                     TvPosterGrid(
-                      items: results,
+                      items: visibleResults,
                       nodes: _resultNodes,
                       columns: columns,
                       padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
