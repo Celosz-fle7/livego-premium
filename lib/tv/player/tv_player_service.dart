@@ -82,23 +82,10 @@ class TvPlayerService implements PlaybackContract {
     );
     if (result.hasStream) return result;
 
-    // 4) Last detail warm-up fallback. Some APIs need detail/episode cache filled
-    // before a stream becomes available.
-    await wrap(
-      'detailWarmup',
-      () async {
-        await LiveGoCatalog.detail(item).timeout(PlaybackTimeoutConfig.detailBackground);
-        return StreamInfo.empty;
-      },
-    );
-
-    result = await wrap(
-      'postDetailStreamInfo',
-      () => LiveGoCatalog.streamInfo(item, chapterId: chapterId)
-          .timeout(const Duration(seconds: 8), onTimeout: () => StreamInfo.empty),
-    );
-    if (result.hasStream) return result;
-
+    // TV Player must not block the remote for slow detail/all-episode warm-up.
+    // If the three direct stream paths fail, return quickly and let the player
+    // error/skip flow handle it. API detail/episode warm-up belongs outside
+    // the active video startup path.
     return result;
   }
 
