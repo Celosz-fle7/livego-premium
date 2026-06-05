@@ -215,3 +215,15 @@ Aturan:
 - Jika native video texture belum siap, tampil loading overlay ringan di atas black surface.
 - Jangan render backdrop/image saat player startup.
 - Jangan padding video surface; safe margin hanya overlay.
+
+## Native Texture Shield
+
+Jika blank putih masih muncul walaupun VideoPlayerController sudah initialized, penyebabnya biasanya native texture Android TV belum menggambar frame pertama.
+
+Aturan tambahan:
+- Setelah controller ready, VideoPlayer boleh dirender di belakang shield hitam.
+- Shield hitam tetap di atas texture sampai posisi video mulai bergerak.
+- Shield wajib dilepas saat first moving frame terdeteksi.
+- Shield punya batas aman pendek agar tidak jadi overlay permanen.
+- Shield timer wajib di-cancel saat dispose.
+- Shield tidak boleh memengaruhi remote, BACK, API, atau request stream.

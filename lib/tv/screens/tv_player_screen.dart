@@ -53,6 +53,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _loading = true;
   bool _fitCover = false;
   bool _autoAdvancing = false;
+  bool _videoSurfaceShield = true;
   StreamInfo _streamInfo = StreamInfo.empty;
   String _currentStreamUrl = '';
   int _selectedSubtitleIndex = -1;
@@ -98,6 +99,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Timer? _autoHideTimer;
   Timer? _statusTimer;
   Timer? _seekDebounceTimer;
+  Timer? _videoSurfaceShieldTimer;
   Duration? _pendingSeekTarget;
   String _statusMessage = '';
 
@@ -116,6 +118,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const double _playerToastBottomClean = 48;
   static const double _playerToastBottomControls = 184;
   static const int _overlayCursorMoveGuardMs = 72;
+  static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
+  static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
 
 
   List<String> get _qualityChoices {
@@ -269,10 +273,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _lastSavedProgressSecond = -1;
 
     setState(() {
+      _videoSurfaceShield = true;
       _loading = true;
       _error = '';
       _detail = _detail ?? playable;
     });
+    _armVideoSurfaceShield();
 
     try {
       final requestChapter = _isDobdaPlayer ? playable.chapterId : '$ep';
@@ -379,6 +385,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     controller.addListener(() {
       if (!mounted || !controller.value.isInitialized || _controller != controller) return;
       final value = controller.value;
+      if (_videoSurfaceShield && value.position >= _videoFirstFrameMinPosition) {
+        _releaseVideoSurfaceShield();
+      }
       _syncSubtitleAt(value.position);
       final second = value.position.inSeconds;
       if (second > 0 && second % 5 == 0 && second != _lastSavedProgressSecond) {
@@ -462,6 +471,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         await controller.dispose();
         return;
       }
+
+      _armVideoSurfaceShield();
 
       if (autoplay) {
         await controller.play();
@@ -739,6 +750,29 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   bool get _isPlayerErrorState => !_loading && _error.isNotEmpty && !_hasReadyController;
+
+  void _armVideoSurfaceShield({bool notify = false}) {
+    _videoSurfaceShieldTimer?.cancel();
+    _videoSurfaceShield = true;
+    if (notify && mounted) setState(() {});
+    _videoSurfaceShieldTimer = Timer(_videoSurfaceShieldMax, () {
+      if (!mounted) return;
+      final c = _controller;
+      if (c == null || !c.value.isInitialized || c.value.isBuffering) return;
+      _releaseVideoSurfaceShield();
+    });
+  }
+
+  void _releaseVideoSurfaceShield() {
+    if (!_videoSurfaceShield) return;
+    _videoSurfaceShieldTimer?.cancel();
+    _videoSurfaceShieldTimer = null;
+    if (!mounted) {
+      _videoSurfaceShield = false;
+      return;
+    }
+    setState(() => _videoSurfaceShield = false);
+  }
 
   Future<void> _retryCurrentEpisode() async {
     if (_loading) return;
@@ -1665,7 +1699,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
     final renderable = _hasRenderableVideo(controller);
-    final showStartupGuard = _loading || (ready && !renderable && !_isPlayerErrorState);
+    final showStartupGuard = _loading ||
+        (ready && _videoSurfaceShield) ||
+        (ready && !renderable && !_isPlayerErrorState);
 
     return PopScope(
       canPop: false,
@@ -1690,11 +1726,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               else
                 const ColoredBox(color: Colors.black),
               Container(color: Colors.black.withOpacity(renderable ? 0.18 : 0.78)),
+              if (ready && _videoSurfaceShield)
+                const ColoredBox(color: Colors.black),
               if (showStartupGuard)
                 TvPlayerLoadingOverlay(
                   title: item.title,
                   episode: _episode,
-                  message: _error.isNotEmpty ? _error : (ready ? 'Menyiapkan layar video...' : 'Menyiapkan stream video...'),
+                  message: _error.isNotEmpty ? _error : (ready ? 'Menyiapkan frame video...' : 'Menyiapkan stream video...'),
                 ),
               if (_statusMessage.isNotEmpty)
                 Positioned(
