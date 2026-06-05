@@ -86,9 +86,7 @@ class TvSideNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: AnimatedContainer(
-        duration: TvFocusStyle.normal,
-        curve: Curves.linear,
+      child: SizedBox(
         width: _visible ? 80 : 8,
         child: _visible ? _buildRail() : const _HiddenGrip(active: true),
       ),
@@ -101,20 +99,12 @@ class TvSideNav extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(7, 30, 7, 30),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 7),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xF2071326), Color(0xF2010409)],
-        ),
+        color: const Color(0xF2071326),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: _focused ? TvFocusStyle.focusBlue.withOpacity(0.56) : AppTheme.borderSoft,
-          width: _focused ? 1.4 : 1,
+          color: _focused ? TvFocusStyle.focusBlue.withOpacity(0.48) : AppTheme.borderSoft,
+          width: _focused ? 1.2 : 1,
         ),
-        boxShadow: [
-          const BoxShadow(color: Colors.black54, blurRadius: 10),
-          if (_focused) TvFocusStyle.glow(0.07, 6),
-        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -153,13 +143,12 @@ class _HiddenGrip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: AnimatedContainer(
-        duration: TvFocusStyle.fast,
+      child: Container(
         width: 2,
-        height: active ? 88 : 56,
+        height: 88,
         margin: const EdgeInsets.only(left: 1),
         decoration: BoxDecoration(
-          color: active ? TvFocusStyle.focusBlue.withOpacity(0.18) : Colors.white.withOpacity(0.035),
+          color: TvFocusStyle.focusBlue.withOpacity(0.16),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -196,49 +185,34 @@ class _NavIconButton extends StatelessWidget {
         final focused = focusNode.hasFocus;
         final selected = focused || active;
         final size = 50.0;
-        return Tooltip(
-          message: label,
-          waitDuration: const Duration(milliseconds: 200),
-          child: Focus(
-            focusNode: focusNode,
-            skipTraversal: true,
-            autofocus: false,
-            onKeyEvent: onKey,
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
-              focusColor: Colors.transparent,
-              child: AnimatedContainer(
-                duration: TvFocusStyle.fast,
-                height: size,
-                width: size,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: selected
-                      ? LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: focused
-                              ? [TvFocusStyle.focusBlue.withOpacity(0.16), AppTheme.surface3.withOpacity(0.96)]
-                              : [AppTheme.surface2, AppTheme.surface],
-                        )
-                      : null,
-                  color: selected ? null : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: focused
-                        ? TvFocusStyle.focusBlue
-                        : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
-                    width: focused ? 2.0 : 1.0,
-                  ),
-                  boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null,
+        return Focus(
+          focusNode: focusNode,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            focusColor: Colors.transparent,
+            child: Container(
+              height: size,
+              width: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? AppTheme.surface2 : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: focused
+                      ? TvFocusStyle.focusBlue
+                      : (active ? TvFocusStyle.focusBlue.withOpacity(0.30) : Colors.transparent),
+                  width: focused ? 2.0 : 1.0,
                 ),
-                child: Icon(
-                  icon,
-                  color: selected ? AppTheme.whiteGlow : Colors.white70,
-                  size: logo ? 24 : 22,
-                ),
+              ),
+              child: Icon(
+                icon,
+                color: selected ? AppTheme.whiteGlow : Colors.white70,
+                size: logo ? 24 : 22,
               ),
             ),
           ),
