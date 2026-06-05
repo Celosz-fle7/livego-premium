@@ -835,11 +835,9 @@ class _SourceRow extends StatelessWidget {
         color: focused && selectedPanel
             ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
             : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
-        width: focused && selectedPanel ? 1.7 : 1,
+        width: 1.3,
       ),
-      boxShadow: focused && selectedPanel
-          ? [TvFocusStyle.glow(0.055, 5)]
-          : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
+      boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 5)],
     );
   }
 
@@ -865,8 +863,7 @@ class _SourceRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Column(
                     children: [
-                      AnimatedContainer(
-                        duration: TvFocusStyle.fast,
+                      Container(
                         padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
                         decoration: _panelDecoration(focused: focused, selectedPanel: !categoryMode),
                         child: Row(
@@ -892,7 +889,8 @@ class _SourceRow extends StatelessWidget {
                                           ),
                                         ),
                                       ),
-                                      if (focused && !categoryMode) _ModeBadge(text: 'OK ON/OFF'),
+                                      // Keep row layout stable while moving remote.
+                                      // Help text is shown globally below the list.
                                     ],
                                   ),
                                   const SizedBox(height: 4),
@@ -922,8 +920,7 @@ class _SourceRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      AnimatedContainer(
-                        duration: TvFocusStyle.fast,
+                      Container(
                         padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
                         decoration: _panelDecoration(focused: focused, selectedPanel: categoryMode),
                         child: Row(
@@ -967,10 +964,7 @@ class _SourceRow extends StatelessWidget {
                             ),
                             if (categories.length > visibleIndexes.length)
                               Icon(Icons.chevron_right_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
-                            if (focused && categoryMode) ...[
-                              const SizedBox(width: 10),
-                              _ModeBadge(text: 'OK PILIH'),
-                            ],
+                            // Keep category row width stable while moving remote.
                           ],
                         ),
                       ),
@@ -1034,9 +1028,9 @@ class _CapabilityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(focused ? 0.14 : 0.08),
+        color: color.withOpacity(0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(focused ? 0.34 : 0.20)),
+        border: Border.all(color: color.withOpacity(0.24)),
       ),
       child: Text(
         text,
@@ -1106,8 +1100,7 @@ class _SwitchPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       width: 84,
       height: 36,
       padding: const EdgeInsets.all(4),
@@ -1115,8 +1108,8 @@ class _SwitchPill extends StatelessWidget {
         gradient: active ? AppTheme.activeGradient : null,
         color: active ? null : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 1.7 : 1),
-        boxShadow: focused ? [TvFocusStyle.glow(0.055, 5)] : null,
+        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: 1.2),
+        boxShadow: null,
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
