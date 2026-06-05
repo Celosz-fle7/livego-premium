@@ -227,3 +227,13 @@ Aturan tambahan:
 - Shield punya batas aman pendek agar tidak jadi overlay permanen.
 - Shield timer wajib di-cancel saat dispose.
 - Shield tidak boleh memengaruhi remote, BACK, API, atau request stream.
+
+## Startup Overlay Priority
+
+Player startup overlay harus punya prioritas jelas:
+
+- Loading overlay hanya tampil jika tidak ada blocking error.
+- Error overlay harus bisa menang walaupun `_loading` masih true saat race singkat.
+- Pesan auto-skip episode seperti "gagal, lanjut Episode" tetap boleh tampil sebagai loading/progress.
+- Native texture shield fallback timer tidak boleh berhenti hanya karena `isBuffering` true pada satu tick.
+- Jika shield fallback timer berhenti tanpa retry, UI bisa terlihat stuck.

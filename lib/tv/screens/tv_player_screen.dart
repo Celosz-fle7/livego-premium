@@ -751,6 +751,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   bool get _isPlayerErrorState => !_loading && _error.isNotEmpty && !_hasReadyController;
 
+  bool _isEpisodeAutoSkipMessage(String message) {
+    return message.toLowerCase().contains('gagal, lanjut episode');
+  }
+
   void _armVideoSurfaceShield({bool notify = false}) {
     _videoSurfaceShieldTimer?.cancel();
     _videoSurfaceShield = true;
@@ -758,7 +762,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _videoSurfaceShieldTimer = Timer(_videoSurfaceShieldMax, () {
       if (!mounted) return;
       final c = _controller;
-      if (c == null || !c.value.isInitialized || c.value.isBuffering) return;
+      if (c == null || !c.value.isInitialized) return;
+
+      // This is a max-time fallback, not a buffering gate. If buffering was true
+      // at the exact timer tick, returning here could leave the black shield and
+      // startup overlay stuck forever with no retry timer.
       _releaseVideoSurfaceShield();
     });
   }
@@ -1699,9 +1707,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
     final renderable = _hasRenderableVideo(controller);
+    final showErrorOverlay = _error.isNotEmpty && !_isEpisodeAutoSkipMessage(_error) && !renderable;
     final showStartupGuard = _loading ||
         (ready && _videoSurfaceShield) ||
         (ready && !renderable && !_isPlayerErrorState);
+    final showLoadingOverlay = !showErrorOverlay && showStartupGuard;
 
     return PopScope(
       canPop: false,
@@ -1728,7 +1738,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               Container(color: Colors.black.withOpacity(renderable ? 0.18 : 0.78)),
               if (ready && _videoSurfaceShield)
                 const ColoredBox(color: Colors.black),
-              if (showStartupGuard)
+              if (showLoadingOverlay)
                 TvPlayerLoadingOverlay(
                   title: item.title,
                   episode: _episode,
@@ -1752,7 +1762,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                     child: Center(child: TvPlayerStatusToast(message: _statusMessage)),
                   ),
                 ),
-              if (!_loading && !ready)
+              if (showErrorOverlay || (!_loading && !ready))
                 TvPlayerErrorOverlay(
                   title: item.title,
                   episode: _episode,
