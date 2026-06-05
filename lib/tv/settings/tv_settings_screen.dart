@@ -181,13 +181,20 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   void _handleBack() {
     if (_ignoreRepeatedBack()) return;
 
-    // Match Source Manager behavior: BACK exits the pushed Settings screen in
-    // one step. Do not first move to the visual header/back button; that made
-    // the screen feel trapped on TV remotes.
-    if (widget.onMoveToNav != null && _zone == TvZone.nav) {
+    // TV BACK ladder:
+    // setting row -> header/back area
+    // header/back area -> Account / Navbar owner
+    if (_zone == TvZone.settings) {
+      setState(() => _zone = TvZone.nav);
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      return;
+    }
+
+    if (widget.onMoveToNav != null) {
       _moveToNav();
       return;
     }
+
     _popScreen();
   }
 
