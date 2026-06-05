@@ -7,6 +7,7 @@ import '../../core/livego_local_store.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../models/tv_zone.dart';
 import '../focus/tv_focus_utils.dart';
+import '../layout/tv_safe_zone.dart';
 
 class TvSettingsScreen extends StatefulWidget {
   final bool showBackButton;
@@ -175,7 +176,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           node.context!,
           duration: Duration.zero,
           curve: Curves.linear,
-          alignment: 0.42,
+          alignment: TvSafeZone.listRevealAlignment,
           alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         );
       } catch (_) {}
@@ -420,16 +421,12 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         },
         child: Scaffold(
           backgroundColor: AppTheme.bgDeep,
-          body: SafeArea(
-            top: true,
-            bottom: true,
-            left: false,
-            right: false,
-            child: DefaultTextStyle.merge(
+          body: DefaultTextStyle.merge(
               style: const TextStyle(decoration: TextDecoration.none),
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(48, 24, 48, 200),
+                padding: TvSafeZone.settings,
+                cacheExtent: TvSafeZone.cacheExtent,
                 children: [
                   _Header(
                     showBackButton: widget.showBackButton,
@@ -454,7 +451,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                   const SizedBox(height: 32),
                 ],
               ),
-            ),
           ),
         ),
       ),

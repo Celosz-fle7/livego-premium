@@ -6,7 +6,7 @@ import '../focus/tv_focus_utils.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
 import 'tv_account_menu_data.dart';
-import 'tv_account_safe_zone.dart';
+import '../layout/tv_safe_zone.dart';
 import 'widgets/tv_account_action_card.dart';
 import 'widgets/tv_account_header.dart';
 
@@ -100,7 +100,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           node.context!,
           duration: Duration.zero,
           curve: Curves.linear,
-          alignment: 0.36,
+          alignment: TvSafeZone.accountRevealAlignment,
           alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
         );
       } catch (_) {}
@@ -263,8 +263,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         },
         child: ListView(
           controller: _scroll,
-          cacheExtent: TvAccountSafeZone.cacheExtent,
-          padding: TvAccountSafeZone.screenMargin,
+          cacheExtent: TvSafeZone.cacheExtent,
+          padding: TvSafeZone.account,
           children: [
             const TvAccountHeader(),
             const SizedBox(height: 14),
