@@ -189,8 +189,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     this._scheduleEmptyFocusIfNeeded(home, gridItems);
 
     final padding = TvSafeZone.home;
-    final gridTitle = categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[_categoryIndex]}';
-
     return ListenableBuilder(
       listenable: _homeNavTick,
       builder: (context, _) {
@@ -279,17 +277,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       },
                       onMoveToGrid: () => this._focusGrid(_gridIndex, throttle: false),
                     ),
-                    Row(
-                      children: [
-                        Text(gridTitle, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                        const Spacer(),
-                        if (home.loading && gridItems.isEmpty)
-                          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppTheme.cyan, strokeWidth: 2)),
-                        if (gridItems.isNotEmpty)
-                          Text('${gridItems.length} judul', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                    // Grid title/count removed so poster grid can sit closer
+                    // to Kategori. This saves vertical TV space without touching
+                    // data loading or focus movement.
+                    const SizedBox(height: 4),
                     if (home.loading && gridItems.isEmpty)
                       const TvProfessionalGridSkeleton(columns: 6, rows: 2)
                     else if (gridItems.isEmpty)
