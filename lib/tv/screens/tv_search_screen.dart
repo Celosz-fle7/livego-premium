@@ -133,16 +133,29 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
 
   void _enterTextEdit() {
     if (!mounted) return;
-    setState(() => _editingInput = true);
+    if (!_editingInput) {
+      setState(() => _editingInput = true);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_editingInput) return;
-      if (_textNode.canRequestFocus) _textNode.requestFocus();
+      if (_textNode.canRequestFocus) {
+        _textNode.requestFocus();
+      }
+
+      // Android TV boxes do not always show the IME just because the TextField
+      // received focus from a remote key. Ask the platform keyboard explicitly
+      // only after the user presses OK/RIGHT to enter typing mode.
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
     });
   }
 
   void _exitTextEdit({bool refocusBox = true}) {
-    if (!_editingInput) return;
-    setState(() => _editingInput = false);
+    if (!_editingInput && !_textNode.hasFocus) return;
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    if (_editingInput) {
+      setState(() => _editingInput = false);
+    }
     if (refocusBox) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusInput(throttle: false);
