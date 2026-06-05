@@ -52,14 +52,14 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusInput(throttle: false));
+    _scheduleSearchEntryFocus();
   }
 
   @override
   void didUpdateWidget(covariant TvSearchScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusTicket > 0 && widget.focusTicket != oldWidget.focusTicket) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _focusInput(throttle: false));
+      _scheduleSearchEntryFocus();
     }
   }
 
@@ -87,6 +87,22 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   int _safe(int value) {
     if (_resultNodes.isEmpty) return 0;
     return value.clamp(0, _resultNodes.length - 1).toInt();
+  }
+
+  void _scheduleSearchEntryFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final search = ref.read(tvSearchProvider);
+      if (!search.loading && _resultNodes.isNotEmpty) {
+        _focusGrid(_gridIndex, throttle: false);
+        return;
+      }
+      if (!search.loading && _emptyNode.context != null) {
+        _focusEmpty(throttle: false);
+        return;
+      }
+      _focusInput(throttle: false);
+    });
   }
 
   bool _focusInput({bool throttle = true}) {

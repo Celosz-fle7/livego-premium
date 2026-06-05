@@ -65,11 +65,11 @@ class TvSideNav extends StatelessWidget {
 
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
-      tvFocusComfort(focusNodes[_safe(itemIndex - 1)], topMargin: 86, bottomMargin: 120);
+      onChanged(_safe(itemIndex - 1));
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      tvFocusComfort(focusNodes[_safe(itemIndex + 1)], topMargin: 86, bottomMargin: 120);
+      onChanged(_safe(itemIndex + 1));
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
@@ -86,9 +86,7 @@ class TvSideNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: AnimatedContainer(
-        duration: TvFocusStyle.normal,
-        curve: Curves.linear,
+      child: Container(
         width: _visible ? 80 : 8,
         child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
       ),
@@ -108,11 +106,10 @@ class TvSideNav extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: _focused ? TvFocusStyle.focusBlue.withOpacity(0.56) : AppTheme.borderSoft,
-          width: _focused ? 1.4 : 1,
+          width: 1.2,
         ),
-        boxShadow: [
-          const BoxShadow(color: Colors.black54, blurRadius: 10),
-          if (_focused) TvFocusStyle.glow(0.07, 6),
+        boxShadow: const [
+          BoxShadow(color: Colors.black54, blurRadius: 8),
         ],
       ),
       child: Column(
@@ -208,8 +205,7 @@ class _NavIconButton extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(16),
               focusColor: Colors.transparent,
-              child: AnimatedContainer(
-                duration: TvFocusStyle.fast,
+              child: Container(
                 height: size,
                 width: size,
                 alignment: Alignment.center,
@@ -229,9 +225,9 @@ class _NavIconButton extends StatelessWidget {
                     color: focused
                         ? TvFocusStyle.focusBlue
                         : (active ? TvFocusStyle.focusBlue.withOpacity(0.35) : Colors.transparent),
-                    width: focused ? 2.0 : 1.0,
+                    width: 1.5,
                   ),
-                  boxShadow: focused ? [TvFocusStyle.glow(0.07, 5)] : null,
+                  boxShadow: null,
                 ),
                 child: Icon(
                   icon,
