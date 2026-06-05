@@ -128,7 +128,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   // DIAGNOSTIC ONLY: isolate Android TV white-screen source.
   // true  = do not insert VideoPlayer native texture/window into the tree.
   // false = normal player behavior.
-  static const bool _disableVideoWindowForWhiteScreenIsolation = true;
+  static const bool _disableVideoWindowForWhiteScreenIsolation = false;
 
   // Large enough for long-running series, still bounded for TV remote safety.
   static const int _maxTvEpisodeCount = 999;
