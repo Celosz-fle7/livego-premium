@@ -1528,9 +1528,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final size = controller.value.size;
     final portrait = size.height > size.width;
     final fit = _fitCover ? BoxFit.cover : BoxFit.contain;
-    final video = FittedBox(
-      fit: fit,
-      child: SizedBox(width: size.width, height: size.height, child: VideoPlayer(controller)),
+    final video = ColoredBox(
+      color: Colors.black,
+      child: FittedBox(
+        fit: fit,
+        child: SizedBox(width: size.width, height: size.height, child: VideoPlayer(controller)),
+      ),
     );
 
     if (!portrait) return video;
@@ -1590,17 +1593,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
               const ColoredBox(color: Colors.black),
               if (ready)
                 _buildVideoSurface(controller)
-              else if (item.backdropUrl.isNotEmpty || item.posterUrl.isNotEmpty)
-                DecoratedBox(
-                  decoration: const BoxDecoration(color: Colors.black),
-                  child: LiveGoCachedImage(
-                    url: item.backdropUrl.isNotEmpty ? item.backdropUrl : item.posterUrl,
-                    fit: BoxFit.cover,
-                    role: LiveGoImageRole.banner,
-                    tv: true,
-                  ),
-                ),
-              Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.48)),
+              else
+                const ColoredBox(color: Colors.black),
+              Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.72)),
               if (_loading)
                 _PlayerLoadingOverlay(
                   title: item.title,
