@@ -104,6 +104,17 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const int _controlCount = 8;
   static const Duration _seekApplyDelay = Duration(milliseconds: 280);
   static const int _optionCount = 6;
+
+  // TV Player safe margin / zone margin.
+  // Video surface stays fullscreen. Only overlays/panels use these margins.
+  static const double _playerSafeSide = 48;
+  static const double _playerSafeTop = 28;
+  static const double _playerSafeBottom = 28;
+  static const double _playerPanelBottom = 188;
+  static const double _playerSubtitleBottomClean = 68;
+  static const double _playerSubtitleBottomControls = 212;
+  static const double _playerToastBottomClean = 48;
+  static const double _playerToastBottomControls = 184;
   static const int _overlayCursorMoveGuardMs = 72;
 
 
@@ -1666,8 +1677,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   right: 0,
                   bottom: 0,
                   child: SafeArea(
+                    left: true,
+                    right: true,
                     bottom: true,
-                    minimum: EdgeInsets.only(bottom: _showControls ? 174 : 42),
+                    minimum: EdgeInsets.fromLTRB(
+                      _playerSafeSide,
+                      0,
+                      _playerSafeSide,
+                      _showControls ? _playerToastBottomControls : _playerToastBottomClean,
+                    ),
                     child: Center(child: TvPlayerStatusToast(message: _statusMessage)),
                   ),
                 ),
@@ -1689,23 +1707,29 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (ready && _activeSubtitleText.isNotEmpty)
                 Positioned(
-                  left: 160,
-                  right: 160,
+                  left: _playerSafeSide * 2.5,
+                  right: _playerSafeSide * 2.5,
                   bottom: 0,
                   child: SafeArea(
+                    left: true,
+                    right: true,
                     bottom: true,
-                    minimum: EdgeInsets.only(bottom: _showControls ? 202 : 58),
+                    minimum: EdgeInsets.only(
+                      bottom: _showControls ? _playerSubtitleBottomControls : _playerSubtitleBottomClean,
+                    ),
                     child: TvPlayerSubtitleOverlay(text: _activeSubtitleText),
                   ),
                 ),
               if (ready && _showControls)
                 Positioned(
-                  left: 42,
-                  right: 42,
+                  left: _playerSafeSide,
+                  right: _playerSafeSide,
                   bottom: 0,
                   child: SafeArea(
+                    left: true,
+                    right: true,
                     bottom: true,
-                    minimum: const EdgeInsets.only(bottom: 18),
+                    minimum: const EdgeInsets.only(bottom: _playerSafeBottom),
                     child: TvPlayerControlDock(
                       controller: controller,
                       playing: controller.value.isPlaying,
@@ -1722,14 +1746,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (_showEpisodes)
                 Positioned(
-                  right: 28,
+                  right: _playerSafeSide,
                   top: 0,
                   bottom: 0,
                   width: 390,
                   child: SafeArea(
                     top: true,
+                    right: true,
                     bottom: true,
-                    minimum: const EdgeInsets.only(top: 26, bottom: 30),
+                    minimum: const EdgeInsets.only(top: _playerSafeTop, bottom: _playerSafeBottom),
                     child: TvPlayerEpisodePanel(
                       episodes: _orderedEpisodes(),
                       total: _episodeTotal(item),
@@ -1741,11 +1766,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (_mode == _PlayerMode.qualityPopup)
                 Positioned(
-                  right: 38,
+                  right: _playerSafeSide,
                   bottom: 0,
                   child: SafeArea(
+                    right: true,
                     bottom: true,
-                    minimum: const EdgeInsets.only(bottom: 176),
+                    minimum: const EdgeInsets.only(bottom: _playerPanelBottom),
                     child: TvPlayerChoicePanel(
                       title: 'Pilih Kualitas',
                       hint: _qualityChoices.length > 1 ? 'OK pilih kualitas video' : 'Kualitas API tidak tersedia',
@@ -1757,11 +1783,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (_mode == _PlayerMode.subtitlePopup)
                 Positioned(
-                  right: 38,
+                  right: _playerSafeSide,
                   bottom: 0,
                   child: SafeArea(
+                    right: true,
                     bottom: true,
-                    minimum: const EdgeInsets.only(bottom: 176),
+                    minimum: const EdgeInsets.only(bottom: _playerPanelBottom),
                     child: TvPlayerChoicePanel(
                       title: 'Pilih Subtitle',
                       hint: _streamInfo.subtitles.isEmpty ? 'Subtitle API tidak tersedia' : 'OK aktifkan subtitle',
@@ -1773,11 +1800,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 ),
               if (_showOptions)
                 Positioned(
-                  right: 38,
+                  right: _playerSafeSide,
                   bottom: 0,
                   child: SafeArea(
+                    right: true,
                     bottom: true,
-                    minimum: const EdgeInsets.only(bottom: 176),
+                    minimum: const EdgeInsets.only(bottom: _playerPanelBottom),
                     child: _PlayerOptionsPanel(
                       speed: _speed,
                       audioTrack: _audioTrack,
@@ -1822,12 +1850,14 @@ class _PlayerInfoOverlay extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            left: 32,
+            left: _TvPlayerScreenState._playerSafeSide,
             top: 0,
-            right: 32,
+            right: _TvPlayerScreenState._playerSafeSide,
             child: SafeArea(
+              left: true,
               top: true,
-              minimum: const EdgeInsets.only(top: 24),
+              right: true,
+              minimum: const EdgeInsets.only(top: _TvPlayerScreenState._playerSafeTop),
               child: Row(
               children: [
                 const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
@@ -1887,7 +1917,6 @@ class _PlayerOptionsPanel extends StatelessWidget {
         color: AppTheme.surface.withOpacity(0.95),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10), const BoxShadow(color: Colors.black87, blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
