@@ -50,7 +50,6 @@ class _TvShellState extends ConsumerState<TvShell> {
   int _backGuardMs = 0;
   int _suppressBackUntilMs = 0;
   bool _exitOpen = false;
-  bool _returnToAccount = false;
   final TvNavigationService _navService = TvNavigationService.instance;
 
   // Keep this intentionally conservative for low-end Android TV boxes.
@@ -239,7 +238,6 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
-      _returnToAccount = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _bumpFocusForCurrent();
@@ -252,7 +250,6 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.focused;
-      _returnToAccount = false;
     });
     _focusNav(safe);
   }
@@ -264,10 +261,6 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
-      // Account opens these as full navbar content screens. BACK from
-      // History/Favorite/Download should expose the navbar, not bounce back
-      // into the Account menu and feel trapped.
-      _returnToAccount = false;
     });
     _bumpFocusForCurrent();
   }
@@ -298,20 +291,10 @@ class _TvShellState extends ConsumerState<TvShell> {
     });
   }
 
-  void _returnToAccountMenuOrNav() {
-    _suppressBack(650);
-    if (_returnToAccount && _index != TvNavIndex.account) {
-      setState(() {
-        _returnToAccount = false;
-        _index = TvNavIndex.account;
-        _navCursorIndex = TvNavIndex.account;
-        _navMode = TvSideNavMode.hidden;
-        _accountTicket++;
-      });
-      _restoreActiveContentAfterBack();
-      return;
-    }
-    _showNav();
+  void _showNavFromContentBack() {
+    // Non-Home content BACK always exposes the navbar. Account is a control
+    // center, not a hidden return trap for History/Favorite/Download.
+    _showNavFromBack();
   }
 
   void _preparePlayerRoute() {
@@ -463,7 +446,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (_index == TvNavIndex.home) {
       _bumpFocusForCurrent();
     } else {
-      _returnToAccountMenuOrNav();
+      _showNavFromContentBack();
     }
   }
 
@@ -504,7 +487,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       (_) => TvDownloadsScreen(
             focusTicket: _index == TvNavIndex.download ? _contentTicket : 0,
             onMoveToNav: _showNav,
-            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToNav: _showNavFromContentBack,
             onBackToHome: () => _enterContent(TvNavIndex.home),
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -515,7 +498,7 @@ class _TvShellState extends ConsumerState<TvShell> {
             favorites: false,
             focusTicket: _index == TvNavIndex.history ? _contentTicket : 0,
             onMoveToNav: _showNav,
-            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToNav: _showNavFromContentBack,
             onBackToHome: () => _enterContent(TvNavIndex.home),
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -526,7 +509,7 @@ class _TvShellState extends ConsumerState<TvShell> {
             favorites: true,
             focusTicket: _index == TvNavIndex.favorite ? _contentTicket : 0,
             onMoveToNav: _showNav,
-            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToNav: _showNavFromContentBack,
             onBackToHome: () => _enterContent(TvNavIndex.home),
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -541,7 +524,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       (_) => TvSearchScreen(
             focusTicket: _index == TvNavIndex.search ? _contentTicket : 0,
             onMoveToNav: _showNav,
-            onBackToNav: _returnToAccountMenuOrNav,
+            onBackToNav: _showNavFromContentBack,
             onBackToHome: () => _enterContent(TvNavIndex.home),
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
