@@ -80,27 +80,30 @@ jobs:
           if 'android:usesCleartextTraffic=' not in s:
               s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
 
-          leanback_filter = '''
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>'''
+          leanback_filter = "\n".join([
+              "            <intent-filter>",
+              "                <action android:name=\"android.intent.action.MAIN\" />",
+              "                <category android:name=\"android.intent.category.LEANBACK_LAUNCHER\" />",
+              "            </intent-filter>",
+          ])
 
-          https_deeplink_filter = '''
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="livego.app" android:pathPrefix="/content" />
-            </intent-filter>'''
+          https_deeplink_filter = "\n".join([
+              "            <intent-filter android:autoVerify=\"true\">",
+              "                <action android:name=\"android.intent.action.VIEW\" />",
+              "                <category android:name=\"android.intent.category.DEFAULT\" />",
+              "                <category android:name=\"android.intent.category.BROWSABLE\" />",
+              "                <data android:scheme=\"https\" android:host=\"livego.app\" android:pathPrefix=\"/content\" />",
+              "            </intent-filter>",
+          ])
 
-          app_deeplink_filter = '''
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="livego" android:host="content" />
-            </intent-filter>'''
+          app_deeplink_filter = "\n".join([
+              "            <intent-filter>",
+              "                <action android:name=\"android.intent.action.VIEW\" />",
+              "                <category android:name=\"android.intent.category.DEFAULT\" />",
+              "                <category android:name=\"android.intent.category.BROWSABLE\" />",
+              "                <data android:scheme=\"livego\" android:host=\"content\" />",
+              "            </intent-filter>",
+          ])
 
           activity_match = re.search(r'(<activity[\s\S]*?</activity>)', s)
           if not activity_match:
@@ -114,7 +117,7 @@ jobs:
               (app_deeplink_filter, 'android:scheme="livego"'),
           ]:
               if marker not in updated_activity:
-                  updated_activity = updated_activity.replace('</activity>', block + '\n        </activity>', 1)
+                  updated_activity = updated_activity.replace('</activity>', block + "\n        </activity>", 1)
 
           if updated_activity != activity:
               s = s.replace(activity, updated_activity, 1)
@@ -123,40 +126,45 @@ jobs:
 
           drawable_dir = Path("android/app/src/main/res/drawable")
           drawable_dir.mkdir(parents=True, exist_ok=True)
-          (drawable_dir / "tv_banner.xml").write_text('''<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient
-        android:startColor="#020617"
-        android:centerColor="#06324A"
-        android:endColor="#00D4FF"
-        android:angle="0" />
-    <corners android:radius="0dp" />
-</shape>
-''')
+          tv_banner_xml = "\n".join([
+              '<?xml version="1.0" encoding="utf-8"?>',
+              '<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">',
+              '    <gradient',
+              '        android:startColor="#020617"',
+              '        android:centerColor="#06324A"',
+              '        android:endColor="#00D4FF"',
+              '        android:angle="0" />',
+              '    <corners android:radius="0dp" />',
+              '</shape>',
+              '',
+          ])
+          (drawable_dir / "tv_banner.xml").write_text(tv_banner_xml)
 
-          styles_xml = '''<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#000000</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowDisablePreview">true</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
-    </style>
-
-    <style name="NormalTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#000000</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowDisablePreview">true</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
-    </style>
-</resources>
-'''
+          styles_xml = "\n".join([
+              '<?xml version="1.0" encoding="utf-8"?>',
+              '<resources>',
+              '    <style name="LaunchTheme" parent="@android:style/Theme.Material.NoActionBar">',
+              '        <item name="android:windowBackground">#000000</item>',
+              '        <item name="android:windowNoTitle">true</item>',
+              '        <item name="android:windowActionBar">false</item>',
+              '        <item name="android:windowFullscreen">true</item>',
+              '        <item name="android:windowDisablePreview">true</item>',
+              '        <item name="android:statusBarColor">#000000</item>',
+              '        <item name="android:navigationBarColor">#000000</item>',
+              '    </style>',
+              '',
+              '    <style name="NormalTheme" parent="@android:style/Theme.Material.NoActionBar">',
+              '        <item name="android:windowBackground">#000000</item>',
+              '        <item name="android:windowNoTitle">true</item>',
+              '        <item name="android:windowActionBar">false</item>',
+              '        <item name="android:windowFullscreen">true</item>',
+              '        <item name="android:windowDisablePreview">true</item>',
+              '        <item name="android:statusBarColor">#000000</item>',
+              '        <item name="android:navigationBarColor">#000000</item>',
+              '    </style>',
+              '</resources>',
+              '',
+          ])
 
           for d in [Path("android/app/src/main/res/values"), Path("android/app/src/main/res/values-night")]:
               d.mkdir(parents=True, exist_ok=True)
