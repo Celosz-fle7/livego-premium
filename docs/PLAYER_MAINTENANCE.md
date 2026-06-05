@@ -184,3 +184,21 @@ Area rawan:
 - Subtitle parse/fetch.
 
 Jika tidak ada bug nyata, jangan refactor area ini.
+
+## Final Stability Lock
+
+Fondasi Player dianggap stabil jika semua aturan ini tetap dijaga:
+
+- Root focus tetap satu di Player.
+- Tidak memakai FocusTraversalGroup.
+- Tidak memakai FocusScope.nextFocus atau previousFocus.
+- Tidak memakai directional focus traversal.
+- Cursor overlay tetap manual state, bukan FocusNode per tombol.
+- Overlay cursor boleh punya guard ringan, tapi guard harus di-reset saat mode overlay berubah.
+- Seek LEFT/RIGHT tidak boleh ikut throttle overlay cursor.
+- Loading tanpa controller tidak boleh membuka popup/episode/options.
+- BACK tetap satu langkah: popup → controls → video bersih → exit.
+- Video surface tetap fullscreen black; safe margin hanya untuk overlay.
+- Request stream tetap lewat TvPlayerService, bukan UI.
+- API detail/all-episode warm-up tidak boleh masuk active startup path lagi.
+- Runtime cache hanya untuk state kecil, bukan stream/video/controller.

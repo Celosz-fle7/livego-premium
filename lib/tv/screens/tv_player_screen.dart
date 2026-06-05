@@ -767,6 +767,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _showControlsMode({bool defaultPlay = false}) {
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.controlsVisible;
       _showControls = true;
@@ -783,6 +784,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _showEpisodeList({bool returnToControls = false}) {
     _showStatus('Episode list • BACK kembali', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.episodeList;
       _showControls = false;
@@ -798,6 +800,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _showQualityPopup() {
     _showStatus('Pilih kualitas • OK terapkan', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.qualityPopup;
       _showControls = true;
@@ -813,6 +816,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _showSubtitlePopup() {
     _showStatus('Pilih subtitle • OK aktifkan', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.subtitlePopup;
       _showControls = true;
@@ -830,6 +834,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   void _showOptionsPanel({int cursor = 0}) {
     _showStatus('Opsi player • LEFT/RIGHT ubah', duration: const Duration(milliseconds: 1200));
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.options;
       _showControls = true;
@@ -844,6 +849,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   void _hideOverlays() {
     _cancelAutoHide();
+    _resetOverlayCursorGuard();
     setState(() {
       _mode = _PlayerMode.watching;
       _showControls = false;
@@ -864,6 +870,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (now - _lastOverlayCursorMoveMs < _overlayCursorMoveGuardMs) return false;
     _lastOverlayCursorMoveMs = now;
     return true;
+  }
+
+  void _resetOverlayCursorGuard() {
+    _lastOverlayCursorMoveMs = 0;
   }
 
   void _exitPlayerRoute() {
