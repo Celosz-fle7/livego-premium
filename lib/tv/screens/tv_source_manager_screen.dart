@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -35,6 +37,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   static const int _backGuardMs = 420;
   int _lastBackHandledMs = 0;
   String? _pingingSlug;
+  Timer? _autoPingTimer;
+  static DateTime? _lastAutoPingAt;
 
   late final Set<String> _initialActivePlatforms;
   late final List<String> _initialHomePlatforms;
@@ -55,7 +59,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (!mounted) return;
       if (_hasPlatforms) {
         _focusSource(0, throttle: false);
-        _autoPingOnce();
+        _scheduleAutoPingOnce();
       } else {
         _focusBack();
       }
@@ -64,6 +68,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   @override
   void dispose() {
+    _autoPingTimer?.cancel();
     for (final node in _sourceNodes) {
       node.dispose();
     }
@@ -184,8 +189,25 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (mounted) setState(() {});
   }
 
+  void _scheduleAutoPingOnce() {
+    // Source Manager should show focus immediately. Server indicator ping is
+    // useful, but it must not compete with the first remote moves on low-end TV.
+    _autoPingTimer?.cancel();
+    _autoPingTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      _autoPingOnce();
+    });
+  }
+
   Future<void> _autoPingOnce() async {
     if (_pingingSlug != null) return;
+
+    final now = DateTime.now();
+    final last = _lastAutoPingAt;
+    if (last != null && now.difference(last) < const Duration(minutes: 10)) {
+      return;
+    }
+    _lastAutoPingAt = now;
 
     // Jangan ping semua source Dobda sekaligus. Setelah Dobda masuk daftar,
     // ping seluruh platform bisa membuat Source Manager terasa berat. Cukup
@@ -204,7 +226,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         .toList();
     for (final slug in targets) {
       if (!mounted) return;
-      setState(() => _pingingSlug = slug);
+      if (_pingingSlug != slug) setState(() => _pingingSlug = slug);
       await LiveGoCatalog.pingPlatform(slug).timeout(
         const Duration(seconds: 3),
         onTimeout: () {
