@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,17 +40,16 @@ class TvSearchScreen extends ConsumerStatefulWidget {
 class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _controller = TextEditingController();
-  final FocusNode _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-input');
+  final FocusNode _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-box');
+  final FocusNode _textNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-text-input');
   final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-search-empty-retry');
   final List<FocusNode> _resultNodes = <FocusNode>[];
   TvZone _zone = TvZone.list;
   int _gridIndex = 0;
   bool _openingDetail = false;
   bool _searchSubmitBusy = false;
+  bool _editingInput = false;
   int _lastSearchSubmitMs = 0;
-  static const int _searchMoveGuardMs = 74;
-  int _lastSearchMoveMs = 0;
-  int _searchRevealToken = 0;
 
   @override
   void initState() {
@@ -70,6 +68,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   @override
   void dispose() {
     _searchNode.dispose();
+    _textNode.dispose();
     _emptyNode.dispose();
     for (final node in _resultNodes) {
       node.dispose();
@@ -93,65 +92,14 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     return value.clamp(0, _resultNodes.length - 1).toInt();
   }
 
-  bool _allowSearchMove(bool throttle) {
-    if (!throttle) return true;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSearchMoveMs < _searchMoveGuardMs) return false;
-    _lastSearchMoveMs = now;
-    return true;
-  }
-
-  void _revealSearchNode(FocusNode node, int token) {
-    void reveal() {
-      if (!mounted || _searchRevealToken != token || !node.hasFocus) return;
-      final context = node.context;
-      if (context == null) return;
-      try {
-        final scrollable = Scrollable.maybeOf(context);
-        final renderObject = context.findRenderObject();
-        if (scrollable == null || renderObject == null) return;
-        final viewport = RenderAbstractViewport.maybeOf(renderObject);
-        if (viewport == null) return;
-
-        final position = scrollable.position;
-        if (!position.hasPixels || !position.hasViewportDimension) return;
-
-        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-        final current = position.pixels;
-        final viewportExtent = position.viewportDimension;
-
-        double? target;
-        if (leading < current + TvSafeZone.listTop) {
-          target = leading - TvSafeZone.listTop;
-        } else if (trailing > current + viewportExtent - TvSafeZone.gridBottom) {
-          target = trailing - viewportExtent + TvSafeZone.gridBottom;
-        }
-        if (target == null) return;
-
-        final clamped = target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
-        if ((clamped - current).abs() < 1) return;
-        position.jumpTo(clamped);
-      } catch (_) {}
-    }
-
-    reveal();
-    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
-  }
-
-  bool _focusNodeDirect(FocusNode node, {bool throttle = true}) {
-    if (!_allowSearchMove(throttle)) return false;
-    if (node.context == null || !node.canRequestFocus) return false;
-    final token = ++_searchRevealToken;
-    if (!node.hasFocus) node.requestFocus();
-    _revealSearchNode(node, token);
-    return true;
-  }
-
   bool _focusInput({bool throttle = true}) {
-    final ok = _focusNodeDirect(_searchNode, throttle: throttle);
+    if (!mounted) return false;
+    _editingInput = false;
+    final ok = tvFocus(
+      _searchNode,
+      alignment: 0.12,
+      throttle: throttle,
+    );
     if (ok) _zone = TvZone.list;
     return ok;
   }
@@ -159,7 +107,12 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _focusGrid(int index, {bool throttle = true}) {
     if (_resultNodes.isEmpty) return false;
     final target = _safe(index);
-    final ok = _focusNodeDirect(_resultNodes[target], throttle: throttle);
+    final ok = tvFocusGrid(
+      _resultNodes[target],
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.gridBottom,
+      throttle: throttle,
+    );
     if (ok) {
       _zone = TvZone.grid;
       _gridIndex = target;
@@ -168,12 +121,40 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   }
 
   bool _focusEmpty({bool throttle = true}) {
-    final ok = _focusNodeDirect(_emptyNode, throttle: throttle);
+    final ok = tvFocusComfort(
+      _emptyNode,
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.listBottom,
+      throttle: throttle,
+    );
     if (ok) _zone = TvZone.placeholder;
     return ok;
   }
 
+  void _enterTextEdit() {
+    if (!mounted) return;
+    setState(() => _editingInput = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_editingInput) return;
+      if (_textNode.canRequestFocus) _textNode.requestFocus();
+    });
+  }
+
+  void _exitTextEdit({bool refocusBox = true}) {
+    if (!_editingInput) return;
+    setState(() => _editingInput = false);
+    if (refocusBox) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusInput(throttle: false);
+      });
+    }
+  }
+
   void _handleBack() {
+    if (_editingInput || _textNode.hasFocus) {
+      _exitTextEdit(refocusBox: true);
+      return;
+    }
     if (_zone == TvZone.grid || _zone == TvZone.placeholder) {
       _focusInput(throttle: false);
       return;
@@ -265,7 +246,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key) || key == LogicalKeyboardKey.arrowRight) {
-      if (!ref.read(tvSearchProvider).loading) {
+      if (!_editingInput) {
+        _enterTextEdit();
+      } else if (!ref.read(tvSearchProvider).loading) {
         _submitSearch(_controller.text);
       }
       return KeyEventResult.handled;
@@ -393,7 +376,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                           child: ListenableBuilder(
                             listenable: _searchNode,
                             builder: (context, _) {
-                              final focused = _searchNode.hasFocus;
+                              final focused = _searchNode.hasFocus || _textNode.hasFocus;
                               return Container(
                                 padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
@@ -402,10 +385,17 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                 ),
                                 child: TextField(
                                   controller: _controller,
-                                  focusNode: _searchNode,
+                                  focusNode: _textNode,
+                                  readOnly: !_editingInput,
+                                  showCursor: _editingInput,
+                                  enableInteractiveSelection: _editingInput,
                                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                                   textInputAction: TextInputAction.search,
-                                  onSubmitted: _submitSearch,
+                                  onTap: _enterTextEdit,
+                                  onSubmitted: (v) {
+                                    _exitTextEdit(refocusBox: true);
+                                    _submitSearch(v);
+                                  },
                                   onChanged: (v) => ref.read(tvSearchProvider.notifier).setDraft(v),
                                   decoration: InputDecoration(
                                     hintText: 'Cari drama, CEO, cinta, balas dendam...',
