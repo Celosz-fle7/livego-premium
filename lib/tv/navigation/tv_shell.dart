@@ -264,7 +264,10 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
-      _returnToAccount = true;
+      // Account opens these as full navbar content screens. BACK from
+      // History/Favorite/Download should expose the navbar, not bounce back
+      // into the Account menu and feel trapped.
+      _returnToAccount = false;
     });
     _bumpFocusForCurrent();
   }

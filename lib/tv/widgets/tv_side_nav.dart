@@ -12,7 +12,7 @@ class TvNavItem {
   const TvNavItem(this.icon, this.label);
 }
 
-enum TvSideNavMode { hidden, peek, focused }
+enum TvSideNavMode { hidden, focused }
 
 class TvSideNav extends StatelessWidget {
   final int index;
@@ -90,7 +90,7 @@ class TvSideNav extends StatelessWidget {
         duration: TvFocusStyle.normal,
         curve: Curves.linear,
         width: _visible ? 80 : 8,
-        child: _visible ? _buildRail() : _HiddenGrip(active: index == 0),
+        child: _visible ? _buildRail() : const _HiddenGrip(active: true),
       ),
     );
   }

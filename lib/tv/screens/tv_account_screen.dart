@@ -52,14 +52,21 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   void initState() {
     super.initState();
+    _syncNodes(_items.length);
     _scheduleFocusRow(_index);
   }
 
   @override
   void didUpdateWidget(covariant TvAccountScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncNodes(_items.length);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      _scheduleFocusRow(_index);
+      final token = ++_focusRetryToken;
+      Future<void>.delayed(const Duration(milliseconds: 60), () {
+        if (!mounted || token != _focusRetryToken) return;
+        _focusRow(_index, throttle: false);
+        _scheduleFocusRow(_index);
+      });
     }
   }
 
@@ -124,14 +131,27 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     });
   }
 
+  void _restoreFocusAfterSubscreen() {
+    final token = ++_focusRetryToken;
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (!mounted || token != _focusRetryToken) return;
+
+      _focusRow(_index, throttle: false);
+      _scheduleFocusRow(_index);
+    });
+  }
+
   void _push(Widget screen) {
     if (_openingSubscreen || !mounted) return;
     _openingSubscreen = true;
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).whenComplete(() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => screen))
+        .whenComplete(() {
       _openingSubscreen = false;
       if (!mounted) return;
+
       _lastBackMs = DateTime.now().millisecondsSinceEpoch;
-      _scheduleFocusRow(_index);
+      _restoreFocusAfterSubscreen();
     });
   }
 
@@ -182,7 +202,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    _syncNodes(items.length);
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.goBack): _AccountBackIntent(),
