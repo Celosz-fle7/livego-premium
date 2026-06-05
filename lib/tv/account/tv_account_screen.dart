@@ -88,9 +88,25 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   bool _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return false;
     final target = _safe(index);
-    final ok = tvFocusComfort(_nodes[target], topMargin: TvAccountSafeZone.focusTopMargin, bottomMargin: TvAccountSafeZone.focusBottomMargin, throttle: throttle);
-    if (ok) _index = target;
-    return ok;
+    final node = _nodes[target];
+
+    _index = target;
+    node.requestFocus();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || node.context == null || !node.hasFocus) return;
+      try {
+        Scrollable.ensureVisible(
+          node.context!,
+          duration: Duration.zero,
+          curve: Curves.linear,
+          alignment: 0.36,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        );
+      } catch (_) {}
+    });
+
+    return true;
   }
 
   void _backToNav() {
@@ -115,8 +131,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     if (!mounted) return;
     final token = ++_focusRetryToken;
 
-    // Account owns only its internal menu focus. App-level bootstrap belongs to
-    // TvShell, so avoid a second delayed retry ladder here.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || token != _focusRetryToken) return;
       _focusRow(index, throttle: false);
@@ -125,11 +139,25 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _restoreFocusAfterSubscreen() {
     final token = ++_focusRetryToken;
-    Future<void>.delayed(const Duration(milliseconds: 80), () {
+
+    // Direct first: attach focus immediately after Navigator returns.
+    _focusRow(_index, throttle: false);
+
+    Future<void>.delayed(const Duration(milliseconds: 90), () {
       if (!mounted || token != _focusRetryToken) return;
 
-      _focusRow(_index, throttle: false);
-      _scheduleFocusRow(_index);
+      final target = _nodes.isEmpty ? null : _nodes[_safe(_index)];
+      if (target == null || FocusManager.instance.primaryFocus != target) {
+        _focusRow(_index, throttle: false);
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || token != _focusRetryToken) return;
+      final target = _nodes.isEmpty ? null : _nodes[_safe(_index)];
+      if (target == null || FocusManager.instance.primaryFocus != target) {
+        _focusRow(_index, throttle: false);
+      }
     });
   }
 

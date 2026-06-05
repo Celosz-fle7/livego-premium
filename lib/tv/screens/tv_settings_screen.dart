@@ -150,7 +150,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   void _tryFocusEntry() {
     if (!mounted || !_entryPending || _rowNodes.isEmpty) return;
     _entryPending = false;
-    _focusRow(_lastRow);
+    _focusRow(_lastRow, throttle: false);
   }
 
   void _focusBack() {
@@ -161,9 +161,27 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   bool _focusRow(int index, {bool throttle = true}) {
     if (_rowNodes.isEmpty) return false;
+    final target = _safe(index);
+    final node = _rowNodes[target];
+
     _zone = TvZone.settings;
-    _lastRow = _safe(index);
-    return tvFocusComfort(_rowNodes[_lastRow], topMargin: 88, bottomMargin: 160, throttle: throttle);
+    _lastRow = target;
+    node.requestFocus();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || node.context == null || !node.hasFocus) return;
+      try {
+        Scrollable.ensureVisible(
+          node.context!,
+          duration: Duration.zero,
+          curve: Curves.linear,
+          alignment: 0.42,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        );
+      } catch (_) {}
+    });
+
+    return true;
   }
 
   bool _ignoreRepeatedBack() {
@@ -307,6 +325,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         _openingSubscreen = false;
         if (!mounted) return;
         setState(() {});
+        _focusRow(_lastRow, throttle: false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _focusRow(_lastRow, throttle: false);
         });
