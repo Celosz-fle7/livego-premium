@@ -1,4 +1,6 @@
 import 'dart:collection';
+import 'dart:convert';
+import 'dart:typed_data';
 
 /// Small in-memory cache for Android TV runtime/UI performance.
 ///
@@ -7,6 +9,7 @@ import 'dart:collection';
 /// - reduce repeated lightweight UI computation
 /// - keep remote/focus responsive
 /// - avoid turning screen widgets into cache containers
+/// - keep cache payload compact with a small binary codec
 ///
 /// Rules:
 /// - no BuildContext
@@ -20,6 +23,8 @@ class TvRuntimeCache {
   TvRuntimeCache._();
 
   static const int _maxEntries = 96;
+  static const int _maxStringBytes = 2048;
+  static const int _maxIntListItems = 64;
 
   static final LinkedHashMap<String, _TvRuntimeCacheEntry> _entries =
       LinkedHashMap<String, _TvRuntimeCacheEntry>();
@@ -31,9 +36,12 @@ class TvRuntimeCache {
     if (entry == null) return null;
     if (entry.isExpired) return null;
 
+    final value = _TvRuntimeBinaryCodec.decode(entry.payload);
+    if (value == null) return null;
+
     // Move to the end so the oldest unused item is evicted first.
     _entries[cleanKey] = entry.touch();
-    return entry.value;
+    return value;
   }
 
   static int? getInt(String key) {
@@ -64,13 +72,20 @@ class TvRuntimeCache {
   }) {
     final cleanKey = key.trim();
     if (cleanKey.isEmpty) return;
-    if (!_isAllowedValue(value)) return;
+
+    final payload = _TvRuntimeBinaryCodec.encode(
+      value,
+      maxStringBytes: _maxStringBytes,
+      maxIntListItems: _maxIntListItems,
+    );
+    if (payload == null) return;
 
     _entries.remove(cleanKey);
+    final now = DateTime.now();
     _entries[cleanKey] = _TvRuntimeCacheEntry(
-      value: value,
-      expiresAt: DateTime.now().add(ttl),
-      touchedAt: DateTime.now(),
+      payload: payload,
+      expiresAt: now.add(ttl),
+      touchedAt: now,
     );
     _trim();
   }
@@ -92,7 +107,7 @@ class TvRuntimeCache {
     List<int> value, {
     Duration ttl = const Duration(minutes: 20),
   }) {
-    setObject(key, List<int>.unmodifiable(value.take(64)), ttl: ttl);
+    setObject(key, value, ttl: ttl);
   }
 
   static void remove(String key) {
@@ -139,18 +154,21 @@ class TvRuntimeCache {
     return _entries.length;
   }
 
+  static int get payloadBytes {
+    clearExpired();
+    var total = 0;
+    for (final entry in _entries.values) {
+      total += entry.payload.lengthInBytes;
+    }
+    return total;
+  }
+
   static String screenKey(String screen, String name) {
     return 'screen:${screen.trim()}:${name.trim()}';
   }
 
   static String playerKey(String itemId, Object episode, String name) {
     return 'player:${itemId.trim()}:$episode:${name.trim()}';
-  }
-
-  static bool _isAllowedValue(Object value) {
-    if (value is int || value is String || value is bool) return true;
-    if (value is List<int>) return value.length <= 64;
-    return false;
   }
 
   static void _trim() {
@@ -162,12 +180,12 @@ class TvRuntimeCache {
 }
 
 class _TvRuntimeCacheEntry {
-  final Object value;
+  final Uint8List payload;
   final DateTime expiresAt;
   final DateTime touchedAt;
 
   const _TvRuntimeCacheEntry({
-    required this.value,
+    required this.payload,
     required this.expiresAt,
     required this.touchedAt,
   });
@@ -176,9 +194,88 @@ class _TvRuntimeCacheEntry {
 
   _TvRuntimeCacheEntry touch() {
     return _TvRuntimeCacheEntry(
-      value: value,
+      payload: payload,
       expiresAt: expiresAt,
       touchedAt: DateTime.now(),
     );
+  }
+}
+
+class _TvRuntimeBinaryCodec {
+  static const int _typeInt = 1;
+  static const int _typeString = 2;
+  static const int _typeBool = 3;
+  static const int _typeIntList = 4;
+
+  static Uint8List? encode(
+    Object value, {
+    required int maxStringBytes,
+    required int maxIntListItems,
+  }) {
+    if (value is int) {
+      final bytes = Uint8List(9);
+      bytes[0] = _typeInt;
+      ByteData.view(bytes.buffer).setInt64(1, value, Endian.little);
+      return bytes;
+    }
+
+    if (value is bool) {
+      return Uint8List.fromList(<int>[_typeBool, value ? 1 : 0]);
+    }
+
+    if (value is String) {
+      final encoded = utf8.encode(value);
+      if (encoded.length > maxStringBytes) return null;
+      final bytes = Uint8List(1 + encoded.length);
+      bytes[0] = _typeString;
+      bytes.setRange(1, bytes.length, encoded);
+      return bytes;
+    }
+
+    if (value is List<int>) {
+      final rows = value.take(maxIntListItems).toList(growable: false);
+      final bytes = Uint8List(3 + rows.length * 4);
+      final data = ByteData.view(bytes.buffer);
+      bytes[0] = _typeIntList;
+      data.setUint16(1, rows.length, Endian.little);
+      for (var i = 0; i < rows.length; i++) {
+        final safe = rows[i].clamp(-2147483648, 2147483647).toInt();
+        data.setInt32(3 + i * 4, safe, Endian.little);
+      }
+      return bytes;
+    }
+
+    return null;
+  }
+
+  static Object? decode(Uint8List payload) {
+    if (payload.isEmpty) return null;
+    final data = ByteData.view(payload.buffer, payload.offsetInBytes, payload.lengthInBytes);
+
+    switch (payload[0]) {
+      case _typeInt:
+        if (payload.lengthInBytes < 9) return null;
+        return data.getInt64(1, Endian.little);
+
+      case _typeBool:
+        if (payload.lengthInBytes < 2) return null;
+        return payload[1] == 1;
+
+      case _typeString:
+        if (payload.lengthInBytes < 1) return '';
+        return utf8.decode(payload.sublist(1), allowMalformed: true);
+
+      case _typeIntList:
+        if (payload.lengthInBytes < 3) return const <int>[];
+        final count = data.getUint16(1, Endian.little);
+        final rows = <int>[];
+        final maxCount = ((payload.lengthInBytes - 3) ~/ 4).clamp(0, count).toInt();
+        for (var i = 0; i < maxCount; i++) {
+          rows.add(data.getInt32(3 + i * 4, Endian.little));
+        }
+        return List<int>.unmodifiable(rows);
+    }
+
+    return null;
   }
 }
