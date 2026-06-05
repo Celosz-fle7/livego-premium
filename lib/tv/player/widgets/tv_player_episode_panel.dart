@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../models/livego_episode.dart';
-import '../../theme/tv_focus_style.dart';
 
 class TvPlayerEpisodePanel extends StatelessWidget {
   final List<LiveGoEpisode> episodes;
@@ -39,10 +38,6 @@ class TvPlayerEpisodePanel extends StatelessWidget {
           color: AppTheme.surface.withOpacity(0.95),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: AppTheme.cyan.withOpacity(0.35)),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.65), blurRadius: 12),
-            BoxShadow(color: AppTheme.cyan.withOpacity(0.04), blurRadius: 10),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,15 +91,13 @@ class _EpisodeListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Row(
         children: [

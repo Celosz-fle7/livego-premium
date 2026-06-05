@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/app_theme.dart';
-import '../../theme/tv_focus_style.dart';
 
 class TvPlayerControlDock extends StatelessWidget {
   final VideoPlayerController controller;
@@ -47,10 +46,6 @@ class TvPlayerControlDock extends StatelessWidget {
           color: AppTheme.surface.withOpacity(0.90),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: AppTheme.cyan.withOpacity(0.34)),
-          boxShadow: [
-            BoxShadow(color: AppTheme.cyan.withOpacity(0.06), blurRadius: 10),
-            const BoxShadow(color: Colors.black87, blurRadius: 10),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -60,13 +55,11 @@ class TvPlayerControlDock extends StatelessWidget {
                 Text(_fmt(value.position), style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 const SizedBox(width: 18),
                 Expanded(
-                  child: AnimatedContainer(
-                    duration: TvFocusStyle.fast,
+                  child: Container(
                     padding: EdgeInsets.all(progressFocused ? 4 : 0),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(color: progressFocused ? AppTheme.cyan : Colors.transparent, width: 2),
-                      boxShadow: progressFocused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
                     ),
                     child: VideoProgressIndicator(
                       controller,
@@ -114,8 +107,7 @@ class _DockButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       width: 56,
       height: 48,
       margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -123,7 +115,6 @@ class _DockButton extends StatelessWidget {
         color: focused ? AppTheme.cyan.withOpacity(0.20) : (active ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.055)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: focused ? AppTheme.cyan : (active ? AppTheme.cyan.withOpacity(0.75) : Colors.white12), width: focused ? 2.5 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -144,8 +135,7 @@ class _DockTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       height: 48,
       constraints: const BoxConstraints(minWidth: 74),
       alignment: Alignment.center,
@@ -155,7 +145,6 @@ class _DockTextButton extends StatelessWidget {
         color: focused ? AppTheme.cyan.withOpacity(0.20) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: focused ? AppTheme.cyan : Colors.white12, width: focused ? 2.5 : 1),
-        boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 8)] : null,
       ),
       child: Text(text, style: TextStyle(color: focused ? Colors.white : Colors.white, fontSize: 14, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
     );
