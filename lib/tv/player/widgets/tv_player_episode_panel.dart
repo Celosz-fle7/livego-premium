@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/app_theme.dart';
 import '../../../models/livego_episode.dart';
 
+const int _maxTvEpisodeCount = 999;
+const int _episodePanelWindowSize = 11;
+
 class TvPlayerEpisodePanel extends StatelessWidget {
   final List<LiveGoEpisode> episodes;
   final int total;
@@ -21,7 +24,7 @@ class TvPlayerEpisodePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalSafe = total.clamp(1, 120).toInt();
+    final totalSafe = total.clamp(1, _maxTvEpisodeCount).toInt();
     final visible = _visibleEpisodeRows(
       episodes: episodes,
       totalSafe: totalSafe,
@@ -85,8 +88,8 @@ List<_EpisodePanelRowData> _visibleEpisodeRows({
   required int selected,
   required int cursor,
 }) {
-  const windowSize = 11;
-  final safeTotal = totalSafe.clamp(1, 120).toInt();
+  const windowSize = _episodePanelWindowSize;
+  final safeTotal = totalSafe.clamp(1, _maxTvEpisodeCount).toInt();
 
   if (episodes.isEmpty) {
     final center = cursor > 0 ? cursor : selected;

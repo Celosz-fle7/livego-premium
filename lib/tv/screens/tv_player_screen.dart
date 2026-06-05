@@ -121,6 +121,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
   static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
 
+  // Large enough for long-running series, still bounded for TV remote safety.
+  static const int _maxTvEpisodeCount = 999;
+
 
   List<String> get _qualityChoices {
     final labels = <String>['Auto'];
@@ -728,7 +731,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final ordered = _orderedEpisodes();
     final fromRows = ordered.isNotEmpty ? ordered.last.index : 0;
     final total = [fromRows, _knownEpisodeCount, item.episodes].reduce((a, b) => a > b ? a : b);
-    return total.clamp(1, 120).toInt();
+    return total.clamp(1, _maxTvEpisodeCount).toInt();
   }
 
   bool _isSelect(LogicalKeyboardKey key) => _playerFocus.isSelectKey(key);

@@ -237,3 +237,14 @@ Player startup overlay harus punya prioritas jelas:
 - Pesan auto-skip episode seperti "gagal, lanjut Episode" tetap boleh tampil sebagai loading/progress.
 - Native texture shield fallback timer tidak boleh berhenti hanya karena `isBuffering` true pada satu tick.
 - Jika shield fallback timer berhenti tanpa retry, UI bisa terlihat stuck.
+
+## Episode Bounds Rule
+
+TV Player boleh mendukung long-running series tanpa merender semua episode.
+
+Aturan:
+- Jangan batasi episode TV ke 120 jika API menyediakan lebih.
+- Batas safety saat ini 999 episode untuk remote dan cache ringan.
+- Episode panel tetap render visible window kecil, bukan semua episode.
+- Window episode tetap 11 row agar RAM/FPS aman.
+- Jika batas episode diubah, ubah Player dan Episode Panel bersama-sama.
