@@ -1462,6 +1462,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
     if (_mode == _PlayerMode.options) {
       if (key == LogicalKeyboardKey.arrowUp) {
+        if (_optionCursor == 0) {
+          _hideOverlays();
+          return KeyEventResult.handled;
+        }
         setState(() => _optionCursor = (_optionCursor - 1).clamp(0, _optionCount - 1).toInt());
       } else if (key == LogicalKeyboardKey.arrowDown) {
         setState(() => _optionCursor = (_optionCursor + 1).clamp(0, _optionCount - 1).toInt());
@@ -1496,8 +1500,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       } else if (key == LogicalKeyboardKey.arrowRight) {
         _moveControl(1);
       } else if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _progressFocused = true);
-        _scheduleAutoHide();
+        _showOptionsPanel(cursor: 0);
+        return KeyEventResult.handled;
       } else if (key == LogicalKeyboardKey.arrowDown) {
         _showEpisodeList(returnToControls: true);
         return KeyEventResult.handled;
