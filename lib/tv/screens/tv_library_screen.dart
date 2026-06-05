@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_theme.dart';
 import '../../models/content_item.dart';
 import '../focus/tv_focus_utils.dart';
-import '../focus/tv_reachability.dart';
+import '../layout/tv_safe_zone.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
 import '../providers/tv_local_store_provider.dart';
@@ -212,14 +212,11 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
         },
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final columns = (constraints.maxWidth / 158).floor().clamp(4, 8).toInt();
-            final padding = TvReachability.contentPadding;
-            return SafeArea(
-              top: true,
-              bottom: true,
-              child: CustomScrollView(
+            final columns = (constraints.maxWidth / 168).floor().clamp(4, 7).toInt();
+            final padding = TvSafeZone.library;
+            return CustomScrollView(
                 controller: _scroll,
-                cacheExtent: 720,
+                cacheExtent: TvSafeZone.cacheExtent,
                 slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
@@ -270,7 +267,7 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
                       items: items,
                       nodes: _nodes,
                       columns: columns,
-                      padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
+                      padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
                       mainAxisExtent: 224,
                       onFocus: (i) {
                         _zone = TvZone.grid;
@@ -282,10 +279,9 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
                       },
                       onKey: (i, item, node, event) => _gridKey(i, item, columns, event),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: TvReachability.contentBottomPadding)),
+                  const SliverToBoxAdapter(child: SizedBox(height: TvSafeZone.smallTail)),
                 ],
-              ),
-            );
+              );
           },
         ),
       ),

@@ -62,6 +62,7 @@ class TvPosterGrid extends StatelessWidget {
             final item = items[i];
             final node = nodes[i];
             return TvPosterTile(
+              key: ValueKey<String>('${item.platformSlug}:${item.id}:${item.chapterId}:$i'),
               item: item,
               focusNode: node,
               onFocus: () => onFocus(i),

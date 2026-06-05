@@ -8,9 +8,11 @@ import '../../shared/widgets/livego_cached_image.dart';
 
 /// Lightweight reusable TV poster tile.
 ///
-/// Keep this widget small and isolated so focus repaint does not force a whole
-/// TV screen rebuild. All poster grids should migrate to this widget before
-/// public release.
+/// TV performance rule:
+/// - non-focused tile = poster + title only
+/// - focused tile = clear border + small metadata badges
+/// - no ripple, glow, shadow, gradient, scale, or extra repaint boundary here
+///   because SliverGrid already owns child repaint boundaries.
 class TvPosterTile extends StatelessWidget {
   final ContentItem item;
   final FocusNode focusNode;
@@ -34,74 +36,74 @@ class TvPosterTile extends StatelessWidget {
       builder: (context, _) {
         final focused = focusNode.hasFocus;
         return Focus(
-            focusNode: focusNode,
-            skipTraversal: true,
-            autofocus: false,
-            onKeyEvent: onKey,
-            onFocusChange: (v) {
-              if (v) onFocus();
-            },
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(16),
-              focusColor: Colors.transparent,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: focused ? AppTheme.cyan : AppTheme.borderSoft.withOpacity(0.42),
-                          width: focused ? 2.0 : 0.6,
-                        ),
+          focusNode: focusNode,
+          skipTraversal: true,
+          autofocus: false,
+          onKeyEvent: onKey,
+          onFocusChange: (value) {
+            if (value) onFocus();
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: focused ? AppTheme.cyan : AppTheme.borderSoft.withOpacity(0.36),
+                        width: focused ? 2.0 : 0.6,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            item.posterUrl.isEmpty
-                                ? Container(
-                                    color: AppTheme.surface2,
-                                    child: const Icon(
-                                      Icons.movie_rounded,
-                                      color: Colors.white38,
-                                      size: 44,
-                                    ),
-                                  )
-                                : LiveGoCachedImage(
-                                    url: item.posterUrl,
-                                    fit: BoxFit.cover,
-                                    role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
-                                    tv: true,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          item.posterUrl.isEmpty
+                              ? Container(
+                                  color: AppTheme.surface2,
+                                  child: const Icon(
+                                    Icons.movie_rounded,
+                                    color: Colors.white38,
+                                    size: 42,
                                   ),
+                                )
+                              : LiveGoCachedImage(
+                                  url: item.posterUrl,
+                                  fit: BoxFit.cover,
+                                  role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
+                                  tv: true,
+                                ),
+                          if (focused) ...[
                             Positioned(top: 8, left: 8, child: _TvPosterBadge(text: '${item.episodes} Ep')),
                             if (item.updated) const Positioned(top: 8, right: 8, child: _TvPosterBadge(text: 'UPDATE')),
                             Positioned(right: 8, bottom: 12, child: _TvPosterBadge(text: item.rating.toStringAsFixed(1))),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11.4,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
-                      decoration: TextDecoration.none,
-                    ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.4,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                    decoration: TextDecoration.none,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
         );
       },
     );
