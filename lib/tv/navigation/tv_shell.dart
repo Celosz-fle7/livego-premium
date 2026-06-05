@@ -77,10 +77,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       if (!mounted) return;
       _rootFocusNode.requestFocus();
       _syncOwner();
-      setState(() => _homeBannerTicket++);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _bootstrapActiveFocus(forceBanner: true);
-      });
+      _bumpFocusForCurrent(banner: true);
     });
   }
 
@@ -159,10 +156,10 @@ class _TvShellState extends ConsumerState<TvShell> {
     }
   }
 
-  void _restoreActiveContentAfterBack({bool banner = false, int delayMs = 380}) {
+  void _restoreActiveContentAfterBack({bool banner = false}) {
     final serial = ++_bootstrapSerial;
     _holdRootFocusDuringBackHandoff();
-    Future<void>.delayed(Duration(milliseconds: delayMs), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || serial != _bootstrapSerial) return;
       _bumpFocusForCurrent(banner: banner);
     });
@@ -199,7 +196,7 @@ class _TvShellState extends ConsumerState<TvShell> {
 
     // Navigation contract:
     // Shell owns owner sync; navbar cursor is separate from active content.
-    _syncOwner(navFocused: true);
+    // FocusNav performs the owner sync after focus is attached.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _navMode != TvSideNavMode.focused) return;
       _focusNav(_navCursorIndex);
@@ -219,7 +216,12 @@ class _TvShellState extends ConsumerState<TvShell> {
         _navCursorIndex = safe;
       });
     }
-    _syncOwner(navFocused: true);
+
+    final node = _navNodes.isEmpty ? null : _navNodes[safe];
+    if (node != null && node.context != null) {
+      _focusNav(safe);
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _navMode != TvSideNavMode.focused) return;
       _focusNav(safe);
@@ -280,14 +282,13 @@ class _TvShellState extends ConsumerState<TvShell> {
       }
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _exitOpen) return;
+    if (!_exitOpen) {
       if (_navMode == TvSideNavMode.focused || _navHasFocus) {
         _syncOwner(navFocused: true);
-        return;
+      } else {
+        _syncOwner();
       }
-      _syncOwner();
-    });
+    }
   }
 
   void _showNavFromContentBack() {
@@ -406,7 +407,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     _suppressBack(520);
     _holdRootFocusDuringBackHandoff();
     setState(() => _exitOpen = true);
-    Future<void>.delayed(const Duration(milliseconds: 120), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _exitOpen) tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
     });
   }
@@ -417,9 +418,9 @@ class _TvShellState extends ConsumerState<TvShell> {
     _holdRootFocusDuringBackHandoff();
     setState(() => _exitOpen = false);
     if (_index == TvNavIndex.home) {
-      _restoreActiveContentAfterBack(banner: true, delayMs: 320);
+      _restoreActiveContentAfterBack(banner: true);
     } else {
-      Future<void>.delayed(const Duration(milliseconds: 320), () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showNav();
       });
     }
