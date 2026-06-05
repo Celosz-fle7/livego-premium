@@ -36,6 +36,17 @@ class LiveGoPremiumApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'LiveGO Premium',
       theme: AppTheme.dark(),
+
+      // Root black guard:
+      // Keep the whole Flutter app canvas black underneath every route.
+      // This helps diagnose/remove white frames during TV Player handoff
+      // without touching Android native resources yet.
+      builder: (context, child) {
+        return ColoredBox(
+          color: Colors.black,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const AdaptiveRoot(),
     );
   }

@@ -67,6 +67,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bg,
+      canvasColor: bg,
       colorScheme: const ColorScheme.dark(
         primary: cyan,
         secondary: purple,
@@ -75,6 +76,7 @@ class AppTheme {
       ),
       fontFamily: 'Roboto',
       cardColor: surface,
+      dialogBackgroundColor: surface,
       dividerColor: borderSoft,
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
