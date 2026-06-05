@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -139,26 +140,61 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       });
   }
 
-  void _closeConfirmPopup() {
+  void _discardAndExit() {
     _markBackHandled();
-    if (!mounted) return;
-    setState(() => _confirmOpen = false);
+    _restoreInitialSettings();
+    _dirty = false;
+    _confirmOpen = false;
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  bool _focusAndReveal(FocusNode node) {
+    if (node.context == null || !node.canRequestFocus) return false;
+    if (!node.hasFocus) node.requestFocus();
+    _revealFocusedNode(node);
+    return true;
+  }
+
+  void _revealFocusedNode(FocusNode node) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_categoryMode) {
-        _focusSource(_lastIndex, categoryMode: true, categoryIndex: _categoryIndex, throttle: false);
-      } else {
-        _focusSource(_lastIndex, categoryMode: false, throttle: false);
-      }
+      if (!mounted || node.context == null || !node.hasFocus) return;
+      try {
+        final scrollable = Scrollable.maybeOf(node.context!);
+        final renderObject = node.context!.findRenderObject();
+        if (scrollable == null || renderObject == null) return;
+        final viewport = RenderAbstractViewport.maybeOf(renderObject);
+        if (viewport == null) return;
+
+        final position = scrollable.position;
+        if (!position.hasPixels || !position.hasViewportDimension) return;
+
+        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+        final current = position.pixels;
+        final visibleBottom = current + position.viewportDimension;
+
+        double? target;
+        if (leading < current + TvSafeZone.listTop) {
+          target = leading - TvSafeZone.listTop;
+        } else if (trailing > visibleBottom - TvSafeZone.listBottom) {
+          target = trailing - position.viewportDimension + TvSafeZone.listBottom;
+        }
+
+        if (target == null) return;
+        final clamped = target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((clamped - current).abs() < 1) return;
+        position.jumpTo(clamped);
+      } catch (_) {}
     });
   }
 
   void _focusBack() {
     if (_backNode.context == null || !_backNode.canRequestFocus) return;
-    final ok = tvFocus(_backNode, alignment: 0.06, throttle: false);
-    if (!ok) return;
     _categoryMode = false;
     if (mounted) setState(() {});
+    _focusAndReveal(_backNode);
   }
 
   void _focusSource(int index, {bool categoryMode = false, int? categoryIndex, bool throttle = true}) {
@@ -175,18 +211,11 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (nextCategoryIndex >= categories.length) nextCategoryIndex = categories.length - 1;
     if (nextCategoryIndex < 0) nextCategoryIndex = 0;
 
-    final ok = tvFocusComfort(
-      node,
-      topMargin: TvSafeZone.listTop,
-      bottomMargin: TvSafeZone.listBottom,
-      throttle: throttle,
-    );
-    if (!ok) return;
-
     _lastIndex = target;
     _categoryMode = nextCategoryMode;
     _categoryIndex = nextCategoryIndex;
     if (mounted) setState(() {});
+    _focusAndReveal(node);
   }
 
   void _markDobdaBeta() {
@@ -293,7 +322,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (_ignoreRepeatedBack()) return;
 
     if (_confirmOpen) {
-      _closeConfirmPopup();
+      _discardAndExit();
       return;
     }
 
@@ -331,9 +360,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
       if (node == _stayNode) {
-        tvFocus(_saveNode, alignment: 0.5);
+        tvFocus(_saveNode, alignment: 0.5, throttle: false);
       } else {
-        tvFocus(_stayNode, alignment: 0.5);
+        tvFocus(_stayNode, alignment: 0.5, throttle: false);
       }
       return KeyEventResult.handled;
     }
@@ -341,12 +370,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (node == _saveNode) {
         _saveAndExit();
       } else {
-        _closeConfirmPopup();
+        _discardAndExit();
       }
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
-      _closeConfirmPopup();
+      _discardAndExit();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -578,7 +607,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                       stayNode: _stayNode,
                       saveNode: _saveNode,
                       onKey: _confirmKey,
-                      onStay: _closeConfirmPopup,
+                      onStay: _discardAndExit,
                       onSave: _saveAndExit,
                     ),
                 ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -154,10 +155,52 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     _focusRow(_lastRow, throttle: false);
   }
 
+  bool _focusAndReveal(FocusNode node) {
+    if (node.context == null || !node.canRequestFocus) return false;
+    if (!node.hasFocus) node.requestFocus();
+    _revealFocusedNode(node);
+    return true;
+  }
+
+  void _revealFocusedNode(FocusNode node) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || node.context == null || !node.hasFocus) return;
+      try {
+        final scrollable = Scrollable.maybeOf(node.context!);
+        final renderObject = node.context!.findRenderObject();
+        if (scrollable == null || renderObject == null) return;
+        final viewport = RenderAbstractViewport.maybeOf(renderObject);
+        if (viewport == null) return;
+
+        final position = scrollable.position;
+        if (!position.hasPixels || !position.hasViewportDimension) return;
+
+        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+        final current = position.pixels;
+        final visibleBottom = current + position.viewportDimension;
+
+        double? target;
+        if (leading < current + TvSafeZone.listTop) {
+          target = leading - TvSafeZone.listTop;
+        } else if (trailing > visibleBottom - TvSafeZone.listBottom) {
+          target = trailing - position.viewportDimension + TvSafeZone.listBottom;
+        }
+
+        if (target == null) return;
+        final clamped = target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((clamped - current).abs() < 1) return;
+        position.jumpTo(clamped);
+      } catch (_) {}
+    });
+  }
+
   void _focusBack() {
     if (!widget.showBackButton) return;
     _zone = TvZone.nav;
-    tvFocus(_backNode, alignment: 0.10);
+    _focusAndReveal(_backNode);
   }
 
   bool _focusRow(int index, {bool throttle = true}) {
@@ -165,17 +208,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     final target = _safe(index);
     final node = _rowNodes[target];
 
-    final ok = tvFocusComfort(
-      node,
-      topMargin: TvSafeZone.listTop,
-      bottomMargin: TvSafeZone.listBottom,
-      throttle: throttle,
-    );
-    if (!ok) return false;
-
     _zone = TvZone.settings;
     _lastRow = target;
-    return true;
+    return _focusAndReveal(node);
   }
 
   bool _ignoreRepeatedBack() {
