@@ -10,7 +10,7 @@ import '../../data/api_manager/api_endpoint_registry.dart';
 import '../../data/api_manager/api_capability_lock.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
-import '../focus/tv_reachability.dart';
+import '../layout/tv_safe_zone.dart';
 import '../widgets/tv_focused_border.dart';
 
 class TvSourceManagerScreen extends StatefulWidget {
@@ -55,7 +55,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (!mounted) return;
       if (_hasPlatforms) {
         _focusSource(0, throttle: false);
-        _autoPingOnce();
+        _markDobdaBeta();
       } else {
         _focusBack();
       }
@@ -155,7 +155,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   void _focusBack() {
-    final focused = tvFocusComfort(_backNode, topMargin: 82, bottomMargin: 160);
+    final focused = tvFocusComfort(_backNode, topMargin: TvSafeZone.listTop, bottomMargin: TvSafeZone.listBottom);
     if (!focused) return;
     _categoryMode = false;
     if (mounted) setState(() {});
@@ -173,8 +173,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (nextCategoryIndex < 0) nextCategoryIndex = 0;
     final focused = tvFocusComfort(
       _sourceNodes[target],
-      topMargin: 112,
-      bottomMargin: 180,
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.listBottom,
       throttle: throttle,
     );
     if (!focused) return;
@@ -184,38 +184,18 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _autoPingOnce() async {
-    if (_pingingSlug != null) return;
-
-    // Jangan ping semua source Dobda sekaligus. Setelah Dobda masuk daftar,
-    // ping seluruh platform bisa membuat Source Manager terasa berat. Cukup
-    // cek platform yang sedang aktif, maksimal 6, dan tandai Dobda sebagai BETA.
+  void _markDobdaBeta() {
+    // Source Manager must stay light. Opening config must not start network
+    // work; API health checks belong to API session, not menu rendering.
     if (_platforms.isEmpty) return;
+    var changed = false;
     for (final slug in _platforms) {
-      if (LiveGoCatalog.isDobdaPlatform(slug)) {
+      if (LiveGoCatalog.isDobdaPlatform(slug) && LiveGoSettings.statusFor(slug) != 'beta') {
         LiveGoSettings.setPlatformStatus(slug, 'beta');
+        changed = true;
       }
     }
-
-    final targets = _platforms
-        .where(LiveGoSettings.isPlatformActive)
-        .where((slug) => !LiveGoCatalog.isDobdaPlatform(slug))
-        .take(6)
-        .toList();
-    for (final slug in targets) {
-      if (!mounted) return;
-      setState(() => _pingingSlug = slug);
-      await LiveGoCatalog.pingPlatform(slug).timeout(
-        const Duration(seconds: 3),
-        onTimeout: () {
-          LiveGoSettings.setPlatformStatus(slug, 'slow');
-          return 'slow';
-        },
-      );
-      if (!mounted) return;
-      setState(() {});
-    }
-    if (mounted) setState(() => _pingingSlug = null);
+    if (changed && mounted) setState(() {});
   }
 
   void _showSnack(String message) {
@@ -507,7 +487,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _syncNodes(_platforms.length);
+    final platforms = _platforms;
+    if (_sourceNodes.length != platforms.length) _syncNodes(platforms.length);
 
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
@@ -540,7 +521,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     style: const TextStyle(decoration: TextDecoration.none),
                     child: ListView(
                       controller: _scrollController,
-                      padding: TvReachability.managerPadding,
+                      padding: TvSafeZone.source,
+                      cacheExtent: TvSafeZone.cacheExtent,
                       children: [
                       _SourceHeader(
                         backNode: _backNode,
@@ -553,14 +535,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppTheme.surface, AppTheme.bgDeep],
-                          ),
+                          color: AppTheme.surface.withOpacity(0.90),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: AppTheme.border),
-                          boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.032), blurRadius: 18)],
                         ),
                         child: Column(
                           children: [
@@ -592,7 +569,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         'OK ON/OFF platform • RIGHT masuk kategori • OK di kategori ON/OFF • BACK keluar mode kategori',
                         style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
                       ),
-                      TvReachability.tailSpacer,
+                      const SizedBox(height: TvSafeZone.bottomReach),
                     ],
                   ),
                 ),
@@ -801,13 +778,7 @@ class _SourceRow extends StatelessWidget {
 
   BoxDecoration _panelDecoration({required bool focused, required bool selectedPanel}) {
     return BoxDecoration(
-      gradient: active
-          ? const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF10243A), Color(0xFF07111F)],
-            )
-          : LinearGradient(colors: [Colors.black.withOpacity(0.72), const Color(0xFF020617)]),
+      color: active ? AppTheme.surface.withOpacity(0.92) : AppTheme.bgDeep.withOpacity(0.82),
       borderRadius: BorderRadius.circular(22),
       border: Border.all(
         color: focused && selectedPanel
@@ -815,9 +786,6 @@ class _SourceRow extends StatelessWidget {
             : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
         width: focused && selectedPanel ? 1.7 : 1,
       ),
-      boxShadow: focused && selectedPanel
-          ? [TvFocusStyle.glow(0.055, 5)]
-          : [const BoxShadow(color: Colors.black38, blurRadius: 7)],
     );
   }
 
@@ -843,8 +811,7 @@ class _SourceRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Column(
                     children: [
-                      AnimatedContainer(
-                        duration: TvFocusStyle.fast,
+                      Container(
                         padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
                         decoration: _panelDecoration(focused: focused, selectedPanel: !categoryMode),
                         child: Row(
@@ -900,8 +867,7 @@ class _SourceRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      AnimatedContainer(
-                        duration: TvFocusStyle.fast,
+                      Container(
                         padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
                         decoration: _panelDecoration(focused: focused, selectedPanel: categoryMode),
                         child: Row(
@@ -1065,7 +1031,7 @@ class _StatusLamp extends StatelessWidget {
           Container(
             width: 13,
             height: 13,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.32), blurRadius: 10)]),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
           Expanded(
