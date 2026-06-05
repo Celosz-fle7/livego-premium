@@ -313,7 +313,8 @@ class LiveGoLocalStore {
 
       LiveGoSettings.language = _string(json['language'], LiveGoSettings.language);
       LiveGoSettings.quality = _string(json['quality'], LiveGoSettings.quality);
-      LiveGoSettings.layoutMode = _string(json['layoutMode'], LiveGoSettings.layoutMode);
+      // TV build must not restore HP/Mobile layout from old saved settings.
+      LiveGoSettings.layoutMode = 'TV';
       LiveGoSettings.drmMode = _string(json['drmMode'], LiveGoSettings.drmMode);
       LiveGoSettings.subtitlesEnabled = _bool(json['subtitlesEnabled'], LiveGoSettings.subtitlesEnabled);
       LiveGoSettings.autoNextEnabled = _bool(json['autoNextEnabled'], LiveGoSettings.autoNextEnabled);
@@ -323,8 +324,8 @@ class LiveGoLocalStore {
       LiveGoSettings.cachePlayback = _bool(json['cachePlayback'], LiveGoSettings.cachePlayback);
       LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
       LiveGoSettings.tvSourceSetupCompleted = _bool(json['tvSourceSetupCompleted'], LiveGoSettings.tvSourceSetupCompleted);
-      LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 6).toInt();
-      LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(4, 10).toInt();
+      LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 5).toInt();
+      LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(6, 10).toInt();
 
       final active = _stringList(json['activePlatforms']).where(supported.contains).toList();
       final home = _stringList(json['homePlatforms']).where(supported.contains).toList();

@@ -53,11 +53,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   List<_SettingsSection> get _sections => [
         _SettingsSection(
           title: 'Tampilan & Navigasi',
-          description: 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
+          description: 'Mode TV dikunci. Grid HP dan TV dipisah agar tidak bertabrakan.',
           items: [
-            _SettingItem.radio(kind: _SettingKind.layoutAuto, title: 'Otomatis (Ikuti Hardware)', active: LiveGoSettings.layoutMode == 'Auto'),
-            _SettingItem.radio(kind: _SettingKind.layoutMobile, title: 'Smartphone / Tablet (Android)', active: LiveGoSettings.layoutMode == 'Mobile'),
-            _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: LiveGoSettings.layoutMode == 'TV'),
+            _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: true),
           ],
         ),
         _SettingsSection(
@@ -67,7 +65,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               kind: _SettingKind.tvGrid,
               icon: Icons.grid_view_rounded,
               title: 'Jumlah Grid Home TV',
-              subtitle: 'LEFT kurang, RIGHT/OK tambah. Nilai ini langsung mengatur jumlah kolom poster Home TV.',
+              subtitle: 'LEFT kurang, RIGHT/OK tambah. TV memakai 6–10 kolom, terpisah dari grid HP.',
               value: '${LiveGoSettings.tvHomeGrid}',
               showGridBar: true,
             ),
@@ -113,6 +111,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _lockTvLayout(persist: true);
     _scheduleEntry();
   }
 
@@ -270,12 +269,32 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     _jumpToCursor(next);
   }
 
+  void _lockTvLayout({bool persist = false}) {
+    var changed = false;
+    if (LiveGoSettings.layoutMode != 'TV') {
+      LiveGoSettings.layoutMode = 'TV';
+      changed = true;
+    }
+
+    final beforeGrid = LiveGoSettings.tvHomeGrid;
+    LiveGoSettings.setTvHomeGrid(beforeGrid);
+    if (LiveGoSettings.tvHomeGrid != beforeGrid) changed = true;
+
+    if (persist && changed) {
+      LiveGoLocalStore.saveSettings();
+    }
+  }
+
   void _persistSettings() {
+    _lockTvLayout();
     LiveGoLocalStore.saveSettings();
   }
 
   void _adjustTvGrid(int delta) {
-    setState(() => LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta));
+    setState(() {
+      LiveGoSettings.layoutMode = 'TV';
+      LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta);
+    });
     _persistSettings();
     _jumpToCursor(_cursor);
   }
@@ -298,12 +317,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     setState(() {
       switch (kind) {
         case _SettingKind.layoutAuto:
-          LiveGoSettings.layoutMode = 'Auto';
-          break;
         case _SettingKind.layoutMobile:
-          LiveGoSettings.layoutMode = 'Mobile';
-          break;
         case _SettingKind.layoutTv:
+          // TV Settings cannot switch into HP/Mobile layout.
           LiveGoSettings.layoutMode = 'TV';
           break;
         case _SettingKind.backgroundPoster:
@@ -328,6 +344,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
         case _SettingKind.reset:
           LiveGoSettings.reset();
+          LiveGoSettings.layoutMode = 'TV';
+          LiveGoSettings.setTvHomeGrid(6);
           break;
       }
     });

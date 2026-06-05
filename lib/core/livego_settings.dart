@@ -6,7 +6,7 @@ class LiveGoSettings {
   static String language = 'id';
   static String defaultPlatform = 'shortmax';
   static String quality = 'Auto';
-  static String layoutMode = 'Auto';
+  static String layoutMode = 'TV';
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
   static bool autoNextEnabled = true;
@@ -102,18 +102,20 @@ class LiveGoSettings {
 
 
   static void setMobileHomeGrid(int value) {
-    mobileHomeGrid = value.clamp(2, 6);
+    // HP/mobile grid range is separate from TV.
+    mobileHomeGrid = value.clamp(2, 5);
   }
 
   static void setTvHomeGrid(int value) {
-    tvHomeGrid = value.clamp(4, 10);
+    // Android TV grid range is separate from HP/mobile.
+    tvHomeGrid = value.clamp(6, 10);
   }
 
   static void reset() {
     language = 'id';
     defaultPlatform = 'shortmax';
     quality = 'Auto';
-    layoutMode = 'Auto';
+    layoutMode = 'TV';
     drmMode = 'Auto';
     subtitlesEnabled = true;
     autoNextEnabled = true;
