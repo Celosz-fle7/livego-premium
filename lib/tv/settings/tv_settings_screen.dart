@@ -223,20 +223,24 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     return false;
   }
 
-  void _goBack() {
+  void _popScreen() {
     _entryPending = false;
     if (Navigator.of(context).canPop()) Navigator.of(context).maybePop();
+  }
+
+  void _moveToNav() {
+    _zone = TvZone.nav;
+    _entryPending = false;
+    widget.onMoveToNav?.call();
   }
 
   void _handleBack() {
     if (_ignoreRepeatedBack()) return;
     if (widget.onMoveToNav != null) {
-      _zone = TvZone.nav;
-      _entryPending = false;
-      widget.onMoveToNav?.call();
+      _moveToNav();
       return;
     }
-    _goBack();
+    _popScreen();
   }
 
   KeyEventResult _backKey(FocusNode node, KeyEvent event) {
@@ -248,11 +252,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft && widget.onMoveToNav != null) {
-      widget.onMoveToNav?.call();
+      _moveToNav();
       return KeyEventResult.handled;
     }
     if (_isSelect(key)) {
-      _goBack();
+      _handleBack();
       return KeyEventResult.handled;
     }
     if (_isBack(key)) {
@@ -294,7 +298,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         return KeyEventResult.handled;
       }
       if (widget.onMoveToNav != null) {
-        widget.onMoveToNav?.call();
+        _moveToNav();
       } else if (widget.showBackButton) {
         _focusBack();
       }
@@ -460,7 +464,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                     showBackButton: widget.showBackButton,
                     backNode: _backNode,
                     onBackKey: _backKey,
-                    onBackTap: _goBack,
+                    onBackTap: _handleBack,
                   ),
                   const SizedBox(height: 12),
                   Row(
