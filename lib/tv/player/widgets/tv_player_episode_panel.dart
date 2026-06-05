@@ -22,14 +22,12 @@ class TvPlayerEpisodePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalSafe = total.clamp(1, 120).toInt();
-    final ordered = episodes.isEmpty
-        ? List.generate(totalSafe, (i) => LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}'))
-        : episodes;
-    final activePos = ordered.indexWhere((e) => e.index == cursor);
-    final center = activePos >= 0 ? activePos : ordered.indexWhere((e) => e.index == selected);
-    final startPos = ((center >= 0 ? center : 0) - 5).clamp(0, ordered.length - 1).toInt();
-    final endPos = (startPos + 11).clamp(0, ordered.length - 1).toInt();
-    final visible = ordered.sublist(startPos, endPos + 1);
+    final visible = _visibleEpisodeRows(
+      episodes: episodes,
+      totalSafe: totalSafe,
+      selected: selected,
+      cursor: cursor,
+    );
 
     return RepaintBoundary(
       child: Container(
@@ -78,6 +76,62 @@ class TvPlayerEpisodePanel extends StatelessWidget {
       ),
     );
   }
+}
+
+
+List<_EpisodePanelRowData> _visibleEpisodeRows({
+  required List<LiveGoEpisode> episodes,
+  required int totalSafe,
+  required int selected,
+  required int cursor,
+}) {
+  const windowSize = 11;
+  final safeTotal = totalSafe.clamp(1, 120).toInt();
+
+  if (episodes.isEmpty) {
+    final center = cursor > 0 ? cursor : selected;
+    final safeCenter = center.clamp(1, safeTotal).toInt();
+    final start = (safeCenter - 5).clamp(1, safeTotal).toInt();
+    final end = (start + windowSize - 1).clamp(1, safeTotal).toInt();
+    final correctedStart = (end - windowSize + 1).clamp(1, end).toInt();
+
+    return List<_EpisodePanelRowData>.generate(
+      end - correctedStart + 1,
+      (index) {
+        final ep = correctedStart + index;
+        return _EpisodePanelRowData(index: ep, title: 'Episode $ep');
+      },
+      growable: false,
+    );
+  }
+
+  final activePos = episodes.indexWhere((e) => e.index == cursor);
+  final selectedPos = episodes.indexWhere((e) => e.index == selected);
+  final center = activePos >= 0 ? activePos : (selectedPos >= 0 ? selectedPos : 0);
+  final startPos = (center - 5).clamp(0, episodes.length - 1).toInt();
+  final endPos = (startPos + windowSize - 1).clamp(0, episodes.length - 1).toInt();
+  final correctedStart = (endPos - windowSize + 1).clamp(0, endPos).toInt();
+
+  return List<_EpisodePanelRowData>.generate(
+    endPos - correctedStart + 1,
+    (index) {
+      final row = episodes[correctedStart + index];
+      final ep = row.index <= 0 ? correctedStart + index + 1 : row.index;
+      final title = row.title.trim().isEmpty ? 'Episode $ep' : row.title.trim();
+      return _EpisodePanelRowData(index: ep, title: title);
+    },
+    growable: false,
+  );
+}
+
+class _EpisodePanelRowData {
+  final int index;
+  final String title;
+
+  const _EpisodePanelRowData({
+    required this.index,
+    required this.title,
+  });
 }
 
 class _EpisodeListRow extends StatelessWidget {
