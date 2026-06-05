@@ -37,6 +37,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   int _lastBackMs = 0;
   int _lastSelectMs = 0;
   int _focusRetryToken = 0;
+  bool _openingSubscreen = false;
 
   List<_AccountItem> get _items => <_AccountItem>[
         _AccountItem(Icons.layers_rounded, 'Kelola Sumber Data', 'Atur Anichin, bahasa, kategori, dan platform aktif.', 'SOURCE', () => _push(const TvSourceManagerScreen())),
@@ -97,6 +98,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastBackMs < 420) return;
     _lastBackMs = now;
+
+    // Leaving Account means Shell/Navbar owns the next focus. Cancel any
+    // pending internal row restore so Account does not pull focus back.
+    _focusRetryToken++;
     widget.onBackToNav?.call();
   }
 
@@ -120,7 +125,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _push(Widget screen) {
+    if (_openingSubscreen || !mounted) return;
+    _openingSubscreen = true;
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen)).whenComplete(() {
+      _openingSubscreen = false;
       if (!mounted) return;
       _lastBackMs = DateTime.now().millisecondsSinceEpoch;
       _scheduleFocusRow(_index);
@@ -131,7 +139,15 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, backgroundColor: AppTheme.surface2, duration: const Duration(seconds: 2)));
-    _focusRow(_index, throttle: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusRow(_index, throttle: false);
+    });
+  }
+
+  void _activateItem(int index, _AccountItem item) {
+    if (!_selectAllowed()) return;
+    _index = _safe(index);
+    item.onTap();
   }
 
   KeyEventResult _rowKey(int index, _AccountItem item, KeyEvent event) {
@@ -145,19 +161,19 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusRow(current - 1);
+      if (current > 0) _focusRow(current - 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(current + 1);
+      if (current < _nodes.length - 1) _focusRow(current + 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      widget.onMoveToNav?.call();
+      _backToNav();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      if (_selectAllowed()) item.onTap();
+      _activateItem(current, item);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -196,10 +212,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                     _AccountActionCard(
                       node: _nodes[i],
                       item: items[i],
-                      onTap: () {
-                        _index = i;
-                        items[i].onTap();
-                      },
+                      onTap: () => _activateItem(i, items[i]),
                       onKey: (node, event) => _rowKey(i, items[i], event),
                     ),
                     if (i < items.length - 1) const SizedBox(height: 10),

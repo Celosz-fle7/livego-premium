@@ -33,6 +33,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   int _lastRow = 0;
   bool _entryPending = false;
   int _lastBackHandledMs = 0;
+  bool _openingSubscreen = false;
 
   List<_SettingsSection> get _sections => [
         _SettingsSection(
@@ -158,11 +159,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     tvFocus(_backNode, alignment: 0.10);
   }
 
-  void _focusRow(int index) {
-    if (_rowNodes.isEmpty) return;
+  bool _focusRow(int index, {bool throttle = true}) {
+    if (_rowNodes.isEmpty) return false;
     _zone = TvZone.settings;
     _lastRow = _safe(index);
-    tvFocusComfort(_rowNodes[_lastRow], topMargin: 104, bottomMargin: 180);
+    return tvFocusComfort(_rowNodes[_lastRow], topMargin: 88, bottomMargin: 160, throttle: throttle);
   }
 
   bool _ignoreRepeatedBack() {
@@ -173,6 +174,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   void _goBack() {
+    _entryPending = false;
     if (Navigator.of(context).canPop()) Navigator.of(context).maybePop();
   }
 
@@ -180,6 +182,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (_ignoreRepeatedBack()) return;
     if (widget.onMoveToNav != null) {
       _zone = TvZone.nav;
+      _entryPending = false;
       widget.onMoveToNav?.call();
       return;
     }
@@ -215,15 +218,17 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     final key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (index == 0 && widget.showBackButton) {
+      final current = _safe(index);
+      if (current == 0 && widget.showBackButton) {
         _focusBack();
-      } else {
-        _focusRow(index == 0 ? 0 : index - 1);
+      } else if (current > 0) {
+        _focusRow(current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      _focusRow(index < _rowNodes.length - 1 ? index + 1 : index);
+      final current = _safe(index);
+      if (current < _rowNodes.length - 1) _focusRow(current + 1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -294,16 +299,17 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _activate(_SettingKind kind) {
     if (kind == _SettingKind.sourceManager) {
+      if (_openingSubscreen || !mounted) return;
+      _openingSubscreen = true;
       Navigator.of(context)
           .push(MaterialPageRoute(builder: (_) => const TvSourceManagerScreen()))
           .then((_) {
+        _openingSubscreen = false;
         if (!mounted) return;
         setState(() {});
-        void restore() {
-          if (mounted) _focusRow(_lastRow);
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-        Future<void>.delayed(const Duration(milliseconds: 120), restore);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusRow(_lastRow, throttle: false);
+        });
       });
       return;
     }
@@ -397,7 +403,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           backgroundColor: AppTheme.bgDeep,
           body: SafeArea(
             top: true,
-            bottom: false,
+            bottom: true,
             left: false,
             right: false,
             child: DefaultTextStyle.merge(
@@ -717,15 +723,14 @@ class _FocusedSettingRow extends StatelessWidget {
             focusColor: Colors.transparent,
             child: Column(
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
+                Container(
                   margin: const EdgeInsets.symmetric(vertical: 3),
                   padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
                   decoration: BoxDecoration(
                     color: focused ? AppTheme.surface3 : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
-                    boxShadow: focused ? [BoxShadow(color: accent.withOpacity(0.10), blurRadius: 10)] : null,
+                    boxShadow: null,
                   ),
                   child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
                 ),
