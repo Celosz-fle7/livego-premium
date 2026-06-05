@@ -327,51 +327,54 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _scheduleBootstrapRetry({bool forceBanner = false, int attempt = 0}) {
-    if (!mounted || attempt > 3) return;
+    if (!mounted || attempt > 1 || !_primaryFocusMissing()) return;
     final token = ++_bootstrapSerial;
-    final delay = attempt == 0
-        ? Duration.zero
-        : attempt == 1
-            ? const Duration(milliseconds: 50)
-            : attempt == 2
-                ? const Duration(milliseconds: 150)
-                : const Duration(milliseconds: 300);
+    final delay = attempt == 0 ? Duration.zero : const Duration(milliseconds: 80);
 
     Future<void>.delayed(delay, () {
-      if (!mounted || token != _bootstrapSerial) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || token != _bootstrapSerial) return;
-        _bootstrapActiveFocus(forceBanner: forceBanner, bypassThrottle: true, allowRetry: false);
-        if (_primaryFocusMissing() && attempt < 3) {
-          _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: attempt + 1);
-        }
-      });
+      if (!mounted || token != _bootstrapSerial || !_primaryFocusMissing()) return;
+      _bootstrapActiveFocus(
+        forceBanner: forceBanner,
+        bypassThrottle: true,
+        allowRetry: false,
+      );
+      if (_primaryFocusMissing() && attempt < 1) {
+        _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: attempt + 1);
+      }
     });
   }
 
   void _bootstrapActiveFocus({bool forceBanner = false, bool bypassThrottle = false, bool allowRetry = true}) {
     if (!mounted) return;
+
+    // Bootstrap is only an emergency net when focus is actually lost. Screen
+    // internals own normal row/grid focus, so Shell must not keep re-asserting
+    // focus after every handoff.
+    if (!_exitOpen && !_primaryFocusMissing()) return;
+
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (!bypassThrottle && now - _lastBootstrapMs < 150) {
-      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+    if (!bypassThrottle && now - _lastBootstrapMs < 180) {
+      if (allowRetry && _primaryFocusMissing()) {
+        _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+      }
       return;
     }
     _lastBootstrapMs = now;
 
     if (_exitOpen) {
       tvFocus(_exitCancelNode, alignment: 0.50, throttle: false);
-      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
       return;
     }
 
     if (_navMode == TvSideNavMode.focused || _navHasFocus) {
       _focusNav(_navCursorIndex);
-      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
       return;
     }
 
-    _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
-    if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+    if (_primaryFocusMissing()) {
+      _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
+      if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
+    }
   }
 
   KeyEventResult _rootKey(FocusNode node, KeyEvent event) {
