@@ -8,7 +8,6 @@ import '../../data/livego_catalog.dart';
 import '../../data/api_manager/livego_api_manager.dart';
 import '../../data/api_manager/api_endpoint_registry.dart';
 import '../../data/api_manager/api_capability_lock.dart';
-import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
 import '../widgets/tv_focused_border.dart';
@@ -510,12 +509,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           },
           child: Scaffold(
             backgroundColor: AppTheme.bgDeep,
-            body: SafeArea(
-              top: true,
-              bottom: true,
-              left: false,
-              right: false,
-              child: Stack(
+            body: Stack(
                 children: [
                   DefaultTextStyle.merge(
                     style: const TextStyle(decoration: TextDecoration.none),
@@ -583,7 +577,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     ),
                 ],
               ),
-            ),
           ),
         ),
       ),
@@ -650,10 +643,9 @@ class _SourceHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        gradient: AppTheme.panelGradient,
+        color: AppTheme.surface.withOpacity(0.92),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border),
-        boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.045), blurRadius: 18)],
       ),
       child: Row(
         children: [
@@ -1050,29 +1042,24 @@ class _SwitchPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       width: 84,
       height: 36,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        gradient: active ? AppTheme.activeGradient : null,
-        color: active ? null : Colors.white.withOpacity(0.055),
+        color: active ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? AppTheme.whiteGlow : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 1.7 : 1),
-        boxShadow: focused ? [TvFocusStyle.glow(0.055, 5)] : null,
+        border: Border.all(color: focused ? AppTheme.cyan : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 1.7 : 1),
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
         children: [
-          AnimatedContainer(
-            duration: TvFocusStyle.fast,
+          Container(
             width: 26,
             height: 26,
             decoration: BoxDecoration(
               color: active ? Colors.white : Colors.white38,
               shape: BoxShape.circle,
-              boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.20), blurRadius: 6)] : null,
             ),
           ),
           Center(
@@ -1097,20 +1084,17 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: TvFocusStyle.fast,
+    return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        gradient: selected ? AppTheme.activeGradient : null,
-        color: selected ? null : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
+        color: selected ? AppTheme.cyan.withOpacity(0.22) : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
         border: Border.all(
-          color: focused ? AppTheme.whiteGlow : (selected ? Colors.white.withOpacity(0.14) : Colors.white12),
+          color: focused ? AppTheme.cyan : (selected ? Colors.white.withOpacity(0.14) : Colors.white12),
           width: focused ? 1.7 : 1,
         ),
-        boxShadow: focused ? [TvFocusStyle.glow(0.055, 5)] : null,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1157,17 +1141,9 @@ class _ConfirmSaveOverlay extends StatelessWidget {
         width: 560,
         padding: const EdgeInsets.all(26),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF10243A), Color(0xFF07111F), Color(0xFF020617)],
-          ),
-          borderRadius: BorderRadius.circular(30),
+          color: AppTheme.surface.withOpacity(0.96),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(color: AppTheme.cyan.withOpacity(0.28), width: 1.2),
-          boxShadow: [
-            const BoxShadow(color: Colors.black87, blurRadius: 36),
-            BoxShadow(color: AppTheme.cyan.withOpacity(0.14), blurRadius: 30),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1180,9 +1156,9 @@ class _ConfirmSaveOverlay extends StatelessWidget {
                   height: 52,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: AppTheme.activeGradient,
+                    color: AppTheme.cyan.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(18),
-                    boxShadow: [TvFocusStyle.glow(0.10, 8)],
+                    border: Border.all(color: AppTheme.cyan.withOpacity(0.32)),
                   ),
                   child: const Icon(Icons.save_rounded, color: Colors.white, size: 26),
                 ),
@@ -1238,21 +1214,18 @@ class _DialogButton extends StatelessWidget {
             canRequestFocus: false,
             onTap: onTap,
             borderRadius: BorderRadius.circular(999),
-            child: AnimatedContainer(
-              duration: TvFocusStyle.fast,
+            child: Container(
               height: 48,
               constraints: const BoxConstraints(minWidth: 132),
               padding: const EdgeInsets.symmetric(horizontal: 22),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: filled ? AppTheme.activeGradient : null,
-                color: filled ? null : Colors.white.withOpacity(focused ? 0.075 : 0.035),
+                color: filled ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(focused ? 0.075 : 0.035),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: focused ? AppTheme.whiteGlow : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
+                  color: focused ? AppTheme.cyan : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
                   width: focused ? 1.7 : 1,
                 ),
-                boxShadow: focused ? [TvFocusStyle.glow(0.10, 8)] : null,
               ),
               child: Text(
                 text,
