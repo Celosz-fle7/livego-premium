@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
+import '../layout/tv_safe_zone.dart';
 
 part 'tv_settings_models.dart';
 part 'tv_settings_widgets.dart';
@@ -26,9 +27,9 @@ class TvSettingsScreen extends StatefulWidget {
 }
 
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
-  static const double _topPadding = 24;
-  static const double _horizontalPadding = 48;
-  static const double _bottomPadding = 220;
+  static const double _topPadding = TvSafeZone.settingsTop;
+  static const double _horizontalPadding = TvSafeZone.settingsSide;
+  static const double _bottomPadding = TvSafeZone.bottomReach;
   static const double _headerHeight = 96;
   static const double _pillsHeight = 42;
   static const double _sectionTitleHeight = 31;
@@ -39,8 +40,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   static const double _tileRowHeight = 82;
   static const double _gridRowHeight = 122;
   static const double _footerHeight = 48;
-  static const double _comfortTop = 110;
-  static const double _comfortBottom = 180;
+  static const double _comfortTop = TvSafeZone.listTop;
+  static const double _comfortBottom = TvSafeZone.listBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-root');
   final ScrollController _scrollController = ScrollController();

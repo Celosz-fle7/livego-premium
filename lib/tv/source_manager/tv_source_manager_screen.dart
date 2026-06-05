@@ -26,9 +26,9 @@ class TvSourceManagerScreen extends StatefulWidget {
 class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   static const int _backGuardMs = 420;
 
-  static const double _topPadding = 24;
-  static const double _horizontalPadding = 48;
-  static const double _bottomPadding = 220;
+  static const double _topPadding = TvSafeZone.sourceTop;
+  static const double _horizontalPadding = TvSafeZone.sourceSide;
+  static const double _bottomPadding = TvSafeZone.bottomReach;
   static const double _headerHeight = 76;
   static const double _afterHeader = 14;
   static const double _panelPadding = 10;

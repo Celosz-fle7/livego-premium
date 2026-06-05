@@ -11,6 +11,15 @@ class TvSafeZone {
   const TvSafeZone._();
 
   static const double bottomReach = 220;
+  static const double accountTop = 24;
+  static const double accountSide = 48;
+  static const double settingsTop = 24;
+  static const double settingsSide = 48;
+  static const double sourceTop = 24;
+  static const double sourceSide = 48;
+  static const double searchTop = 24;
+  static const double searchSideLeft = 40;
+  static const double searchSideRight = 48;
   static const double smallTail = 32;
   static const double cacheExtent = 420;
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../screens/tv_settings_screen.dart';
+import '../layout/tv_safe_zone.dart';
 import '../screens/tv_source_manager_screen.dart';
 import 'tv_account_menu_data.dart';
 import 'widgets/tv_account_header.dart';
@@ -36,17 +37,17 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   static const int _backGuardMs = 420;
   static const int _selectGuardMs = 300;
 
-  static const double _topPadding = 24;
-  static const double _horizontalPadding = 48;
-  static const double _bottomPadding = 220;
+  static const double _topPadding = TvSafeZone.accountTop;
+  static const double _horizontalPadding = TvSafeZone.accountSide;
+  static const double _bottomPadding = TvSafeZone.bottomReach;
   static const double _headerHeight = 98;
   static const double _afterHeader = 14;
   static const double _rowHeight = 86;
   static const double _rowGap = 10;
   static const double _footerGap = 14;
   static const double _footerHeight = 50;
-  static const double _comfortTop = 110;
-  static const double _comfortBottom = 180;
+  static const double _comfortTop = TvSafeZone.listTop;
+  static const double _comfortBottom = TvSafeZone.listBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-account-root');
   final ScrollController _scrollController = ScrollController();
