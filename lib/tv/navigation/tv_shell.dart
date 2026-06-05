@@ -194,7 +194,10 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromBack() {
-    _suppressBack(650);
+    // Content -> navbar is a visual owner handoff, not a route transition.
+    // Long suppression made the next BACK feel dead on Account/History/Favorite/
+    // Download. Keep only a tiny guard against the same physical repeat event.
+    _suppressBack(180);
     _showNav();
   }
 
@@ -273,9 +276,9 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromContentBack() {
-    // Non-Home content BACK always exposes the navbar. Account is a control
-    // center, not a hidden return trap for History/Favorite/Download.
-    _showNavFromBack();
+    // Non-Home content BACK exposes the navbar immediately. Do not add a long
+    // cooldown here; users expect the second BACK on the navbar to work.
+    _showNav();
   }
 
   void _preparePlayerRoute() {

@@ -122,6 +122,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _backToNav() {
     if (!_backAllowed()) return;
+
+    // Header BACK should expose Navbar Akun immediately, same as LEFT-to-navbar.
+    // Use onMoveToNav first because Shell's onBackToNav path can intentionally
+    // suppress BACK for route-style handoffs.
+    if (widget.onMoveToNav != null) {
+      widget.onMoveToNav?.call();
+      return;
+    }
     widget.onBackToNav?.call();
   }
 
