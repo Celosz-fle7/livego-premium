@@ -124,14 +124,13 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _backToNav() {
     if (!_backAllowed()) return;
 
-    // Header BACK should expose Navbar Akun immediately, same as LEFT-to-navbar.
-    // Use onMoveToNav first because Shell's onBackToNav path can intentionally
-    // suppress BACK for route-style handoffs.
-    if (widget.onMoveToNav != null) {
-      widget.onMoveToNav?.call();
+    // Account is a navbar page. BACK/LEFT from Account content must return to
+    // navbar Akun first, not to Home and not to the profile/header image.
+    if (widget.onBackToNav != null) {
+      widget.onBackToNav?.call();
       return;
     }
-    widget.onBackToNav?.call();
+    widget.onMoveToNav?.call();
   }
 
   void _jumpToTop() {
@@ -293,12 +292,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
     if (_zone == _AccountZone.menu) {
       if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
-        // Applies to every Account menu item:
-        // Pengaturan Tampilan / Kelola Sumber Data / Tentang / Update.
-        //
-        // Account is a navbar page, so menu BACK/LEFT returns to Navbar Akun.
-        // Subscreens still return to their opening item first; after that,
-        // BACK/LEFT from the item goes to Navbar Akun.
+        // Exact Account ladder:
+        // Account item BACK/LEFT -> navbar Akun.
+        // Settings/Source subscreen BACK still pops back to the item first,
+        // then this rule returns to navbar Akun.
         _backToNav();
         return KeyEventResult.handled;
       }

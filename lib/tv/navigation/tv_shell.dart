@@ -213,9 +213,27 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromBack() {
-    // Short guard only blocks the same physical repeat, not the user's next BACK.
+    // Content -> navbar handoff. Keep cursor on the active navbar item.
+    // Do not return Home here.
     _suppressBack(180);
     _showNav();
+  }
+
+  void _returnToHomeFromNavbar() {
+    // Exact navbar BACK ladder:
+    //
+    // Home last zone -> LEFT navbar -> choose Download/History/Favorite/Account/Search
+    // -> BACK from content returns to that navbar icon
+    // -> BACK from navbar returns to Home last remembered zone.
+    _suppressBack(180);
+    _holdRootFocusDuringBackHandoff();
+    setState(() {
+      _index = TvNavIndex.home;
+      _navCursorIndex = TvNavIndex.home;
+      _navMode = TvSideNavMode.hidden;
+    });
+    _syncOwner();
+    _restoreActiveContentAfterBack(banner: false);
   }
 
   void _moveNavCursor(int navIndex) {
@@ -305,12 +323,14 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromContentBack() {
-    // Applies to every non-Home navbar page:
-    // Unduhan / Histori / Favorit / Akun / Cari.
+    // BACK from any non-Home content page opens the navbar on that same item:
+    // Unduhan -> navbar Unduhan
+    // Histori -> navbar Histori
+    // Favorit -> navbar Favorit
+    // Akun -> navbar Akun
+    // Cari -> navbar Cari
     //
-    // First BACK from content exposes the navbar on the same item. The next BACK
-    // is handled by the global navbar contract above and returns to Home last
-    // zone.
+    // The next BACK is handled by _navHasFocus and returns to Home last zone.
     _showNav();
   }
 
@@ -483,7 +503,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      _returnToHomeV2();
+      _returnToHomeFromNavbar();
       return;
     }
     if (_index == TvNavIndex.home) {
@@ -561,7 +581,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       (_) => TvAccountScreen(
             focusTicket: _index == TvNavIndex.account ? _accountTicket : 0,
             onMoveToNav: _showNav,
-            onBackToNav: _showNavFromBack,
+            onBackToNav: _showNavFromContentBack,
             onBackToHome: _returnToHomeV2,
             onOpenNavIndex: _openFromAccount,
           ),
