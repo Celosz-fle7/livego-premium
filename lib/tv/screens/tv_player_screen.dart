@@ -24,6 +24,7 @@ import '../../services/api/api_platform.dart';
 import '../player/tv_player_focus_controller.dart';
 import '../player/tv_player_route_context.dart';
 import '../player/tv_player_service.dart';
+import '../cache/tv_runtime_cache.dart';
 import '../player/widgets/tv_player_error_overlay.dart';
 import '../player/widgets/tv_player_choice_panel.dart';
 import '../player/widgets/tv_player_control_dock.dart';
@@ -76,6 +77,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   final Set<int> _brokenEpisodes = <int>{};
   List<LiveGoEpisode> _episodes = const <LiveGoEpisode>[];
   List<LiveGoEpisode> _orderedEpisodeCache = const <LiveGoEpisode>[];
+  int _episodeRowsRevision = 0;
+  int _orderedEpisodeCacheRevision = -1;
   Future<List<LiveGoEpisode>>? _episodeListLoad;
   bool _episodeNavigationBusy = false;
   bool _resumePlaybackAfterFailedEpisode = true;
@@ -153,14 +156,33 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return 0;
   }
 
+  int _initialEpisodeFromCache() {
+    final saved = LiveGoLocalStore.continueEpisode(widget.item).clamp(1, 999).toInt();
+    final cached = TvRuntimeCache.getInt(
+      TvRuntimeCache.playerKey(widget.item.id, 'session', 'episode'),
+    );
+    if (cached == null || cached <= 0) return saved;
+    return cached.clamp(1, 999).toInt();
+  }
+
+  void _saveRuntimeEpisodeState({int? episode}) {
+    final safe = (episode ?? _episode).clamp(1, 999).toInt();
+    TvRuntimeCache.setInt(
+      TvRuntimeCache.playerKey(widget.item.id, 'session', 'episode'),
+      safe,
+      ttl: const Duration(hours: 6),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _episode = LiveGoLocalStore.continueEpisode(widget.item).clamp(1, 999).toInt();
+    _episode = _initialEpisodeFromCache();
     _routeContext = TvPlayerRouteContext.fromItem(widget.item, source: 'tv', episode: _episode);
     debugPrint('LIVEGO TV PLAYER OPEN ${_routeContext.debugLabel}');
     _lastPlayableEpisode = _episode;
     _episodeCursor = _episode;
+    _saveRuntimeEpisodeState();
     LiveGoLocalStore.addHistory(widget.item);
     _playerFocus.requestRootFocusPostFrame();
     _loadPreferences();
@@ -443,6 +465,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _currentStreamUrl = playUrl;
       _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
       _lastPlayableEpisode = expectedEpisode;
+      _saveRuntimeEpisodeState(episode: expectedEpisode);
       _brokenEpisodeSkips = 0;
       _lastBrokenReason = '';
       _brokenEpisodes.remove(expectedEpisode);
@@ -653,7 +676,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         _knownEpisodeCount = count.clamp(1, 999).toInt();
         if (normalized.length > 1) {
           _episodes = normalized;
+          _episodeRowsRevision += 1;
           _orderedEpisodeCache = normalized;
+          _orderedEpisodeCacheRevision = _episodeRowsRevision;
         }
       });
       return _orderedEpisodes();
@@ -977,12 +1002,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   List<LiveGoEpisode> _orderedEpisodes() {
-    // Episode rows can change while keeping the same length after detail/API
-    // refresh. Recompute the normalized rows instead of trusting length-only
-    // cache, otherwise PREV/NEXT or the episode side panel can point to stale
-    // chapter ids.
+    // Episode rows only change when _episodes changes. Avoid normalizing the
+    // same list on every remote movement; keep a small in-screen cache and bump
+    // _episodeRowsRevision only when new episode rows arrive.
+    if (_orderedEpisodeCacheRevision == _episodeRowsRevision) {
+      return _orderedEpisodeCache;
+    }
     final normalized = _normalizeEpisodeRows(_episodes, _detail ?? widget.item);
     _orderedEpisodeCache = normalized;
+    _orderedEpisodeCacheRevision = _episodeRowsRevision;
     return normalized;
   }
 
