@@ -168,3 +168,14 @@ Checklist:
 - Jangan tambah animasi visual.
 - Pastikan focus tetap terlihat.
 - Pastikan BACK tetap satu langkah.
+
+## TV Black Route Rule
+
+TV route menuju Detail dan Player wajib memakai black zero-transition route.
+
+Aturan:
+- Jangan pakai MaterialPageRoute default untuk route TV menuju Player.
+- Jangan biarkan default route background putih muncul sebelum destination build.
+- Gunakan route hitam opaque dengan transitionDuration zero.
+- Detail, Download, History/Favorite/Search/Home harus masuk Player lewat route hitam.
+- Video/Player blank putih yang muncul sebelum loading biasanya berasal dari route/parent, bukan VideoPlayer.

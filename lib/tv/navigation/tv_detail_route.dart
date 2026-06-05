@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/content_item.dart';
 import '../screens/tv_content_detail_screen.dart';
+import 'tv_black_page_route.dart';
 import '../../services/analytics/livego_analytics.dart';
 
 /// Satu pintu route untuk semua poster TV.
@@ -19,7 +20,7 @@ class TvDetailRoute {
   }) {
     LiveGoAnalytics.contentOpen(item.platformSlug, item.id, item.title);
     return Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+      TvBlackPageRoute.build<void>(
         builder: (_) => TvContentDetailScreen(
           item: item,
           onPlayerRouteOpen: onPlayerRouteOpen,

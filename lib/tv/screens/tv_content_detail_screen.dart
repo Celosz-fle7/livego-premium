@@ -16,6 +16,7 @@ import '../focus/tv_reachability.dart';
 import '../providers/tv_detail_provider.dart';
 import '../theme/tv_focus_style.dart';
 import 'tv_player_screen.dart';
+import '../navigation/tv_black_page_route.dart';
 import '../../services/analytics/livego_analytics.dart';
 import '../widgets/tv_professional_loading.dart';
 
@@ -111,14 +112,8 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     widget.onPlayerRouteOpen?.call();
     final playerItem = _episodeItem(detail, episode);
     Navigator.of(context)
-        .push(PageRouteBuilder<void>(
-          opaque: true,
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-          pageBuilder: (_, __, ___) => ColoredBox(
-            color: Colors.black,
-            child: TvPlayerScreen(item: playerItem),
-          ),
+        .push(TvBlackPageRoute.build<void>(
+          builder: (_) => TvPlayerScreen(item: playerItem),
         ))
         .whenComplete(() {
       _openingPlayer = false;

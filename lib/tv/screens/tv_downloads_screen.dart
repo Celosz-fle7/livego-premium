@@ -11,6 +11,7 @@ import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
 import 'tv_player_screen.dart';
+import '../navigation/tv_black_page_route.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -158,7 +159,11 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvPlayerScreen(item: record.item))).whenComplete(() {
+    Navigator.of(context)
+        .push(TvBlackPageRoute.build<void>(
+          builder: (_) => TvPlayerScreen(item: record.item),
+        ))
+        .whenComplete(() {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
