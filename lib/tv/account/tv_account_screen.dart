@@ -86,7 +86,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _rootNode.requestFocus();
       if (header) {
         setState(() => _zone = _AccountZone.header);
-        _jumpToTop();
+        if (_items.length > 4) _jumpToTop();
       } else {
         _jumpToCursor(_cursor);
       }
@@ -138,6 +138,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _jumpToCursor(int index) {
     if (!_scrollController.hasClients || _items.isEmpty) return;
 
+    // Account only has four visible menu items. Keep the viewport steady like a
+    // fixed TV menu; aggressive UP/DOWN should move the cursor, not pull scroll.
+    if (_items.length <= 4) return;
+
     final safe = index.clamp(0, _items.length - 1).toInt();
     final position = _scrollController.position;
     final rowTop = _rowOffset(safe);
@@ -161,7 +165,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _moveToHeader() {
     setState(() => _zone = _AccountZone.header);
-    _jumpToTop();
+    if (_items.length > 4) _jumpToTop();
   }
 
   void _moveToMenu({int? index}) {

@@ -5,7 +5,6 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
-import '../focus/tv_focus_utils.dart';
 
 part 'tv_settings_models.dart';
 part 'tv_settings_widgets.dart';
@@ -34,7 +33,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   static const double _pillsHeight = 42;
   static const double _sectionTitleHeight = 31;
   static const double _sectionGap = 16;
-  static const double _cardVerticalPadding = 12;
+  static const double _cardVerticalPadding = 6;
   static const double _descriptionHeight = 48;
   static const double _radioRowHeight = 55;
   static const double _tileRowHeight = 82;
@@ -175,24 +174,24 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _handleBack() {
     if (_ignoreRepeatedBack()) return;
-    if (_zone == TvZone.nav) {
-      if (widget.onMoveToNav != null) {
-        _moveToNav();
-      } else {
-        _popScreen();
-      }
-      return;
-    }
-    if (widget.showBackButton) {
-      setState(() => _zone = TvZone.nav);
-      if (_scrollController.hasClients) _scrollController.jumpTo(0);
-      return;
-    }
-    if (widget.onMoveToNav != null) {
+
+    // Match Source Manager behavior: BACK exits the pushed Settings screen in
+    // one step. Do not first move to the visual header/back button; that made
+    // the screen feel trapped on TV remotes.
+    if (widget.onMoveToNav != null && _zone == TvZone.nav) {
       _moveToNav();
       return;
     }
     _popScreen();
+  }
+
+  bool _ignoreRepeatActivation(KeyEvent event) {
+    if (event is! KeyRepeatEvent) return false;
+    final key = event.logicalKey;
+    return _isSelect(key) ||
+        _isBack(key) ||
+        key == LogicalKeyboardKey.contextMenu ||
+        key == LogicalKeyboardKey.f10;
   }
 
   double _rowHeight(_SettingItem item) {
@@ -207,8 +206,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     var rowIndex = 0;
 
     for (final section in sections) {
-      offset += _sectionTitleHeight;
-      offset += 10;
+      offset += _sectionTitleHeight + 10;
       offset += _cardVerticalPadding;
       if (section.description != null) offset += _descriptionHeight;
 
@@ -218,8 +216,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         rowIndex++;
       }
 
-      offset += _cardVerticalPadding;
-      offset += _sectionGap;
+      offset += _cardVerticalPadding + _sectionGap;
     }
 
     return offset;
@@ -318,7 +315,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
         case _SettingKind.reset:
           LiveGoSettings.reset();
-          _cursor = 0;
           break;
       }
     });
@@ -328,7 +324,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    if (_ignoreRepeatActivation(event)) return KeyEventResult.handled;
 
     final key = event.logicalKey;
 
@@ -432,11 +428,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         ));
       }
       sectionWidgets.addAll([
-        const SizedBox(height: _sectionTitleHeight, child: SizedBox.shrink()),
-        Transform.translate(
-          offset: const Offset(0, -_sectionTitleHeight),
-          child: _SectionTitle(section.title),
-        ),
+        SizedBox(height: _sectionTitleHeight, child: _SectionTitle(section.title)),
         const SizedBox(height: 10),
         _SettingsCard(description: section.description, children: rows),
         const SizedBox(height: _sectionGap),
