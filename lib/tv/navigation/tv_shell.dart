@@ -94,7 +94,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   int _safeNav(int index) => index.clamp(0, _navNodes.length - 1).toInt();
-  bool get _navHasFocus => _navNodes.any((node) => node.hasFocus);
+  bool get _navHasFocus => _navMode == TvSideNavMode.focused;
 
   TvRemoteOwner _ownerFor(int index) {
     switch (index) {
@@ -167,26 +167,15 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _focusNav(int index) {
-    if (_navNodes.isEmpty) return;
     final safe = _safeNav(index);
     _navCursorIndex = safe;
-    final node = _navNodes[safe];
 
-    void syncAfterFocus() {
-      if (!mounted) return;
-      _syncOwner(navFocused: true);
+    // Deterministic navbar: Shell root owns remote input while navbar is active.
+    // SideNav is visual only, so no item FocusNode/requestFocus is used here.
+    if (_rootFocusNode.canRequestFocus) {
+      _rootFocusNode.requestFocus();
     }
-
-    if (node.context != null) {
-      tvFocus(node, alignment: 0.10, throttle: false);
-      syncAfterFocus();
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      tvFocus(node, alignment: 0.10, throttle: false);
-      syncAfterFocus();
-    });
+    _syncOwner(navFocused: true);
   }
 
   void _showNav() {
@@ -217,16 +206,7 @@ class _TvShellState extends ConsumerState<TvShell> {
         _navCursorIndex = safe;
       });
     }
-
-    final node = _navNodes.isEmpty ? null : _navNodes[safe];
-    if (node != null && node.context != null) {
-      _focusNav(safe);
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _navMode != TvSideNavMode.focused) return;
-      _focusNav(safe);
-    });
+    _focusNav(safe);
   }
 
   void _hideNav() {
@@ -325,6 +305,28 @@ class _TvShellState extends ConsumerState<TvShell> {
         tvIsMenuKey(key);
   }
 
+  bool _handleDeterministicNavKey(LogicalKeyboardKey key) {
+    if (_navMode != TvSideNavMode.focused) return false;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _moveNavCursor(_navCursorIndex - 1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _moveNavCursor(_navCursorIndex + 1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
+      _enterContent(_navCursorIndex);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft || tvIsMenuKey(key)) {
+      return true;
+    }
+
+    return false;
+  }
+
   bool _primaryFocusMissing() {
     final primary = FocusManager.instance.primaryFocus;
     if (primary == null) return true;
@@ -393,6 +395,10 @@ class _TvShellState extends ConsumerState<TvShell> {
     final key = event.logicalKey;
     if (tvIsBackKey(key)) {
       _handleBack();
+      return KeyEventResult.handled;
+    }
+
+    if (_handleDeterministicNavKey(key)) {
       return KeyEventResult.handled;
     }
 

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../theme/tv_focus_style.dart';
-import '../focus/tv_focus_utils.dart';
 
 class TvNavItem {
   final IconData icon;
@@ -42,47 +40,6 @@ class TvSideNav extends StatelessWidget {
   bool get _visible => mode != TvSideNavMode.hidden;
   bool get _focused => mode == TvSideNavMode.focused;
 
-  int _safe(int value) {
-    if (focusNodes.isEmpty) return 0;
-    if (value < 0) return 0;
-    final max = focusNodes.length - 1;
-    if (value > max) return max;
-    return value;
-  }
-
-  bool _isSelect(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.select ||
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter ||
-        key == LogicalKeyboardKey.space;
-  }
-
-  KeyEventResult _handleKey(int itemIndex, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowUp) {
-      onChanged(_safe(itemIndex - 1));
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      onChanged(_safe(itemIndex + 1));
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
-      onOpenContent(itemIndex);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      // Already on the left-most rail. LEFT stays in navbar.
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
@@ -94,7 +51,6 @@ class TvSideNav extends StatelessWidget {
   }
 
   Widget _buildRail() {
-    final count = focusNodes.length < TvSideNav.items.length ? focusNodes.length : TvSideNav.items.length;
     return Container(
       margin: const EdgeInsets.fromLTRB(7, 30, 7, 30),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 7),
@@ -110,16 +66,14 @@ class TvSideNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (var i = 0; i < count; i++) ...[
+          for (var i = 0; i < TvSideNav.items.length; i++) ...[
             _NavIconButton(
-              focusNode: focusNodes[i],
               icon: TvSideNav.items[i].icon,
               label: TvSideNav.items[i].label,
               active: i == index,
               railFocused: _focused,
               logo: i == 0,
               onTap: () => onOpenContent(i),
-              onKey: (node, event) => _handleKey(i, event),
             ),
             if (i == 0) ...[
               const SizedBox(height: 8),
@@ -157,67 +111,51 @@ class _HiddenGrip extends StatelessWidget {
 }
 
 class _NavIconButton extends StatelessWidget {
-  final FocusNode focusNode;
   final IconData icon;
   final String label;
   final bool active;
   final bool railFocused;
   final bool logo;
   final VoidCallback onTap;
-  final FocusOnKeyEventCallback onKey;
 
   const _NavIconButton({
-    required this.focusNode,
     required this.icon,
     required this.label,
     required this.active,
     required this.railFocused,
     required this.onTap,
-    required this.onKey,
     this.logo = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: focusNode,
-      builder: (context, _) {
-        final focused = focusNode.hasFocus;
-        final selected = focused || active;
-        final size = 50.0;
-        return Focus(
-          focusNode: focusNode,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            focusColor: Colors.transparent,
-            child: Container(
-              height: size,
-              width: size,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected ? AppTheme.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: focused
-                      ? TvFocusStyle.focusBlue
-                      : (active ? TvFocusStyle.focusBlue.withOpacity(0.30) : Colors.transparent),
-                  width: focused ? 2.0 : 1.0,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: selected ? AppTheme.whiteGlow : Colors.white70,
-                size: logo ? 24 : 22,
-              ),
-            ),
+    final selected = active;
+    final size = 50.0;
+    return InkWell(
+      canRequestFocus: false,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      focusColor: Colors.transparent,
+      child: Container(
+        height: size,
+        width: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected && railFocused
+                ? TvFocusStyle.focusBlue
+                : (selected ? TvFocusStyle.focusBlue.withOpacity(0.30) : Colors.transparent),
+            width: selected && railFocused ? 2.0 : 1.0,
           ),
-        );
-      },
+        ),
+        child: Icon(
+          icon,
+          color: selected ? AppTheme.whiteGlow : Colors.white70,
+          size: logo ? 24 : 22,
+        ),
+      ),
     );
   }
 }
