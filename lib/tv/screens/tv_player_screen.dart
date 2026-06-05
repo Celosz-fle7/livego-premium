@@ -70,6 +70,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   int _lastSavedProgressSecond = -1;
   int _lastBackHandledMs = 0;
   int _lastSelectHandledMs = 0;
+  int _lastOverlayCursorMoveMs = 0;
   int _loadTicket = 0;
   int _lastPlayableEpisode = 1;
   int _brokenEpisodeSkips = 0;
@@ -103,6 +104,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const int _controlCount = 8;
   static const Duration _seekApplyDelay = Duration(milliseconds: 280);
   static const int _optionCount = 6;
+  static const int _overlayCursorMoveGuardMs = 72;
 
 
   List<String> get _qualityChoices {
@@ -846,6 +848,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   bool _selectDebounced([int ms = 280]) => _playerFocus.ignoreSelect(ms);
 
+  bool _allowOverlayCursorMove() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastOverlayCursorMoveMs < _overlayCursorMoveGuardMs) return false;
+    _lastOverlayCursorMoveMs = now;
+    return true;
+  }
+
   void _exitPlayerRoute() {
     if (_routeClosing || !mounted) return;
     _routeClosing = true;
@@ -964,6 +973,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _moveControl(int delta) {
+    if (!_allowOverlayCursorMove()) return;
     setState(() {
       _progressFocused = false;
       _controlCursor = (_controlCursor + delta).clamp(0, _controlCount - 1).toInt();
@@ -1173,6 +1183,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _moveEpisodeCursor(int delta) {
+    if (!_allowOverlayCursorMove()) return;
     final rows = _orderedEpisodes();
     if (rows.length > 1) {
       final current = rows.indexWhere((e) => e.index == _episodeCursor);
@@ -1292,6 +1303,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _moveQualityCursor(int delta) {
+    if (!_allowOverlayCursorMove()) return;
     final choices = _qualityChoices;
     if (choices.isEmpty) return;
     setState(() => _qualityCursor = (_qualityCursor + delta).clamp(0, choices.length - 1).toInt());
@@ -1440,7 +1452,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       return KeyEventResult.handled;
     }
 
-    if (_isMenu(key) && _mode != _PlayerMode.episodeList) {
+    if (_loading && !_hasReadyController) {
+      if (selectPressed) _showStatus('Memuat video...');
+      return KeyEventResult.handled;
+    }
+
+    if (_isMenu(key) && _mode != _PlayerMode.episodeList && _hasReadyController) {
       _showOptionsPanel();
       return KeyEventResult.handled;
     }
@@ -1478,9 +1495,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     if (_mode == _PlayerMode.subtitlePopup) {
       final choices = _subtitleChoices;
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() => _subtitleCursor = (_subtitleCursor - 1).clamp(0, choices.length - 1).toInt());
+        if (_allowOverlayCursorMove()) {
+          setState(() => _subtitleCursor = (_subtitleCursor - 1).clamp(0, choices.length - 1).toInt());
+        }
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _subtitleCursor = (_subtitleCursor + 1).clamp(0, choices.length - 1).toInt());
+        if (_allowOverlayCursorMove()) {
+          setState(() => _subtitleCursor = (_subtitleCursor + 1).clamp(0, choices.length - 1).toInt());
+        }
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _showControlsMode();
       } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
@@ -1495,9 +1516,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           _hideOverlays();
           return KeyEventResult.handled;
         }
-        setState(() => _optionCursor = (_optionCursor - 1).clamp(0, _optionCount - 1).toInt());
+        if (_allowOverlayCursorMove()) {
+          setState(() => _optionCursor = (_optionCursor - 1).clamp(0, _optionCount - 1).toInt());
+        }
       } else if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() => _optionCursor = (_optionCursor + 1).clamp(0, _optionCount - 1).toInt());
+        if (_allowOverlayCursorMove()) {
+          setState(() => _optionCursor = (_optionCursor + 1).clamp(0, _optionCount - 1).toInt());
+        }
       } else if (key == LogicalKeyboardKey.arrowLeft) {
         _changeOption(-1);
       } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
