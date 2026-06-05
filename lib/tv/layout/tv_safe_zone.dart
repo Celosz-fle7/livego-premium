@@ -20,6 +20,7 @@ class TvSafeZone {
   static const EdgeInsets search = EdgeInsets.fromLTRB(40, 24, 48, bottomReach);
   static const EdgeInsets library = EdgeInsets.fromLTRB(40, 24, 48, bottomReach);
   static const EdgeInsets downloads = EdgeInsets.fromLTRB(48, 24, 48, bottomReach);
+  static const EdgeInsets home = EdgeInsets.fromLTRB(32, 28, 44, bottomReach);
 
   static const double listTop = 96;
   static const double listBottom = 160;

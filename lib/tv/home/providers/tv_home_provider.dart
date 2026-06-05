@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/livego_catalog.dart';
 import '../../../models/content_item.dart';
+import '../../../services/content/content_health_service.dart';
 import '../../../services/network/livego_network_status.dart';
 import '../../cache/tv_ram_cache.dart';
 
@@ -66,10 +67,18 @@ class TvHomeContentState {
 class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentController() : super(const TvHomeContentState());
 
+  static const int _maxTvHomeItems = 35;
+
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
   String _lastPlatform = 'shortmax';
   String _lastCategory = 'Populer';
+
+  List<ContentItem> _prepareItems(List<ContentItem> rows) {
+    return ContentHealthService.filterPlayable(rows)
+        .take(_maxTvHomeItems)
+        .toList(growable: false);
+  }
 
   Future<void> load({
     required String platform,
@@ -130,10 +139,11 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       ).timeout(const Duration(milliseconds: 650), onTimeout: () => const <ContentItem>[]);
 
       if (token != _loadToken) return;
-      if (cached.isNotEmpty) {
+      final prepared = _prepareItems(cached);
+      if (prepared.isNotEmpty) {
         final next = TvHomeContentState(
-          hero: cached.first,
-          items: cached,
+          hero: prepared.first,
+          items: prepared,
           loading: false,
           refreshing: true,
           fromCache: true,
@@ -155,9 +165,10 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       ).timeout(const Duration(seconds: 10), onTimeout: () => const <ContentItem>[]);
 
       if (token != _loadToken) return;
-      if (items.isNotEmpty) {
+      final prepared = _prepareItems(items);
+      if (prepared.isNotEmpty) {
         LiveGoNetworkStatus.markOnline();
-        final next = TvHomeContentState(hero: items.first, items: items, loading: false);
+        final next = TvHomeContentState(hero: prepared.first, items: prepared, loading: false);
         _lastGoodState = next;
         TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
         state = next;
@@ -175,10 +186,11 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       ).timeout(const Duration(milliseconds: 800), onTimeout: () => const <ContentItem>[]);
 
       if (token != _loadToken) return;
-      if (fallback.isNotEmpty) {
+      final prepared = _prepareItems(fallback);
+      if (prepared.isNotEmpty) {
         final next = TvHomeContentState(
-          hero: fallback.first,
-          items: fallback,
+          hero: prepared.first,
+          items: prepared,
           loading: false,
           hasError: true,
           fromCache: true,
@@ -228,7 +240,9 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       }
 
       LiveGoNetworkStatus.markOnline();
-      final next = TvHomeContentState(hero: fresh.first, items: fresh, loading: false);
+      final prepared = _prepareItems(fresh);
+      if (prepared.isEmpty) return;
+      final next = TvHomeContentState(hero: prepared.first, items: prepared, loading: false);
       _lastGoodState = next;
       TvRamCache.instance.write(
         TvRamCache.key('home', [platform, selectedCategory]),

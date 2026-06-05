@@ -9,9 +9,8 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
-import '../../services/content/content_health_service.dart';
 import '../focus/tv_focus_utils.dart';
-import '../focus/tv_reachability.dart';
+import '../layout/tv_safe_zone.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
 import '../navigation/tv_nav_index.dart';
@@ -91,8 +90,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _settingsVersion = LiveGoLocalStore.version.value;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
-  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(4, 10).toInt();
-  int get _homeGridLimit => (_gridColumns * 5).clamp(24, 40).toInt();
+  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(4, 7).toInt();
+  int get _homeGridLimit => (_gridColumns * 5).clamp(24, 35).toInt();
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -168,12 +167,20 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     final platforms = LiveGoCatalog.platformLabels;
     final categories = _categories;
     final rawItems = home.items;
-    final gridItems = ContentHealthService.filterPlayable(rawItems).take(_homeGridLimit).toList(growable: false);
+    final gridItems = rawItems.length > _homeGridLimit
+        ? rawItems.take(_homeGridLimit).toList(growable: false)
+        : rawItems;
     _gridItems = gridItems;
 
-    this._syncNodes(_platformNodes, platforms.length, 'tv-home-platform');
-    this._syncNodes(_categoryNodes, categories.length, 'tv-home-category');
-    this._syncNodes(_gridNodes, gridItems.length, 'tv-home-grid');
+    if (_platformNodes.length != platforms.length) {
+      this._syncNodes(_platformNodes, platforms.length, 'tv-home-platform');
+    }
+    if (_categoryNodes.length != categories.length) {
+      this._syncNodes(_categoryNodes, categories.length, 'tv-home-category');
+    }
+    if (_gridNodes.length != gridItems.length) {
+      this._syncNodes(_gridNodes, gridItems.length, 'tv-home-grid');
+    }
 
     if (_platformNodes.isNotEmpty) _platformIndex = this._safe(_platformIndex, _platformNodes.length);
     if (_categoryNodes.isNotEmpty) _categoryIndex = this._safe(_categoryIndex, _categoryNodes.length);
@@ -181,7 +188,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
     this._scheduleEmptyFocusIfNeeded(home, gridItems);
 
-    final padding = TvReachability.homePadding;
+    final padding = TvSafeZone.home;
     final gridTitle = categories.isEmpty ? 'Pilihan' : 'Pilihan ${categories[_categoryIndex]}';
 
     return ListenableBuilder(
@@ -200,14 +207,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             return null;
           }),
         },
-        child: SafeArea(
-          top: true,
-          bottom: true,
-          left: false,
-          right: false,
-          child: CustomScrollView(
+        child: CustomScrollView(
             controller: _scroll,
-            cacheExtent: 720,
+            cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
@@ -318,7 +320,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   items: gridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
+                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
                   mainAxisExtent: 224,
                   onFocus: (i) {
                     _gridIndex = i;
@@ -330,10 +332,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   },
                   onKey: (i, item, node, event) => this._gridKey(i, item, event),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: TvReachability.homeBottomPadding)),
+              const SliverToBoxAdapter(child: SizedBox(height: TvSafeZone.smallTail)),
             ],
           ),
-        ),
       ),
     );
       },
