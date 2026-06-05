@@ -4,7 +4,6 @@ import '../../../core/app_theme.dart';
 import '../../../models/livego_episode.dart';
 
 const int _maxTvEpisodeCount = 999;
-const int _episodePanelWindowSize = 11;
 
 class TvPlayerEpisodePanel extends StatelessWidget {
   final List<LiveGoEpisode> episodes;
@@ -12,6 +11,8 @@ class TvPlayerEpisodePanel extends StatelessWidget {
   final int selected;
   final int cursor;
   final Set<int> broken;
+  final ScrollController scrollController;
+  final double rowHeight;
 
   const TvPlayerEpisodePanel({
     super.key,
@@ -19,18 +20,15 @@ class TvPlayerEpisodePanel extends StatelessWidget {
     required this.total,
     required this.selected,
     required this.cursor,
+    required this.scrollController,
+    required this.rowHeight,
     this.broken = const <int>{},
   });
 
   @override
   Widget build(BuildContext context) {
     final totalSafe = total.clamp(1, _maxTvEpisodeCount).toInt();
-    final visible = _visibleEpisodeRows(
-      episodes: episodes,
-      totalSafe: totalSafe,
-      selected: selected,
-      cursor: cursor,
-    );
+    final itemCount = episodes.isNotEmpty ? episodes.length : totalSafe;
 
     return RepaintBoundary(
       child: Container(
@@ -55,15 +53,18 @@ class TvPlayerEpisodePanel extends StatelessWidget {
             const SizedBox(height: 14),
             Expanded(
               child: ListView.builder(
+                controller: scrollController,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.only(bottom: 18),
-                itemCount: visible.length,
+                itemExtent: rowHeight + 8,
+                itemCount: itemCount,
                 itemBuilder: (context, index) {
-                  final row = visible[index];
+                  final row = _rowAt(index);
                   final ep = row.index;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _EpisodeListRow(
+                      height: rowHeight,
                       ep: ep,
                       title: row.title,
                       selected: ep == selected,
@@ -79,52 +80,18 @@ class TvPlayerEpisodePanel extends StatelessWidget {
       ),
     );
   }
-}
 
+  _EpisodePanelRowData _rowAt(int index) {
+    if (episodes.isEmpty) {
+      final ep = (index + 1).clamp(1, total.clamp(1, _maxTvEpisodeCount).toInt()).toInt();
+      return _EpisodePanelRowData(index: ep, title: 'Episode $ep');
+    }
 
-List<_EpisodePanelRowData> _visibleEpisodeRows({
-  required List<LiveGoEpisode> episodes,
-  required int totalSafe,
-  required int selected,
-  required int cursor,
-}) {
-  const windowSize = _episodePanelWindowSize;
-  final safeTotal = totalSafe.clamp(1, _maxTvEpisodeCount).toInt();
-
-  if (episodes.isEmpty) {
-    final center = cursor > 0 ? cursor : selected;
-    final safeCenter = center.clamp(1, safeTotal).toInt();
-    final start = (safeCenter - 5).clamp(1, safeTotal).toInt();
-    final end = (start + windowSize - 1).clamp(1, safeTotal).toInt();
-    final correctedStart = (end - windowSize + 1).clamp(1, end).toInt();
-
-    return List<_EpisodePanelRowData>.generate(
-      end - correctedStart + 1,
-      (index) {
-        final ep = correctedStart + index;
-        return _EpisodePanelRowData(index: ep, title: 'Episode $ep');
-      },
-      growable: false,
-    );
+    final row = episodes[index.clamp(0, episodes.length - 1).toInt()];
+    final ep = row.index <= 0 ? index + 1 : row.index;
+    final title = row.title.trim().isEmpty ? 'Episode $ep' : row.title.trim();
+    return _EpisodePanelRowData(index: ep, title: title);
   }
-
-  final activePos = episodes.indexWhere((e) => e.index == cursor);
-  final selectedPos = episodes.indexWhere((e) => e.index == selected);
-  final center = activePos >= 0 ? activePos : (selectedPos >= 0 ? selectedPos : 0);
-  final startPos = (center - 5).clamp(0, episodes.length - 1).toInt();
-  final endPos = (startPos + windowSize - 1).clamp(0, episodes.length - 1).toInt();
-  final correctedStart = (endPos - windowSize + 1).clamp(0, endPos).toInt();
-
-  return List<_EpisodePanelRowData>.generate(
-    endPos - correctedStart + 1,
-    (index) {
-      final row = episodes[correctedStart + index];
-      final ep = row.index <= 0 ? correctedStart + index + 1 : row.index;
-      final title = row.title.trim().isEmpty ? 'Episode $ep' : row.title.trim();
-      return _EpisodePanelRowData(index: ep, title: title);
-    },
-    growable: false,
-  );
 }
 
 class _EpisodePanelRowData {
@@ -138,23 +105,31 @@ class _EpisodePanelRowData {
 }
 
 class _EpisodeListRow extends StatelessWidget {
+  final double height;
   final int ep;
   final String title;
   final bool selected;
   final bool focused;
   final bool broken;
 
-  const _EpisodeListRow({required this.ep, required this.title, required this.selected, required this.focused, this.broken = false});
+  const _EpisodeListRow({
+    required this.height,
+    required this.ep,
+    required this.title,
+    required this.selected,
+    required this.focused,
+    this.broken = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 52,
+      height: height,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: selected ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.045),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: focused ? AppTheme.cyan : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
+        border: Border.all(color: focused ? Colors.white : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12), width: focused ? 2 : 1),
       ),
       child: Row(
         children: [

@@ -21,7 +21,6 @@ import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_resolver.dart';
 import '../../services/api/api_platform.dart';
-import '../player/tv_player_focus_controller.dart';
 import '../player/tv_player_route_context.dart';
 import '../player/tv_player_service.dart';
 import '../cache/tv_runtime_cache.dart';
@@ -43,8 +42,8 @@ enum _PlayerMode { watching, controlsVisible, progress, episodeList, qualityPopu
 
 class _TvPlayerScreenState extends State<TvPlayerScreen> {
   final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-root');
-  late final TvPlayerFocusController _playerFocus = TvPlayerFocusController(rootFocus: _rootFocus);
   late final TvPlayerRouteContext _routeContext;
+  final ScrollController _episodeScrollController = ScrollController();
   final TvPlayerService _playerService = const TvPlayerService();
 
   VideoPlayerController? _controller;
@@ -120,6 +119,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const double _playerToastBottomClean = 48;
   static const double _playerToastBottomControls = 184;
   static const int _overlayCursorMoveGuardMs = 72;
+  static const double _episodePanelRowHeight = 52;
+  static const double _episodePanelRowStride = 60;
+  static const double _episodePanelComfortTopRows = 3;
+  static const double _episodePanelComfortBottomRows = 4;
   static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
   static const Duration _videoWindowOpenDelay = Duration(milliseconds: 420);
   static const Duration _videoWindowFramePollDelay = Duration(milliseconds: 160);
@@ -213,7 +216,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _episodeCursor = _episode;
     _saveRuntimeEpisodeState();
     LiveGoLocalStore.addHistory(widget.item);
-    _playerFocus.requestRootFocusPostFrame();
+    _requestRootFocusPostFrame();
     _loadPreferences();
     _load();
   }
@@ -747,11 +750,41 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return total.clamp(1, _maxTvEpisodeCount).toInt();
   }
 
-  bool _isSelect(LogicalKeyboardKey key) => _playerFocus.isSelectKey(key);
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.mediaPlayPause;
+  }
 
-  bool _isBack(LogicalKeyboardKey key) => _playerFocus.isBackKey(key);
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
+  }
 
-  bool _isMenu(LogicalKeyboardKey key) => _playerFocus.isMenuKey(key);
+  bool _isMenu(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
+  }
+
+  void _requestRootFocus() {
+    if (_rootFocus.canRequestFocus && !_rootFocus.hasFocus) {
+      _rootFocus.requestFocus();
+    }
+  }
+
+  void _requestRootFocusPostFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _requestRootFocus();
+    });
+  }
+
+  void _requestRootFocusSoon() {
+    Future<void>.microtask(() {
+      if (mounted) _requestRootFocus();
+    });
+  }
 
   bool get _hasReadyController {
     final c = _controller;
@@ -880,7 +913,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = false;
       if (defaultPlay) _controlCursor = 1;
     });
-    _playerFocus.requestRootFocusSoon();
+    _requestRootFocusSoon();
     _scheduleAutoHide();
   }
 
@@ -897,7 +930,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = returnToControls;
       _episodeCursor = _episode;
     });
-    _playerFocus.requestRootFocusSoon();
+    _requestRootFocusSoon();
+    _jumpEpisodePanelPostFrame();
   }
 
   void _showQualityPopup() {
@@ -913,7 +947,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = true;
       _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
     });
-    _playerFocus.requestRootFocusSoon();
+    _requestRootFocusSoon();
   }
 
   void _showSubtitlePopup() {
@@ -931,7 +965,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
           ? _selectedSubtitleIndex + 1
           : 0;
     });
-    _playerFocus.requestRootFocusSoon();
+    _requestRootFocusSoon();
   }
 
   void _showOptionsPanel({int cursor = 0}) {
@@ -947,7 +981,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _returnControlsAfterPanel = true;
       _optionCursor = cursor;
     });
-    _playerFocus.requestRootFocusSoon();
+    _requestRootFocusSoon();
   }
 
   void _hideOverlays() {
@@ -961,12 +995,22 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _progressFocused = false;
       _returnControlsAfterPanel = false;
     });
-    _playerFocus.releaseAndRequestRootSoon();
+    _requestRootFocusSoon();
   }
 
-  bool _backDebounced() => _playerFocus.ignoreBack();
+  bool _backDebounced([int ms = 420]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackHandledMs < ms) return true;
+    _lastBackHandledMs = now;
+    return false;
+  }
 
-  bool _selectDebounced([int ms = 280]) => _playerFocus.ignoreSelect(ms);
+  bool _selectDebounced([int ms = 280]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSelectHandledMs < ms) return true;
+    _lastSelectHandledMs = now;
+    return false;
+  }
 
   bool _allowOverlayCursorMove() {
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -1306,6 +1350,52 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
   }
 
+  int _episodeCursorPosition() {
+    final rows = _orderedEpisodes();
+    if (rows.length > 1) {
+      final index = rows.indexWhere((e) => e.index == _episodeCursor);
+      if (index >= 0) return index;
+      final selected = rows.indexWhere((e) => e.index == _episode);
+      return selected < 0 ? 0 : selected;
+    }
+    final total = _episodeTotal(_detail ?? widget.item);
+    return (_episodeCursor.clamp(1, total).toInt()) - 1;
+  }
+
+  void _jumpEpisodePanelToCursor() {
+    if (!_episodeScrollController.hasClients) return;
+
+    final rows = _orderedEpisodes();
+    final count = rows.length > 1 ? rows.length : _episodeTotal(_detail ?? widget.item);
+    if (count <= 0) return;
+
+    final pos = _episodeCursorPosition().clamp(0, count - 1).toInt();
+    final position = _episodeScrollController.position;
+    final rowTop = pos * _episodePanelRowStride;
+    final rowBottom = rowTop + _episodePanelRowStride;
+    final current = position.pixels;
+    final visibleTop = current + (_episodePanelRowStride * _episodePanelComfortTopRows);
+    final visibleBottom = current + position.viewportDimension - (_episodePanelRowStride * _episodePanelComfortBottomRows);
+
+    double? target;
+    if (rowTop < visibleTop) {
+      target = rowTop - (_episodePanelRowStride * _episodePanelComfortTopRows);
+    } else if (rowBottom > visibleBottom) {
+      target = rowBottom - position.viewportDimension + (_episodePanelRowStride * _episodePanelComfortBottomRows);
+    }
+
+    if (target == null) return;
+    final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    if ((clamped - current).abs() < 1) return;
+    position.jumpTo(clamped);
+  }
+
+  void _jumpEpisodePanelPostFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _jumpEpisodePanelToCursor();
+    });
+  }
+
   void _moveEpisodeCursor(int delta) {
     if (!_allowOverlayCursorMove()) return;
     final rows = _orderedEpisodes();
@@ -1315,9 +1405,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (start >= 0) {
         final nextPos = (start + delta).clamp(0, rows.length - 1).toInt();
         setState(() => _episodeCursor = rows[nextPos].index);
+        _jumpEpisodePanelToCursor();
         return;
       }
       setState(() => _episodeCursor = _episodeByOffsetFromRows(rows, _episodeCursor, delta));
+      _jumpEpisodePanelToCursor();
       return;
     }
     if (_isDobdaPlayer) {
@@ -1325,6 +1417,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     }
     final total = _episodeTotal(_detail ?? widget.item);
     setState(() => _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt());
+    _jumpEpisodePanelToCursor();
   }
 
   Future<void> _toggleAutoNext() async {
@@ -1757,7 +1850,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _cancelPendingSeek();
     _videoSurfaceShieldTimer?.cancel();
     _videoWindowOpenTimer?.cancel();
-    _playerFocus.dispose();
+    _episodeScrollController.dispose();
     _rootFocus.dispose();
     _controller?.dispose();
     super.dispose();
@@ -1903,6 +1996,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                       selected: _episode,
                       cursor: _episodeCursor,
                       broken: _brokenEpisodes,
+                      scrollController: _episodeScrollController,
+                      rowHeight: _episodePanelRowHeight,
                     ),
                   ),
                 ),
