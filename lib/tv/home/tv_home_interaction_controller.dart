@@ -161,43 +161,49 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(index, _gridNodes.length);
     final node = _gridNodes[target];
-    final ok = tvFocusGrid(node, throttle: throttle);
+
+    // Home grid vertical movement must behave like Source Manager:
+    // cursor target and scroll target are calculated in the same key event.
+    // For vertical row jumps, do not use ensureVisible/post-frame reveal.
+    final ok = anchorRow ? _requestGridNode(node) : tvFocusGrid(node, throttle: throttle);
     if (ok) {
       _gridIndex = target;
       _rememberFocus(TvZone.grid, target);
       if (anchorRow) {
-        _anchorGridRow(node, alignment: anchorAlignment);
+        _anchorGridRow(alignment: anchorAlignment);
       }
     }
     return ok;
   }
 
-  void _anchorGridRow(FocusNode node, {required double alignment}) {
-    // Home grid is a SliverGrid inside the parent CustomScrollView. tvFocusGrid()
-    // only reveals when an item is near/outside the safe window. For TV row
-    // movement, DOWN/UP should move the viewport with the focused row immediately.
-    //
-    // Keep this Home-grid-only and only call it on vertical row moves. LEFT/RIGHT
-    // stays normal so horizontal movement does not shake the page.
-    void run() {
-      if (!mounted || node.context == null || !node.hasFocus) return;
-      try {
-        Scrollable.ensureVisible(
-          node.context!,
-          alignment: alignment,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-          duration: Duration.zero,
-          curve: Curves.linear,
-        );
-      } catch (_) {}
+  bool _requestGridNode(FocusNode node) {
+    if (!node.canRequestFocus) return false;
+    try {
+      node.requestFocus();
+      return true;
+    } catch (_) {
+      return false;
     }
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      run();
-      // One correction frame catches SliverGrid paint/layout after focus change
-      // without adding a window guard or per-zone throttle.
-      WidgetsBinding.instance.addPostFrameCallback((_) => run());
-    });
+  void _anchorGridRow({required double alignment}) {
+    // Deterministic grid row scroll.
+    //
+    // TvPosterGrid uses mainAxisExtent: 224 and default mainAxisSpacing: 16.
+    // Therefore one vertical row movement is a fixed 240px step. This avoids
+    // context-based ensureVisible and the old two post-frame correction that made
+    // the viewport feel late behind aggressive remote input.
+    if (!_scroll.hasClients) return;
+
+    const rowStride = 240.0;
+    final position = _scroll.position;
+    final direction = alignment >= 0.50 ? 1.0 : -1.0;
+    final target = (position.pixels + (rowStride * direction))
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+
+    if ((target - position.pixels).abs() < 1) return;
+    position.jumpTo(target);
   }
 
   bool _focusRows({bool preferMyList = false}) {
@@ -373,22 +379,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
-    if (_zone == TvZone.grid) {
-      if (_focusRows(preferMyList: true)) return;
-      if (_focusCategory(_categoryIndex, throttle: false)) return;
-      if (_focusPlatform(_platformIndex, throttle: false)) return;
-      _focusBanner(throttle: false);
-      return;
-    }
-    if (_zone == TvZone.category) {
-      if (_focusPlatform(_platformIndex, throttle: false)) return;
-      _focusBanner(throttle: false);
-      return;
-    }
-    if (_zone == TvZone.platform) {
-      _focusBanner(throttle: false);
-      return;
-    }
+    // Home BACK is an exit intent. Do not climb grid -> category -> platform
+    // -> banner anymore; that fights the Shell exit popup and makes BACK feel
+    // unpredictable.
     _requestExit();
   }
 
