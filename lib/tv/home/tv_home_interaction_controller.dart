@@ -179,7 +179,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   bool _requestGridNode(FocusNode node) {
-    if (!node.canRequestFocus) return false;
+    // Never focus a SliverGrid node that is not currently attached. Focusing an
+    // offstage/unbuilt poster is the fastest way to make the cursor disappear
+    // under aggressive remote input.
+    if (!node.canRequestFocus || node.context == null) return false;
     try {
       node.requestFocus();
       return true;
@@ -522,7 +525,21 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _gridNodes.length - 1) _focusGrid(current + 1);
+      // Do not wrap from the right edge into the next row. On TV this feels like
+      // the cursor disappeared, especially when the next row is partly outside
+      // the visible safe zone. RIGHT at row edge must hold position.
+      if (col >= _gridColumns - 1) {
+        _rememberFocus(TvZone.grid, current);
+        return KeyEventResult.handled;
+      }
+
+      final next = current + 1;
+      if (next >= _gridNodes.length || next ~/ _gridColumns != row) {
+        _rememberFocus(TvZone.grid, current);
+        return KeyEventResult.handled;
+      }
+
+      _focusGrid(next);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
