@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -35,12 +34,9 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   final ScrollController _scroll = ScrollController();
   final List<FocusNode> _nodes = <FocusNode>[];
   int _index = 0;
-  static const int _accountMoveGuardMs = 74;
   int _lastBackMs = 0;
   int _lastSelectMs = 0;
-  int _lastAccountMoveMs = 0;
   int _focusRetryToken = 0;
-  int _accountRevealToken = 0;
   bool _openingSubscreen = false;
 
   List<TvAccountMenuItem> get _items => TvAccountMenuData.build();
@@ -57,12 +53,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     super.didUpdateWidget(oldWidget);
     _syncNodes(_items.length);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      final token = ++_focusRetryToken;
-      Future<void>.delayed(const Duration(milliseconds: 60), () {
-        if (!mounted || token != _focusRetryToken) return;
-        _focusRow(_index, throttle: false);
-        _scheduleFocusRow(_index);
-      });
+      _scheduleFocusRow(_index);
     }
   }
 
@@ -89,69 +80,21 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     return value.clamp(0, _nodes.length - 1).toInt();
   }
 
-  bool _allowAccountMove(bool throttle) {
-    if (!throttle) return true;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastAccountMoveMs < _accountMoveGuardMs) return false;
-    _lastAccountMoveMs = now;
-    return true;
-  }
-
-  void _revealAccountNode(FocusNode node, int token) {
-    void reveal() {
-      if (!mounted || _accountRevealToken != token || !node.hasFocus) return;
-      final context = node.context;
-      if (context == null) return;
-      try {
-        final scrollable = Scrollable.maybeOf(context);
-        final renderObject = context.findRenderObject();
-        if (scrollable == null || renderObject == null) return;
-        final viewport = RenderAbstractViewport.maybeOf(renderObject);
-        if (viewport == null) return;
-
-        final position = scrollable.position;
-        if (!position.hasPixels || !position.hasViewportDimension) return;
-
-        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-        final current = position.pixels;
-        final viewportExtent = position.viewportDimension;
-
-        double? target;
-        if (leading < current + TvSafeZone.listTop) {
-          target = leading - TvSafeZone.listTop;
-        } else if (trailing > current + viewportExtent - TvSafeZone.listBottom) {
-          target = trailing - viewportExtent + TvSafeZone.listBottom;
-        }
-        if (target == null) return;
-
-        final clamped = target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
-        if ((clamped - current).abs() < 1) return;
-        position.jumpTo(clamped);
-      } catch (_) {}
-    }
-
-    // Immediate reveal keeps Account visually attached to the remote. The
-    // post-frame pass only corrects low-end TV layout timing.
-    reveal();
-    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
-  }
-
   bool _focusRow(int index, {bool throttle = true}) {
-    if (!_allowAccountMove(throttle)) return false;
     if (_nodes.isEmpty) return false;
     final target = _safe(index);
     final node = _nodes[target];
     if (node.context == null || !node.canRequestFocus) return false;
 
-    final token = ++_accountRevealToken;
     _index = target;
-    if (!node.hasFocus) node.requestFocus();
-    _revealAccountNode(node, token);
-
-    return true;
+    // Use the shared TV comfort helper only. The custom Account reveal/guard
+    // made this menu feel sticky and could leave visual scroll one layer behind.
+    return tvFocusComfort(
+      node,
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.listBottom,
+      throttle: throttle,
+    );
   }
 
   void _backToNav() {
@@ -183,27 +126,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _restoreFocusAfterSubscreen() {
-    final token = ++_focusRetryToken;
-
-    // Direct first: attach focus immediately after Navigator returns.
-    _focusRow(_index, throttle: false);
-
-    Future<void>.delayed(const Duration(milliseconds: 90), () {
-      if (!mounted || token != _focusRetryToken) return;
-
-      final target = _nodes.isEmpty ? null : _nodes[_safe(_index)];
-      if (target == null || FocusManager.instance.primaryFocus != target) {
-        _focusRow(_index, throttle: false);
-      }
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || token != _focusRetryToken) return;
-      final target = _nodes.isEmpty ? null : _nodes[_safe(_index)];
-      if (target == null || FocusManager.instance.primaryFocus != target) {
-        _focusRow(_index, throttle: false);
-      }
-    });
+    _scheduleFocusRow(_index);
   }
 
   void _push(Widget screen) {
@@ -233,15 +156,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     switch (action) {
       case TvAccountAction.sourceManager:
         _push(const TvSourceManagerScreen());
-        break;
-      case TvAccountAction.history:
-        widget.onOpenNavIndex?.call(2);
-        break;
-      case TvAccountAction.favorite:
-        widget.onOpenNavIndex?.call(3);
-        break;
-      case TvAccountAction.download:
-        widget.onOpenNavIndex?.call(1);
         break;
       case TvAccountAction.displaySettings:
         _push(const TvSettingsScreen());
