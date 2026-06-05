@@ -65,11 +65,11 @@ class TvSideNav extends StatelessWidget {
 
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
-      tvFocusComfort(focusNodes[_safe(itemIndex - 1)], topMargin: 86, bottomMargin: 120);
+      onChanged(_safe(itemIndex - 1));
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      tvFocusComfort(focusNodes[_safe(itemIndex + 1)], topMargin: 86, bottomMargin: 120);
+      onChanged(_safe(itemIndex + 1));
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
@@ -77,7 +77,7 @@ class TvSideNav extends StatelessWidget {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
-      onOpenContent(itemIndex);
+      // Already on the left-most rail. LEFT stays in navbar.
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -96,6 +96,7 @@ class TvSideNav extends StatelessWidget {
   }
 
   Widget _buildRail() {
+    final count = focusNodes.length < TvSideNav.items.length ? focusNodes.length : TvSideNav.items.length;
     return Container(
       margin: const EdgeInsets.fromLTRB(7, 30, 7, 30),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 7),
@@ -119,7 +120,7 @@ class TvSideNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          for (var i = 0; i < TvSideNav.items.length; i++) ...[
+          for (var i = 0; i < count; i++) ...[
             _NavIconButton(
               focusNode: focusNodes[i],
               icon: TvSideNav.items[i].icon,

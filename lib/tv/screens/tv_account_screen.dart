@@ -108,22 +108,14 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   void _scheduleFocusRow(int index, {int attempt = 0}) {
-    if (!mounted || attempt > 3) return;
+    if (!mounted) return;
     final token = ++_focusRetryToken;
-    final delay = attempt == 0
-        ? Duration.zero
-        : attempt == 1
-            ? const Duration(milliseconds: 50)
-            : attempt == 2
-                ? const Duration(milliseconds: 150)
-                : const Duration(milliseconds: 300);
-    Future<void>.delayed(delay, () {
+
+    // Account owns only its internal menu focus. App-level bootstrap belongs to
+    // TvShell, so avoid a second delayed retry ladder here.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || token != _focusRetryToken) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || token != _focusRetryToken) return;
-        final ok = _focusRow(index, throttle: false);
-        if (!ok && attempt < 3) _scheduleFocusRow(index, attempt: attempt + 1);
-      });
+      _focusRow(index, throttle: false);
     });
   }
 

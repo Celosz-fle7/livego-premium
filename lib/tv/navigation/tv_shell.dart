@@ -41,6 +41,7 @@ class TvShell extends ConsumerStatefulWidget {
 
 class _TvShellState extends ConsumerState<TvShell> {
   int _index = TvNavIndex.home;
+  int _navCursorIndex = TvNavIndex.home;
   TvSideNavMode _navMode = TvSideNavMode.hidden;
   int _homeTicket = 0;
   int _homeBannerTicket = 0;
@@ -117,17 +118,18 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _syncOwner({bool navFocused = false}) {
+    final visibleIndex = navFocused ? _navCursorIndex : _index;
     final owner = navFocused ? TvRemoteOwner.navbar : _ownerFor(_index);
     final nav = ref.read(tvNavigationProvider.notifier);
     if (navFocused) {
-      nav.selectNav(_index);
+      nav.selectNav(visibleIndex);
     } else {
       nav.enterContent(_index);
     }
     nav.setOwner(owner);
     ref.read(tvFocusProvider.notifier).setOwner(owner);
     _navService.update(
-      index: _index,
+      index: visibleIndex,
       navFocused: navFocused,
       owner: owner.name,
       navMode: _navMode.name,
@@ -171,6 +173,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   void _focusNav(int index) {
     if (_navNodes.isEmpty) return;
     final safe = _safeNav(index);
+    _navCursorIndex = safe;
     final node = _navNodes[safe];
 
     void syncAfterFocus() {
@@ -191,13 +194,38 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNav() {
-    setState(() => _navMode = TvSideNavMode.focused);
-    _focusNav(_index);
+    setState(() {
+      _navMode = TvSideNavMode.focused;
+      _navCursorIndex = _index;
+    });
+
+    // Navigation contract:
+    // Shell owns owner sync; navbar cursor is separate from active content.
+    _syncOwner(navFocused: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _navMode != TvSideNavMode.focused) return;
+      _focusNav(_navCursorIndex);
+    });
   }
 
   void _showNavFromBack() {
     _suppressBack(650);
     _showNav();
+  }
+
+  void _moveNavCursor(int navIndex) {
+    final safe = _safeNav(navIndex);
+    if (_navMode != TvSideNavMode.focused || _navCursorIndex != safe) {
+      setState(() {
+        _navMode = TvSideNavMode.focused;
+        _navCursorIndex = safe;
+      });
+    }
+    _syncOwner(navFocused: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _navMode != TvSideNavMode.focused) return;
+      _focusNav(safe);
+    });
   }
 
   void _hideNav() {
@@ -209,6 +237,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     final safe = _safeNav(navIndex);
     setState(() {
       _index = safe;
+      _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
       _returnToAccount = false;
     });
@@ -221,6 +250,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     final safe = _safeNav(navIndex);
     setState(() {
       _index = safe;
+      _navCursorIndex = safe;
       _navMode = TvSideNavMode.focused;
       _returnToAccount = false;
     });
@@ -232,6 +262,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (safe == TvNavIndex.account) return;
     setState(() {
       _index = safe;
+      _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
       _returnToAccount = true;
     });
@@ -270,6 +301,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       setState(() {
         _returnToAccount = false;
         _index = TvNavIndex.account;
+        _navCursorIndex = TvNavIndex.account;
         _navMode = TvSideNavMode.hidden;
         _accountTicket++;
       });
@@ -347,7 +379,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     }
 
     if (_navMode == TvSideNavMode.focused || _navHasFocus) {
-      _focusNav(_index);
+      _focusNav(_navCursorIndex);
       if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
       return;
     }
@@ -588,7 +620,13 @@ class _TvShellState extends ConsumerState<TvShell> {
                   children: [
                     Row(
                       children: [
-                        TvSideNav(index: _index, mode: _navMode, focusNodes: _navNodes, onChanged: _openNavIndex, onOpenContent: _enterContent),
+                        TvSideNav(
+                          index: _navMode == TvSideNavMode.focused ? _navCursorIndex : _index,
+                          mode: _navMode,
+                          focusNodes: _navNodes,
+                          onChanged: _moveNavCursor,
+                          onOpenContent: _enterContent,
+                        ),
                         AnimatedContainer(duration: TvFocusStyle.normal, width: _navMode == TvSideNavMode.hidden ? 0 : 1, margin: const EdgeInsets.symmetric(vertical: 30), color: Colors.white.withOpacity(0.035)),
                         Expanded(
                           child: TvLazyIndexedStack(
