@@ -54,6 +54,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   bool _fitCover = false;
   bool _autoAdvancing = false;
   bool _videoSurfaceShield = true;
+  bool _videoWindowReady = false;
   StreamInfo _streamInfo = StreamInfo.empty;
   String _currentStreamUrl = '';
   int _selectedSubtitleIndex = -1;
@@ -100,6 +101,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   Timer? _statusTimer;
   Timer? _seekDebounceTimer;
   Timer? _videoSurfaceShieldTimer;
+  Timer? _videoWindowOpenTimer;
   Duration? _pendingSeekTarget;
   String _statusMessage = '';
 
@@ -119,6 +121,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const double _playerToastBottomControls = 184;
   static const int _overlayCursorMoveGuardMs = 72;
   static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
+  static const Duration _videoWindowOpenDelay = Duration(milliseconds: 420);
   static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
 
   // Large enough for long-running series, still bounded for TV remote safety.
@@ -274,9 +277,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final playable = _playableItem(ep);
     _autoAdvancing = false;
     _lastSavedProgressSecond = -1;
+    _videoWindowOpenTimer?.cancel();
+    _videoWindowOpenTimer = null;
 
     setState(() {
       _videoSurfaceShield = true;
+      _videoWindowReady = false;
       _loading = true;
       _error = '';
       _detail = _detail ?? playable;
@@ -388,7 +394,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     controller.addListener(() {
       if (!mounted || !controller.value.isInitialized || _controller != controller) return;
       final value = controller.value;
-      if (_videoSurfaceShield && value.position >= _videoFirstFrameMinPosition) {
+      if (_videoWindowReady && _videoSurfaceShield && value.position >= _videoFirstFrameMinPosition) {
         _releaseVideoSurfaceShield();
       }
       _syncSubtitleAt(value.position);
@@ -488,6 +494,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
       final previous = _controller;
       _controller = controller;
+      _armVideoWindowGate();
       _streamInfo = stream;
       _currentStreamUrl = playUrl;
       _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
@@ -758,6 +765,21 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return message.toLowerCase().contains('gagal, lanjut episode');
   }
 
+  void _armVideoWindowGate({bool notify = false}) {
+    _videoWindowOpenTimer?.cancel();
+    _videoWindowReady = false;
+    if (notify && mounted) setState(() {});
+    _videoWindowOpenTimer = Timer(_videoWindowOpenDelay, () {
+      if (!mounted) return;
+      final c = _controller;
+      if (!_hasRenderableVideo(c)) {
+        _videoWindowOpenTimer = null;
+        return;
+      }
+      setState(() => _videoWindowReady = true);
+    });
+  }
+
   void _armVideoSurfaceShield({bool notify = false}) {
     _videoSurfaceShieldTimer?.cancel();
     _videoSurfaceShield = true;
@@ -766,6 +788,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       if (!mounted) return;
       final c = _controller;
       if (c == null || !c.value.isInitialized) return;
+      if (!_videoWindowReady) {
+        _armVideoSurfaceShield();
+        return;
+      }
 
       // This is a max-time fallback, not a buffering gate. If buffering was true
       // at the exact timer tick, returning here could leave the black shield and
@@ -775,7 +801,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   }
 
   void _releaseVideoSurfaceShield() {
-    if (!_videoSurfaceShield) return;
+    if (!_videoSurfaceShield || !_videoWindowReady) return;
     _videoSurfaceShieldTimer?.cancel();
     _videoSurfaceShieldTimer = null;
     if (!mounted) {
@@ -1330,10 +1356,15 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final duration = old != null && old.value.isInitialized ? old.value.duration : Duration.zero;
     final wasPlaying = old?.value.isPlaying ?? true;
 
+    _videoWindowOpenTimer?.cancel();
+    _videoWindowOpenTimer = null;
     setState(() {
       _loading = true;
       _error = '';
+      _videoSurfaceShield = true;
+      _videoWindowReady = false;
     });
+    _armVideoSurfaceShield();
 
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(nextUrl),
@@ -1355,6 +1386,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
       final previous = _controller;
       _controller = controller;
+      _armVideoWindowGate();
       _currentStreamUrl = nextUrl;
       if (!mounted) {
         await previous?.dispose();
@@ -1698,6 +1730,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _statusTimer?.cancel();
     _saveCurrentProgress(force: true);
     _cancelPendingSeek();
+    _videoSurfaceShieldTimer?.cancel();
+    _videoWindowOpenTimer?.cancel();
     _playerFocus.dispose();
     _rootFocus.dispose();
     _controller?.dispose();
@@ -1710,8 +1744,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
     final renderable = _hasRenderableVideo(controller);
+    final canShowVideoWindow = renderable && _videoWindowReady;
     final showErrorOverlay = _error.isNotEmpty && !_isEpisodeAutoSkipMessage(_error) && !renderable;
     final showStartupGuard = _loading ||
+        (ready && renderable && !_videoWindowReady) ||
         (ready && _videoSurfaceShield) ||
         (ready && !renderable && !_isPlayerErrorState);
     final showLoadingOverlay = !showErrorOverlay && showStartupGuard;
@@ -1734,11 +1770,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: Colors.black),
-              if (renderable)
+              if (canShowVideoWindow)
                 _buildVideoSurface(controller!)
               else
                 const ColoredBox(color: Colors.black),
-              Container(color: Colors.black.withOpacity(renderable ? 0.18 : 0.78)),
+              Container(color: Colors.black.withOpacity(canShowVideoWindow ? 0.18 : 0.78)),
               if (ready && _videoSurfaceShield)
                 const ColoredBox(color: Colors.black),
               if (showLoadingOverlay)
