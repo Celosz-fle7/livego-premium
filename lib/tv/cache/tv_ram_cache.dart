@@ -28,7 +28,7 @@ class TvRamCache {
       return null;
     }
     final value = entry.value;
-    if (value is T) return value;
+    if (value is T) return value as T;
     return null;
   }
 
