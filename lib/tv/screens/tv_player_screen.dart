@@ -122,6 +122,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const int _overlayCursorMoveGuardMs = 72;
   static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
   static const Duration _videoWindowOpenDelay = Duration(milliseconds: 420);
+  static const Duration _videoWindowFramePollDelay = Duration(milliseconds: 160);
   static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
 
   // DIAGNOSTIC ONLY: isolate Android TV white-screen source.
@@ -774,15 +775,34 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _videoWindowOpenTimer?.cancel();
     _videoWindowReady = false;
     if (notify && mounted) setState(() {});
-    _videoWindowOpenTimer = Timer(_videoWindowOpenDelay, () {
+
+    void tryOpenVideoWindow() {
       if (!mounted) return;
       final c = _controller;
       if (!_hasRenderableVideo(c)) {
         _videoWindowOpenTimer = null;
         return;
       }
-      setState(() => _videoWindowReady = true);
-    });
+
+      final value = c!.value;
+      final hasFirstFrameProgress = value.position >= _videoFirstFrameMinPosition;
+
+      // Android TV native video surfaces can flash white if inserted after
+      // initialize() but before the first decoded frame/progress is available.
+      // Keep the Flutter tree black/loading and poll briefly until playback has
+      // advanced enough to make the first visible frame safe.
+      if (!hasFirstFrameProgress && !value.hasError) {
+        _videoWindowOpenTimer = Timer(_videoWindowFramePollDelay, tryOpenVideoWindow);
+        return;
+      }
+
+      _videoWindowOpenTimer = null;
+      if (!_videoWindowReady) {
+        setState(() => _videoWindowReady = true);
+      }
+    }
+
+    _videoWindowOpenTimer = Timer(_videoWindowOpenDelay, tryOpenVideoWindow);
   }
 
   void _armVideoSurfaceShield({bool notify = false}) {
