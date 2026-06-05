@@ -104,12 +104,22 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     );
   }
 
-  void _openPlayer(ContentItem detail, {LiveGoEpisode? episode}) {
+  Future<void> _openPlayer(ContentItem detail, {LiveGoEpisode? episode}) async {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     final episodeNumber = episode?.index ?? (int.tryParse(detail.chapterId) ?? LiveGoLocalStore.continueEpisode(detail));
     LiveGoAnalytics.play(detail.platformSlug, detail.id, detail.title, episodeNumber);
     widget.onPlayerRouteOpen?.call();
+
+    // Player route handoff guard: give Shell one frame to paint the black
+    // overlay before the native/route stack starts opening Player.
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!mounted) {
+      _openingPlayer = false;
+      widget.onPlayerRouteClosed?.call();
+      return;
+    }
+
     final playerItem = _episodeItem(detail, episode);
     Navigator.of(context)
         .push(TvBlackPageRoute.build<void>(

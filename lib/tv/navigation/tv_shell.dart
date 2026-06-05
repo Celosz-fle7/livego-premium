@@ -50,6 +50,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   int _backGuardMs = 0;
   int _suppressBackUntilMs = 0;
   bool _exitOpen = false;
+  bool _playerBlackGuard = false;
   final TvNavigationService _navService = TvNavigationService.instance;
 
   // Keep this intentionally tight for low-end Android TV boxes.
@@ -299,11 +300,17 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   void _preparePlayerRoute() {
     _suppressBack(700);
+    if (!_playerBlackGuard) {
+      setState(() => _playerBlackGuard = true);
+    }
     _hideNav();
   }
 
   void _restorePlayerRoute() {
     _suppressBack(650);
+    if (_playerBlackGuard) {
+      setState(() => _playerBlackGuard = false);
+    }
     _hideNav();
     _bumpFocusForCurrent();
   }
@@ -624,6 +631,12 @@ class _TvShellState extends ConsumerState<TvShell> {
                         ),
                       ],
                     ),
+                    if (_playerBlackGuard)
+                      const Positioned.fill(
+                        child: IgnorePointer(
+                          child: ColoredBox(color: Colors.black),
+                        ),
+                      ),
                     _exitDialog(),
                   ],
                 ),
