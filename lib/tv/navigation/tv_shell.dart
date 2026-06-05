@@ -425,7 +425,8 @@ class _TvShellState extends ConsumerState<TvShell> {
     _holdRootFocusDuringBackHandoff();
     setState(() => _exitOpen = false);
     if (_index == TvNavIndex.home) {
-      _restoreActiveContentAfterBack(banner: true);
+      // Closing exit popup returns to Home's last focus. Do not force Banner.
+      _restoreActiveContentAfterBack();
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showNav();
@@ -452,7 +453,8 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_index == TvNavIndex.home) {
-      _bumpFocusForCurrent();
+      // Home BACK is an exit intent, not a ladder back to Banner.
+      _showExit();
     } else {
       _showNavFromContentBack();
     }
