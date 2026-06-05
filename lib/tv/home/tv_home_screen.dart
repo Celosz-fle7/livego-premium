@@ -233,12 +233,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       fromCache: home.fromCache,
                       refreshing: home.refreshing,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     TvSectionBox(
                       icon: Icons.apps_rounded,
                       label: 'Platform',
                       hint: LiveGoCatalog.label(_platformSlug),
-                      height: 76,
+                      height: 58,
                       child: TvChipRow(
                         labels: platforms,
                         selected: _platformIndex,
@@ -251,12 +251,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         onKey: this._platformKey,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     TvSectionBox(
                       icon: Icons.tune_rounded,
                       label: 'Kategori',
                       hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
-                      height: 76,
+                      height: 58,
                       child: TvChipRow(
                         labels: categories,
                         selected: _categoryIndex,
@@ -269,7 +269,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         onKey: this._categoryKey,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     TvHomeProfessionalRows(
                       key: _rowsKey,
                       onOpen: this._openDetail,
