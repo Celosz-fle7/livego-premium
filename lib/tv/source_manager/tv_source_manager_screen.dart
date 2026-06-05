@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
+import '../layout/tv_safe_zone.dart';
 
 part 'tv_source_manager_widgets.dart';
 
@@ -34,8 +35,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   static const double _groupHeaderHeight = 36;
   static const double _rowHeight = 149;
   static const double _footerHeight = 52;
-  static const double _comfortTop = 118;
-  static const double _comfortBottom = 190;
+  static const double _comfortTop = TvSafeZone.listTop;
+  static const double _comfortBottom = TvSafeZone.listBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-root');
   final ScrollController _scrollController = ScrollController();
@@ -260,13 +261,33 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return offset;
   }
 
-  void _jumpToPlatform(int index) {
+  void _jumpToPlatform(int index, {int? previousIndex}) {
     if (!_scrollController.hasClients) return;
 
     final position = _scrollController.position;
+    final current = position.pixels;
+
+    // V2 movement: when remote moves from one platform row to another, scroll
+    // by calculated index delta in the same key event. This makes movement feel
+    // like real steps instead of waiting until the row is nearly out of view.
+    if (previousIndex != null && previousIndex != index) {
+      final requestedStep = _platformOffset(index) - _platformOffset(previousIndex);
+      final comfortWindow = (position.viewportDimension - _comfortTop - _comfortBottom)
+          .clamp(_rowHeight, _rowHeight * 2.0)
+          .toDouble();
+      final safeStep = requestedStep.clamp(-comfortWindow, comfortWindow).toDouble();
+      final target = (current + safeStep)
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+
+      if ((target - current).abs() >= 1) {
+        position.jumpTo(target);
+        return;
+      }
+    }
+
     final rowTop = _platformOffset(index);
     final rowBottom = rowTop + _rowHeight;
-    final current = position.pixels;
     final visibleTop = current + _comfortTop;
     final visibleBottom = current + position.viewportDimension - _comfortBottom;
 
@@ -286,13 +307,14 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   void _movePlatform(int delta) {
     final platforms = _platforms;
     if (platforms.isEmpty) return;
+    final previous = _platformIndex;
     final next = (_platformIndex + delta).clamp(0, platforms.length - 1).toInt();
     setState(() {
       _zone = _SourceZone.platform;
       _platformIndex = next;
       _categoryIndex = 0;
     });
-    _jumpToPlatform(next);
+    _jumpToPlatform(next, previousIndex: previous);
   }
 
   void _enterCategory() {
@@ -659,7 +681,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   Color _statusColorFor(String slug) {
     if (!_draftActive.contains(slug)) return Colors.white38;
     if (_isAicinLike(slug) || slug == 'melolo') return Colors.orangeAccent;
-    if (LiveGoCatalog.isDobdaPlatform(slug)) return Colors.greenAccent;
-    return AppTheme.cyan;
+
+    // ON state must not look like the cursor. Cursor/focus is white; active ON
+    // state is green.
+    return Colors.greenAccent;
   }
 }

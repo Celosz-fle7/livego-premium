@@ -189,7 +189,7 @@ class _SourceRowLite extends StatelessWidget {
                                     ),
                                     if (recommended) const _SmallBadgeLite(text: 'REKOMENDASI', color: Colors.greenAccent),
                                     if (beta) const _SmallBadgeLite(text: 'BETA', color: Colors.orangeAccent),
-                                    if (platformFocused) const _SmallBadgeLite(text: 'OK ON/OFF', color: AppTheme.cyan),
+                                    if (platformFocused) const _SmallBadgeLite(text: 'FOKUS', color: Colors.white),
                                   ],
                                 ),
                                 const SizedBox(height: 3),
@@ -258,7 +258,7 @@ class _SourceRowLite extends StatelessWidget {
                           ),
                           if (categoryFocused) ...[
                             const SizedBox(width: 10),
-                            const _SmallBadgeLite(text: 'OK PILIH', color: AppTheme.cyan),
+                            const _SmallBadgeLite(text: 'FOKUS', color: Colors.white),
                           ],
                         ],
                       ),
@@ -276,12 +276,20 @@ class _SourceRowLite extends StatelessWidget {
 
   BoxDecoration _decoration(bool focused) {
     return BoxDecoration(
-      color: active ? AppTheme.surface.withOpacity(0.92) : AppTheme.bgDeep.withOpacity(0.82),
+      color: focused
+          ? AppTheme.surface2.withOpacity(0.98)
+          : (active ? AppTheme.surface.withOpacity(0.92) : AppTheme.bgDeep.withOpacity(0.82)),
       borderRadius: BorderRadius.circular(22),
       border: Border.all(
-        color: focused ? AppTheme.cyan : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
-        width: focused ? 1.8 : 1,
+        color: focused ? Colors.white : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
+        width: focused ? 2.4 : 1,
       ),
+      boxShadow: focused
+          ? [
+              BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 18),
+              BoxShadow(color: AppTheme.cyan.withOpacity(0.10), blurRadius: 24),
+            ]
+          : null,
     );
   }
 }
@@ -327,9 +335,9 @@ class _SwitchPillLite extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: active ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(0.055),
+        color: active ? Colors.greenAccent.withOpacity(0.22) : Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? AppTheme.cyan : (active ? Colors.white.withOpacity(0.20) : Colors.white12), width: focused ? 1.7 : 1),
+        border: Border.all(color: focused ? Colors.white : (active ? Colors.greenAccent.withOpacity(0.45) : Colors.white12), width: focused ? 1.8 : 1),
       ),
       child: Stack(
         alignment: active ? Alignment.centerRight : Alignment.centerLeft,
@@ -366,22 +374,23 @@ class _CategoryChipLite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = focused ? AppTheme.cyan : (selected ? Colors.white.withOpacity(0.14) : Colors.white12);
+    final color = focused ? Colors.white : (selected ? Colors.greenAccent.withOpacity(0.52) : Colors.white12);
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        color: selected ? AppTheme.cyan.withOpacity(0.22) : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
-        border: Border.all(color: color, width: focused ? 1.7 : 1),
+        color: selected ? Colors.greenAccent.withOpacity(0.18) : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
+        border: Border.all(color: color, width: focused ? 1.8 : 1),
+        boxShadow: focused ? [BoxShadow(color: Colors.white.withOpacity(0.10), blurRadius: 12)] : null,
       ),
       child: Text(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
+          color: disabled ? Colors.white30 : (focused ? Colors.white : (selected ? Colors.greenAccent : Colors.white54)),
           fontSize: 11.4,
           fontWeight: FontWeight.w900,
           decoration: TextDecoration.none,
