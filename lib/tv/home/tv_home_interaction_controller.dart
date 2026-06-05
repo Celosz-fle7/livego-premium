@@ -152,52 +152,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return ok;
   }
 
-  bool _focusGrid(
-    int index, {
-    bool throttle = true,
-    bool anchorRow = false,
-    double anchorAlignment = 0.58,
-  }) {
+  bool _focusGrid(int index, {bool throttle = true}) {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(index, _gridNodes.length);
-    final node = _gridNodes[target];
-    final ok = tvFocusGrid(node, throttle: throttle);
+    final ok = tvFocusGrid(_gridNodes[target], throttle: throttle);
     if (ok) {
       _gridIndex = target;
       _rememberFocus(TvZone.grid, target);
-      if (anchorRow) {
-        _anchorGridRow(node, alignment: anchorAlignment);
-      }
     }
     return ok;
-  }
-
-  void _anchorGridRow(FocusNode node, {required double alignment}) {
-    // Home grid is a SliverGrid inside the parent CustomScrollView. tvFocusGrid()
-    // only reveals when an item is near/outside the safe window. For TV row
-    // movement, DOWN/UP should move the viewport with the focused row immediately.
-    //
-    // Keep this Home-grid-only and only call it on vertical row moves. LEFT/RIGHT
-    // stays normal so horizontal movement does not shake the page.
-    void run() {
-      if (!mounted || node.context == null || !node.hasFocus) return;
-      try {
-        Scrollable.ensureVisible(
-          node.context!,
-          alignment: alignment,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-          duration: Duration.zero,
-          curve: Curves.linear,
-        );
-      } catch (_) {}
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      run();
-      // One correction frame catches SliverGrid paint/layout after focus change
-      // without adding a window guard or per-zone throttle.
-      WidgetsBinding.instance.addPostFrameCallback((_) => run());
-    });
   }
 
   bool _focusRows({bool preferMyList = false}) {
@@ -523,13 +486,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           if (!_focusCategory(_categoryIndex)) _focusPlatform(_platformIndex);
         }
       } else {
-        _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
+        _focusGrid(current - _gridColumns);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = current + _gridColumns;
-      if (next < _gridNodes.length) _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
+      if (next < _gridNodes.length) _focusGrid(next);
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
