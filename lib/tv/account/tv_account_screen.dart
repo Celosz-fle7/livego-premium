@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
-import '../focus/tv_focus_utils.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
 import 'tv_account_menu_data.dart';
-import '../layout/tv_safe_zone.dart';
-import 'widgets/tv_account_action_card.dart';
 import 'widgets/tv_account_header.dart';
+
+enum _AccountZone {
+  header,
+  menu,
+}
 
 class TvAccountScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -31,12 +33,28 @@ class TvAccountScreen extends StatefulWidget {
 }
 
 class _TvAccountScreenState extends State<TvAccountScreen> {
-  final ScrollController _scroll = ScrollController();
-  final List<FocusNode> _nodes = <FocusNode>[];
-  int _index = 0;
+  static const int _backGuardMs = 420;
+  static const int _selectGuardMs = 300;
+
+  static const double _topPadding = 24;
+  static const double _horizontalPadding = 48;
+  static const double _bottomPadding = 220;
+  static const double _headerHeight = 98;
+  static const double _afterHeader = 14;
+  static const double _rowHeight = 86;
+  static const double _rowGap = 10;
+  static const double _footerGap = 14;
+  static const double _footerHeight = 50;
+  static const double _comfortTop = 110;
+  static const double _comfortBottom = 180;
+
+  final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-account-root');
+  final ScrollController _scrollController = ScrollController();
+
+  _AccountZone _zone = _AccountZone.header;
+  int _cursor = 0;
   int _lastBackMs = 0;
   int _lastSelectMs = 0;
-  int _focusRetryToken = 0;
   bool _openingSubscreen = false;
 
   List<TvAccountMenuItem> get _items => TvAccountMenuData.build();
@@ -44,89 +62,128 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   @override
   void initState() {
     super.initState();
-    _syncNodes(_items.length);
-    _scheduleFocusRow(_index);
+    _scheduleEntry(header: true);
   }
 
   @override
   void didUpdateWidget(covariant TvAccountScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _syncNodes(_items.length);
     if (widget.focusTicket > 0 && oldWidget.focusTicket != widget.focusTicket) {
-      _scheduleFocusRow(_index);
+      _scheduleEntry(header: true);
     }
   }
 
   @override
   void dispose() {
-    for (final node in _nodes) {
-      node.dispose();
-    }
-    _scroll.dispose();
+    _rootNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _syncNodes(int count) {
-    while (_nodes.length < count) {
-      _nodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-account-row-${_nodes.length}'));
-    }
-    while (_nodes.length > count) {
-      _nodes.removeLast().dispose();
-    }
+  void _scheduleEntry({bool header = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _rootNode.requestFocus();
+      if (header) {
+        setState(() => _zone = _AccountZone.header);
+        _jumpToTop();
+      } else {
+        _jumpToCursor(_cursor);
+      }
+    });
   }
 
-  int _safe(int value) {
-    if (_nodes.isEmpty) return 0;
-    return value.clamp(0, _nodes.length - 1).toInt();
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
   }
 
-  bool _focusRow(int index, {bool throttle = true}) {
-    if (_nodes.isEmpty) return false;
-    final target = _safe(index);
-    final node = _nodes[target];
-    if (node.context == null || !node.canRequestFocus) return false;
-
-    _index = target;
-    // Use the shared TV comfort helper only. The custom Account reveal/guard
-    // made this menu feel sticky and could leave visual scroll one layer behind.
-    return tvFocusComfort(
-      node,
-      topMargin: TvSafeZone.listTop,
-      bottomMargin: TvSafeZone.listBottom,
-      throttle: throttle,
-    );
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space;
   }
 
-  void _backToNav() {
+  bool _backAllowed() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackMs < 420) return;
+    if (now - _lastBackMs < _backGuardMs) return false;
     _lastBackMs = now;
-
-    // Leaving Account means Shell/Navbar owns the next focus. Cancel any
-    // pending internal row restore so Account does not pull focus back.
-    _focusRetryToken++;
-    widget.onBackToNav?.call();
+    return true;
   }
 
-  bool _selectAllowed([int ms = 300]) {
+  bool _selectAllowed() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSelectMs < ms) return false;
+    if (now - _lastSelectMs < _selectGuardMs) return false;
     _lastSelectMs = now;
     return true;
   }
 
-  void _scheduleFocusRow(int index, {int attempt = 0}) {
-    if (!mounted) return;
-    final token = ++_focusRetryToken;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || token != _focusRetryToken) return;
-      _focusRow(index, throttle: false);
-    });
+  void _backToNav() {
+    if (!_backAllowed()) return;
+    widget.onBackToNav?.call();
   }
 
-  void _restoreFocusAfterSubscreen() {
-    _scheduleFocusRow(_index);
+  void _jumpToTop() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels.abs() < 1) return;
+    _scrollController.jumpTo(0);
+  }
+
+  double _rowOffset(int index) {
+    return _topPadding + _headerHeight + _afterHeader + (index * (_rowHeight + _rowGap));
+  }
+
+  void _jumpToCursor(int index) {
+    if (!_scrollController.hasClients || _items.isEmpty) return;
+
+    final safe = index.clamp(0, _items.length - 1).toInt();
+    final position = _scrollController.position;
+    final rowTop = _rowOffset(safe);
+    final rowBottom = rowTop + _rowHeight;
+    final current = position.pixels;
+    final visibleTop = current + _comfortTop;
+    final visibleBottom = current + position.viewportDimension - _comfortBottom;
+
+    double? target;
+    if (rowTop < visibleTop) {
+      target = rowTop - _comfortTop;
+    } else if (rowBottom > visibleBottom) {
+      target = rowBottom - position.viewportDimension + _comfortBottom;
+    }
+
+    if (target == null) return;
+    final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    if ((clamped - current).abs() < 1) return;
+    position.jumpTo(clamped);
+  }
+
+  void _moveToHeader() {
+    setState(() => _zone = _AccountZone.header);
+    _jumpToTop();
+  }
+
+  void _moveToMenu({int? index}) {
+    final items = _items;
+    if (items.isEmpty) return;
+    final next = (index ?? _cursor).clamp(0, items.length - 1).toInt();
+    setState(() {
+      _zone = _AccountZone.menu;
+      _cursor = next;
+    });
+    _jumpToCursor(next);
+  }
+
+  void _moveMenu(int delta) {
+    final items = _items;
+    if (items.isEmpty) return;
+    final next = (_cursor + delta).clamp(0, items.length - 1).toInt();
+    setState(() {
+      _zone = _AccountZone.menu;
+      _cursor = next;
+    });
+    _jumpToCursor(next);
   }
 
   void _push(Widget screen) {
@@ -138,33 +195,30 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _openingSubscreen = false;
       if (!mounted) return;
 
+      // Return exactly to the item that opened the subscreen.
       _lastBackMs = DateTime.now().millisecondsSinceEpoch;
-      _restoreFocusAfterSubscreen();
+      _scheduleEntry(header: false);
     });
   }
 
   void _message(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, backgroundColor: AppTheme.surface2, duration: const Duration(seconds: 2)));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusRow(_index, throttle: false);
-    });
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.surface2,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    _scheduleEntry(header: false);
   }
 
   void _activateAction(TvAccountAction action) {
     switch (action) {
       case TvAccountAction.sourceManager:
         _push(const TvSourceManagerScreen());
-        break;
-      case TvAccountAction.history:
-        widget.onOpenNavIndex?.call(2);
-        break;
-      case TvAccountAction.favorite:
-        widget.onOpenNavIndex?.call(3);
-        break;
-      case TvAccountAction.download:
-        widget.onOpenNavIndex?.call(1);
         break;
       case TvAccountAction.displaySettings:
         _push(const TvSettingsScreen());
@@ -175,79 +229,141 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       case TvAccountAction.update:
         _message('Update mengikuti build GitHub Actions terbaru.');
         break;
+
+      // These actions are intentionally navbar-owned. They are not shown in the
+      // Account menu, but remain here so old saved builds do not break if enum
+      // cases still exist.
+      case TvAccountAction.history:
+        widget.onOpenNavIndex?.call(2);
+        break;
+      case TvAccountAction.favorite:
+        widget.onOpenNavIndex?.call(3);
+        break;
+      case TvAccountAction.download:
+        widget.onOpenNavIndex?.call(1);
+        break;
     }
   }
 
-  void _activateItem(int index, TvAccountMenuItem item) {
-    if (!_selectAllowed()) return;
-    _index = _safe(index);
-    _activateAction(item.action);
+  void _activateCurrent() {
+    final items = _items;
+    if (items.isEmpty || !_selectAllowed()) return;
+    final safe = _cursor.clamp(0, items.length - 1).toInt();
+    setState(() {
+      _zone = _AccountZone.menu;
+      _cursor = safe;
+    });
+    _activateAction(items[safe].action);
   }
 
-  KeyEventResult _rowKey(int index, TvAccountMenuItem item, KeyEvent event) {
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+
     final key = event.logicalKey;
-    final current = _safe(index);
-    _index = current;
-    if (tvIsBackKey(key)) {
-      _backToNav();
+    if (event is KeyRepeatEvent && (_isBack(key) || _isSelect(key))) {
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      if (current > 0) _focusRow(current - 1);
+
+    if (_zone == _AccountZone.header) {
+      if (key == LogicalKeyboardKey.arrowDown ||
+          key == LogicalKeyboardKey.arrowRight ||
+          _isSelect(key)) {
+        _moveToMenu();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowLeft || _isBack(key)) {
+        _backToNav();
+        return KeyEventResult.handled;
+      }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (current < _nodes.length - 1) _focusRow(current + 1);
+
+    if (_zone == _AccountZone.menu) {
+      if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
+        _moveToHeader();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        if (_cursor == 0) {
+          _moveToHeader();
+        } else {
+          _moveMenu(-1);
+        }
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _moveMenu(1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+        _activateCurrent();
+        return KeyEventResult.handled;
+      }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _backToNav();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      _activateItem(current, item);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+
+    return KeyEventResult.handled;
   }
 
   @override
   Widget build(BuildContext context) {
     final items = _items;
-    return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.goBack): _AccountBackIntent(),
-        SingleActivator(LogicalKeyboardKey.escape): _AccountBackIntent(),
-        SingleActivator(LogicalKeyboardKey.browserBack): _AccountBackIntent(),
-      },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          _AccountBackIntent: CallbackAction<_AccountBackIntent>(onInvoke: (_) {
+    if (items.isNotEmpty && _cursor >= items.length) {
+      _cursor = items.length - 1;
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          if (_zone == _AccountZone.menu) {
+            _moveToHeader();
+          } else {
             _backToNav();
-            return null;
-          }),
-        },
+          }
+        }
+      },
+      child: Focus(
+        focusNode: _rootNode,
+        autofocus: true,
+        skipTraversal: true,
+        onKeyEvent: _handleKey,
         child: ListView(
-          controller: _scroll,
-          cacheExtent: TvSafeZone.cacheExtent,
-          padding: TvSafeZone.account,
+          controller: _scrollController,
+          cacheExtent: 420,
+          padding: const EdgeInsets.fromLTRB(_horizontalPadding, _topPadding, _horizontalPadding, _bottomPadding),
           children: [
-            const TvAccountHeader(),
-            const SizedBox(height: 14),
+            TvAccountHeader(
+              height: _headerHeight,
+              focused: _zone == _AccountZone.header,
+              onTap: () => _moveToMenu(),
+            ),
+            const SizedBox(height: _afterHeader),
             for (var i = 0; i < items.length; i++) ...[
-              TvAccountActionCard(
-                node: _nodes[i],
+              _AccountDeterministicRow(
+                height: _rowHeight,
                 item: items[i],
-                onTap: () => _activateItem(i, items[i]),
-                onKey: (node, event) => _rowKey(i, items[i], event),
+                focused: _zone == _AccountZone.menu && _cursor == i,
+                onTap: () {
+                  _moveToMenu(index: i);
+                  _activateAction(items[i].action);
+                },
               ),
-              if (i < items.length - 1) const SizedBox(height: 10),
+              if (i < items.length - 1) const SizedBox(height: _rowGap),
             ],
-            const SizedBox(height: 14),
-            Text('Remote: ↑↓ pilih menu • OK/→ buka • ← navbar • Back kembali ke navbar Akun', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-            const SizedBox(height: 32),
+            const SizedBox(height: _footerGap),
+            SizedBox(
+              height: _footerHeight,
+              child: Text(
+                'Remote: Header ↓/→ masuk menu • Item ←/Back ke Header • Header ←/Back ke Navbar Akun',
+                style: TextStyle(
+                  color: AppTheme.textSoft.withOpacity(0.72),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -255,6 +371,105 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 }
 
-class _AccountBackIntent extends Intent {
-  const _AccountBackIntent();
+class _AccountDeterministicRow extends StatelessWidget {
+  final double height;
+  final TvAccountMenuItem item;
+  final bool focused;
+  final VoidCallback onTap;
+
+  const _AccountDeterministicRow({
+    required this.height,
+    required this.item,
+    required this.focused,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: InkWell(
+        canRequestFocus: false,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        focusColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 18)] : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.55) : Colors.white10),
+                ),
+                child: Icon(item.icon, color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: focused ? Colors.white : AppTheme.text,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      item.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.textSoft,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: focused ? AppTheme.cyan.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.42) : Colors.white10),
+                ),
+                child: Text(
+                  item.badge,
+                  style: TextStyle(
+                    color: focused ? AppTheme.cyan : AppTheme.textSoft,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Icon(Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
