@@ -202,3 +202,16 @@ Fondasi Player dianggap stabil jika semua aturan ini tetap dijaga:
 - Request stream tetap lewat TvPlayerService, bukan UI.
 - API detail/all-episode warm-up tidak boleh masuk active startup path lagi.
 - Runtime cache hanya untuk state kecil, bukan stream/video/controller.
+
+## Blank White Guard
+
+Player tidak boleh pernah menampilkan surface putih saat startup.
+
+Aturan:
+- Root Player wajib dibungkus black Material/Scaffold.
+- Stack dasar wajib ColoredBox hitam.
+- VideoPlayer hanya dirender jika controller initialized dan size video valid.
+- Jika size video masih 0x0, tetap tampil black startup guard.
+- Jika native video texture belum siap, tampil loading overlay ringan di atas black surface.
+- Jangan render backdrop/image saat player startup.
+- Jangan padding video surface; safe margin hanya overlay.

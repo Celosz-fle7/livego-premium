@@ -731,6 +731,13 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     return c != null && c.value.isInitialized;
   }
 
+  bool _hasRenderableVideo(VideoPlayerController? controller) {
+    if (controller == null || !controller.value.isInitialized) return false;
+    if (controller.value.hasError) return false;
+    final size = controller.value.size;
+    return size.width > 0 && size.height > 0;
+  }
+
   bool get _isPlayerErrorState => !_loading && _error.isNotEmpty && !_hasReadyController;
 
   Future<void> _retryCurrentEpisode() async {
@@ -1605,6 +1612,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Widget _buildVideoSurface(VideoPlayerController controller) {
     final size = controller.value.size;
+    if (size.width <= 0 || size.height <= 0 || controller.value.hasError) {
+      return const ColoredBox(color: Colors.black);
+    }
+
     final portrait = size.height > size.width;
     final fit = _fitCover ? BoxFit.cover : BoxFit.contain;
     final video = ColoredBox(
@@ -1653,6 +1664,8 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final item = _detail ?? widget.item;
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
+    final renderable = _hasRenderableVideo(controller);
+    final showStartupGuard = _loading || (ready && !renderable && !_isPlayerErrorState);
 
     return PopScope(
       canPop: false,
@@ -1664,22 +1677,24 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
         autofocus: true,
         skipTraversal: true,
         onKeyEvent: _handleRemoteKey,
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
+        child: Material(
+          color: Colors.black,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: Colors.black),
-              if (ready)
-                _buildVideoSurface(controller)
+              if (renderable)
+                _buildVideoSurface(controller!)
               else
                 const ColoredBox(color: Colors.black),
-              Container(color: Colors.black.withOpacity(ready ? 0.18 : 0.72)),
-              if (_loading)
+              Container(color: Colors.black.withOpacity(renderable ? 0.18 : 0.78)),
+              if (showStartupGuard)
                 TvPlayerLoadingOverlay(
                   title: item.title,
                   episode: _episode,
-                  message: _error.isNotEmpty ? _error : 'Menyiapkan stream video...',
+                  message: _error.isNotEmpty ? _error : (ready ? 'Menyiapkan layar video...' : 'Menyiapkan stream video...'),
                 ),
               if (_statusMessage.isNotEmpty)
                 Positioned(
@@ -1828,6 +1843,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                   ),
                 ),
             ],
+          ),
           ),
         ),
       ),
