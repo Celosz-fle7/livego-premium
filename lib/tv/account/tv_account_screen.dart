@@ -292,7 +292,13 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
     if (_zone == _AccountZone.menu) {
       if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
-        _moveToHeader();
+        // Applies to every Account menu item:
+        // Pengaturan Tampilan / Kelola Sumber Data / Tentang / Update.
+        //
+        // Account is a navbar page, so menu BACK/LEFT returns to Navbar Akun.
+        // Subscreens still return to their opening item first; after that,
+        // BACK/LEFT from the item goes to Navbar Akun.
+        _backToNav();
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
@@ -328,11 +334,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (!didPop) {
-          if (_zone == _AccountZone.menu) {
-            _moveToHeader();
-          } else {
-            _backToNav();
-          }
+          _backToNav();
         }
       },
       child: Focus(
@@ -367,7 +369,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             SizedBox(
               height: _footerHeight,
               child: Text(
-                'Remote: Header ↓/→ masuk menu • Item ←/Back ke Header • Header ←/Back ke Navbar Akun',
+                'Remote: Header ↓/→ masuk menu • Item ←/Back ke Navbar Akun',
                 style: TextStyle(
                   color: AppTheme.textSoft.withOpacity(0.72),
                   fontSize: 11,

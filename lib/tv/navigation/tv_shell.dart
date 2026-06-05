@@ -194,9 +194,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromBack() {
-    // Content -> navbar is a visual owner handoff, not a route transition.
-    // Long suppression made the next BACK feel dead on Account/History/Favorite/
-    // Download. Keep only a tiny guard against the same physical repeat event.
+    // Short guard only blocks the same physical repeat, not the user's next BACK.
     _suppressBack(180);
     _showNav();
   }
@@ -276,8 +274,12 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _showNavFromContentBack() {
-    // Non-Home content BACK exposes the navbar immediately. Do not add a long
-    // cooldown here; users expect the second BACK on the navbar to work.
+    // Applies to every non-Home navbar page:
+    // Unduhan / Histori / Favorit / Akun / Cari.
+    //
+    // First BACK from content exposes the navbar on the same item. The next BACK
+    // is handled by the global navbar contract above and returns to Home last
+    // zone.
     _showNav();
   }
 
@@ -450,13 +452,21 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      _suppressBack(650);
+      // Global navbar BACK contract.
+      //
+      // Applies to every navbar item:
+      // Home / Unduhan / Histori / Favorit / Akun / Cari.
+      //
+      // When navbar owns focus, BACK always leaves navbar and restores Home at
+      // its last remembered zone. This prevents non-Home pages from feeling
+      // trapped after content BACK exposes the navbar.
+      _suppressBack(180);
       _holdRootFocusDuringBackHandoff();
-
-      // BACK while the navbar owns focus must return to the active screen's
-      // last remembered focus. Do not force Home to Banner, otherwise entering
-      // navbar from Grid/Platform makes BACK feel like it forgot the source.
-      setState(() => _navMode = TvSideNavMode.hidden);
+      setState(() {
+        _index = TvNavIndex.home;
+        _navCursorIndex = TvNavIndex.home;
+        _navMode = TvSideNavMode.hidden;
+      });
       _syncOwner();
       _restoreActiveContentAfterBack();
       return;
