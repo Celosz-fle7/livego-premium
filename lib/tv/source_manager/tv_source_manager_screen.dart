@@ -58,8 +58,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (_draftDefault != _initialDefault) return true;
     if (!_sameSet(_draftActive, _initialActive)) return true;
     if (!_sameList(_draftHome, _initialHome)) return true;
-    final keys = <String>{..._draftCategories.keys, ..._initialCategories.keys};
-    for (final key in keys) {
+
+    // Only compare categories that can affect Home/Player behavior. Comparing
+    // every supported platform made the popup appear even when a hidden/inactive
+    // platform was normalized internally.
+    final visibleKeys = <String>{..._draftActive, ..._initialActive, ..._draftHome, ..._initialHome};
+    for (final key in visibleKeys) {
       if (!_sameList(_draftCategories[key] ?? const <String>[], _initialCategories[key] ?? const <String>[])) {
         return true;
       }
@@ -332,6 +336,23 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     });
   }
 
+  void _handleBackAction() {
+    if (_ignoreBackSpam()) return;
+
+    if (_zone == _SourceZone.popup) {
+      _discardAndExit();
+      return;
+    }
+
+    if (_zone == _SourceZone.category) {
+      setState(() => _zone = _SourceZone.platform);
+      _revealCurrentPlatform();
+      return;
+    }
+
+    _requestExit();
+  }
+
   void _discardAndExit() {
     Navigator.of(context).pop();
   }
@@ -456,13 +477,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
 
     if (_isBack(key)) {
-      if (_ignoreBackSpam()) return KeyEventResult.handled;
-      if (_zone == _SourceZone.category) {
-        setState(() => _zone = _SourceZone.platform);
-        _revealCurrentPlatform();
-      } else {
-        _requestExit();
-      }
+      _handleBackAction();
       return KeyEventResult.handled;
     }
 
@@ -545,7 +560,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
-        if (!didPop) _requestExit();
+        if (!didPop) _handleBackAction();
       },
       child: Focus(
         focusNode: _rootNode,
