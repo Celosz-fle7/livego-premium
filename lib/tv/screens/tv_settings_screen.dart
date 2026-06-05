@@ -167,7 +167,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
     _zone = TvZone.settings;
     _lastRow = target;
-    node.requestFocus();
+    if (!node.hasFocus) node.requestFocus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || node.context == null || !node.hasFocus) return;
@@ -375,10 +375,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _syncRowNodes(_itemCount);
-    if (_entryPending) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _tryFocusEntry());
-    }
+    final itemCount = _itemCount;
+    if (_rowNodes.length != itemCount) _syncRowNodes(itemCount);
 
     final sectionWidgets = <Widget>[];
     var cursor = 0;
