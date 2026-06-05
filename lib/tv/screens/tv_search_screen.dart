@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,6 +49,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _openingDetail = false;
   bool _searchSubmitBusy = false;
   int _lastSearchSubmitMs = 0;
+  static const int _searchMoveGuardMs = 74;
+  int _lastSearchMoveMs = 0;
+  int _searchRevealToken = 0;
 
   @override
   void initState() {
@@ -89,9 +93,65 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     return value.clamp(0, _resultNodes.length - 1).toInt();
   }
 
+  bool _allowSearchMove(bool throttle) {
+    if (!throttle) return true;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSearchMoveMs < _searchMoveGuardMs) return false;
+    _lastSearchMoveMs = now;
+    return true;
+  }
+
+  void _revealSearchNode(FocusNode node, int token) {
+    void reveal() {
+      if (!mounted || _searchRevealToken != token || !node.hasFocus) return;
+      final context = node.context;
+      if (context == null) return;
+      try {
+        final scrollable = Scrollable.maybeOf(context);
+        final renderObject = context.findRenderObject();
+        if (scrollable == null || renderObject == null) return;
+        final viewport = RenderAbstractViewport.maybeOf(renderObject);
+        if (viewport == null) return;
+
+        final position = scrollable.position;
+        if (!position.hasPixels || !position.hasViewportDimension) return;
+
+        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
+        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
+        final current = position.pixels;
+        final viewportExtent = position.viewportDimension;
+
+        double? target;
+        if (leading < current + TvSafeZone.listTop) {
+          target = leading - TvSafeZone.listTop;
+        } else if (trailing > current + viewportExtent - TvSafeZone.gridBottom) {
+          target = trailing - viewportExtent + TvSafeZone.gridBottom;
+        }
+        if (target == null) return;
+
+        final clamped = target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((clamped - current).abs() < 1) return;
+        position.jumpTo(clamped);
+      } catch (_) {}
+    }
+
+    reveal();
+    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
+  }
+
+  bool _focusNodeDirect(FocusNode node, {bool throttle = true}) {
+    if (!_allowSearchMove(throttle)) return false;
+    if (node.context == null || !node.canRequestFocus) return false;
+    final token = ++_searchRevealToken;
+    if (!node.hasFocus) node.requestFocus();
+    _revealSearchNode(node, token);
+    return true;
+  }
+
   bool _focusInput({bool throttle = true}) {
-    if (_searchNode.context == null) return false;
-    final ok = tvFocus(_searchNode, alignment: 0.06, throttle: throttle);
+    final ok = _focusNodeDirect(_searchNode, throttle: throttle);
     if (ok) _zone = TvZone.list;
     return ok;
   }
@@ -99,7 +159,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _focusGrid(int index, {bool throttle = true}) {
     if (_resultNodes.isEmpty) return false;
     final target = _safe(index);
-    final ok = tvFocusGrid(_resultNodes[target], throttle: throttle);
+    final ok = _focusNodeDirect(_resultNodes[target], throttle: throttle);
     if (ok) {
       _zone = TvZone.grid;
       _gridIndex = target;
@@ -108,8 +168,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   }
 
   bool _focusEmpty({bool throttle = true}) {
-    if (_emptyNode.context == null) return false;
-    final ok = tvFocusComfort(_emptyNode, throttle: throttle);
+    final ok = _focusNodeDirect(_emptyNode, throttle: throttle);
     if (ok) _zone = TvZone.placeholder;
     return ok;
   }
@@ -288,7 +347,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     final search = ref.watch(tvSearchProvider);
     final results = search.results;
     final visibleResults = search.loading ? const <ContentItem>[] : results;
-    _syncNodes(visibleResults.length);
+    if (_resultNodes.length != visibleResults.length) {
+      _syncNodes(visibleResults.length);
+    }
     if (visibleResults.isEmpty) {
       _gridIndex = 0;
     } else if (_gridIndex >= visibleResults.length) {
@@ -316,9 +377,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
             final columns = (constraints.maxWidth / 168).floor().clamp(4, 7).toInt();
             final padding = TvSafeZone.search;
             return CustomScrollView(
-                controller: _scroll,
-                cacheExtent: TvSafeZone.cacheExtent,
-                slivers: [
+              controller: _scroll,
+              cacheExtent: TvSafeZone.cacheExtent,
+              slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                     sliver: SliverList(
@@ -450,8 +511,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                       onKey: (i, item, node, event) => _gridKey(i, item, columns, event),
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: TvSafeZone.smallTail)),
-                ],
-              );
+              ],
+            );
           },
         ),
       ),
