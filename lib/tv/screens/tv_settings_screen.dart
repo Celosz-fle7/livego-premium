@@ -165,23 +165,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     final target = _safe(index);
     final node = _rowNodes[target];
 
+    final ok = tvFocusComfort(
+      node,
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.listBottom,
+      throttle: throttle,
+    );
+    if (!ok) return false;
+
     _zone = TvZone.settings;
     _lastRow = target;
-    if (!node.hasFocus) node.requestFocus();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || node.context == null || !node.hasFocus) return;
-      try {
-        Scrollable.ensureVisible(
-          node.context!,
-          duration: Duration.zero,
-          curve: Curves.linear,
-          alignment: TvSafeZone.listRevealAlignment,
-          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-        );
-      } catch (_) {}
-    });
-
     return true;
   }
 
@@ -326,7 +319,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         _openingSubscreen = false;
         if (!mounted) return;
         setState(() {});
-        _focusRow(_lastRow, throttle: false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _focusRow(_lastRow, throttle: false);
         });

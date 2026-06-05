@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -33,10 +32,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   bool _dirty = false;
   bool _confirmOpen = false;
   static const int _backGuardMs = 420;
-  static const int _sourceMoveGuardMs = 74;
   int _lastBackHandledMs = 0;
-  int _lastSourceMoveMs = 0;
-  int _sourceRevealToken = 0;
   String? _pingingSlug;
 
   late final Set<String> _initialActivePlatforms;
@@ -157,71 +153,20 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     });
   }
 
-  bool _allowSourceMove(bool throttle) {
-    if (!throttle) return true;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSourceMoveMs < _sourceMoveGuardMs) return false;
-    _lastSourceMoveMs = now;
-    return true;
-  }
-
-  void _revealSourceNode(FocusNode node, int token) {
-    void reveal() {
-      if (!mounted || _sourceRevealToken != token || !node.hasFocus) return;
-      final context = node.context;
-      if (context == null) return;
-      try {
-        final scrollable = Scrollable.maybeOf(context);
-        final renderObject = context.findRenderObject();
-        if (scrollable == null || renderObject == null) return;
-        final viewport = RenderAbstractViewport.maybeOf(renderObject);
-        if (viewport == null) return;
-
-        final position = scrollable.position;
-        if (!position.hasPixels || !position.hasViewportDimension) return;
-
-        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-        final current = position.pixels;
-        final viewportExtent = position.viewportDimension;
-
-        double? target;
-        if (leading < current + TvSafeZone.listTop) {
-          target = leading - TvSafeZone.listTop;
-        } else if (trailing > current + viewportExtent - TvSafeZone.listBottom) {
-          target = trailing - viewportExtent + TvSafeZone.listBottom;
-        }
-        if (target == null) return;
-
-        final clamped = target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
-        if ((clamped - current).abs() < 1) return;
-        position.jumpTo(clamped);
-      } catch (_) {}
-    }
-
-    // Run once immediately so the screen follows the remote, then once after
-    // layout to correct low-end TV frame timing without animation delay.
-    reveal();
-    WidgetsBinding.instance.addPostFrameCallback((_) => reveal());
-  }
-
   void _focusBack() {
     if (_backNode.context == null || !_backNode.canRequestFocus) return;
-    final token = ++_sourceRevealToken;
-    if (!_backNode.hasFocus) _backNode.requestFocus();
+    final ok = tvFocus(_backNode, alignment: 0.06, throttle: false);
+    if (!ok) return;
     _categoryMode = false;
     if (mounted) setState(() {});
-    _revealSourceNode(_backNode, token);
   }
 
   void _focusSource(int index, {bool categoryMode = false, int? categoryIndex, bool throttle = true}) {
-    if (!_allowSourceMove(throttle)) return;
     if (_sourceNodes.isEmpty || _platforms.isEmpty) return;
     final target = _safeSource(index);
     final node = _sourceNodes[target];
     if (node.context == null || !node.canRequestFocus) return;
+
     final slug = _platforms[target];
     final categories = _allCategoriesFor(slug);
     final active = LiveGoSettings.isPlatformActive(slug);
@@ -230,13 +175,18 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (nextCategoryIndex >= categories.length) nextCategoryIndex = categories.length - 1;
     if (nextCategoryIndex < 0) nextCategoryIndex = 0;
 
-    final token = ++_sourceRevealToken;
-    if (!node.hasFocus) node.requestFocus();
+    final ok = tvFocusComfort(
+      node,
+      topMargin: TvSafeZone.listTop,
+      bottomMargin: TvSafeZone.listBottom,
+      throttle: throttle,
+    );
+    if (!ok) return;
+
     _lastIndex = target;
     _categoryMode = nextCategoryMode;
     _categoryIndex = nextCategoryIndex;
     if (mounted) setState(() {});
-    _revealSourceNode(node, token);
   }
 
   void _markDobdaBeta() {
