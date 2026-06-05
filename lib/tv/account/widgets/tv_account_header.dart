@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/app_theme.dart';
-import '../../../core/livego_local_store.dart';
 import '../../../core/livego_settings.dart';
 import 'tv_account_mini_stat.dart';
 
@@ -12,10 +11,23 @@ class TvAccountHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(gradient: AppTheme.panelGradient, borderRadius: BorderRadius.circular(22), border: Border.all(color: AppTheme.border), boxShadow: [BoxShadow(color: AppTheme.cyan.withOpacity(0.045), blurRadius: 18)]),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.border),
+      ),
       child: Row(
         children: [
-          Container(width: 58, height: 58, decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: AppTheme.activeGradient, border: Border.all(color: Colors.white.withOpacity(0.18))), child: const Icon(Icons.person_rounded, color: Colors.white, size: 32)),
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppTheme.cyan.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
+            ),
+            child: const Icon(Icons.person_rounded, color: Colors.white, size: 32),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -27,9 +39,9 @@ class TvAccountHeader extends StatelessWidget {
               ],
             ),
           ),
-          TvAccountMiniStat(value: '${LiveGoLocalStore.history.length}', label: 'Riwayat'),
+          const TvAccountMiniStat(kind: TvAccountMiniStatKind.history, label: 'Riwayat'),
           const SizedBox(width: 10),
-          TvAccountMiniStat(value: '${LiveGoLocalStore.favorites.length}', label: 'Favorit'),
+          const TvAccountMiniStat(kind: TvAccountMiniStatKind.favorite, label: 'Favorit'),
         ],
       ),
     );

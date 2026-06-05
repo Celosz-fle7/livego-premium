@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../focus/tv_focus_utils.dart';
-import '../focus/tv_reachability.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
 import 'tv_account_menu_data.dart';
+import 'tv_account_safe_zone.dart';
 import 'widgets/tv_account_action_card.dart';
 import 'widgets/tv_account_header.dart';
 
@@ -88,7 +88,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   bool _focusRow(int index, {bool throttle = true}) {
     if (_nodes.isEmpty) return false;
     final target = _safe(index);
-    final ok = tvFocusComfort(_nodes[target], topMargin: 104, bottomMargin: 180, throttle: throttle);
+    final ok = tvFocusComfort(_nodes[target], topMargin: TvAccountSafeZone.focusTopMargin, bottomMargin: TvAccountSafeZone.focusBottomMargin, throttle: throttle);
     if (ok) _index = target;
     return ok;
   }
@@ -233,34 +233,26 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             return null;
           }),
         },
-        child: SafeArea(
-          top: true,
-          bottom: true,
-          child: ValueListenableBuilder<int>(
-            valueListenable: TvAccountMenuData.versionListenable,
-            builder: (context, _, __) {
-              return ListView(
-                controller: _scroll,
-                padding: TvReachability.accountPadding,
-                children: [
-                  const TvAccountHeader(),
-                  const SizedBox(height: 14),
-                  for (var i = 0; i < items.length; i++) ...[
-                    TvAccountActionCard(
-                      node: _nodes[i],
-                      item: items[i],
-                      onTap: () => _activateItem(i, items[i]),
-                      onKey: (node, event) => _rowKey(i, items[i], event),
-                    ),
-                    if (i < items.length - 1) const SizedBox(height: 10),
-                  ],
-                  const SizedBox(height: 14),
-                  Text('Remote: ↑↓ pilih menu • OK/→ buka • ← navbar • Back kembali ke navbar Akun', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-                  const SizedBox(height: 32),
-                ],
-              );
-            },
-          ),
+        child: ListView(
+          controller: _scroll,
+          cacheExtent: TvAccountSafeZone.cacheExtent,
+          padding: TvAccountSafeZone.screenMargin,
+          children: [
+            const TvAccountHeader(),
+            const SizedBox(height: 14),
+            for (var i = 0; i < items.length; i++) ...[
+              TvAccountActionCard(
+                node: _nodes[i],
+                item: items[i],
+                onTap: () => _activateItem(i, items[i]),
+                onKey: (node, event) => _rowKey(i, items[i], event),
+              ),
+              if (i < items.length - 1) const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 14),
+            Text('Remote: ↑↓ pilih menu • OK/→ buka • ← navbar • Back kembali ke navbar Akun', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
