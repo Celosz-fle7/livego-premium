@@ -169,7 +169,13 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _popScreen() {
     _entryPending = false;
-    if (Navigator.of(context).canPop()) Navigator.of(context).maybePop();
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      // This screen uses PopScope(canPop:false) to own TV BACK. maybePop()
+      // respects PopScope and can be blocked. Use pop() for the explicit
+      // in-screen BACK action, matching Source Manager behavior.
+      nav.pop();
+    }
   }
 
   void _handleBack() {
