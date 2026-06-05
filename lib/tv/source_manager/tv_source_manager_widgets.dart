@@ -4,66 +4,72 @@ class _SourceHeaderLite extends StatelessWidget {
   final bool focused;
   final int activeCount;
   final bool dirty;
+  final double height;
 
   const _SourceHeaderLite({
     required this.focused,
     required this.activeCount,
     required this.dirty,
+    required this.height,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2,
-              borderRadius: BorderRadius.circular(16),
+    return SizedBox(
+      height: height,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppTheme.surface.withOpacity(0.94),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
             ),
-            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Kelola Sumber Data',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  dirty ? 'Ada perubahan. BACK untuk simpan atau batal.' : 'Ringan: pilih platform dan kategori untuk Beranda TV.',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
-                ),
-              ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Kelola Sumber Data',
+                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    dirty ? 'Ada perubahan. BACK untuk simpan atau batal.' : 'Ringan: pilih platform dan kategori untuk Beranda TV.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.surface2,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surface2,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
+              ),
+              child: Text(
+                '$activeCount/6 AKTIF',
+                style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+              ),
             ),
-            child: Text(
-              '$activeCount/6 AKTIF',
-              style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -71,23 +77,27 @@ class _SourceHeaderLite extends StatelessWidget {
 
 class _SourceGroupHeaderLite extends StatelessWidget {
   final String text;
+  final double height;
 
-  const _SourceGroupHeaderLite({required this.text});
+  const _SourceGroupHeaderLite({required this.text, required this.height});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppTheme.cyan,
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          decoration: TextDecoration.none,
+    return SizedBox(
+      height: height,
+      child: Container(
+        width: double.infinity,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: AppTheme.cyan,
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+            decoration: TextDecoration.none,
+          ),
         ),
       ),
     );
@@ -95,6 +105,7 @@ class _SourceGroupHeaderLite extends StatelessWidget {
 }
 
 class _SourceRowLite extends StatelessWidget {
+  final double height;
   final String title;
   final String subtitle;
   final String statusText;
@@ -110,7 +121,7 @@ class _SourceRowLite extends StatelessWidget {
   final bool isLast;
 
   const _SourceRowLite({
-    super.key,
+    required this.height,
     required this.title,
     required this.subtitle,
     required this.statusText,
@@ -138,116 +149,128 @@ class _SourceRowLite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visible = _visibleIndexes();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-                decoration: _decoration(platformFocused),
-                child: Row(
-                  children: [
-                    _StatusLampLite(color: statusColor, text: statusText),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    return SizedBox(
+      height: height,
+      child: Column(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Column(
+                children: [
+                  Expanded(
+                    flex: 52,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                      decoration: _decoration(platformFocused),
+                      child: Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  title,
+                          _StatusLampLite(color: statusColor, text: statusText),
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: active ? Colors.white : Colors.white54,
+                                          fontSize: 17.2,
+                                          fontWeight: FontWeight.w900,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                    if (recommended) const _SmallBadgeLite(text: 'REKOMENDASI', color: Colors.greenAccent),
+                                    if (beta) const _SmallBadgeLite(text: 'BETA', color: Colors.orangeAccent),
+                                    if (platformFocused) const _SmallBadgeLite(text: 'OK ON/OFF', color: AppTheme.cyan),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  active ? subtitle : 'OFF. Tekan OK untuk aktifkan.',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: active ? Colors.white : Colors.white54,
-                                    fontSize: 17.2,
+                                    color: active ? AppTheme.textSoft : Colors.white38,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _SwitchPillLite(active: active, focused: platformFocused),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    flex: 38,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                      decoration: _decoration(categoryFocused),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 94,
+                            child: Row(
+                              children: [
+                                Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
+                                const SizedBox(width: 6),
+                                Text(
+                                  active ? 'Kategori' : 'OFF',
+                                  style: TextStyle(
+                                    color: active ? AppTheme.textSoft : Colors.white38,
+                                    fontSize: 10.5,
                                     fontWeight: FontWeight.w900,
                                     decoration: TextDecoration.none,
                                   ),
                                 ),
-                              ),
-                              if (recommended) const _SmallBadgeLite(text: 'REKOMENDASI', color: Colors.greenAccent),
-                              if (beta) const _SmallBadgeLite(text: 'BETA', color: Colors.orangeAccent),
-                              if (platformFocused) const _SmallBadgeLite(text: 'OK ON/OFF', color: AppTheme.cyan),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            active ? subtitle : 'OFF. Tekan OK untuk aktifkan.',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: active ? AppTheme.textSoft : Colors.white38,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              decoration: TextDecoration.none,
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    _SwitchPillLite(active: active, focused: platformFocused),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-                decoration: _decoration(categoryFocused),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 94,
-                      child: Row(
-                        children: [
-                          Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
-                          const SizedBox(width: 6),
-                          Text(
-                            active ? 'Kategori' : 'OFF',
-                            style: TextStyle(
-                              color: active ? AppTheme.textSoft : Colors.white38,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
-                              decoration: TextDecoration.none,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                for (var j = 0; j < visible.length; j++) ...[
+                                  Expanded(
+                                    child: _CategoryChipLite(
+                                      text: categories[visible[j]],
+                                      selected: active && selectedCategories.contains(categories[visible[j]]),
+                                      focused: active && categoryFocused && visible[j] == categoryIndex,
+                                      disabled: !active,
+                                    ),
+                                  ),
+                                  if (j != visible.length - 1) const SizedBox(width: 8),
+                                ],
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          for (var j = 0; j < visible.length; j++) ...[
-                            Expanded(
-                              child: _CategoryChipLite(
-                                text: categories[visible[j]],
-                                selected: active && selectedCategories.contains(categories[visible[j]]),
-                                focused: active && categoryFocused && visible[j] == categoryIndex,
-                                disabled: !active,
-                              ),
-                            ),
-                            if (j != visible.length - 1) const SizedBox(width: 8),
+                          if (categoryFocused) ...[
+                            const SizedBox(width: 10),
+                            const _SmallBadgeLite(text: 'OK PILIH', color: AppTheme.cyan),
                           ],
                         ],
                       ),
                     ),
-                    if (categoryFocused) ...[
-                      const SizedBox(width: 10),
-                      const _SmallBadgeLite(text: 'OK PILIH', color: AppTheme.cyan),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-        if (!isLast) const Divider(color: AppTheme.borderSoft, height: 1),
-      ],
+          if (!isLast) const Divider(color: AppTheme.borderSoft, height: 1),
+        ],
+      ),
     );
   }
 

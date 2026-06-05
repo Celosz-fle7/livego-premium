@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
@@ -25,12 +24,21 @@ class TvSourceManagerScreen extends StatefulWidget {
 
 class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   static const int _backGuardMs = 420;
-  static const double _listTopMargin = 118;
-  static const double _listBottomMargin = 190;
+
+  static const double _topPadding = 24;
+  static const double _horizontalPadding = 48;
+  static const double _bottomPadding = 220;
+  static const double _headerHeight = 76;
+  static const double _afterHeader = 14;
+  static const double _panelPadding = 10;
+  static const double _groupHeaderHeight = 36;
+  static const double _rowHeight = 149;
+  static const double _footerHeight = 52;
+  static const double _comfortTop = 118;
+  static const double _comfortBottom = 190;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-root');
   final ScrollController _scrollController = ScrollController();
-  final List<GlobalKey> _rowKeys = <GlobalKey>[];
 
   _SourceZone _zone = _SourceZone.platform;
   int _platformIndex = 0;
@@ -59,9 +67,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (!_sameSet(_draftActive, _initialActive)) return true;
     if (!_sameList(_draftHome, _initialHome)) return true;
 
-    // Only compare categories that can affect Home/Player behavior. Comparing
-    // every supported platform made the popup appear even when a hidden/inactive
-    // platform was normalized internally.
     final visibleKeys = <String>{..._draftActive, ..._initialActive, ..._draftHome, ..._initialHome};
     for (final key in visibleKeys) {
       if (!_sameList(_draftCategories[key] ?? const <String>[], _initialCategories[key] ?? const <String>[])) {
@@ -79,7 +84,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _rootNode.requestFocus();
-      _revealCurrentPlatform();
+      _jumpToPlatform(_platformIndex);
     });
   }
 
@@ -217,12 +222,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       final preferred = _platforms.where((slug) => _draftActive.contains(slug) && !_isAicinLike(slug)).take(6).toList();
       _draftHome.addAll(preferred);
     }
-    if (_draftHome.isEmpty) {
-      _draftHome.add(_draftActive.first);
-    }
-    if (_draftHome.length > 6) {
-      _draftHome = _draftHome.take(6).toList();
-    }
+    if (_draftHome.isEmpty) _draftHome.add(_draftActive.first);
+    if (_draftHome.length > 6) _draftHome = _draftHome.take(6).toList();
 
     if (!_draftActive.contains(_draftDefault) || _isAicinLike(_draftDefault)) {
       _draftDefault = _draftHome.isNotEmpty ? _draftHome.first : _draftActive.first;
@@ -236,17 +237,62 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     }
   }
 
+  double _platformOffset(int index) {
+    final platforms = _platforms;
+    var offset = _topPadding + _headerHeight + _afterHeader + _panelPadding;
+    String? lastBackend;
+    for (var i = 0; i < index && i < platforms.length; i++) {
+      final backend = LiveGoCatalog.backendLabel(platforms[i]);
+      if (i == 0 || backend != lastBackend) {
+        offset += _groupHeaderHeight;
+      }
+      offset += _rowHeight;
+      lastBackend = backend;
+    }
+
+    if (index >= 0 && index < platforms.length) {
+      final backend = LiveGoCatalog.backendLabel(platforms[index]);
+      if (index == 0 || backend != lastBackend) {
+        offset += _groupHeaderHeight;
+      }
+    }
+
+    return offset;
+  }
+
+  void _jumpToPlatform(int index) {
+    if (!_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+    final rowTop = _platformOffset(index);
+    final rowBottom = rowTop + _rowHeight;
+    final current = position.pixels;
+    final visibleTop = current + _comfortTop;
+    final visibleBottom = current + position.viewportDimension - _comfortBottom;
+
+    double? target;
+    if (rowTop < visibleTop) {
+      target = rowTop - _comfortTop;
+    } else if (rowBottom > visibleBottom) {
+      target = rowBottom - position.viewportDimension + _comfortBottom;
+    }
+
+    if (target == null) return;
+    final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    if ((clamped - current).abs() < 1) return;
+    position.jumpTo(clamped);
+  }
+
   void _movePlatform(int delta) {
     final platforms = _platforms;
     if (platforms.isEmpty) return;
     final next = (_platformIndex + delta).clamp(0, platforms.length - 1).toInt();
-    if (next == _platformIndex && _zone == _SourceZone.platform) return;
     setState(() {
       _zone = _SourceZone.platform;
       _platformIndex = next;
       _categoryIndex = 0;
     });
-    _revealCurrentPlatform();
+    _jumpToPlatform(next);
   }
 
   void _enterCategory() {
@@ -262,7 +308,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       _zone = _SourceZone.category;
       _categoryIndex = _categoryIndex.clamp(0, categories.length - 1).toInt();
     });
-    _revealCurrentPlatform();
+    _jumpToPlatform(_platformIndex);
   }
 
   void _moveCategory(int delta) {
@@ -271,7 +317,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final next = (_categoryIndex + delta).clamp(0, categories.length - 1).toInt();
     if (next == _categoryIndex) return;
     setState(() => _categoryIndex = next);
-    _revealCurrentPlatform();
   }
 
   void _togglePlatform() {
@@ -298,7 +343,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       _repairDraft();
     });
-    _revealCurrentPlatform();
+    _jumpToPlatform(_platformIndex);
   }
 
   void _toggleCategory() {
@@ -322,7 +367,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       _draftCategories[slug] = selected.take(6).toList();
       _repairDraft();
     });
-    _revealCurrentPlatform();
   }
 
   void _requestExit() {
@@ -346,7 +390,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
     if (_zone == _SourceZone.category) {
       setState(() => _zone = _SourceZone.platform);
-      _revealCurrentPlatform();
+      _jumpToPlatform(_platformIndex);
       return;
     }
 
@@ -401,53 +445,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     });
   }
 
-  void _syncRowKeys(int count) {
-    while (_rowKeys.length < count) {
-      _rowKeys.add(GlobalKey());
-    }
-    while (_rowKeys.length > count) {
-      _rowKeys.removeLast();
-    }
-  }
-
-  void _revealCurrentPlatform() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_platformIndex < 0 || _platformIndex >= _rowKeys.length) return;
-      final context = _rowKeys[_platformIndex].currentContext;
-      if (context == null) return;
-      try {
-        final scrollable = Scrollable.maybeOf(context);
-        final renderObject = context.findRenderObject();
-        if (scrollable == null || renderObject == null) return;
-        final viewport = RenderAbstractViewport.maybeOf(renderObject);
-        if (viewport == null) return;
-
-        final position = scrollable.position;
-        if (!position.hasPixels || !position.hasViewportDimension) return;
-
-        final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
-        final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
-        final current = position.pixels;
-        final bottom = current + position.viewportDimension;
-
-        double? target;
-        if (leading < current + _listTopMargin) {
-          target = leading - _listTopMargin;
-        } else if (trailing > bottom - _listBottomMargin) {
-          target = trailing - position.viewportDimension + _listBottomMargin;
-        }
-
-        if (target == null) return;
-        final clamped = target
-            .clamp(position.minScrollExtent, position.maxScrollExtent)
-            .toDouble();
-        if ((clamped - current).abs() < 1) return;
-        position.jumpTo(clamped);
-      } catch (_) {}
-    });
-  }
-
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (event is KeyRepeatEvent && (_isSelect(event.logicalKey) || _isBack(event.logicalKey))) {
@@ -497,6 +494,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       if (key == LogicalKeyboardKey.arrowUp) {
         if (_platformIndex == 0) {
           setState(() => _zone = _SourceZone.back);
+          if (_scrollController.hasClients) _scrollController.jumpTo(0);
         } else {
           _movePlatform(-1);
         }
@@ -508,6 +506,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       if (key == LogicalKeyboardKey.arrowLeft) {
         setState(() => _zone = _SourceZone.back);
+        if (_scrollController.hasClients) _scrollController.jumpTo(0);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowRight) {
@@ -532,7 +531,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       }
       if (key == LogicalKeyboardKey.arrowUp) {
         setState(() => _zone = _SourceZone.platform);
-        _revealCurrentPlatform();
+        _jumpToPlatform(_platformIndex);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
@@ -552,7 +551,6 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   @override
   Widget build(BuildContext context) {
     final platforms = _platforms;
-    _syncRowKeys(platforms.length);
     if (platforms.isNotEmpty && _platformIndex >= platforms.length) {
       _platformIndex = platforms.length - 1;
     }
@@ -573,19 +571,20 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
             children: [
               ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
+                padding: const EdgeInsets.fromLTRB(_horizontalPadding, _topPadding, _horizontalPadding, _bottomPadding),
                 children: [
                   _SourceHeaderLite(
                     focused: _zone == _SourceZone.back,
                     activeCount: _draftActive.length,
                     dirty: _dirty,
+                    height: _headerHeight,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: _afterHeader),
                   if (platforms.isEmpty)
                     const _SourceEmptyLite()
                   else
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(_panelPadding),
                       decoration: BoxDecoration(
                         color: AppTheme.surface.withOpacity(0.90),
                         borderRadius: BorderRadius.circular(24),
@@ -595,9 +594,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         children: [
                           for (var i = 0; i < platforms.length; i++) ...[
                             if (i == 0 || LiveGoCatalog.backendLabel(platforms[i]) != LiveGoCatalog.backendLabel(platforms[i - 1]))
-                              _SourceGroupHeaderLite(text: LiveGoCatalog.backendLabel(platforms[i])),
+                              _SourceGroupHeaderLite(text: LiveGoCatalog.backendLabel(platforms[i]), height: _groupHeaderHeight),
                             _SourceRowLite(
-                              key: _rowKeys[i],
+                              height: _rowHeight,
                               title: LiveGoCatalog.label(platforms[i]),
                               subtitle: _subtitleFor(platforms[i]),
                               statusText: _statusTextFor(platforms[i]),
@@ -617,13 +616,16 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                       ),
                     ),
                   const SizedBox(height: 12),
-                  Text(
-                    'OK ON/OFF platform • RIGHT kategori • OK kategori ON/OFF • BACK satu langkah',
-                    style: TextStyle(
-                      color: AppTheme.textSoft.withOpacity(0.72),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      decoration: TextDecoration.none,
+                  SizedBox(
+                    height: _footerHeight,
+                    child: Text(
+                      'OK ON/OFF platform • RIGHT kategori • OK kategori ON/OFF • BACK satu langkah',
+                      style: TextStyle(
+                        color: AppTheme.textSoft.withOpacity(0.72),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ),
                 ],
@@ -661,4 +663,3 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return AppTheme.cyan;
   }
 }
-

@@ -1,94 +1,77 @@
 part of 'tv_settings_screen.dart';
 
 class _Header extends StatelessWidget {
+  final double height;
   final bool showBackButton;
-  final FocusNode backNode;
-  final FocusOnKeyEventCallback onBackKey;
-  final VoidCallback onBackTap;
-
-  const _Header({required this.showBackButton, required this.backNode, required this.onBackKey, required this.onBackTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 14)],
-      ),
-      child: Row(
-        children: [
-          if (showBackButton) ...[
-            _BackButton(node: backNode, onKey: onBackKey, onTap: onBackTap),
-            const SizedBox(width: 14),
-          ],
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: AppTheme.activeGradient,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.settings_rounded, color: Colors.white, size: 32),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2, decoration: TextDecoration.none)),
-                SizedBox(height: 10),
-                Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                SizedBox(height: 8),
-                Text('Rapikan mode tampilan, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BackButton extends StatelessWidget {
-  final FocusNode node;
-  final FocusOnKeyEventCallback onKey;
+  final bool focused;
   final VoidCallback onTap;
 
-  const _BackButton({required this.node, required this.onKey, required this.onTap});
+  const _Header({
+    required this.height,
+    required this.showBackButton,
+    required this.focused,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          child: InkWell(
-              canRequestFocus: false,
-            onTap: onTap,
+    return SizedBox(
+      height: height,
+      child: InkWell(
+        canRequestFocus: false,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        focusColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surface.withOpacity(0.96),
             borderRadius: BorderRadius.circular(16),
-            focusColor: Colors.transparent,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 130),
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: focused ? AppTheme.surface3 : AppTheme.surface2,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
-              ),
-              child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-            ),
+            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
+            boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 14)],
           ),
-        );
-      },
+          child: Row(
+            children: [
+              if (showBackButton) ...[
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: focused ? AppTheme.surface3 : AppTheme.surface2,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
+                  ),
+                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+              ],
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.activeGradient,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 32),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2, decoration: TextDecoration.none)),
+                    SizedBox(height: 8),
+                    Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                    SizedBox(height: 6),
+                    Text('Rapikan mode tampilan, source, izin, dan cache dari satu tempat.', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -100,7 +83,8 @@ class _HeaderPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: AppTheme.surface3,
         borderRadius: BorderRadius.circular(999),
@@ -118,7 +102,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.only(left: 4, top: 7),
       child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 12.5, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
     );
   }
@@ -143,11 +127,13 @@ class _SettingsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (description != null) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-              child: Text(description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+            SizedBox(
+              height: 48,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                child: Text(description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              ),
             ),
-            const SizedBox(height: 4),
           ],
           ...children,
         ],
@@ -156,58 +142,49 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-class _FocusedSettingRow extends StatelessWidget {
-  final FocusNode node;
+class _DeterministicSettingRow extends StatelessWidget {
   final _SettingItem item;
-  final FocusOnKeyEventCallback onKey;
+  final bool focused;
+  final double height;
   final VoidCallback onTap;
-  final bool isLast;
 
-  const _FocusedSettingRow({
-    required this.node,
+  const _DeterministicSettingRow({
     required this.item,
-    required this.onKey,
+    required this.focused,
+    required this.height,
     required this.onTap,
-    required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        final accent = item.danger ? AppTheme.danger : AppTheme.cyan;
-        final isRadio = item.style == _SettingItemStyle.radio;
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          autofocus: false,
-          onKeyEvent: onKey,
-          child: InkWell(
-              canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            focusColor: Colors.transparent,
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.symmetric(vertical: 3),
-                  padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
-                  decoration: BoxDecoration(
-                    color: focused ? AppTheme.surface3 : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
-                    boxShadow: null,
-                  ),
-                  child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
+    final accent = item.danger ? AppTheme.danger : AppTheme.cyan;
+    final isRadio = item.style == _SettingItemStyle.radio;
+    return SizedBox(
+      height: height,
+      child: InkWell(
+        canRequestFocus: false,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        focusColor: Colors.transparent,
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 3),
+                padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
+                decoration: BoxDecoration(
+                  color: focused ? AppTheme.surface3 : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
+                  boxShadow: null,
                 ),
-                if (!isLast) const Divider(color: AppTheme.border, height: 1),
-              ],
+                child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
+              ),
             ),
-          ),
-        );
-      },
+            const Divider(color: AppTheme.border, height: 1),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -257,6 +234,7 @@ class _TileContent extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
@@ -291,8 +269,7 @@ class _SwitchPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+    return Container(
       width: 58,
       height: 30,
       padding: const EdgeInsets.all(3),
@@ -306,7 +283,6 @@ class _SwitchPill extends StatelessWidget {
     );
   }
 }
-
 
 class _TvGridStepper extends StatelessWidget {
   final int value;
