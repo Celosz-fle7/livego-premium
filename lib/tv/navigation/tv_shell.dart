@@ -166,6 +166,25 @@ class _TvShellState extends ConsumerState<TvShell> {
     });
   }
 
+  void _returnToHomeV2() {
+    // Single Home V2 return contract for every route:
+    // - navbar BACK from any item
+    // - onBackToHome from content screens
+    // - Account shortcuts that return Home
+    //
+    // Do not force banner. Home owns its remembered zone/index, so this returns
+    // to the last Home position under the V2 grid/safe-zone movement system.
+    _suppressBack(180);
+    _holdRootFocusDuringBackHandoff();
+    setState(() {
+      _index = TvNavIndex.home;
+      _navCursorIndex = TvNavIndex.home;
+      _navMode = TvSideNavMode.hidden;
+    });
+    _syncOwner();
+    _restoreActiveContentAfterBack(banner: false);
+  }
+
   void _focusNav(int index) {
     final safe = _safeNav(index);
     _navCursorIndex = safe;
@@ -217,6 +236,10 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   void _enterContent(int navIndex) {
     final safe = _safeNav(navIndex);
+    if (safe == TvNavIndex.home) {
+      _returnToHomeV2();
+      return;
+    }
     setState(() {
       _index = safe;
       _navCursorIndex = safe;
@@ -229,6 +252,10 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   void _openNavIndex(int navIndex) {
     final safe = _safeNav(navIndex);
+    if (safe == TvNavIndex.home) {
+      _returnToHomeV2();
+      return;
+    }
     setState(() {
       _index = safe;
       _navCursorIndex = safe;
@@ -240,6 +267,10 @@ class _TvShellState extends ConsumerState<TvShell> {
   void _openFromAccount(int navIndex) {
     final safe = _safeNav(navIndex);
     if (safe == TvNavIndex.account) return;
+    if (safe == TvNavIndex.home) {
+      _returnToHomeV2();
+      return;
+    }
     setState(() {
       _index = safe;
       _navCursorIndex = safe;
@@ -452,23 +483,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      // Global navbar BACK contract.
-      //
-      // Applies to every navbar item:
-      // Home / Unduhan / Histori / Favorit / Akun / Cari.
-      //
-      // When navbar owns focus, BACK always leaves navbar and restores Home at
-      // its last remembered zone. This prevents non-Home pages from feeling
-      // trapped after content BACK exposes the navbar.
-      _suppressBack(180);
-      _holdRootFocusDuringBackHandoff();
-      setState(() {
-        _index = TvNavIndex.home;
-        _navCursorIndex = TvNavIndex.home;
-        _navMode = TvSideNavMode.hidden;
-      });
-      _syncOwner();
-      _restoreActiveContentAfterBack();
+      _returnToHomeV2();
       return;
     }
     if (_index == TvNavIndex.home) {
@@ -517,7 +532,7 @@ class _TvShellState extends ConsumerState<TvShell> {
             focusTicket: _index == TvNavIndex.download ? _contentTicket : 0,
             onMoveToNav: _showNav,
             onBackToNav: _showNavFromContentBack,
-            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
@@ -528,7 +543,7 @@ class _TvShellState extends ConsumerState<TvShell> {
             focusTicket: _index == TvNavIndex.history ? _contentTicket : 0,
             onMoveToNav: _showNav,
             onBackToNav: _showNavFromContentBack,
-            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
@@ -539,7 +554,7 @@ class _TvShellState extends ConsumerState<TvShell> {
             focusTicket: _index == TvNavIndex.favorite ? _contentTicket : 0,
             onMoveToNav: _showNav,
             onBackToNav: _showNavFromContentBack,
-            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
@@ -547,14 +562,14 @@ class _TvShellState extends ConsumerState<TvShell> {
             focusTicket: _index == TvNavIndex.account ? _accountTicket : 0,
             onMoveToNav: _showNav,
             onBackToNav: _showNavFromBack,
-            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onBackToHome: _returnToHomeV2,
             onOpenNavIndex: _openFromAccount,
           ),
       (_) => TvSearchScreen(
             focusTicket: _index == TvNavIndex.search ? _contentTicket : 0,
             onMoveToNav: _showNav,
             onBackToNav: _showNavFromContentBack,
-            onBackToHome: () => _enterContent(TvNavIndex.home),
+            onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
