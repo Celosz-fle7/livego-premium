@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 
 /// Builds TV tab pages lazily and keeps memory under control.
 ///
-/// Home is the only screen that should normally stay warm all the time because
-/// it owns the main TV focus/scroll memory. Secondary screens can be disposed
-/// when inactive so a large TV session does not keep every heavy screen alive.
+/// TV lifecycle rule:
+/// - active page is mounted
+/// - explicitly kept page may stay mounted
+/// - inactive non-kept pages are removed from the tree and disposed
+///
+/// KeepAlive must stay very small. Home is the normal warm page because it owns
+/// the main TV landing experience. Other screens should be disposable unless
+/// real-device testing proves otherwise.
 class TvLazyIndexedStack extends StatefulWidget {
   final int index;
   final List<WidgetBuilder> builders;
@@ -12,7 +17,8 @@ class TvLazyIndexedStack extends StatefulWidget {
 
   /// Pages that should remain mounted after first visit.
   ///
-  /// Keep this list small. Every kept page stays in memory.
+  /// Keep this list small. Every kept page stays in memory and can still receive
+  /// provider updates while mounted.
   final Set<int> keepAliveIndexes;
 
   const TvLazyIndexedStack({
@@ -45,21 +51,20 @@ class _TvLazyIndexedStackState extends State<TvLazyIndexedStack> {
   @override
   void didUpdateWidget(covariant TvLazyIndexedStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final active = _safeIndex;
+    _collect(active: _safeIndex);
+  }
+
+  void _collect({required int active}) {
     _visited
       ..removeWhere((index) => index >= widget.builders.length)
       ..add(active);
 
-    // Dispose secondary screens when they are not active and not explicitly
-    // kept alive. This keeps TV memory stable after the user opens many tabs.
+    // Dispose all inactive pages that are not explicitly kept warm.
     _visited.removeWhere((index) => index != active && !widget.keepAliveIndexes.contains(index));
     _cache.removeWhere((index, _) => index >= widget.builders.length || !_visited.contains(index));
   }
 
-  Widget _pageFor(BuildContext context, int pageIndex, int activeIndex) {
-    final shouldBuild = pageIndex == activeIndex || widget.keepAliveIndexes.contains(pageIndex);
-    if (!_visited.contains(pageIndex) || !shouldBuild) return widget.placeholder;
-
+  Widget _buildPage(BuildContext context, int pageIndex, int activeIndex) {
     if (pageIndex == activeIndex) {
       // Active page must rebuild so focus tickets / provider updates are fresh.
       final page = KeyedSubtree(
@@ -79,18 +84,52 @@ class _TvLazyIndexedStackState extends State<TvLazyIndexedStack> {
     );
   }
 
+  Widget _wrapPage({
+    required int pageIndex,
+    required int activeIndex,
+    required Widget child,
+  }) {
+    final active = pageIndex == activeIndex;
+    return Positioned.fill(
+      child: Offstage(
+        offstage: !active,
+        child: TickerMode(
+          enabled: active,
+          child: IgnorePointer(
+            ignoring: !active,
+            child: RepaintBoundary(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.builders.isEmpty) return widget.placeholder;
-    final active = _safeIndex;
-    _visited.add(active);
 
-    return IndexedStack(
-      index: active,
-      sizing: StackFit.expand,
-      children: [
-        for (var i = 0; i < widget.builders.length; i++)
-          RepaintBoundary(child: _pageFor(context, i, active)),
+    final active = _safeIndex;
+    _collect(active: active);
+
+    final keptInactive = _visited
+        .where((index) => index != active && widget.keepAliveIndexes.contains(index))
+        .toList(growable: false)
+      ..sort();
+
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        for (final pageIndex in keptInactive)
+          _wrapPage(
+            pageIndex: pageIndex,
+            activeIndex: active,
+            child: _buildPage(context, pageIndex, active),
+          ),
+        _wrapPage(
+          pageIndex: active,
+          activeIndex: active,
+          child: _buildPage(context, active, active),
+        ),
       ],
     );
   }
