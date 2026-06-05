@@ -6,12 +6,13 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
-import '../../data/api_manager/livego_api_manager.dart';
-import '../../data/api_manager/api_endpoint_registry.dart';
-import '../../data/api_manager/api_capability_lock.dart';
-import '../focus/tv_focus_utils.dart';
-import '../layout/tv_safe_zone.dart';
-import '../widgets/tv_focused_border.dart';
+
+enum _SourceZone {
+  back,
+  platform,
+  category,
+  popup,
+}
 
 class TvSourceManagerScreen extends StatefulWidget {
   const TvSourceManagerScreen({super.key});
@@ -21,146 +22,380 @@ class TvSourceManagerScreen extends StatefulWidget {
 }
 
 class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
-  final ScrollController _scrollController = ScrollController();
-  final List<FocusNode> _sourceNodes = [];
-  late final FocusNode _backNode;
-  late final FocusNode _stayNode;
-  late final FocusNode _saveNode;
-
-  int _lastIndex = 0;
-  int _categoryIndex = 0;
-  bool _categoryMode = false;
-  bool _dirty = false;
-  bool _confirmOpen = false;
   static const int _backGuardMs = 420;
-  int _lastBackHandledMs = 0;
-  String? _pingingSlug;
+  static const double _listTopMargin = 118;
+  static const double _listBottomMargin = 190;
 
-  late final Set<String> _initialActivePlatforms;
-  late final List<String> _initialHomePlatforms;
-  late final String _initialDefaultPlatform;
+  final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-root');
+  final ScrollController _scrollController = ScrollController();
+  final List<GlobalKey> _rowKeys = <GlobalKey>[];
+
+  _SourceZone _zone = _SourceZone.platform;
+  int _platformIndex = 0;
+  int _categoryIndex = 0;
+  int _popupCursor = 0;
+  int _lastBackMs = 0;
+
+  late Set<String> _draftActive;
+  late List<String> _draftHome;
+  late String _draftDefault;
+  late Map<String, List<String>> _draftCategories;
+
+  late final Set<String> _initialActive;
+  late final List<String> _initialHome;
+  late final String _initialDefault;
   late final Map<String, List<String>> _initialCategories;
 
-  List<String> get _platforms => LiveGoCatalog.allPlatforms;
-  bool get _hasPlatforms => _platforms.isNotEmpty;
+  List<String> get _platforms {
+    final values = List<String>.from(LiveGoCatalog.allPlatforms);
+    values.sort(_sourceSort);
+    return values;
+  }
+
+  bool get _dirty {
+    if (_draftDefault != _initialDefault) return true;
+    if (!_sameSet(_draftActive, _initialActive)) return true;
+    if (!_sameList(_draftHome, _initialHome)) return true;
+    final keys = <String>{..._draftCategories.keys, ..._initialCategories.keys};
+    for (final key in keys) {
+      if (!_sameList(_draftCategories[key] ?? const <String>[], _initialCategories[key] ?? const <String>[])) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   @override
   void initState() {
     super.initState();
-    _backNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-back');
-    _stayNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-confirm-stay');
-    _saveNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-confirm-save');
-    _captureInitialSettings();
+    _captureInitial();
+    _resetDraftFromCurrent();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (_hasPlatforms) {
-        _focusSource(0, throttle: false);
-        _markDobdaBeta();
-      } else {
-        _focusBack();
-      }
+      _rootNode.requestFocus();
+      _revealCurrentPlatform();
     });
   }
 
   @override
   void dispose() {
-    for (final node in _sourceNodes) {
-      node.dispose();
-    }
-    _backNode.dispose();
-    _stayNode.dispose();
-    _saveNode.dispose();
+    _rootNode.dispose();
     _scrollController.dispose();
-    if (_dirty) _restoreInitialSettings();
     super.dispose();
   }
 
-  void _syncNodes(int count) {
-    while (_sourceNodes.length < count) {
-      _sourceNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-source-${_sourceNodes.length}'));
-    }
-    while (_sourceNodes.length > count) {
-      _sourceNodes.removeLast().dispose();
-    }
+  int _sourceSort(String a, String b) {
+    final pa = _sourcePriority(a);
+    final pb = _sourcePriority(b);
+    if (pa != pb) return pa.compareTo(pb);
+    final ba = LiveGoCatalog.backendLabel(a);
+    final bb = LiveGoCatalog.backendLabel(b);
+    final backend = ba.compareTo(bb);
+    if (backend != 0) return backend;
+    return LiveGoCatalog.label(a).compareTo(LiveGoCatalog.label(b));
   }
 
-  bool _isSelect(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.select ||
-      key == LogicalKeyboardKey.enter ||
-      key == LogicalKeyboardKey.numpadEnter ||
-      key == LogicalKeyboardKey.space;
-
-  bool _isBack(LogicalKeyboardKey key) =>
-      key == LogicalKeyboardKey.goBack ||
-      key == LogicalKeyboardKey.escape ||
-      key == LogicalKeyboardKey.browserBack;
-
-  int _safeSource(int index) {
-    if (_sourceNodes.isEmpty) return 0;
-    return index.clamp(0, _sourceNodes.length - 1).toInt();
+  int _sourcePriority(String slug) {
+    final lower = slug.toLowerCase();
+    if (lower.contains('aicin') || lower.contains('aichin')) return 900;
+    if (slug == 'dobda_shortmax') return 0;
+    if (slug == 'dobda_netshort') return 1;
+    if (slug == 'dobda_pinedrama') return 2;
+    if (slug == 'dobda_flickreels') return 3;
+    if (slug == 'dobda_melolo') return 4;
+    if (LiveGoCatalog.isDobdaPlatform(slug)) return 20;
+    if (slug == 'shortmax') return 100;
+    if (slug == 'netshort') return 101;
+    if (slug == 'pinedrama') return 102;
+    if (slug == 'dramabox') return 103;
+    if (slug == 'flickreels') return 104;
+    if (slug == 'melolo') return 850;
+    return 400;
   }
 
-  List<String> _allCategoriesFor(String slug) {
-    final values = LiveGoCatalog.availableCategoriesFor(slug);
-    return values.isEmpty ? const ['Populer'] : List<String>.from(values);
-  }
-
-  List<String> _selectedCategoriesFor(String slug) => LiveGoSettings.categoriesFor(slug);
-
-  void _captureInitialSettings() {
-    _initialActivePlatforms = Set<String>.from(LiveGoSettings.activePlatforms);
-    _initialHomePlatforms = List<String>.from(LiveGoSettings.homePlatforms);
-    _initialDefaultPlatform = LiveGoSettings.defaultPlatform;
+  void _captureInitial() {
+    _initialActive = Set<String>.from(LiveGoSettings.activePlatforms);
+    _initialHome = List<String>.from(LiveGoSettings.homePlatforms);
+    _initialDefault = LiveGoSettings.defaultPlatform;
     _initialCategories = <String, List<String>>{
       for (final entry in LiveGoSettings.homeCategories.entries)
         entry.key: List<String>.from(entry.value),
     };
   }
 
-  void _restoreInitialSettings() {
-    LiveGoSettings.activePlatforms
-      ..clear()
-      ..addAll(_initialActivePlatforms);
-    LiveGoSettings.homePlatforms
-      ..clear()
-      ..addAll(_initialHomePlatforms.where(LiveGoSettings.activePlatforms.contains));
-    if (LiveGoSettings.homePlatforms.isEmpty && LiveGoSettings.activePlatforms.isNotEmpty) {
-      LiveGoSettings.homePlatforms.add(LiveGoSettings.activePlatforms.first);
+  void _resetDraftFromCurrent() {
+    _draftActive = Set<String>.from(LiveGoSettings.activePlatforms);
+    _draftHome = List<String>.from(LiveGoSettings.homePlatforms.where(_draftActive.contains));
+    _draftDefault = LiveGoSettings.defaultPlatform;
+    _draftCategories = <String, List<String>>{
+      for (final slug in LiveGoCatalog.allPlatforms)
+        slug: List<String>.from(LiveGoSettings.categoriesFor(slug)),
+    };
+    _repairDraft();
+  }
+
+  bool _sameSet(Set<String> a, Set<String> b) {
+    if (a.length != b.length) return false;
+    for (final value in a) {
+      if (!b.contains(value)) return false;
     }
-    LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.contains(_initialDefaultPlatform)
-        ? _initialDefaultPlatform
-        : (LiveGoSettings.homePlatforms.isNotEmpty
-            ? LiveGoSettings.homePlatforms.first
-            : LiveGoSettings.defaultPlatforms.first);
-    LiveGoSettings.homeCategories
-      ..clear()
-      ..addAll({
-        for (final entry in _initialCategories.entries)
-          entry.key: List<String>.from(entry.value),
-      });
-  }
-
-  void _discardAndExit() {
-    _markBackHandled();
-    _restoreInitialSettings();
-    _dirty = false;
-    _confirmOpen = false;
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  bool _focusAndReveal(FocusNode node) {
-    if (node.context == null || !node.canRequestFocus) return false;
-    if (!node.hasFocus) node.requestFocus();
-    _revealFocusedNode(node);
     return true;
   }
 
-  void _revealFocusedNode(FocusNode node) {
+  bool _sameList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space;
+  }
+
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
+  }
+
+  bool _ignoreBackSpam() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastBackMs < _backGuardMs) return true;
+    _lastBackMs = now;
+    return false;
+  }
+
+  String get _currentSlug {
+    final platforms = _platforms;
+    if (platforms.isEmpty) return '';
+    return platforms[_platformIndex.clamp(0, platforms.length - 1).toInt()];
+  }
+
+  List<String> _availableCategories(String slug) {
+    final rows = LiveGoCatalog.availableCategoriesFor(slug);
+    return rows.isEmpty ? const <String>['Home'] : rows;
+  }
+
+  List<String> _selectedCategories(String slug) {
+    final available = _availableCategories(slug);
+    final saved = _draftCategories[slug] ?? available.take(2).toList();
+    final clean = saved.where(available.contains).toList();
+    if (clean.isEmpty) return available.take(1).toList();
+    return clean.take(6).toList();
+  }
+
+  bool _isAicinLike(String slug) {
+    final lower = slug.toLowerCase();
+    return lower.contains('aicin') || lower.contains('aichin');
+  }
+
+  void _repairDraft() {
+    final all = LiveGoCatalog.allPlatforms.toSet();
+    _draftActive = _draftActive.where(all.contains).toSet();
+
+    if (_draftActive.isEmpty) {
+      final fallback = _platforms.firstWhere(
+        (slug) => !_isAicinLike(slug),
+        orElse: () => _platforms.isNotEmpty ? _platforms.first : 'shortmax',
+      );
+      _draftActive.add(fallback);
+    }
+
+    _draftHome = _draftHome.where((slug) => _draftActive.contains(slug) && !_isAicinLike(slug)).toList();
+    if (_draftHome.isEmpty) {
+      final preferred = _platforms.where((slug) => _draftActive.contains(slug) && !_isAicinLike(slug)).take(6).toList();
+      _draftHome.addAll(preferred);
+    }
+    if (_draftHome.isEmpty) {
+      _draftHome.add(_draftActive.first);
+    }
+    if (_draftHome.length > 6) {
+      _draftHome = _draftHome.take(6).toList();
+    }
+
+    if (!_draftActive.contains(_draftDefault) || _isAicinLike(_draftDefault)) {
+      _draftDefault = _draftHome.isNotEmpty ? _draftHome.first : _draftActive.first;
+    }
+
+    for (final slug in all) {
+      final available = _availableCategories(slug);
+      final saved = _draftCategories[slug] ?? available.take(2).toList();
+      final clean = saved.where(available.contains).toList();
+      _draftCategories[slug] = clean.isEmpty ? available.take(1).toList() : clean.take(6).toList();
+    }
+  }
+
+  void _movePlatform(int delta) {
+    final platforms = _platforms;
+    if (platforms.isEmpty) return;
+    final next = (_platformIndex + delta).clamp(0, platforms.length - 1).toInt();
+    if (next == _platformIndex && _zone == _SourceZone.platform) return;
+    setState(() {
+      _zone = _SourceZone.platform;
+      _platformIndex = next;
+      _categoryIndex = 0;
+    });
+    _revealCurrentPlatform();
+  }
+
+  void _enterCategory() {
+    final slug = _currentSlug;
+    if (slug.isEmpty) return;
+    if (!_draftActive.contains(slug)) {
+      _toast('Aktifkan platform dulu dengan OK.');
+      return;
+    }
+    final categories = _availableCategories(slug);
+    if (categories.isEmpty) return;
+    setState(() {
+      _zone = _SourceZone.category;
+      _categoryIndex = _categoryIndex.clamp(0, categories.length - 1).toInt();
+    });
+    _revealCurrentPlatform();
+  }
+
+  void _moveCategory(int delta) {
+    final categories = _availableCategories(_currentSlug);
+    if (categories.isEmpty) return;
+    final next = (_categoryIndex + delta).clamp(0, categories.length - 1).toInt();
+    if (next == _categoryIndex) return;
+    setState(() => _categoryIndex = next);
+    _revealCurrentPlatform();
+  }
+
+  void _togglePlatform() {
+    final slug = _currentSlug;
+    if (slug.isEmpty) return;
+
+    setState(() {
+      if (_draftActive.contains(slug)) {
+        if (_draftActive.length <= 1) {
+          _toast('Minimal 1 platform harus aktif.');
+          return;
+        }
+        _draftActive.remove(slug);
+        _draftHome.remove(slug);
+      } else {
+        if (_draftActive.length >= 6) {
+          _toast('Maksimal 6 platform aktif. Matikan salah satu dulu.');
+          return;
+        }
+        _draftActive.add(slug);
+        if (!_isAicinLike(slug) && _draftHome.length < 6) {
+          _draftHome.add(slug);
+        }
+      }
+      _repairDraft();
+    });
+    _revealCurrentPlatform();
+  }
+
+  void _toggleCategory() {
+    final slug = _currentSlug;
+    if (slug.isEmpty || !_draftActive.contains(slug)) return;
+    final categories = _availableCategories(slug);
+    if (categories.isEmpty) return;
+    final cat = categories[_categoryIndex.clamp(0, categories.length - 1).toInt()];
+    final selected = List<String>.from(_selectedCategories(slug));
+
+    setState(() {
+      if (selected.contains(cat)) {
+        if (selected.length <= 1) {
+          _toast('Minimal 1 kategori harus aktif.');
+          return;
+        }
+        selected.remove(cat);
+      } else {
+        selected.add(cat);
+      }
+      _draftCategories[slug] = selected.take(6).toList();
+      _repairDraft();
+    });
+    _revealCurrentPlatform();
+  }
+
+  void _requestExit() {
+    if (!_dirty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _zone = _SourceZone.popup;
+      _popupCursor = 0;
+    });
+  }
+
+  void _discardAndExit() {
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _saveAndExit() async {
+    _repairDraft();
+
+    LiveGoSettings.activePlatforms
+      ..clear()
+      ..addAll(_draftActive);
+
+    LiveGoSettings.homePlatforms
+      ..clear()
+      ..addAll(_draftHome.where(_draftActive.contains));
+
+    if (LiveGoSettings.homePlatforms.isEmpty) {
+      LiveGoSettings.homePlatforms.add(_draftActive.first);
+    }
+
+    LiveGoSettings.defaultPlatform = _draftDefault;
+
+    LiveGoSettings.homeCategories
+      ..clear()
+      ..addAll({
+        for (final entry in _draftCategories.entries)
+          entry.key: List<String>.from(entry.value),
+      });
+
+    await LiveGoLocalStore.saveSettings();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  void _toast(String message) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || node.context == null || !node.hasFocus) return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            duration: const Duration(milliseconds: 1500),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppTheme.surface2,
+          ),
+        );
+    });
+  }
+
+  void _syncRowKeys(int count) {
+    while (_rowKeys.length < count) {
+      _rowKeys.add(GlobalKey());
+    }
+    while (_rowKeys.length > count) {
+      _rowKeys.removeLast();
+    }
+  }
+
+  void _revealCurrentPlatform() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_platformIndex < 0 || _platformIndex >= _rowKeys.length) return;
+      final context = _rowKeys[_platformIndex].currentContext;
+      if (context == null) return;
       try {
-        final scrollable = Scrollable.maybeOf(node.context!);
-        final renderObject = node.context!.findRenderObject();
+        final scrollable = Scrollable.maybeOf(context);
+        final renderObject = context.findRenderObject();
         if (scrollable == null || renderObject == null) return;
         final viewport = RenderAbstractViewport.maybeOf(renderObject);
         if (viewport == null) return;
@@ -171,13 +406,13 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         final leading = viewport.getOffsetToReveal(renderObject, 0.0).offset;
         final trailing = viewport.getOffsetToReveal(renderObject, 1.0).offset;
         final current = position.pixels;
-        final visibleBottom = current + position.viewportDimension;
+        final bottom = current + position.viewportDimension;
 
         double? target;
-        if (leading < current + TvSafeZone.listTop) {
-          target = leading - TvSafeZone.listTop;
-        } else if (trailing > visibleBottom - TvSafeZone.listBottom) {
-          target = trailing - position.viewportDimension + TvSafeZone.listBottom;
+        if (leading < current + _listTopMargin) {
+          target = leading - _listTopMargin;
+        } else if (trailing > bottom - _listBottomMargin) {
+          target = trailing - position.viewportDimension + _listBottomMargin;
         }
 
         if (target == null) return;
@@ -190,487 +425,235 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     });
   }
 
-  void _focusBack() {
-    if (_backNode.context == null || !_backNode.canRequestFocus) return;
-    _categoryMode = false;
-    if (mounted) setState(() {});
-    _focusAndReveal(_backNode);
-  }
-
-  void _focusSource(int index, {bool categoryMode = false, int? categoryIndex, bool throttle = true}) {
-    if (_sourceNodes.isEmpty || _platforms.isEmpty) return;
-    final target = _safeSource(index);
-    final node = _sourceNodes[target];
-    if (node.context == null || !node.canRequestFocus) return;
-
-    final slug = _platforms[target];
-    final categories = _allCategoriesFor(slug);
-    final active = LiveGoSettings.isPlatformActive(slug);
-    final nextCategoryMode = categoryMode && active && categories.isNotEmpty;
-    var nextCategoryIndex = categoryIndex ?? _categoryIndex;
-    if (nextCategoryIndex >= categories.length) nextCategoryIndex = categories.length - 1;
-    if (nextCategoryIndex < 0) nextCategoryIndex = 0;
-
-    _lastIndex = target;
-    _categoryMode = nextCategoryMode;
-    _categoryIndex = nextCategoryIndex;
-    if (mounted) setState(() {});
-    _focusAndReveal(node);
-  }
-
-  void _markDobdaBeta() {
-    // Source Manager must stay light. Opening config must not start network
-    // work; API health checks belong to API session, not menu rendering.
-    if (_platforms.isEmpty) return;
-    var changed = false;
-    for (final slug in _platforms) {
-      if (LiveGoCatalog.isDobdaPlatform(slug) && LiveGoSettings.statusFor(slug) != 'beta') {
-        LiveGoSettings.setPlatformStatus(slug, 'beta');
-        changed = true;
-      }
-    }
-    if (changed && mounted) setState(() {});
-  }
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.surface2,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-  }
-
-  bool _setPlatformActive(String slug, bool value) {
-    final active = LiveGoSettings.isPlatformActive(slug);
-    if (value == active) return true;
-
-    if (value) {
-      if (LiveGoSettings.activePlatforms.length >= 6) {
-        _showSnack('Maksimal 6 platform aktif di Beranda TV. Matikan salah satu dulu.');
-        return false;
-      }
-      LiveGoSettings.activePlatforms.add(slug);
-      if (!LiveGoSettings.homePlatforms.contains(slug) && LiveGoSettings.homePlatforms.length < 6) {
-        LiveGoSettings.homePlatforms.add(slug);
-      }
-      if (LiveGoSettings.homePlatforms.isNotEmpty) LiveGoSettings.defaultPlatform = LiveGoSettings.homePlatforms.first;
-    } else {
-      if (LiveGoSettings.activePlatforms.length <= 1) {
-        _showSnack('Minimal 1 platform harus tetap aktif.');
-        return false;
-      }
-      LiveGoSettings.activePlatforms.remove(slug);
-      LiveGoSettings.homePlatforms.remove(slug);
-      if (LiveGoSettings.homePlatforms.isEmpty) {
-        final fallback = LiveGoSettings.activePlatforms.first;
-        LiveGoSettings.homePlatforms.add(fallback);
-      }
-      if (!LiveGoSettings.activePlatforms.contains(LiveGoSettings.defaultPlatform)) {
-        LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.first;
-      }
-    }
-    _dirty = true;
-    setState(() {});
-    return true;
-  }
-
-  void _togglePlatform(String slug) {
-    final next = !LiveGoSettings.isPlatformActive(slug);
-    final ok = _setPlatformActive(slug, next);
-    if (ok && next) {
-      _focusSource(_lastIndex, categoryMode: false);
-    }
-  }
-
-  void _toggleCategory(String slug) {
-    if (!LiveGoSettings.isPlatformActive(slug)) return;
-    final all = _allCategoriesFor(slug);
-    if (all.isEmpty) return;
-    final cat = all[_categoryIndex.clamp(0, all.length - 1).toInt()];
-    final selected = _selectedCategoriesFor(slug);
-    if (selected.contains(cat)) {
-      if (selected.length <= 1) {
-        _showSnack('Minimal 1 kategori harus tetap aktif.');
-        return;
-      }
-      selected.remove(cat);
-    } else {
-      selected.add(cat);
-    }
-    LiveGoSettings.setCategoriesFor(slug, selected);
-    _dirty = true;
-    setState(() {});
-  }
-
-  void _markBackHandled() {
-    _lastBackHandledMs = DateTime.now().millisecondsSinceEpoch;
-  }
-
-  bool _ignoreRepeatedBack() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < _backGuardMs) return true;
-    _lastBackHandledMs = now;
-    return false;
-  }
-
-  void _handleBack() {
-    if (_ignoreRepeatedBack()) return;
-
-    if (_confirmOpen) {
-      _discardAndExit();
-      return;
-    }
-
-    if (_categoryMode) {
-      _focusSource(_lastIndex, categoryMode: false, throttle: false);
-      return;
-    }
-
-    _requestExit();
-  }
-
-  void _requestExit() {
-    if (_confirmOpen) return;
-    if (!_dirty) {
-      Navigator.of(context).pop();
-      return;
-    }
-    setState(() => _confirmOpen = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_stayNode, alignment: 0.5);
-    });
-  }
-
-  Future<void> _saveAndExit() async {
-    _markBackHandled();
-    _dirty = false;
-    _confirmOpen = false;
-    await LiveGoLocalStore.saveSettings();
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  KeyEventResult _confirmKey(FocusNode node, KeyEvent event) {
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
-      if (node == _stayNode) {
-        tvFocus(_saveNode, alignment: 0.5, throttle: false);
-      } else {
-        tvFocus(_stayNode, alignment: 0.5, throttle: false);
-      }
+    if (event is KeyRepeatEvent && (_isSelect(event.logicalKey) || _isBack(event.logicalKey))) {
       return KeyEventResult.handled;
     }
-    if (_isSelect(key)) {
-      if (node == _saveNode) {
-        _saveAndExit();
-      } else {
-        _discardAndExit();
-      }
-      return KeyEventResult.handled;
-    }
-    if (_isBack(key)) {
-      _discardAndExit();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
 
-  KeyEventResult _backKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
-      _focusSource(_lastIndex);
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
-      _requestExit();
-      return KeyEventResult.handled;
-    }
-    if (_isBack(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
 
-  KeyEventResult _sourceKey(int index, String slug, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    final active = LiveGoSettings.isPlatformActive(slug);
-    final categories = _allCategoriesFor(slug);
-
-    if (_categoryMode) {
-      if (key == LogicalKeyboardKey.arrowLeft) {
-        final targetCategory = _categoryIndex == 0 ? 0 : _categoryIndex - 1;
-        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowRight) {
-        final targetCategory = _categoryIndex < categories.length - 1 ? _categoryIndex + 1 : _categoryIndex;
-        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowUp) {
-        _focusSource(index, categoryMode: false);
-        return KeyEventResult.handled;
-      }
-      if (key == LogicalKeyboardKey.arrowDown) {
-        _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index, categoryMode: false);
+    if (_zone == _SourceZone.popup) {
+      if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+        setState(() => _popupCursor = _popupCursor == 0 ? 1 : 0);
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
-        _toggleCategory(slug);
-        _focusSource(index, categoryMode: true);
+        if (_popupCursor == 0) {
+          _discardAndExit();
+        } else {
+          _saveAndExit();
+        }
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _handleBack();
+        _discardAndExit();
         return KeyEventResult.handled;
       }
-      return KeyEventResult.ignored;
+      return KeyEventResult.handled;
     }
 
-    if (key == LogicalKeyboardKey.arrowUp) {
-      if (index == 0) {
-        _focusBack();
-      } else {
-        _focusSource(index - 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      _focusSource(index < _sourceNodes.length - 1 ? index + 1 : index);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _focusBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (active && categories.isNotEmpty) {
-        final targetCategory = _categoryIndex.clamp(0, categories.length - 1).toInt();
-        _focusSource(index, categoryMode: true, categoryIndex: targetCategory);
-      } else {
-        _showSnack('Aktifkan platform dulu dengan OK.');
-      }
-      return KeyEventResult.handled;
-    }
-    if (_isSelect(key)) {
-      _togglePlatform(slug);
-      return KeyEventResult.handled;
-    }
     if (_isBack(key)) {
-      _handleBack();
+      if (_ignoreBackSpam()) return KeyEventResult.handled;
+      if (_zone == _SourceZone.category) {
+        setState(() => _zone = _SourceZone.platform);
+        _revealCurrentPlatform();
+      } else {
+        _requestExit();
+      }
       return KeyEventResult.handled;
     }
-    return KeyEventResult.ignored;
-  }
 
-  Color _statusColor(String slug) {
-    if (_pingingSlug == slug) return AppTheme.cyan;
-    final managerStatus = LiveGoApiManager.statusFor(slug);
-    if (managerStatus == 'cooldown') return Colors.orangeAccent;
-    if (managerStatus == 'online') return Colors.greenAccent;
-    if (managerStatus == 'slow') return Colors.orangeAccent;
-    if (managerStatus == 'offline') return Colors.redAccent;
-    switch (LiveGoSettings.statusFor(slug)) {
-      case 'online':
-        return Colors.greenAccent;
-      case 'slow':
-        return Colors.orangeAccent;
-      case 'offline':
-        return Colors.redAccent;
-      case 'beta':
-        return Colors.orangeAccent;
-      default:
-        return LiveGoCatalog.isDobdaPlatform(slug) ? Colors.orangeAccent : Colors.blueGrey;
+    if (_zone == _SourceZone.back) {
+      if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+        _movePlatform(0);
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _requestExit();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
     }
-  }
 
-  String _statusText(String slug) {
-    if (_pingingSlug == slug) return 'PING';
-    final managerStatus = LiveGoApiManager.statusFor(slug);
-    if (managerStatus == 'cooldown') return 'COOLDOWN';
-    switch (LiveGoSettings.statusFor(slug)) {
-      case 'online':
-        return 'AMAN';
-      case 'slow':
-        return 'LAMBAT';
-      case 'offline':
-        return 'OFFLINE';
-      case 'beta':
-        return 'BETA';
-      default:
-        return LiveGoCatalog.isDobdaPlatform(slug) ? 'BETA' : 'BELUM';
+    if (_zone == _SourceZone.platform) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        if (_platformIndex == 0) {
+          setState(() => _zone = _SourceZone.back);
+        } else {
+          _movePlatform(-1);
+        }
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _movePlatform(1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        setState(() => _zone = _SourceZone.back);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _enterCategory();
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _togglePlatform();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
     }
-  }
 
-  String _sourceDescription(String slug) {
-    final warning = ApiCapabilityLock.warningFor(slug);
-    final summary = ApiCapabilityLock.dashboardSubtitleFor(slug);
-    return warning.isEmpty ? summary : '$summary • $warning';
+    if (_zone == _SourceZone.category) {
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _moveCategory(-1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _moveCategory(1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() => _zone = _SourceZone.platform);
+        _revealCurrentPlatform();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _movePlatform(1);
+        return KeyEventResult.handled;
+      }
+      if (_isSelect(key)) {
+        _toggleCategory();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.handled;
   }
 
   @override
   Widget build(BuildContext context) {
     final platforms = _platforms;
-    if (_sourceNodes.length != platforms.length) _syncNodes(platforms.length);
+    _syncRowKeys(platforms.length);
+    if (platforms.isNotEmpty && _platformIndex >= platforms.length) {
+      _platformIndex = platforms.length - 1;
+    }
 
-    return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.goBack): _TvSourceBackIntent(),
-        SingleActivator(LogicalKeyboardKey.escape): _TvSourceBackIntent(),
-        SingleActivator(LogicalKeyboardKey.browserBack): _TvSourceBackIntent(),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _requestExit();
       },
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          _TvSourceBackIntent: CallbackAction<_TvSourceBackIntent>(onInvoke: (_) {
-            _handleBack();
-            return null;
-          }),
-        },
-        child: PopScope(
-          canPop: false,
-          onPopInvoked: (didPop) {
-            if (!didPop) _handleBack();
-          },
-          child: Scaffold(
-            backgroundColor: AppTheme.bgDeep,
-            body: Stack(
+      child: Focus(
+        focusNode: _rootNode,
+        autofocus: true,
+        skipTraversal: true,
+        onKeyEvent: _handleKey,
+        child: Scaffold(
+          backgroundColor: AppTheme.bgDeep,
+          body: Stack(
+            children: [
+              ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(48, 24, 48, 220),
                 children: [
-                  DefaultTextStyle.merge(
-                    style: const TextStyle(decoration: TextDecoration.none),
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: TvSafeZone.source,
-                      cacheExtent: TvSafeZone.cacheExtent,
-                      children: [
-                      _SourceHeader(
-                        backNode: _backNode,
-                        onBackKey: _backKey,
-                        onBack: _requestExit,
-                        activeCount: LiveGoSettings.activePlatforms.length,
-                        pingingSlug: _pingingSlug,
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface.withOpacity(0.90),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: Column(
-                          children: [
-                            for (var i = 0; i < _platforms.length; i++) ...[
-                              if (i == 0 || LiveGoCatalog.backendLabel(_platforms[i]) != LiveGoCatalog.backendLabel(_platforms[i - 1]))
-                                _SourceGroupHeader(text: LiveGoCatalog.backendLabel(_platforms[i])),
-                              _SourceRow(
-                                node: _sourceNodes[i],
-                                title: LiveGoCatalog.label(_platforms[i]),
-                                subtitle: _sourceDescription(_platforms[i]),
-                                active: LiveGoSettings.isPlatformActive(_platforms[i]),
-                                statusColor: _statusColor(_platforms[i]),
-                                statusText: _statusText(_platforms[i]),
-                                capabilityBadges: ApiCapabilityLock.badgesFor(_platforms[i]),
-                                categories: _allCategoriesFor(_platforms[i]),
-                                selectedCategories: _selectedCategoriesFor(_platforms[i]),
-                                categoryMode: _categoryMode && _lastIndex == i,
-                                categoryIndex: _categoryIndex,
-                                onKey: (node, event) => _sourceKey(i, _platforms[i], event),
-                                onTap: () => _togglePlatform(_platforms[i]),
-                                isLast: i == _platforms.length - 1,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'OK ON/OFF platform • RIGHT masuk kategori • OK di kategori ON/OFF • BACK keluar mode kategori',
-                        style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: TvSafeZone.bottomReach),
-                    ],
+                  _SourceHeaderLite(
+                    focused: _zone == _SourceZone.back,
+                    activeCount: _draftActive.length,
+                    dirty: _dirty,
                   ),
-                ),
-                  if (_confirmOpen)
-                    _ConfirmSaveOverlay(
-                      stayNode: _stayNode,
-                      saveNode: _saveNode,
-                      onKey: _confirmKey,
-                      onStay: _discardAndExit,
-                      onSave: _saveAndExit,
+                  const SizedBox(height: 14),
+                  if (platforms.isEmpty)
+                    const _SourceEmptyLite()
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface.withOpacity(0.90),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppTheme.border),
+                      ),
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < platforms.length; i++) ...[
+                            if (i == 0 || LiveGoCatalog.backendLabel(platforms[i]) != LiveGoCatalog.backendLabel(platforms[i - 1]))
+                              _SourceGroupHeaderLite(text: LiveGoCatalog.backendLabel(platforms[i])),
+                            _SourceRowLite(
+                              key: _rowKeys[i],
+                              title: LiveGoCatalog.label(platforms[i]),
+                              subtitle: _subtitleFor(platforms[i]),
+                              statusText: _statusTextFor(platforms[i]),
+                              statusColor: _statusColorFor(platforms[i]),
+                              active: _draftActive.contains(platforms[i]),
+                              recommended: _sourcePriority(platforms[i]) < 50,
+                              beta: _sourcePriority(platforms[i]) >= 850,
+                              categories: _availableCategories(platforms[i]),
+                              selectedCategories: _selectedCategories(platforms[i]),
+                              platformFocused: _zone == _SourceZone.platform && _platformIndex == i,
+                              categoryFocused: _zone == _SourceZone.category && _platformIndex == i,
+                              categoryIndex: _categoryIndex,
+                              isLast: i == platforms.length - 1,
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'OK ON/OFF platform • RIGHT kategori • OK kategori ON/OFF • BACK satu langkah',
+                    style: TextStyle(
+                      color: AppTheme.textSoft.withOpacity(0.72),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
                 ],
               ),
+              if (_zone == _SourceZone.popup)
+                _SourceConfirmLite(
+                  cursor: _popupCursor,
+                ),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-class _SourceEmptyPanel extends StatelessWidget {
-  const _SourceEmptyPanel();
+  String _subtitleFor(String slug) {
+    if (_isAicinLike(slug)) return 'Eksperimen. Tidak dipakai default karena player bisa lama.';
+    if (LiveGoCatalog.isDobdaPlatform(slug)) return 'Dobda cepat untuk TV. Cocok jadi pilihan utama.';
+    if (slug == 'melolo') return 'Eksperimen/encrypted. Aktifkan hanya kalau perlu.';
+    return 'Anichin API. Aktifkan sesuai kebutuhan.';
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 250,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.source_outlined, color: AppTheme.cyan, size: 48),
-          SizedBox(height: 14),
-          Text(
-            'Source belum tersedia',
-            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Data platform kosong. BACK untuk kembali, lalu coba buka lagi setelah data siap.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
-          ),
-        ],
-      ),
-    );
+  String _statusTextFor(String slug) {
+    if (_isAicinLike(slug)) return 'BETA';
+    if (!_draftActive.contains(slug)) return 'OFF';
+    if (LiveGoCatalog.isDobdaPlatform(slug)) return 'CEPAT';
+    if (slug == 'melolo') return 'BETA';
+    return 'AKTIF';
+  }
+
+  Color _statusColorFor(String slug) {
+    if (!_draftActive.contains(slug)) return Colors.white38;
+    if (_isAicinLike(slug) || slug == 'melolo') return Colors.orangeAccent;
+    if (LiveGoCatalog.isDobdaPlatform(slug)) return Colors.greenAccent;
+    return AppTheme.cyan;
   }
 }
 
-class _TvSourceBackIntent extends Intent {
-  const _TvSourceBackIntent();
-}
-
-class _SourceHeader extends StatelessWidget {
-  final FocusNode backNode;
-  final FocusOnKeyEventCallback onBackKey;
-  final VoidCallback onBack;
+class _SourceHeaderLite extends StatelessWidget {
+  final bool focused;
   final int activeCount;
-  final String? pingingSlug;
+  final bool dirty;
 
-  const _SourceHeader({
-    required this.backNode,
-    required this.onBackKey,
-    required this.onBack,
+  const _SourceHeaderLite({
+    required this.focused,
     required this.activeCount,
-    required this.pingingSlug,
+    required this.dirty,
   });
 
   @override
@@ -678,46 +661,37 @@ class _SourceHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.92),
+        color: AppTheme.surface.withOpacity(0.94),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
       ),
       child: Row(
         children: [
-          Focus(
-            focusNode: backNode,
-            skipTraversal: true,
-            onKeyEvent: onBackKey,
-            child: InkWell(
-              canRequestFocus: false,
-              onTap: onBack,
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2,
               borderRadius: BorderRadius.circular(16),
-              child: TvFocusedBorder(
-                focusNode: backNode,
-                color: AppTheme.cyan,
-                radius: 16,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppTheme.surface2, borderRadius: BorderRadius.circular(16)),
-                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-                ),
-              ),
             ),
+            child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Kelola Sumber Data', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                const Text(
+                  'Kelola Sumber Data',
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+                ),
                 const SizedBox(height: 3),
                 Text(
-                  pingingSlug == null ? 'OK mengaktifkan platform. RIGHT memilih kategori di bawah platform.' : 'Mengecek server ${LiveGoCatalog.label(pingingSlug!)}...',
+                  dirty ? 'Ada perubahan. BACK untuk simpan atau batal.' : 'Ringan: pilih platform dan kategori untuk Beranda TV.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700),
+                  style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
                 ),
               ],
             ),
@@ -729,7 +703,10 @@ class _SourceHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: AppTheme.cyan.withOpacity(0.26)),
             ),
-            child: Text('$activeCount/6 AKTIF', style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900)),
+            child: Text(
+              '$activeCount/6 AKTIF',
+              style: const TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+            ),
           ),
         ],
       ),
@@ -737,9 +714,10 @@ class _SourceHeader extends StatelessWidget {
   }
 }
 
-class _SourceGroupHeader extends StatelessWidget {
+class _SourceGroupHeaderLite extends StatelessWidget {
   final String text;
-  const _SourceGroupHeader({required this.text});
+
+  const _SourceGroupHeaderLite({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -754,268 +732,6 @@ class _SourceGroupHeader extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _SourceRow extends StatelessWidget {
-  final FocusNode node;
-  final String title;
-  final String subtitle;
-  final bool active;
-  final Color statusColor;
-  final String statusText;
-  final List<String> capabilityBadges;
-  final List<String> categories;
-  final List<String> selectedCategories;
-  final bool categoryMode;
-  final int categoryIndex;
-  final FocusOnKeyEventCallback onKey;
-  final VoidCallback onTap;
-  final bool isLast;
-
-  const _SourceRow({
-    required this.node,
-    required this.title,
-    required this.subtitle,
-    required this.active,
-    required this.statusColor,
-    required this.statusText,
-    required this.capabilityBadges,
-    required this.categories,
-    required this.selectedCategories,
-    required this.categoryMode,
-    required this.categoryIndex,
-    required this.onKey,
-    required this.onTap,
-    required this.isLast,
-  });
-
-  List<int> _visibleCategoryIndexes() {
-    if (categories.isEmpty) return const <int>[];
-    const maxVisible = 6;
-    if (categories.length <= maxVisible) return List<int>.generate(categories.length, (i) => i);
-    final safeIndex = categoryIndex.clamp(0, categories.length - 1).toInt();
-    final desiredStart = categoryMode ? safeIndex - 2 : 0;
-    final start = desiredStart.clamp(0, categories.length - maxVisible).toInt();
-    return List<int>.generate(maxVisible, (i) => start + i);
-  }
-
-  BoxDecoration _panelDecoration({required bool focused, required bool selectedPanel}) {
-    return BoxDecoration(
-      color: active ? AppTheme.surface.withOpacity(0.92) : AppTheme.bgDeep.withOpacity(0.82),
-      borderRadius: BorderRadius.circular(22),
-      border: Border.all(
-        color: focused && selectedPanel
-            ? (categoryMode ? AppTheme.whiteGlow : AppTheme.cyan.withOpacity(0.96))
-            : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
-        width: focused && selectedPanel ? 1.7 : 1,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        final visibleIndexes = _visibleCategoryIndexes();
-        final safeCategoryIndex = categories.isEmpty ? 0 : categoryIndex.clamp(0, categories.length - 1).toInt();
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-                        decoration: _panelDecoration(focused: focused, selectedPanel: !categoryMode),
-                        child: Row(
-                          children: [
-                            _StatusLamp(color: statusColor, text: statusText),
-                            const SizedBox(width: 13),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: active ? Colors.white : Colors.white54,
-                                            fontSize: 17.2,
-                                            fontWeight: FontWeight.w900,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
-                                      ),
-                                      if (focused && !categoryMode) _ModeBadge(text: 'OK ON/OFF'),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    active ? subtitle : 'Platform dimatikan. Tekan OK untuk mengaktifkan lagi.',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: active ? AppTheme.textSoft : Colors.white38,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 7),
-                                  _CapabilityBadgeRow(
-                                    badges: capabilityBadges,
-                                    active: active,
-                                    focused: focused && !categoryMode,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _SwitchPill(active: active, focused: focused && !categoryMode),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-                        decoration: _panelDecoration(focused: focused, selectedPanel: categoryMode),
-                        child: Row(
-                          children: [
-                            SizedBox(
-                              width: 94,
-                              child: Row(
-                                children: [
-                                  Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    active ? 'Kategori' : 'OFF',
-                                    style: TextStyle(
-                                      color: active ? AppTheme.textSoft : Colors.white38,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w900,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (categories.length > visibleIndexes.length)
-                              Icon(Icons.chevron_left_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  for (var j = 0; j < visibleIndexes.length; j++) ...[
-                                    Expanded(
-                                      child: _CategoryChip(
-                                        text: categories[visibleIndexes[j]],
-                                        selected: active && selectedCategories.contains(categories[visibleIndexes[j]]),
-                                        focused: focused && categoryMode && visibleIndexes[j] == safeCategoryIndex,
-                                        disabled: !active,
-                                      ),
-                                    ),
-                                    if (j != visibleIndexes.length - 1) const SizedBox(width: 8),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            if (categories.length > visibleIndexes.length)
-                              Icon(Icons.chevron_right_rounded, color: active ? Colors.white24 : Colors.white10, size: 19),
-                            if (focused && categoryMode) ...[
-                              const SizedBox(width: 10),
-                              _ModeBadge(text: 'OK PILIH'),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isLast) const Divider(color: AppTheme.borderSoft, height: 1),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _CapabilityBadgeRow extends StatelessWidget {
-  final List<String> badges;
-  final bool active;
-  final bool focused;
-
-  const _CapabilityBadgeRow({
-    required this.badges,
-    required this.active,
-    required this.focused,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (badges.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 6,
-      runSpacing: 5,
-      children: [
-        for (final badge in badges.take(6))
-          _CapabilityBadge(text: badge, active: active, focused: focused),
-      ],
-    );
-  }
-}
-
-class _CapabilityBadge extends StatelessWidget {
-  final String text;
-  final bool active;
-  final bool focused;
-
-  const _CapabilityBadge({
-    required this.text,
-    required this.active,
-    required this.focused,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final danger = text == 'DRM' || text == 'BETA';
-    final color = !active
-        ? Colors.white38
-        : danger
-            ? Colors.orangeAccent
-            : AppTheme.cyan;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(focused ? 0.14 : 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(focused ? 0.34 : 0.20)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 9.2,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.3,
           decoration: TextDecoration.none,
         ),
       ),
@@ -1023,31 +739,180 @@ class _CapabilityBadge extends StatelessWidget {
   }
 }
 
-class _ModeBadge extends StatelessWidget {
-  final String text;
-  const _ModeBadge({required this.text});
+class _SourceRowLite extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String statusText;
+  final Color statusColor;
+  final bool active;
+  final bool recommended;
+  final bool beta;
+  final List<String> categories;
+  final List<String> selectedCategories;
+  final bool platformFocused;
+  final bool categoryFocused;
+  final int categoryIndex;
+  final bool isLast;
+
+  const _SourceRowLite({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.statusText,
+    required this.statusColor,
+    required this.active,
+    required this.recommended,
+    required this.beta,
+    required this.categories,
+    required this.selectedCategories,
+    required this.platformFocused,
+    required this.categoryFocused,
+    required this.categoryIndex,
+    required this.isLast,
+  });
+
+  List<int> _visibleIndexes() {
+    if (categories.isEmpty) return const <int>[];
+    const maxVisible = 6;
+    if (categories.length <= maxVisible) return List<int>.generate(categories.length, (i) => i);
+    final safe = categoryIndex.clamp(0, categories.length - 1).toInt();
+    final start = (safe - 2).clamp(0, categories.length - maxVisible).toInt();
+    return List<int>.generate(maxVisible, (i) => start + i);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.cyan.withOpacity(0.11),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.22)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(color: AppTheme.cyan, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.5, decoration: TextDecoration.none),
+    final visible = _visibleIndexes();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+                decoration: _decoration(platformFocused),
+                child: Row(
+                  children: [
+                    _StatusLampLite(color: statusColor, text: statusText),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: active ? Colors.white : Colors.white54,
+                                    fontSize: 17.2,
+                                    fontWeight: FontWeight.w900,
+                                    decoration: TextDecoration.none,
+                                  ),
+                                ),
+                              ),
+                              if (recommended) const _SmallBadgeLite(text: 'REKOMENDASI', color: Colors.greenAccent),
+                              if (beta) const _SmallBadgeLite(text: 'BETA', color: Colors.orangeAccent),
+                              if (platformFocused) const _SmallBadgeLite(text: 'OK ON/OFF', color: AppTheme.cyan),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            active ? subtitle : 'OFF. Tekan OK untuk aktifkan.',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: active ? AppTheme.textSoft : Colors.white38,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _SwitchPillLite(active: active, focused: platformFocused),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+                decoration: _decoration(categoryFocused),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 94,
+                      child: Row(
+                        children: [
+                          Icon(Icons.category_rounded, color: active ? AppTheme.cyan.withOpacity(0.70) : Colors.white24, size: 15),
+                          const SizedBox(width: 6),
+                          Text(
+                            active ? 'Kategori' : 'OFF',
+                            style: TextStyle(
+                              color: active ? AppTheme.textSoft : Colors.white38,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          for (var j = 0; j < visible.length; j++) ...[
+                            Expanded(
+                              child: _CategoryChipLite(
+                                text: categories[visible[j]],
+                                selected: active && selectedCategories.contains(categories[visible[j]]),
+                                focused: active && categoryFocused && visible[j] == categoryIndex,
+                                disabled: !active,
+                              ),
+                            ),
+                            if (j != visible.length - 1) const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (categoryFocused) ...[
+                      const SizedBox(width: 10),
+                      const _SmallBadgeLite(text: 'OK PILIH', color: AppTheme.cyan),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!isLast) const Divider(color: AppTheme.borderSoft, height: 1),
+      ],
+    );
+  }
+
+  BoxDecoration _decoration(bool focused) {
+    return BoxDecoration(
+      color: active ? AppTheme.surface.withOpacity(0.92) : AppTheme.bgDeep.withOpacity(0.82),
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(
+        color: focused ? AppTheme.cyan : (active ? AppTheme.border : Colors.white.withOpacity(0.06)),
+        width: focused ? 1.8 : 1,
       ),
     );
   }
 }
 
-class _StatusLamp extends StatelessWidget {
+class _StatusLampLite extends StatelessWidget {
   final Color color;
   final String text;
-  const _StatusLamp({required this.color, required this.text});
+
+  const _StatusLampLite({required this.color, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -1055,14 +920,15 @@ class _StatusLamp extends StatelessWidget {
       width: 72,
       child: Row(
         children: [
-          Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
+          Container(width: 13, height: 13, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+            ),
           ),
         ],
       ),
@@ -1070,10 +936,11 @@ class _StatusLamp extends StatelessWidget {
   }
 }
 
-class _SwitchPill extends StatelessWidget {
+class _SwitchPillLite extends StatelessWidget {
   final bool active;
   final bool focused;
-  const _SwitchPill({required this.active, required this.focused});
+
+  const _SwitchPillLite({required this.active, required this.focused});
 
   @override
   Widget build(BuildContext context) {
@@ -1092,10 +959,7 @@ class _SwitchPill extends StatelessWidget {
           Container(
             width: 26,
             height: 26,
-            decoration: BoxDecoration(
-              color: active ? Colors.white : Colors.white38,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: active ? Colors.white : Colors.white38, shape: BoxShape.circle),
           ),
           Center(
             child: Text(
@@ -1109,16 +973,22 @@ class _SwitchPill extends StatelessWidget {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
+class _CategoryChipLite extends StatelessWidget {
   final String text;
   final bool selected;
   final bool focused;
   final bool disabled;
 
-  const _CategoryChip({required this.text, required this.selected, required this.focused, required this.disabled});
+  const _CategoryChipLite({
+    required this.text,
+    required this.selected,
+    required this.focused,
+    required this.disabled,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final color = focused ? AppTheme.cyan : (selected ? Colors.white.withOpacity(0.14) : Colors.white12);
     return Container(
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1126,46 +996,51 @@ class _CategoryChip extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         color: selected ? AppTheme.cyan.withOpacity(0.22) : (disabled ? Colors.white.withOpacity(0.025) : Colors.white.withOpacity(0.052)),
-        border: Border.all(
-          color: focused ? AppTheme.cyan : (selected ? Colors.white.withOpacity(0.14) : Colors.white12),
-          width: focused ? 1.7 : 1,
-        ),
+        border: Border.all(color: color, width: focused ? 1.7 : 1),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (selected) ...[
-            Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-          ],
-          Flexible(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
-                fontSize: 11.4,
-                fontWeight: FontWeight.w900,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: disabled ? Colors.white30 : (selected || focused ? Colors.white : Colors.white54),
+          fontSize: 11.4,
+          fontWeight: FontWeight.w900,
+          decoration: TextDecoration.none,
+        ),
       ),
     );
   }
 }
 
-class _ConfirmSaveOverlay extends StatelessWidget {
-  final FocusNode stayNode;
-  final FocusNode saveNode;
-  final FocusOnKeyEventCallback onKey;
-  final VoidCallback onStay;
-  final VoidCallback onSave;
+class _SmallBadgeLite extends StatelessWidget {
+  final String text;
+  final Color color;
 
-  const _ConfirmSaveOverlay({required this.stayNode, required this.saveNode, required this.onKey, required this.onStay, required this.onSave});
+  const _SmallBadgeLite({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.11),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontSize: 9.2, fontWeight: FontWeight.w900, letterSpacing: 0.3, decoration: TextDecoration.none),
+      ),
+    );
+  }
+}
+
+class _SourceConfirmLite extends StatelessWidget {
+  final int cursor;
+
+  const _SourceConfirmLite({required this.cursor});
 
   @override
   Widget build(BuildContext context) {
@@ -1184,39 +1059,22 @@ class _ConfirmSaveOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppTheme.cyan.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppTheme.cyan.withOpacity(0.32)),
-                  ),
-                  child: const Icon(Icons.save_rounded, color: Colors.white, size: 26),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Simpan perubahan?', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                      SizedBox(height: 4),
-                      Text('Platform dan kategori aktif akan diterapkan ke Beranda TV.', style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-                    ],
-                  ),
-                ),
-              ],
+            const Text(
+              'Simpan perubahan?',
+              style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Batal & Keluar akan membuang perubahan. Simpan akan menerapkan ke Beranda TV.',
+              style: TextStyle(color: AppTheme.textSoft, fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
             ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _DialogButton(node: stayNode, text: 'Batal', onKey: onKey, onTap: onStay),
+                _DialogButtonLite(text: 'Batal & Keluar', focused: cursor == 0),
                 const SizedBox(width: 14),
-                _DialogButton(node: saveNode, text: 'Simpan', onKey: onKey, onTap: onSave, filled: true),
+                _DialogButtonLite(text: 'Simpan', focused: cursor == 1, filled: true),
               ],
             ),
           ],
@@ -1226,50 +1084,58 @@ class _ConfirmSaveOverlay extends StatelessWidget {
   }
 }
 
-class _DialogButton extends StatelessWidget {
-  final FocusNode node;
+class _DialogButtonLite extends StatelessWidget {
   final String text;
-  final FocusOnKeyEventCallback onKey;
-  final VoidCallback onTap;
+  final bool focused;
   final bool filled;
 
-  const _DialogButton({required this.node, required this.text, required this.onKey, required this.onTap, this.filled = false});
+  const _DialogButtonLite({
+    required this.text,
+    required this.focused,
+    this.filled = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: node,
-      builder: (context, _) {
-        final focused = node.hasFocus;
-        return Focus(
-          focusNode: node,
-          skipTraversal: true,
-          onKeyEvent: onKey,
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              height: 48,
-              constraints: const BoxConstraints(minWidth: 132),
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: filled ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(focused ? 0.075 : 0.035),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: focused ? AppTheme.cyan : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
-                  width: focused ? 1.7 : 1,
-                ),
-              ),
-              child: Text(
-                text,
-                style: TextStyle(color: filled || focused ? Colors.white : Colors.white70, fontSize: 13.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
-              ),
-            ),
-          ),
-        );
-      },
+    return Container(
+      height: 48,
+      constraints: const BoxConstraints(minWidth: 132),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: filled ? AppTheme.cyan.withOpacity(0.22) : Colors.white.withOpacity(focused ? 0.075 : 0.035),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: focused ? AppTheme.cyan : (filled ? Colors.white.withOpacity(0.16) : Colors.white12),
+          width: focused ? 1.7 : 1,
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: filled || focused ? Colors.white : Colors.white70, fontSize: 13.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+      ),
+    );
+  }
+}
+
+class _SourceEmptyLite extends StatelessWidget {
+  const _SourceEmptyLite();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 250,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Text(
+        'Source belum tersedia',
+        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
+      ),
     );
   }
 }
