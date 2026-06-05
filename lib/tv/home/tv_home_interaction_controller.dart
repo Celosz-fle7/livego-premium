@@ -160,17 +160,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }) {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(index, _gridNodes.length);
+    final previous = _gridIndex;
     final node = _gridNodes[target];
 
-    // Home grid vertical movement must behave like Source Manager:
-    // cursor target and scroll target are calculated in the same key event.
-    // For vertical row jumps, do not use ensureVisible/post-frame reveal.
+    // Home grid vertical movement uses the same principle as Source Manager:
+    // target cursor and target scroll are calculated from index math in the
+    // same key event. Horizontal movement can still use tvFocusGrid because it
+    // should not pull the vertical viewport.
     final ok = anchorRow ? _requestGridNode(node) : tvFocusGrid(node, throttle: throttle);
     if (ok) {
       _gridIndex = target;
       _rememberFocus(TvZone.grid, target);
       if (anchorRow) {
-        _anchorGridRow(alignment: anchorAlignment);
+        _anchorGridRow(targetIndex: target, previousIndex: previous);
       }
     }
     return ok;
@@ -186,19 +188,32 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
   }
 
-  void _anchorGridRow({required double alignment}) {
-    // Deterministic grid row scroll.
+  void _anchorGridRow({required int targetIndex, required int previousIndex}) {
+    // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 224 and default mainAxisSpacing: 16.
-    // Therefore one vertical row movement is a fixed 240px step. This avoids
-    // context-based ensureVisible and the old two post-frame correction that made
-    // the viewport feel late behind aggressive remote input.
-    if (!_scroll.hasClients) return;
+    // TvPosterGrid uses mainAxisExtent: 224 and default mainAxisSpacing: 16, so
+    // the vertical row stride is stable: 240px. Unlike the v1 test, this uses
+    // actual row delta from index math and clamps aggressive repeat movement
+    // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
+    // post-frame ensureVisible.
+    if (!_scroll.hasClients || _gridColumns <= 0) return;
 
     const rowStride = 240.0;
+    final previousRow = previousIndex ~/ _gridColumns;
+    final targetRow = targetIndex ~/ _gridColumns;
+    final deltaRows = targetRow - previousRow;
+    if (deltaRows == 0) return;
+
     final position = _scroll.position;
-    final direction = alignment >= 0.50 ? 1.0 : -1.0;
-    final target = (position.pixels + (rowStride * direction))
+    final viewport = position.viewportDimension;
+    final comfortWindow = (viewport - TvSafeZone.gridTop - TvSafeZone.gridBottom)
+        .clamp(rowStride, rowStride * 2.0)
+        .toDouble();
+    final maxStep = comfortWindow;
+    final requestedStep = rowStride * deltaRows;
+    final safeStep = requestedStep.clamp(-maxStep, maxStep).toDouble();
+
+    final target = (position.pixels + safeStep)
         .clamp(position.minScrollExtent, position.maxScrollExtent)
         .toDouble();
 
