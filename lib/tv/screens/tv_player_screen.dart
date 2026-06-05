@@ -124,6 +124,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const Duration _videoWindowOpenDelay = Duration(milliseconds: 420);
   static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
 
+  // DIAGNOSTIC ONLY: isolate Android TV white-screen source.
+  // true  = do not insert VideoPlayer native texture/window into the tree.
+  // false = normal player behavior.
+  static const bool _disableVideoWindowForWhiteScreenIsolation = true;
+
   // Large enough for long-running series, still bounded for TV remote safety.
   static const int _maxTvEpisodeCount = 999;
 
@@ -1744,9 +1749,12 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final controller = _controller;
     final ready = controller != null && controller.value.isInitialized;
     final renderable = _hasRenderableVideo(controller);
-    final canShowVideoWindow = renderable && _videoWindowReady;
+    final canShowVideoWindow = renderable &&
+        _videoWindowReady &&
+        !_disableVideoWindowForWhiteScreenIsolation;
     final showErrorOverlay = _error.isNotEmpty && !_isEpisodeAutoSkipMessage(_error) && !renderable;
-    final showStartupGuard = _loading ||
+    final showStartupGuard = _disableVideoWindowForWhiteScreenIsolation ||
+        _loading ||
         (ready && renderable && !_videoWindowReady) ||
         (ready && _videoSurfaceShield) ||
         (ready && !renderable && !_isPlayerErrorState);
@@ -1781,7 +1789,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
                 TvPlayerLoadingOverlay(
                   title: item.title,
                   episode: _episode,
-                  message: _error.isNotEmpty ? _error : (ready ? 'Menyiapkan frame video...' : 'Menyiapkan stream video...'),
+                  message: _disableVideoWindowForWhiteScreenIsolation
+                      ? 'Diagnosa: video window dimatikan sementara.'
+                      : (_error.isNotEmpty ? _error : (ready ? 'Menyiapkan frame video...' : 'Menyiapkan stream video...')),
                 ),
               if (_statusMessage.isNotEmpty)
                 Positioned(
