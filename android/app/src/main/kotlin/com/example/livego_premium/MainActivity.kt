@@ -5,15 +5,12 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var pendingPlayerResult: MethodChannel.Result? = null
-    private var startupBlackProofLaunched = false
 
     private fun forceBlackWindow() {
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
@@ -26,20 +23,9 @@ class MainActivity : FlutterActivity() {
         forceBlackWindow()
         super.onCreate(savedInstanceState)
         forceBlackWindow()
-        launchStartupBlackProof()
     }
 
 
-    private fun launchStartupBlackProof() {
-        if (startupBlackProofLaunched) return
-        startupBlackProofLaunched = true
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                startActivity(Intent(this, TvNativeBlackTestActivity::class.java))
-            } catch (_: Exception) {
-            }
-        }, 650)
-    }
 
     override fun onResume() {
         super.onResume()

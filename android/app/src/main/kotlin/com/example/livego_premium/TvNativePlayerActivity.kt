@@ -8,10 +8,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -19,8 +19,6 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 import kotlin.math.max
 import kotlin.math.min
@@ -28,7 +26,7 @@ import kotlin.math.min
 class TvNativePlayerActivity : Activity() {
     private var player: ExoPlayer? = null
     private lateinit var root: FrameLayout
-    private lateinit var playerView: PlayerView
+    private lateinit var textureView: TextureView
     private lateinit var topInfo: TextView
     private lateinit var bottomInfo: TextView
     private lateinit var centerStatus: TextView
@@ -45,6 +43,7 @@ class TvNativePlayerActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        forceBlackWindow()
         super.onCreate(savedInstanceState)
         forceBlackWindow()
         readIntent()
@@ -56,6 +55,7 @@ class TvNativePlayerActivity : Activity() {
         super.onResume()
         forceBlackWindow()
         immersive()
+        root.requestFocus()
     }
 
     override fun onPause() {
@@ -65,7 +65,7 @@ class TvNativePlayerActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        playerView.player = null
+        player?.clearVideoTextureView(textureView)
         player?.release()
         player = null
         super.onDestroy()
@@ -104,12 +104,13 @@ class TvNativePlayerActivity : Activity() {
             isFocusableInTouchMode = true
         }
 
-        playerView = PlayerView(this).apply {
-            setBackgroundColor(Color.BLACK)
-            setShutterBackgroundColor(Color.BLACK)
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            keepScreenOn = true
+        // TextureView is intentionally used instead of PlayerView/SurfaceView.
+        // Some Android TV boxes show a white native Surface during handoff.
+        // TextureView stays inside the Activity view tree, so the black root and
+        // overlays remain in control.
+        textureView = TextureView(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            isOpaque = false
         }
 
         topInfo = TextView(this).apply {
@@ -137,47 +138,61 @@ class TvNativePlayerActivity : Activity() {
             gravity = Gravity.CENTER
             setBackgroundColor(0x99000000.toInt())
             setPadding(28, 20, 28, 20)
-            text = "Menyiapkan video..."
+            text = "Menyiapkan Native Media3 Player..."
         }
 
-        root.addView(playerView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT,
-        ))
+        root.addView(
+            textureView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        )
 
-        root.addView(topInfo, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP
-        ).apply {
-            leftMargin = 56
-            rightMargin = 56
-            topMargin = 36
-        })
+        root.addView(
+            topInfo,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP
+            ).apply {
+                leftMargin = 56
+                rightMargin = 56
+                topMargin = 36
+            }
+        )
 
-        root.addView(centerStatus, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
-        ))
+        root.addView(
+            centerStatus,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            )
+        )
 
-        root.addView(bottomInfo, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        ).apply {
-            bottomMargin = 42
-        })
+        root.addView(
+            bottomInfo,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            ).apply {
+                bottomMargin = 42
+            }
+        )
 
         setContentView(root)
         root.requestFocus()
-        showControls("Menyiapkan video...")
+        showControls("Native Media3 Player")
     }
 
     private fun setupPlayer() {
         val url = intent.getStringExtra("url") ?: ""
         if (url.isBlank()) {
             showControls("URL video kosong")
+            centerStatus.text = "URL video kosong"
+            centerStatus.visibility = View.VISIBLE
             return
         }
 
@@ -200,7 +215,7 @@ class TvNativePlayerActivity : Activity() {
             .build()
 
         player = exo
-        playerView.player = exo
+        exo.setVideoTextureView(textureView)
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {

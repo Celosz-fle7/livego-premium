@@ -111,18 +111,15 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     _openingPlayer = true;
     final episodeNumber = episode?.index ?? (int.tryParse(detail.chapterId) ?? LiveGoLocalStore.continueEpisode(detail));
     LiveGoAnalytics.play(detail.platformSlug, detail.id, detail.title, episodeNumber);
-    widget.onPlayerRouteOpen?.call();
-
     await Future<void>.delayed(const Duration(milliseconds: 16));
     if (!mounted) {
       _openingPlayer = false;
-      widget.onPlayerRouteClosed?.call();
       return;
     }
 
     final playerItem = _episodeItem(detail, episode);
     try {
-      await TvNativePlayerLauncher.openBlackTest(playerItem);
+      await TvNativePlayerLauncher.open(playerItem, episode: episodeNumber);
     } catch (e) {
       debugPrint('LIVEGO TV NATIVE PLAYER OPEN FAILED: $e');
       if (mounted) {
@@ -132,7 +129,6 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
       }
     } finally {
       _openingPlayer = false;
-      widget.onPlayerRouteClosed?.call();
       if (mounted) _schedulePlayerReturnFocus(preferEpisode: episode != null);
     }
   }

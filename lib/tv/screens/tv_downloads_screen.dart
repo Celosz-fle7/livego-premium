@@ -159,10 +159,8 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   Future<void> _open(DownloadRecord record) async {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
-    widget.onPlayerRouteOpen?.call();
-
     try {
-      await TvNativePlayerLauncher.openBlackTest(record.item);
+      await TvNativePlayerLauncher.open(record.item);
     } catch (e) {
       debugPrint('LIVEGO TV NATIVE PLAYER DOWNLOAD OPEN FAILED: $e');
       if (mounted) {
@@ -172,7 +170,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
       }
     } finally {
       _openingPlayer = false;
-      widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusRow(_lastRow);
