@@ -30,6 +30,7 @@ class TvNativePlayerActivity : Activity() {
     private lateinit var topInfo: TextView
     private lateinit var bottomInfo: TextView
     private lateinit var centerStatus: TextView
+    private lateinit var blackGuard: View
 
     private val handler = Handler(Looper.getMainLooper())
     private var controlsVisible = true
@@ -37,9 +38,17 @@ class TvNativePlayerActivity : Activity() {
     private var episode = 1
     private var totalEpisodes = 1
     private var quality = "Auto"
+    private var exoCreated = false
+    private var playerReady = false
 
     private val hideControlsRunnable = Runnable {
         hideControls()
+    }
+
+    private val createExoRunnable = Runnable {
+        if (!isFinishing && !isDestroyed && !exoCreated) {
+            setupPlayer()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +57,8 @@ class TvNativePlayerActivity : Activity() {
         forceBlackWindow()
         readIntent()
         buildUi()
-        setupPlayer()
+        showPermanentStatus("OPENED NATIVE PLAYER\nmenunggu Exo attach...")
+        handler.postDelayed(createExoRunnable, 1000)
     }
 
     override fun onResume() {
@@ -65,7 +75,10 @@ class TvNativePlayerActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        player?.clearVideoTextureView(textureView)
+        try {
+            player?.clearVideoTextureView(textureView)
+        } catch (_: Exception) {
+        }
         player?.release()
         player = null
         super.onDestroy()
@@ -104,13 +117,15 @@ class TvNativePlayerActivity : Activity() {
             isFocusableInTouchMode = true
         }
 
-        // TextureView is intentionally used instead of PlayerView/SurfaceView.
-        // Some Android TV boxes show a white native Surface during handoff.
-        // TextureView stays inside the Activity view tree, so the black root and
-        // overlays remain in control.
         textureView = TextureView(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            isOpaque = false
+            visibility = View.INVISIBLE
+            setBackgroundColor(Color.BLACK)
+            isOpaque = true
+        }
+
+        blackGuard = View(this).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.VISIBLE
         }
 
         topInfo = TextView(this).apply {
@@ -126,23 +141,31 @@ class TvNativePlayerActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
-            setBackgroundColor(0x99000000.toInt())
+            setBackgroundColor(0xCC000000.toInt())
             setPadding(24, 14, 24, 14)
             text = controlsText()
         }
 
         centerStatus = TextView(this).apply {
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 20f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setBackgroundColor(0x99000000.toInt())
-            setPadding(28, 20, 28, 20)
-            text = "Menyiapkan Native Media3 Player..."
+            setBackgroundColor(0xDD000000.toInt())
+            setPadding(34, 26, 34, 26)
+            text = "OPENED NATIVE PLAYER"
         }
 
         root.addView(
             textureView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        )
+
+        root.addView(
+            blackGuard,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -184,15 +207,14 @@ class TvNativePlayerActivity : Activity() {
 
         setContentView(root)
         root.requestFocus()
-        showControls("Native Media3 Player")
     }
 
     private fun setupPlayer() {
+        exoCreated = true
+        showPermanentStatus("CREATING EXO\nmenyiapkan stream...")
         val url = intent.getStringExtra("url") ?: ""
         if (url.isBlank()) {
-            showControls("URL video kosong")
-            centerStatus.text = "URL video kosong"
-            centerStatus.visibility = View.VISIBLE
+            showPermanentStatus("ERROR\nURL video kosong")
             return
         }
 
@@ -215,25 +237,32 @@ class TvNativePlayerActivity : Activity() {
             .build()
 
         player = exo
-        exo.setVideoTextureView(textureView)
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
-                    Player.STATE_BUFFERING -> showControls("Buffering...")
+                    Player.STATE_BUFFERING -> showPermanentStatus("BUFFERING\nmenunggu frame video...")
                     Player.STATE_READY -> {
-                        centerStatus.visibility = View.GONE
-                        showControls("Memutar Episode $episode")
+                        playerReady = true
+                        textureView.visibility = View.VISIBLE
+                        // Keep guard for one more short moment after READY, then reveal.
+                        handler.postDelayed({
+                            if (!isFinishing && playerReady) {
+                                blackGuard.visibility = View.GONE
+                                centerStatus.visibility = View.GONE
+                                showControls("READY • Memutar Episode $episode")
+                            }
+                        }, 450)
                     }
-                    Player.STATE_ENDED -> showControls("Episode selesai")
-                    Player.STATE_IDLE -> showControls("Player idle")
+                    Player.STATE_ENDED -> showPermanentStatus("EPISODE SELESAI")
+                    Player.STATE_IDLE -> showPermanentStatus("PLAYER IDLE")
                 }
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                showControls("Gagal memutar video")
-                centerStatus.visibility = View.VISIBLE
-                centerStatus.text = "Gagal memutar video\n${error.errorCodeName}"
+                textureView.visibility = View.INVISIBLE
+                blackGuard.visibility = View.VISIBLE
+                showPermanentStatus("ERROR\n${error.errorCodeName}")
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -241,6 +270,10 @@ class TvNativePlayerActivity : Activity() {
             }
         })
 
+        // Attach texture only after the UI is already black and diagnostic text
+        // is visible. If blank white starts after this line, it is definitely the
+        // Media3/decoder/stream surface path.
+        exo.setVideoTextureView(textureView)
         exo.setMediaItem(MediaItem.fromUri(url))
         exo.prepare()
         exo.playWhenReady = true
@@ -297,7 +330,7 @@ class TvNativePlayerActivity : Activity() {
             }
             KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_ESCAPE -> {
-                if (controlsVisible) {
+                if (controlsVisible && playerReady) {
                     hideControls()
                 } else {
                     setResult(RESULT_OK)
@@ -338,11 +371,21 @@ class TvNativePlayerActivity : Activity() {
         showControls("$sign${kotlin.math.abs(deltaMs / 1000)} detik")
     }
 
+    private fun showPermanentStatus(message: String) {
+        controlsVisible = true
+        topInfo.visibility = View.VISIBLE
+        bottomInfo.visibility = View.VISIBLE
+        centerStatus.visibility = View.VISIBLE
+        centerStatus.text = message
+        refreshBottomText()
+        handler.removeCallbacks(hideControlsRunnable)
+    }
+
     private fun showControls(message: String? = null) {
         controlsVisible = true
         topInfo.visibility = View.VISIBLE
         bottomInfo.visibility = View.VISIBLE
-        if (message != null) {
+        if (message != null && !playerReady) {
             centerStatus.visibility = View.VISIBLE
             centerStatus.text = message
         }
@@ -354,7 +397,7 @@ class TvNativePlayerActivity : Activity() {
         controlsVisible = false
         topInfo.visibility = View.GONE
         bottomInfo.visibility = View.GONE
-        if (player?.playbackState == Player.STATE_READY) {
+        if (playerReady) {
             centerStatus.visibility = View.GONE
         }
         handler.removeCallbacks(hideControlsRunnable)
@@ -372,6 +415,6 @@ class TvNativePlayerActivity : Activity() {
 
     private fun controlsText(): String {
         val state = if (player?.isPlaying == true) "PLAY" else "PAUSE"
-        return "$state   OK Play/Pause   ←/→ Seek 10s   ↑ Controls   ↓ Episode   MENU Opsi   BACK Tutup/Keluar"
+        return "$state   OK Play/Pause   ←/→ Seek 10s   ↑ Controls   ↓ Episode   MENU Opsi   BACK Keluar"
     }
 }
