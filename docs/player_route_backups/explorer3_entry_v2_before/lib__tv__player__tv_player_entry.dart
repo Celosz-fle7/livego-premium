@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/content_item.dart';
-import 'explorer3/tv_player_explorer3_screen.dart';
+import '../screens/tv_basic_player_screen.dart';
 
 class TvPlayerEntry {
   const TvPlayerEntry._();
@@ -17,7 +17,7 @@ class TvPlayerEntry {
         barrierColor: Colors.black,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
-        pageBuilder: (_, __, ___) => TvPlayerExplorer3Screen(
+        pageBuilder: (_, __, ___) => TvBasicPlayerScreen(
           item: item,
           episode: episode,
         ),
