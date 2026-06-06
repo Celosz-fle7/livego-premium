@@ -123,10 +123,10 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
   static const double _episodePanelRowStride = 60;
   static const double _episodePanelComfortTopRows = 3;
   static const double _episodePanelComfortBottomRows = 4;
-  static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 120);
-  static const Duration _videoWindowOpenDelay = Duration(milliseconds: 420);
-  static const Duration _videoWindowFramePollDelay = Duration(milliseconds: 160);
-  static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 3200);
+  static const Duration _videoFirstFrameMinPosition = Duration(milliseconds: 900);
+  static const Duration _videoWindowOpenDelay = Duration(milliseconds: 700);
+  static const Duration _videoWindowFramePollDelay = Duration(milliseconds: 220);
+  static const Duration _videoSurfaceShieldMax = Duration(milliseconds: 6500);
 
   // DIAGNOSTIC ONLY: isolate Android TV white-screen source.
   // true  = do not insert VideoPlayer native texture/window into the tree.
@@ -822,8 +822,9 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
       // Android TV native video surfaces can flash white if inserted after
       // initialize() but before the first decoded frame/progress is available.
-      // Keep the Flutter tree black/loading and poll briefly until playback has
-      // advanced enough to make the first visible frame safe.
+      // Keep the native video widget OUT of the Flutter tree until the black
+      // shield is released. Some TV boxes draw native video above Flutter
+      // overlays, so an overlay alone is not enough.
       if (!hasFirstFrameProgress && !value.hasError) {
         _videoWindowOpenTimer = Timer(_videoWindowFramePollDelay, tryOpenVideoWindow);
         return;
@@ -1864,6 +1865,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     final renderable = _hasRenderableVideo(controller);
     final canShowVideoWindow = renderable &&
         _videoWindowReady &&
+        !_videoSurfaceShield &&
         !_disableVideoWindowForWhiteScreenIsolation;
     final showErrorOverlay = _error.isNotEmpty && !_isEpisodeAutoSkipMessage(_error) && !renderable;
     final showStartupGuard = _disableVideoWindowForWhiteScreenIsolation ||
