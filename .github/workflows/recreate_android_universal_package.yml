@@ -1,5 +1,4 @@
 name: Recreate Android Universal Package
-
 on:
   workflow_dispatch:
     inputs:
