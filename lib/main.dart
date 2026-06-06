@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
 import 'core/livego_local_store.dart';
-import 'mobile/mobile_app.dart';
 import 'tv/tv_app.dart';
 
 void main() {
@@ -55,22 +54,15 @@ class LiveGoPremiumApp extends StatelessWidget {
 class AdaptiveRoot extends StatelessWidget {
   const AdaptiveRoot({super.key});
 
-  bool _isTvLayout(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-
-    if (const bool.fromEnvironment('LIVEGO_FORCE_TV')) return true;
-    if (LiveGoSettings.layoutMode == 'TV') return true;
-    if (LiveGoSettings.layoutMode == 'Mobile') return false;
-
-    // Aman untuk HP: landscape phone tidak boleh otomatis masuk TvApp.
-    // Android TV/box biasanya punya width besar dan tinggi/shortestSide besar.
-    final landscape = size.width > size.height;
-    final bigLandscape = landscape && size.width >= 960 && size.shortestSide >= 540;
-    return bigLandscape;
-  }
-
   @override
   Widget build(BuildContext context) {
-    return _isTvLayout(context) ? const TvApp() : const MobileApp();
+    // Android TV build is hard-locked to TV UI.
+    //
+    // Mobile UI/player still exists in source for backup, but it must never be
+    // selected by the TV APK. This removes any chance that old saved settings,
+    // window metrics, or landscape detection accidentally route TV users into
+    // MobileApp/MobilePlayerScreen.
+    LiveGoSettings.layoutMode = 'TV';
+    return const TvApp();
   }
 }

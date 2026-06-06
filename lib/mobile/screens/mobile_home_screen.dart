@@ -8,7 +8,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/poster_card.dart';
-import 'mobile_player_screen.dart';
+import '../../tv/player/tv_native_player_launcher.dart';
 
 class MobileHomeScreen extends StatefulWidget {
   final ValueChanged<int> onTab;
@@ -76,8 +76,18 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
   void _reload() => setState(() => _future = _load());
 
-  void _open(ContentItem item) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => MobilePlayerScreen(item: item)));
+  Future<void> _open(ContentItem item) async {
+    // TV APK safety guard:
+    // If Mobile UI is ever reached by mistake, do not open the old Flutter
+    // MobilePlayerScreen. Use the same native player bridge as TV.
+    try {
+      await TvNativePlayerLauncher.open(item);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Native player gagal dibuka: $e')),
+      );
+    }
   }
 
   List<ContentItem> _filtered(List<ContentItem> items, List<String> categories) {

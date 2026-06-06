@@ -3,7 +3,7 @@ import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../shared/widgets/poster_card.dart';
-import 'mobile_player_screen.dart';
+import '../../tv/player/tv_native_player_launcher.dart';
 
 class MobileSearchScreen extends StatefulWidget {
   const MobileSearchScreen({super.key});
@@ -142,7 +142,19 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
             ),
             itemBuilder: (_, i) {
               final item = results[i];
-              return PosterCard(item: item, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MobilePlayerScreen(item: item))));
+              return PosterCard(
+                item: item,
+                onTap: () async {
+                  try {
+                    await TvNativePlayerLauncher.open(item);
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Native player gagal dibuka: $e')),
+                    );
+                  }
+                },
+              );
             },
           ),
       ],
