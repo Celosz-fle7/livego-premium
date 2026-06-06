@@ -11,6 +11,7 @@ import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
 import 'tv_player_screen.dart';
+import '../player/tv_native_player_launcher.dart';
 import '../navigation/tv_black_page_route.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
@@ -155,23 +156,28 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     tvFocusComfort(_rowNodes[_lastRow], topMargin: 110, bottomMargin: 180);
   }
 
-  void _open(DownloadRecord record) {
+  Future<void> _open(DownloadRecord record) async {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     widget.onPlayerRouteOpen?.call();
-    Navigator.of(context)
-        .push(TvBlackPageRoute.build<void>(
-          builder: (_) => TvPlayerScreen(item: record.item),
-        ))
-        .whenComplete(() {
+
+    try {
+      await TvNativePlayerLauncher.open(record.item);
+    } catch (e) {
+      debugPrint('LIVEGO TV NATIVE PLAYER DOWNLOAD OPEN FAILED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Native player gagal dibuka: $e')),
+        );
+      }
+    } finally {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
       if (!mounted) return;
-      void restore() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusRow(_lastRow);
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-    });
+      });
+    }
   }
 
   KeyEventResult _emptyKey(FocusNode node, KeyEvent event) {

@@ -16,6 +16,7 @@ import '../focus/tv_reachability.dart';
 import '../providers/tv_detail_provider.dart';
 import '../theme/tv_focus_style.dart';
 import 'tv_player_screen.dart';
+import '../player/tv_native_player_launcher.dart';
 import 'tv_player_stage_screen.dart';
 import '../navigation/tv_black_page_route.dart';
 import '../../services/analytics/livego_analytics.dart';
@@ -112,8 +113,6 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     LiveGoAnalytics.play(detail.platformSlug, detail.id, detail.title, episodeNumber);
     widget.onPlayerRouteOpen?.call();
 
-    // Player route handoff guard: give Shell one frame to paint the black
-    // overlay before the native/route stack starts opening Player.
     await Future<void>.delayed(const Duration(milliseconds: 16));
     if (!mounted) {
       _openingPlayer = false;
@@ -122,15 +121,20 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     }
 
     final playerItem = _episodeItem(detail, episode);
-    Navigator.of(context)
-        .push(TvBlackPageRoute.build<void>(
-          builder: (_) => TvPlayerStageScreen(item: playerItem),
-        ))
-        .whenComplete(() {
+    try {
+      await TvNativePlayerLauncher.open(playerItem, episode: episodeNumber);
+    } catch (e) {
+      debugPrint('LIVEGO TV NATIVE PLAYER OPEN FAILED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Native player gagal dibuka: $e')),
+        );
+      }
+    } finally {
       _openingPlayer = false;
       widget.onPlayerRouteClosed?.call();
-      _schedulePlayerReturnFocus(preferEpisode: episode != null);
-    });
+      if (mounted) _schedulePlayerReturnFocus(preferEpisode: episode != null);
+    }
   }
 
   Future<void> _toggleFavorite(ContentItem item) async {
