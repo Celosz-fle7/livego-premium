@@ -48,6 +48,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   bool _surfaceReady = false;
   String _status = 'Membuka Explorer 3...';
   String _error = '';
+  String _debugPhase = 'init';
+  String _debugUrlType = '-';
+  String _debugHost = '-';
+  String _debugPathTail = '-';
+  String _debugHeaderKeys = '-';
+  int _debugToken = 0;
   Timer? _surfaceTimer;
   Timer? _hideControlsTimer;
   Timer? _statusTimer;
@@ -95,6 +101,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _error = '';
       _status = 'Mencari stream EP $_episode...';
       _controls = true;
+      _debugPhase = 'resolve';
+      _debugToken = token;
+      _debugUrlType = '-';
+      _debugHost = '-';
+      _debugPathTail = '-';
+      _debugHeaderKeys = '-';
     });
 
     try {
@@ -110,7 +122,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       final url = preferred.isNotEmpty ? preferred : stream.url.trim();
       if (url.isEmpty) throw StateError('Stream kosong');
 
-      setState(() => _status = 'Menyiapkan video...');
+      _setDebugStream(url, stream.headers);
+      setState(() {
+        _status = 'Menyiapkan video...';
+        _debugPhase = 'stream-ready';
+      });
       await _startController(token, stream, url);
     } catch (error) {
       if (!_active(token)) return;
@@ -122,6 +138,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _error = '$error';
         _status = 'ERROR';
         _controls = true;
+        _debugPhase = 'error';
       });
     }
   }
@@ -129,6 +146,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   bool _active(int token) => mounted && !_closing && token == _loadToken;
 
   Future<void> _startController(int token, StreamInfo stream, String url) async {
+    setState(() => _debugPhase = 'controller-create');
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
       httpHeaders: stream.headers,
@@ -136,6 +154,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     );
 
     try {
+      setState(() => _debugPhase = 'initialize');
       await controller.initialize().timeout(
         const Duration(seconds: 22),
         onTimeout: () => throw TimeoutException('Initialize video timeout'),
@@ -145,6 +164,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         return;
       }
 
+      setState(() => _debugPhase = 'play');
       await controller.play();
 
       final old = _controller;
@@ -156,6 +176,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _loading = false;
         _status = 'PLAY';
         _controls = true;
+        _debugPhase = 'surface-wait';
       });
 
       _surfaceTimer?.cancel();
@@ -163,7 +184,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         if (!_active(token)) return;
         final c = _controller;
         if (c == null || !c.value.isInitialized || c.value.hasError) return;
-        setState(() => _surfaceReady = true);
+        setState(() {
+          _surfaceReady = true;
+          _debugPhase = 'surface-ready';
+        });
       });
       _scheduleHideControls();
     } catch (_) {
@@ -293,6 +317,75 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     return KeyEventResult.handled;
   }
 
+  void _setDebugStream(String url, Map<String, String> headers) {
+    try {
+      final uri = Uri.parse(url);
+      final lowerPath = uri.path.toLowerCase();
+      final type = lowerPath.endsWith('.m3u8') || lowerPath.contains('/hls')
+          ? 'HLS'
+          : lowerPath.endsWith('.mp4')
+              ? 'MP4'
+              : 'UNKNOWN';
+      final segments = uri.pathSegments;
+      final tail = segments.isEmpty
+          ? '/'
+          : segments.reversed.take(2).toList().reversed.join('/');
+      final keys = headers.keys.map((e) => e.trim()).where((e) => e.isNotEmpty).toList()..sort();
+      _debugUrlType = type;
+      _debugHost = uri.host.isEmpty ? '-' : uri.host;
+      _debugPathTail = tail.isEmpty ? '/' : tail;
+      _debugHeaderKeys = keys.isEmpty ? '-' : keys.join(',');
+    } catch (_) {
+      _debugUrlType = 'BAD_URL';
+      _debugHost = '-';
+      _debugPathTail = '-';
+      _debugHeaderKeys = headers.keys.join(',');
+    }
+  }
+
+  Widget _buildDebugOverlay() {
+    final c = _controller;
+    final v = c?.value;
+    final lines = <String>[
+      'LIVEGO PLAYER DEBUG',
+      'phase=$_debugPhase token=$_debugToken ep=$_episode',
+      'loading=$_loading surface=$_surfaceReady controls=$_controls closing=$_closing',
+      'controller=${c != null} init=${v?.isInitialized ?? false} playing=${v?.isPlaying ?? false} buffering=${v?.isBuffering ?? false} error=${v?.hasError ?? false}',
+      'pos=${v?.position.inMilliseconds ?? 0}ms dur=${v?.duration.inMilliseconds ?? 0}ms aspect=${v?.aspectRatio.toStringAsFixed(3) ?? "-"}',
+      'stream=$_debugUrlType host=$_debugHost tail=$_debugPathTail',
+      'headers=$_debugHeaderKeys',
+      if (_error.isNotEmpty) 'err=${_error.length > 120 ? _error.substring(0, 120) : _error}',
+    ];
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Container(
+            margin: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 760),
+            decoration: BoxDecoration(
+              color: const Color(0xDD000000),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.55)),
+            ),
+            child: Text(
+              lines.join('\n'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                height: 1.18,
+                fontWeight: FontWeight.w800,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _videoSurface() {
     final c = _controller;
     if (!_surfaceReady || c == null || !c.value.isInitialized || c.value.hasError) {
@@ -418,6 +511,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                       ),
                     ),
                   ),
+                _buildDebugOverlay(),
               ],
             ),
           ),
