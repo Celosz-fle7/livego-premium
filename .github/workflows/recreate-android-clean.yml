@@ -71,6 +71,7 @@ jobs:
           root = Path(".")
           package_name = "com.livego.premium"
           kotlin_package_dir = "com/livego/premium"
+          application_name_placeholder = "$" + "{applicationName}"
 
           manifest = root / "android/app/src/main/AndroidManifest.xml"
           manifest.write_text(f'''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -87,7 +88,7 @@ jobs:
 
               <application
                   android:label="LiveGO Premium"
-                  android:name="${{applicationName}}"
+                  android:name="{application_name_placeholder}"
                   android:icon="@mipmap/ic_launcher"
                   android:banner="@drawable/tv_banner"
                   android:hardwareAccelerated="true"
