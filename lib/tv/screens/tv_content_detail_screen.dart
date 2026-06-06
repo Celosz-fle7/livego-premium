@@ -122,7 +122,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
 
     final playerItem = _episodeItem(detail, episode);
     try {
-      await TvNativePlayerLauncher.open(playerItem, episode: episodeNumber);
+      await TvNativePlayerLauncher.openBlackTest(playerItem);
     } catch (e) {
       debugPrint('LIVEGO TV NATIVE PLAYER OPEN FAILED: $e');
       if (mounted) {

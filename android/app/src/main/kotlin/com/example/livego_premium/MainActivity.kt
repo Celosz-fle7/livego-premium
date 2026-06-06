@@ -38,9 +38,23 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "openNativePlayer" -> openNativePlayer(call.arguments, result)
+                "openNativeBlackTest" -> openNativeBlackTest(result)
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun openNativeBlackTest(result: MethodChannel.Result) {
+        if (pendingPlayerResult != null) {
+            result.error("PLAYER_BUSY", "Native player is already open", null)
+            return
+        }
+
+        pendingPlayerResult = result
+        startActivityForResult(
+            Intent(this, TvNativeBlackTestActivity::class.java),
+            REQUEST_NATIVE_PLAYER
+        )
     }
 
     private fun openNativePlayer(arguments: Any?, result: MethodChannel.Result) {

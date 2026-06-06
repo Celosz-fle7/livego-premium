@@ -17,6 +17,14 @@ class TvNativePlayerLauncher {
 
   const TvNativePlayerLauncher._();
 
+  static Future<void> openBlackTest(ContentItem item) async {
+    await _channel.invokeMethod<void>('openNativeBlackTest', <String, Object?>{
+      'title': item.title,
+      'platformSlug': item.platformSlug,
+      'contentId': item.id,
+    });
+  }
+
   static Future<void> open(ContentItem item, {int? episode}) async {
     final ep = _episodeFor(item, episode);
     final playable = _playableItem(item, ep);

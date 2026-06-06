@@ -162,7 +162,7 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     widget.onPlayerRouteOpen?.call();
 
     try {
-      await TvNativePlayerLauncher.open(record.item);
+      await TvNativePlayerLauncher.openBlackTest(record.item);
     } catch (e) {
       debugPrint('LIVEGO TV NATIVE PLAYER DOWNLOAD OPEN FAILED: $e');
       if (mounted) {
