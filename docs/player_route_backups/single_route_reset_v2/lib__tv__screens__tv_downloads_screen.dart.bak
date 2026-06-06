@@ -10,7 +10,9 @@ import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
-import '../player/tv_player_entry.dart';
+import 'tv_player_screen.dart';
+import '../player/tv_native_player_launcher.dart';
+import '../navigation/tv_black_page_route.dart';
 
 class TvDownloadsScreen extends StatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -158,11 +160,14 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
     try {
-      await TvPlayerEntry.open(
-        context,
-        item: record.item,
-        episode: record.episode,
-      );
+      await TvNativePlayerLauncher.open(record.item);
+    } catch (e) {
+      debugPrint('LIVEGO TV NATIVE PLAYER DOWNLOAD OPEN FAILED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Native player gagal dibuka: $e')),
+        );
+      }
     } finally {
       _openingPlayer = false;
       if (!mounted) return;

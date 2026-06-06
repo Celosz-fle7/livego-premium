@@ -4,7 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
 import '../../shared/widgets/poster_card.dart';
-import '../../tv/player/tv_native_player_launcher.dart';
+import '../../tv/player/tv_player_entry.dart';
 
 class MobileLibraryScreen extends StatelessWidget {
   final String title;
@@ -61,16 +61,7 @@ class MobileLibraryScreen extends StatelessWidget {
                   final item = items[i];
                   return PosterCard(
                     item: item,
-                    onTap: () async {
-                      try {
-                        await TvNativePlayerLauncher.open(item);
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Native player gagal dibuka: $e')),
-                        );
-                      }
-                    },
+                    onTap: () => TvPlayerEntry.open(context, item: item),
                   );
                 },
               ),
