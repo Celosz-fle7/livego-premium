@@ -1,0 +1,253 @@
+name: Recreate Android Clean Universal
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch hasil recreate Android"
+        required: true
+        default: "android-recreate-clean"
+      flutter_channel:
+        description: "Flutter channel"
+        required: true
+        default: "stable"
+
+permissions:
+  contents: write
+
+jobs:
+  recreate_android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ inputs.flutter_channel }}
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Prepare clean branch
+        run: |
+          git checkout -B "${{ inputs.target_branch }}"
+
+      - name: Backup current android folder as artifact source
+        run: |
+          rm -rf /tmp/livego_android_backup
+          mkdir -p /tmp/livego_android_backup
+          if [ -d android ]; then
+            cp -a android /tmp/livego_android_backup/android-before-recreate
+          fi
+
+      - name: Upload old android backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-before-recreate
+          path: /tmp/livego_android_backup/android-before-recreate
+          if-no-files-found: ignore
+
+      - name: Recreate Android folder
+        run: |
+          rm -rf android
+          flutter create \
+            --platforms=android \
+            --org com.livego \
+            --project-name livego_premium \
+            .
+
+      - name: Patch Android universal black bootstrap
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path(".")
+          package_name = "com.livego.premium"
+          kotlin_package_dir = "com/livego/premium"
+
+          manifest = root / "android/app/src/main/AndroidManifest.xml"
+          manifest.write_text(f'''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+              <uses-feature
+                  android:name="android.software.leanback"
+                  android:required="false" />
+              <uses-feature
+                  android:name="android.hardware.touchscreen"
+                  android:required="false" />
+
+              <application
+                  android:label="LiveGO Premium"
+                  android:name="${{applicationName}}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:banner="@drawable/tv_banner"
+                  android:hardwareAccelerated="true"
+                  android:resizeableActivity="true"
+                  android:usesCleartextTraffic="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          ''')
+
+          kotlin_root = root / "android/app/src/main/kotlin"
+          if kotlin_root.exists():
+              for old in kotlin_root.rglob("MainActivity.kt"):
+                  old.unlink()
+          kotlin_dir = kotlin_root / kotlin_package_dir
+          kotlin_dir.mkdir(parents=True, exist_ok=True)
+          (kotlin_dir / "MainActivity.kt").write_text(f'''package {package_name}
+
+          import android.graphics.Color
+          import android.graphics.drawable.ColorDrawable
+          import android.os.Bundle
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity : FlutterActivity() {{
+              private fun forceBlackWindow() {{
+                  window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
+                  window.statusBarColor = Color.BLACK
+                  window.navigationBarColor = Color.BLACK
+                  window.decorView.setBackgroundColor(Color.BLACK)
+              }}
+
+              override fun onCreate(savedInstanceState: Bundle?) {{
+                  forceBlackWindow()
+                  super.onCreate(savedInstanceState)
+                  forceBlackWindow()
+              }}
+
+              override fun onResume() {{
+                  super.onResume()
+                  forceBlackWindow()
+              }}
+          }}
+          ''')
+
+          styles = '''<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#000000</item>
+                  <item name="android:colorBackground">#000000</item>
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowActionBar">false</item>
+                  <item name="android:windowDisablePreview">true</item>
+                  <item name="android:forceDarkAllowed">false</item>
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:windowLightNavigationBar">false</item>
+              </style>
+
+              <style name="NormalTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#000000</item>
+                  <item name="android:colorBackground">#000000</item>
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowActionBar">false</item>
+                  <item name="android:windowDisablePreview">true</item>
+                  <item name="android:forceDarkAllowed">false</item>
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:windowLightNavigationBar">false</item>
+              </style>
+          </resources>
+          '''
+
+          styles_v31 = styles.replace(
+              '<item name="android:colorBackground">#000000</item>',
+              '<item name="android:colorBackground">#000000</item>\n                  <item name="android:windowSplashScreenBackground">#000000</item>',
+          )
+
+          for rel, content in [
+              ("android/app/src/main/res/values/styles.xml", styles),
+              ("android/app/src/main/res/values-night/styles.xml", styles),
+              ("android/app/src/main/res/values-v31/styles.xml", styles_v31),
+              ("android/app/src/main/res/values-night-v31/styles.xml", styles_v31),
+          ]:
+              p = root / rel
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(content)
+
+          black_layer = '''<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/black" />
+          </layer-list>
+          '''
+          for rel in [
+              "android/app/src/main/res/drawable/launch_background.xml",
+              "android/app/src/main/res/drawable-v21/launch_background.xml",
+              "android/app/src/main/res/drawable/tv_banner.xml",
+          ]:
+              p = root / rel
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(black_layer)
+
+          for gradle in [
+              root / "android/app/build.gradle",
+              root / "android/app/build.gradle.kts",
+          ]:
+              if not gradle.exists():
+                  continue
+              text = gradle.read_text()
+              text = re.sub(r'namespace\s*=\s*["\'][^"\']+["\']', f'namespace = "{package_name}"', text)
+              text = re.sub(r'applicationId\s*=\s*["\'][^"\']+["\']', f'applicationId = "{package_name}"', text)
+              gradle.write_text(text)
+          PY
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Commit recreated Android folder
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git status --short
+          git add -A android .metadata pubspec.lock
+
+          if git diff --cached --quiet; then
+            echo "No Android recreate changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Recreate Android folder clean universal"
+          git push --force-with-lease origin "${{ inputs.target_branch }}"
