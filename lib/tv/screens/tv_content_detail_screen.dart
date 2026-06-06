@@ -16,6 +16,7 @@ import '../focus/tv_reachability.dart';
 import '../providers/tv_detail_provider.dart';
 import '../theme/tv_focus_style.dart';
 import 'tv_player_screen.dart';
+import 'tv_player_stage_screen.dart';
 import '../navigation/tv_black_page_route.dart';
 import '../../services/analytics/livego_analytics.dart';
 import '../widgets/tv_professional_loading.dart';
@@ -123,7 +124,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     final playerItem = _episodeItem(detail, episode);
     Navigator.of(context)
         .push(TvBlackPageRoute.build<void>(
-          builder: (_) => TvPlayerScreen(item: playerItem),
+          builder: (_) => TvPlayerStageScreen(item: playerItem),
         ))
         .whenComplete(() {
       _openingPlayer = false;
