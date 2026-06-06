@@ -1,4 +1,4 @@
-package com.example.livego_premium
+package com.livego.premium
 
 import android.app.Activity
 import android.graphics.Color
