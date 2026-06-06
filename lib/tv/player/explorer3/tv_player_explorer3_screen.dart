@@ -180,20 +180,48 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       });
 
       _surfaceTimer?.cancel();
-      _surfaceTimer = Timer(const Duration(milliseconds: 220), () {
-        if (!_active(token)) return;
-        final c = _controller;
-        if (c == null || !c.value.isInitialized || c.value.hasError) return;
-        setState(() {
-          _surfaceReady = true;
-          _debugPhase = 'surface-ready';
-        });
-      });
+      _surfaceTimer = null;
+      _detectVideoPlayback(token);
       _scheduleHideControls();
     } catch (_) {
       await controller.dispose();
       rethrow;
     }
+  }
+
+  void _detectVideoPlayback(int token) {
+    int checkCount = 0;
+    const maxChecks = 60; // 6 seconds at 100ms intervals.
+    const checkInterval = Duration(milliseconds: 100);
+
+    void checkProgress() {
+      if (!_active(token)) return;
+
+      final c = _controller;
+      if (c == null || !c.value.isInitialized || c.value.hasError) return;
+
+      checkCount += 1;
+      final currentPos = c.value.position;
+      final hasMotion = currentPos.inMilliseconds > 50;
+      final timedOut = checkCount >= maxChecks;
+
+      if (hasMotion || timedOut) {
+        _surfaceTimer?.cancel();
+        _surfaceTimer = null;
+        if (!_active(token)) return;
+        setState(() {
+          _surfaceReady = true;
+          _debugPhase = hasMotion
+              ? 'surface-ready-by-motion'
+              : 'surface-ready-by-timeout';
+        });
+        return;
+      }
+
+      _surfaceTimer = Timer(checkInterval, checkProgress);
+    }
+
+    checkProgress();
   }
 
   Future<void> _disposeController() async {
@@ -351,7 +379,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       'phase=$_debugPhase token=$_debugToken ep=$_episode',
       'loading=$_loading surface=$_surfaceReady controls=$_controls closing=$_closing',
       'controller=${c != null} init=${v?.isInitialized ?? false} playing=${v?.isPlaying ?? false} buffering=${v?.isBuffering ?? false} error=${v?.hasError ?? false}',
-      'pos=${v?.position.inMilliseconds ?? 0}ms dur=${v?.duration.inMilliseconds ?? 0}ms aspect=${v?.aspectRatio.toStringAsFixed(3) ?? "-"}',
+      'pos=${v?.position.inMilliseconds ?? 0}ms dur=${v?.duration.inMilliseconds ?? 0}ms aspect=${v?.aspectRatio.toStringAsFixed(3) ?? "-"} surface-phase=$_debugPhase',
       'stream=$_debugUrlType host=$_debugHost tail=$_debugPathTail',
       'headers=$_debugHeaderKeys',
       if (_error.isNotEmpty) 'err=${_error.length > 120 ? _error.substring(0, 120) : _error}',
