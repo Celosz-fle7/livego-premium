@@ -157,13 +157,23 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   Future<void> _open(DownloadRecord record) async {
     if (_openingPlayer || !mounted) return;
     _openingPlayer = true;
+
+    // Player upper route guard:
+    // Downloads bypasses Detail, so it must notify Shell directly before
+    // opening Explorer 3. Keep this aligned with TvContentDetailScreen.
+    widget.onPlayerRouteOpen?.call();
+
     try {
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      if (!mounted) return;
+
       await TvPlayerEntry.open(
         context,
         item: record.item,
         episode: record.episode,
       );
     } finally {
+      widget.onPlayerRouteClosed?.call();
       _openingPlayer = false;
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
