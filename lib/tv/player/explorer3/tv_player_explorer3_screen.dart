@@ -419,7 +419,28 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!_surfaceReady || c == null || !c.value.isInitialized || c.value.hasError) {
       return const ColoredBox(color: Colors.black);
     }
+
+    final size = c.value.size;
+    if (size.width <= 0 || size.height <= 0) {
+      if (_debugPhase != 'texture-size-invalid') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_surfaceReady) return;
+          if (_debugPhase == 'texture-size-invalid') return;
+          setState(() => _debugPhase = 'texture-size-invalid');
+        });
+      }
+      debugPrint(
+        'VIDEO_SURFACE: texture size invalid '
+        '(${size.width}x${size.height}), showing black guard',
+      );
+      return const ColoredBox(color: Colors.black);
+    }
+
     final aspect = c.value.aspectRatio;
+    debugPrint(
+      'VIDEO_SURFACE: rendering with size=${size.width}x${size.height} '
+      'aspect=$aspect',
+    );
     return ColoredBox(
       color: Colors.black,
       child: Center(
