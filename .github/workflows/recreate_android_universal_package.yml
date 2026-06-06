@@ -1,0 +1,113 @@
+name: Recreate Android Universal Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch tujuan hasil recreate Android"
+        required: true
+        default: "main"
+      flutter_channel:
+        description: "Flutter channel"
+        required: true
+        default: "stable"
+      package_name:
+        description: "ApplicationId / namespace baru"
+        required: true
+        default: "com.livego.premium"
+
+permissions:
+  contents: write
+
+jobs:
+  recreate_android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ inputs.flutter_channel }}
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Prepare target branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -B "${{ inputs.target_branch }}"
+
+      - name: Backup current android folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/livego_android_backup
+          mkdir -p /tmp/livego_android_backup
+          if [ -d android ]; then
+            cp -a android /tmp/livego_android_backup/android-before-recreate
+          fi
+
+      - name: Upload old android backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-before-recreate
+          path: /tmp/livego_android_backup/android-before-recreate
+          if-no-files-found: ignore
+
+      - name: Recreate Android folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          flutter create --platforms=android --org com.livego --project-name livego_premium .
+
+      - name: Patch Android universal TV and HP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/recreate_android_universal.py --package-name "${{ inputs.package_name }}"
+
+      - name: Flutter pub get
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: livego-debug-apk-${{ inputs.package_name }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+      - name: Commit recreated Android folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status --short
+          git add -A android .metadata pubspec.lock
+          if git diff --cached --quiet; then
+            echo "No Android recreate changes to commit."
+            exit 0
+          fi
+          git commit -m "Recreate Android universal package"
+          if [ "${{ inputs.target_branch }}" = "main" ]; then
+            git push origin HEAD:main
+          else
+            git push --force-with-lease origin HEAD:"${{ inputs.target_branch }}"
+          fi
