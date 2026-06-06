@@ -26,6 +26,7 @@ class MainActivity : FlutterActivity() {
         forceBlackWindow()
         super.onCreate(savedInstanceState)
         forceBlackWindow()
+        launchStartupBlackProof()
     }
 
 
