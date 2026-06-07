@@ -575,9 +575,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _toggleFit() {
+    // Disabled temporarily for Android TV texture safety.
+    // FittedBox/Cover layout caused audio-with-white-screen on some devices.
     setState(() {
-      _fitCover = !_fitCover;
-      _status = _fitCover ? 'Layar Cover' : 'Layar Fit';
+      _fitCover = false;
+      _status = 'Layar Fit aman';
     });
   }
 
@@ -868,19 +870,22 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return const ColoredBox(color: Colors.black);
     }
 
-    final size = c.value.size;
+    final value = c.value;
+    final size = value.size;
     if (size.width <= 0 || size.height <= 0) {
       return const ColoredBox(color: Colors.black);
     }
 
-    final fit = _fitCover ? BoxFit.cover : BoxFit.contain;
+    // Android TV safety:
+    // Do not wrap VideoPlayer in FittedBox/SizedBox with raw native texture size.
+    // Some TV boxes play audio but render a white native texture with that layout.
+    // The earlier stable Explorer 3 surface used Center + AspectRatio; keep it.
+    final aspect = value.aspectRatio;
     return ColoredBox(
       color: Colors.black,
-      child: FittedBox(
-        fit: fit,
-        child: SizedBox(
-          width: size.width,
-          height: size.height,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: aspect > 0 ? aspect : 16 / 9,
           child: VideoPlayer(c),
         ),
       ),
