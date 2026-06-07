@@ -4,6 +4,8 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ClipDrawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -220,14 +222,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun buildTopInfo(frame: FrameLayout) {
         topInfo = LinearLayout(this)
         topInfo.orientation = LinearLayout.VERTICAL
-        topInfo.setPadding(dp(42), dp(30), dp(42), dp(20))
-        topInfo.background = verticalGradient(0x99000000.toInt(), 0x11000000)
+        topInfo.setPadding(dp(46), dp(28), dp(46), dp(18))
+        topInfo.background = verticalGradient(0xB0000000.toInt(), 0x16000000)
 
-        titleText = label(titleLine(), 24f, Color.WHITE, true)
+        titleText = label(titleLine(), 25f, Color.WHITE, true)
         titleText.maxLines = 1
         topInfo.addView(titleText, LinearLayout.LayoutParams(-1, -2))
 
-        descText = label(description.ifBlank { " " }, 14f, 0xFFE5E7EB.toInt(), false)
+        descText = label(description.ifBlank { " " }, 14f, 0xFFD4DCE8.toInt(), false)
         descText.maxLines = 2
         val descLp = LinearLayout.LayoutParams(-1, -2)
         descLp.setMargins(0, dp(8), 0, dp(12))
@@ -246,18 +248,19 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun buildBottomDock(frame: FrameLayout) {
         bottomDock = LinearLayout(this)
         bottomDock.orientation = LinearLayout.VERTICAL
-        bottomDock.setPadding(dp(22), dp(16), dp(22), dp(16))
-        bottomDock.background = roundedBg(0xDD071321.toInt(), dp(24), 0x772A9FD6)
+        bottomDock.setPadding(dp(24), dp(17), dp(24), dp(17))
+        bottomDock.background = roundedBg(0xE6071321.toInt(), dp(26), 0x8842D9FF.toInt())
 
         val timeRow = LinearLayout(this)
         timeRow.orientation = LinearLayout.HORIZONTAL
         timeRow.gravity = Gravity.CENTER_VERTICAL
-        leftTime = label("00:00", 17f, Color.WHITE, true)
-        rightTime = label("00:00", 17f, Color.WHITE, true)
+        leftTime = label("00:00", 17f, 0xFFF2F8FF.toInt(), true)
+        rightTime = label("00:00", 17f, 0xFFF2F8FF.toInt(), true)
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         progressBar.max = 1000
+        progressBar.progressDrawable = premiumProgressDrawable()
         timeRow.addView(leftTime, LinearLayout.LayoutParams(dp(82), -2))
-        val progressParams = LinearLayout.LayoutParams(0, dp(12), 1f)
+        val progressParams = LinearLayout.LayoutParams(0, dp(10), 1f)
         progressParams.setMargins(dp(10), 0, dp(10), 0)
         timeRow.addView(progressBar, progressParams)
         timeRow.addView(rightTime, LinearLayout.LayoutParams(dp(82), -2))
@@ -266,21 +269,23 @@ class TvNativeSurfacePlayerActivity : Activity() {
         controlRow = LinearLayout(this)
         controlRow.orientation = LinearLayout.HORIZONTAL
         controlRow.gravity = Gravity.CENTER
-        val controlLp = LinearLayout.LayoutParams(-1, dp(66))
+        val controlLp = LinearLayout.LayoutParams(-1, dp(68))
         controlLp.setMargins(0, dp(18), 0, 0)
         bottomDock.addView(controlRow, controlLp)
 
         repeat(10) { index ->
             val width = when (index) {
-                4 -> dp(96)
-                6 -> dp(82)
-                else -> dp(62)
+                1 -> dp(72)
+                4 -> dp(106)
+                6 -> dp(86)
+                8 -> dp(84)
+                else -> dp(64)
             }
             val button = label("", 12f, Color.WHITE, true)
             button.gravity = Gravity.CENTER
             button.maxLines = 2
             val lp = LinearLayout.LayoutParams(width, -1)
-            if (index > 0) lp.leftMargin = dp(6)
+            if (index > 0) lp.leftMargin = dp(7)
             controlRow.addView(button, lp)
             controlButtons.add(button)
         }
@@ -297,9 +302,9 @@ class TvNativeSurfacePlayerActivity : Activity() {
         sidePanel = LinearLayout(this)
         sidePanel.orientation = LinearLayout.VERTICAL
         sidePanel.setPadding(dp(22), dp(22), dp(22), dp(22))
-        sidePanel.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
+        sidePanel.background = roundedBg(0xF0071321.toInt(), dp(26), 0x8842D9FF.toInt())
         sidePanel.visibility = View.GONE
-        sideTitle = label("Daftar Episode", 22f, Color.WHITE, true)
+        sideTitle = label("Daftar Episode", 23f, Color.WHITE, true)
         sidePanel.addView(sideTitle, LinearLayout.LayoutParams(-1, -2))
         sideBody = LinearLayout(this)
         sideBody.orientation = LinearLayout.VERTICAL
@@ -318,16 +323,16 @@ class TvNativeSurfacePlayerActivity : Activity() {
         bottomSheet = LinearLayout(this)
         bottomSheet.orientation = LinearLayout.VERTICAL
         bottomSheet.setPadding(dp(24), dp(18), dp(24), dp(20))
-        bottomSheet.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
+        bottomSheet.background = roundedBg(0xF0071321.toInt(), dp(26), 0x8842D9FF.toInt())
         bottomSheet.visibility = View.GONE
 
         val handle = View(this)
-        handle.background = roundedBg(0xAA8AB3C9.toInt(), dp(5), 0x00000000)
+        handle.background = roundedBg(0xCC5DDCFF.toInt(), dp(5), 0x00000000)
         val handleLp = LinearLayout.LayoutParams(dp(130), dp(5))
         handleLp.gravity = Gravity.CENTER_HORIZONTAL
         bottomSheet.addView(handle, handleLp)
 
-        sheetTitle = label("Panel", 22f, Color.WHITE, true)
+        sheetTitle = label("Panel", 23f, Color.WHITE, true)
         sheetTitle.gravity = Gravity.CENTER
         val titleLp = LinearLayout.LayoutParams(-1, -2)
         titleLp.setMargins(0, dp(16), 0, dp(14))
@@ -349,7 +354,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         toastText = label("", 13f, Color.WHITE, true)
         toastText.gravity = Gravity.CENTER
         toastText.setPadding(dp(22), dp(12), dp(22), dp(12))
-        toastText.background = roundedBg(0xEE111827.toInt(), dp(18), 0x33555555)
+        toastText.background = roundedBg(0xF00B1524.toInt(), dp(18), 0x6642D9FF.toInt())
         toastText.visibility = View.GONE
         val params = FrameLayout.LayoutParams(-2, -2)
         params.gravity = Gravity.CENTER
@@ -571,7 +576,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             shape = GradientDrawable.RECTANGLE
             setColor(color)
             cornerRadius = radius.toFloat()
-            setStroke(1, stroke)
+            setStroke(dp(1), stroke)
         }
     }
 
@@ -579,15 +584,55 @@ class TvNativeSurfacePlayerActivity : Activity() {
         return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom))
     }
 
+    private fun premiumProgressDrawable(): LayerDrawable {
+        val track = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(0x55304452)
+            cornerRadius = dp(8).toFloat()
+        }
+        val fill = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(0xFFB339FF.toInt(), 0xFF35CBFF.toInt())
+        ).apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(8).toFloat()
+        }
+        val clip = ClipDrawable(fill, Gravity.LEFT, ClipDrawable.HORIZONTAL)
+        return LayerDrawable(arrayOf(track, clip)).apply {
+            setId(0, android.R.id.background)
+            setId(1, android.R.id.progress)
+        }
+    }
+
     private fun selectedBg(): GradientDrawable {
-        return GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFF35CBFF.toInt(), 0xFF7D5CFF.toInt())).apply {
-            cornerRadius = dp(16).toFloat()
+        return GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(0xFF2ED7FF.toInt(), 0xFF7A5CFF.toInt())
+        ).apply {
+            cornerRadius = dp(18).toFloat()
             setStroke(dp(2), 0xFFEAFBFF.toInt())
         }
     }
 
-    private fun normalBg(): GradientDrawable = roundedBg(0x55203245, dp(16), 0x334E6B7D)
-    private fun rowBg(focused: Boolean): GradientDrawable = if (focused) selectedBg() else roundedBg(0x55314257, dp(14), 0x334E6B7D)
+    private fun normalBg(): GradientDrawable {
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0x66344A5C, 0x55203142)
+        ).apply {
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), 0x334ECFFF)
+        }
+    }
+
+    private fun rowBg(focused: Boolean): GradientDrawable {
+        return if (focused) selectedBg() else GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0x6632495D, 0x55202D3C)
+        ).apply {
+            cornerRadius = dp(15).toFloat()
+            setStroke(dp(1), 0x334ECFFF)
+        }
+    }
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun titleLine(): String = "$title - Ep $episode${if (totalEpisodes > 1 && totalEpisodes < 999) " / $totalEpisodes" else ""}"
@@ -602,7 +647,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             val chip = label(tag, 12f, 0xFFE5E7EB.toInt(), false)
             chip.gravity = Gravity.CENTER
             chip.setPadding(dp(10), 0, dp(10), 0)
-            chip.background = roundedBg(0x663A3A3A, dp(11), 0x55FFFFFF)
+            chip.background = roundedBg(0x66304A5C, dp(13), 0x555DDCFF)
             val lp = LinearLayout.LayoutParams(-2, dp(28))
             lp.rightMargin = dp(8)
             tagRow.addView(chip, lp)
@@ -680,23 +725,30 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val speed = speeds[speedIndex]
         val speedText = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
         val labels = listOf(
-            "⏮\nPrev",
+            "‹‹\nPrev",
             if (player?.isPlaying == true) "⏸\nPause" else "▶\nPlay",
-            "⏭\nNext",
+            "Next\n››",
             "☰\nEpisode",
             qualities.getOrNull(qualityCursor)?.label ?: "Auto",
-            "▣\n${if (fitCover) "Cover" else "Fit"}",
+            "⛶\n${if (fitCover) "Cover" else "Fit"}",
             "↻\n${if (autoNext) "Auto ON" else speedText}",
             "♪\nAudio",
-            "CC\nSubtitle",
+            "CC\nSub",
             "☰\nEpisode"
         )
         for (i in controlButtons.indices) {
             val b = controlButtons[i]
             b.text = labels[i]
+            b.textSize = when (i) {
+                1 -> 14.5f
+                4 -> 14.0f
+                8 -> 12.5f
+                else -> 12.0f
+            }
             val selected = mode == Mode.DOCK && i == selectedControl
             b.background = if (selected) selectedBg() else normalBg()
             b.setTextColor(if (selected) Color.WHITE else 0xFFD8E4F0.toInt())
+            b.alpha = if (selected) 1.0f else 0.86f
         }
     }
 
@@ -719,14 +771,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val start = (endRaw - 44).coerceAtLeast(1)
 
         for (ep in start..endRaw) {
-            val row = label("EPISODE\n$ep", 13f, Color.WHITE, true)
+            val row = label("EPISODE\n$ep", 12.5f, Color.WHITE, true)
             row.gravity = Gravity.CENTER
             row.maxLines = 2
             row.background = rowBg(ep == episodeCursor)
             if (ep == episode) row.text = "DIPUTAR\n$ep"
             val lp = GridLayout.LayoutParams()
-            lp.width = dp(78)
-            lp.height = dp(58)
+            lp.width = dp(80)
+            lp.height = dp(60)
             lp.setMargins(dp(5), dp(5), dp(5), dp(5))
             grid.addView(row, lp)
         }
@@ -756,7 +808,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         sheetBody.columnCount = columns
         val safeRows = rows.ifEmpty { listOf("Tidak tersedia") }
         safeRows.forEachIndexed { index, text ->
-            val row = label(text, 14f, Color.WHITE, true)
+            val row = label(text, 14.5f, Color.WHITE, true)
             row.gravity = Gravity.CENTER
             row.setPadding(dp(14), 0, dp(14), 0)
             row.background = rowBg(index == cursor)
