@@ -287,6 +287,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
       'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
       'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
+      'autoNextEnabled': LiveGoSettings.autoNextEnabled,
     };
   }
 
@@ -296,6 +297,15 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
     if (call.method == 'nativeClosed') {
       _closeFromNative();
+      return true;
+    }
+    if (call.method == 'setAutoNext') {
+      final raw = call.arguments;
+      final enabled = raw is Map
+          ? raw['enabled'] == true || '${raw['enabled']}'.toLowerCase() == 'true'
+          : raw == true || '$raw'.toLowerCase() == 'true';
+      LiveGoSettings.autoNextEnabled = enabled;
+      await LiveGoLocalStore.saveSettings();
       return true;
     }
     return null;

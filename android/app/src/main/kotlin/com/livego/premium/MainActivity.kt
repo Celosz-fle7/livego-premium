@@ -67,6 +67,7 @@ class MainActivity : FlutterActivity() {
                         putExtra("category", call.argument<String>("category").orEmpty())
                         putExtra("episode", episode)
                         putExtra("totalEpisodes", totalEpisodes)
+                        putExtra("autoNextEnabled", call.argument<Boolean>("autoNextEnabled") ?: true)
                         putStringArrayListExtra("headerKeys", headerKeys)
                         putStringArrayListExtra("headerValues", headerValues)
                         putStringArrayListExtra("qualityLabels", stringListArg(call, "qualityLabels"))
