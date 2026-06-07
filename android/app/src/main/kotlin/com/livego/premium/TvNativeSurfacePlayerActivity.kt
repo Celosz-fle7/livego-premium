@@ -898,9 +898,12 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (now - lastBackMs < 350L) return
         lastBackMs = now
         when (mode) {
+            // Panel/sheet still closes one step back to controls.
             Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
-            Mode.DOCK -> setMode(Mode.CLEAN)
-            Mode.CLEAN -> finish()
+
+            // Do not hide controls into a black/clean intermediate screen.
+            // From player controls, BACK must exit to the previous grid/detail source in one press.
+            Mode.DOCK, Mode.CLEAN -> finish()
         }
     }
 
