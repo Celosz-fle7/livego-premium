@@ -74,6 +74,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   int _controlCursor = 1;
   int _episodeCursor = 1;
+  int _episodeListTotal = 0;
   int _qualityCursor = 0;
   int _subtitleCursor = 0;
   int _optionCursor = 0;
@@ -87,6 +88,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Timer? _hideControlsTimer;
   Timer? _statusTimer;
   Timer? _prefetchTimer;
+  Timer? _episodeWarmupTimer;
   final Set<String> _prefetchKeys = <String>{};
 
   @override
@@ -151,6 +153,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   int _episodeTotal() {
     final fromStream = _streamInfo.totalEpisodes;
     if (fromStream > 1) return fromStream.clamp(1, 999).toInt();
+    final fromWarmList = _episodeListTotal;
+    if (fromWarmList > 1) return fromWarmList.clamp(1, 999).toInt();
     final fromItem = widget.item.episodes;
     if (fromItem > 1) return fromItem.clamp(1, 999).toInt();
     return 999;
@@ -353,6 +357,54 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
   }
 
+  void _cancelEpisodeListWarmup() {
+    _episodeWarmupTimer?.cancel();
+    _episodeWarmupTimer = null;
+  }
+
+  void _scheduleEpisodeListWarmup({Duration delay = const Duration(seconds: 1)}) {
+    _cancelEpisodeListWarmup();
+
+    final token = _loadToken;
+    _episodeWarmupTimer = Timer(delay, () {
+      if (!_active(token)) return;
+      unawaited(_warmEpisodeListCache(token));
+    });
+  }
+
+  Future<void> _warmEpisodeListCache(int token) async {
+    if (!_active(token)) return;
+
+    final key = [
+      'episodes',
+      widget.item.platformSlug.trim(),
+      widget.item.id.trim(),
+    ].join('|');
+    if (!_rememberPrefetchKey(key)) return;
+
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 5));
+      if (!_active(token)) return;
+
+      var maxIndex = 0;
+      for (final row in rows) {
+        if (row.index > maxIndex) maxIndex = row.index;
+      }
+
+      final inferredTotal = maxIndex > rows.length ? maxIndex : rows.length;
+      if (inferredTotal > 1 && inferredTotal != _episodeListTotal) {
+        if (!mounted) return;
+        setState(() {
+          _episodeListTotal = inferredTotal.clamp(1, 999).toInt();
+        });
+      }
+
+      debugPrint('LIVEGO TV PLAYER EPISODE LIST WARM total=$inferredTotal rows=${rows.length}');
+    } catch (error) {
+      debugPrint('LIVEGO TV PLAYER EPISODE LIST WARM SKIP error=$error');
+    }
+  }
+
   Future<List<MapEntry<int, String>>> _orderedPrefetchTargets(int count) async {
     try {
       final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 4));
@@ -552,6 +604,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   void _exitFlutterPlayerRoute({required String source}) {
     if (!mounted) return;
 
+    _cancelEpisodeListWarmup();
     _cancelLightPrefetch();
     _cancelAutoHide();
     _statusTimer?.cancel();
@@ -595,6 +648,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Future<void> _load() async {
     final token = ++_loadToken;
     final item = _playableItem();
+
+    _cancelEpisodeListWarmup();
 
     _cancelLightPrefetch();
 
@@ -642,6 +697,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         }
       });
 
+      _scheduleEpisodeListWarmup();
       final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
       if (nativeOpened) {
         _scheduleLightPrefetch();
@@ -730,6 +786,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_closing) _onControllerTick();
       });
+      _scheduleEpisodeListWarmup();
       _scheduleLightPrefetch();
       _scheduleAutoHide();
     } catch (_) {
@@ -1492,6 +1549,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   @override
   void dispose() {
+    _episodeWarmupTimer?.cancel();
     _prefetchTimer?.cancel();
     _surfaceTimer?.cancel();
     _hideControlsTimer?.cancel();
