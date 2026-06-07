@@ -23,6 +23,11 @@ class TvGlobalDebugHud extends StatefulWidget {
 }
 
 class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
+  // Temporary diagnostic flag. Keep HUD visible even when the APK is
+  // built in release/profile mode by CI, because kDebugMode can be false
+  // in Telegram-distributed APKs.
+  static const bool _forceVisible = true;
+
   final Stopwatch _uptime = Stopwatch()..start();
   Timer? _ticker;
 
@@ -100,7 +105,7 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
       fit: StackFit.expand,
       children: [
         widget.child,
-        if (kDebugMode) _hud(context),
+        if (kDebugMode || _forceVisible) _hud(context),
       ],
     );
   }
