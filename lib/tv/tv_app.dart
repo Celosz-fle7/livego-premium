@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'navigation/tv_shell.dart';
 
@@ -15,5 +14,5 @@ class TvApp extends StatelessWidget {
   const TvApp({super.key});
 
   @override
-  Widget build(BuildContext context) => const ProviderScope(child: TvShell());
+  Widget build(BuildContext context) => const TvShell();
 }

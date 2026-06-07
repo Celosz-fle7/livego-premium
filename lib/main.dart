@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
 import 'core/livego_local_store.dart';
@@ -57,7 +58,11 @@ void main() {
     };
 
     await LiveGoLocalStore.init();
-    runApp(const LiveGoPremiumApp());
+    runApp(
+      const ProviderScope(
+        child: LiveGoPremiumApp(),
+      ),
+    );
   }, (Object error, StackTrace stackTrace) {
     TvGlobalDebugErrors.report(error, stackTrace);
     debugPrint('LIVEGO ZONE ERROR: $error');
