@@ -308,6 +308,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       await _nativeSurfacePlayer.invokeMethod<bool>('open', {
         'url': url,
         'title': widget.item.title,
+        'description': widget.item.description,
+        'source': widget.item.source,
+        'category': widget.item.category,
         'episode': _episode,
         'totalEpisodes': _episodeTotal(),
         'headers': stream.headers,

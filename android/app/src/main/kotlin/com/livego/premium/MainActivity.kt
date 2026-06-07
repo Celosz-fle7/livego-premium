@@ -56,6 +56,9 @@ class MainActivity : FlutterActivity() {
                         val intent = Intent(this, TvNativeSurfacePlayerActivity::class.java).apply {
                             putExtra("url", url)
                             putExtra("title", title)
+                            putExtra("description", call.argument<String>("description").orEmpty())
+                            putExtra("source", call.argument<String>("source").orEmpty())
+                            putExtra("category", call.argument<String>("category").orEmpty())
                             putExtra("episode", episode)
                             putExtra("totalEpisodes", totalEpisodes)
                             putStringArrayListExtra("headerKeys", headerKeys)
