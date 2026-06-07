@@ -79,7 +79,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var speedIndex = 1
     private var fitCover = false
     private var muted = false
-    private var autoNext = false
+    private var autoNext = true
     private var mode = Mode.DOCK
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
@@ -125,6 +125,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         episode = intent.getIntExtra("episode", 1)
         totalEpisodes = intent.getIntExtra("totalEpisodes", 0)
         episodeCursor = episode
+        autoNext = intent.getBooleanExtra("autoNextEnabled", true)
 
         readHeadersFromIntent()
         readQualitiesFromIntent()
@@ -301,20 +302,20 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun buildSidePanel(frame: FrameLayout) {
         sidePanel = LinearLayout(this)
         sidePanel.orientation = LinearLayout.VERTICAL
-        sidePanel.setPadding(dp(22), dp(22), dp(22), dp(22))
+        sidePanel.setPadding(dp(18), dp(20), dp(18), dp(20))
         sidePanel.background = roundedBg(0xF0071321.toInt(), dp(26), 0x8842D9FF.toInt())
         sidePanel.visibility = View.GONE
-        sideTitle = label("Daftar Episode", 23f, Color.WHITE, true)
+        sideTitle = label("Daftar Episode", 21f, Color.WHITE, true)
         sidePanel.addView(sideTitle, LinearLayout.LayoutParams(-1, -2))
         sideBody = LinearLayout(this)
         sideBody.orientation = LinearLayout.VERTICAL
         val bodyLp = LinearLayout.LayoutParams(-1, 0, 1f)
         bodyLp.setMargins(0, dp(16), 0, 0)
         sidePanel.addView(sideBody, bodyLp)
-        val params = FrameLayout.LayoutParams(dp(512), -1)
+        val params = FrameLayout.LayoutParams(dp(420), -1)
         params.gravity = Gravity.RIGHT
         params.topMargin = dp(24)
-        params.rightMargin = dp(24)
+        params.rightMargin = dp(10)
         params.bottomMargin = dp(24)
         frame.addView(sidePanel, params)
     }
@@ -345,7 +346,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val params = FrameLayout.LayoutParams(-1, -2)
         params.gravity = Gravity.BOTTOM
         params.leftMargin = dp(24)
-        params.rightMargin = dp(24)
+        params.rightMargin = dp(10)
         params.bottomMargin = dp(24)
         frame.addView(bottomSheet, params)
     }
@@ -392,6 +393,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 refreshAudioRows()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateDock()
             }
         })
         exo.setMediaItem(buildMediaItem(url))
@@ -607,10 +612,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun selectedBg(): GradientDrawable {
         return GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
-            intArrayOf(0xFF2ED7FF.toInt(), 0xFF7A5CFF.toInt())
+            intArrayOf(0xFF00E5FF.toInt(), 0xFF8A5CFF.toInt())
         ).apply {
             cornerRadius = dp(18).toFloat()
-            setStroke(dp(2), 0xFFEAFBFF.toInt())
+            setStroke(dp(3), 0xFFFFFFFF.toInt())
         }
     }
 
@@ -717,7 +722,6 @@ class TvNativeSurfacePlayerActivity : Activity() {
         leftTime.setTextColor(if (progressFocused) 0xFF35CBFF.toInt() else Color.WHITE)
         rightTime.setTextColor(if (progressFocused) 0xFF35CBFF.toInt() else Color.WHITE)
         titleText.text = titleLine()
-        updateDock()
     }
 
     private fun updateDock() {
@@ -758,7 +762,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         sideTitle.text = "Daftar Episode"
         val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else max(episode, 1)
 
-        val chip = label("$total Ep", 13f, 0xFFE9F8FF.toInt(), true)
+        val chip = label("$total Ep", 12.5f, 0xFFE9F8FF.toInt(), true)
         chip.gravity = Gravity.CENTER
         chip.background = roundedBg(0x55314257, dp(14), 0x554FC3FF)
         sideBody.addView(chip, LinearLayout.LayoutParams(dp(86), dp(36)))
@@ -772,15 +776,20 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val start = (endRaw - 44).coerceAtLeast(1)
 
         for (ep in start..endRaw) {
-            val row = label("EPISODE\n$ep", 12.5f, Color.WHITE, true)
+            val row = label("EP\n$ep", 12.5f, Color.WHITE, true)
             row.gravity = Gravity.CENTER
             row.maxLines = 2
             row.background = rowBg(ep == episodeCursor)
-            if (ep == episode) row.text = "DIPUTAR\n$ep"
+            row.setTextColor(if (ep == episodeCursor) Color.WHITE else 0xFFE6F7FF.toInt())
+            if (ep == episode) {
+                row.text = "DIPUTAR\n$ep"
+            } else if (ep == episodeCursor) {
+                row.text = "PILIH\n$ep"
+            }
             val lp = GridLayout.LayoutParams()
-            lp.width = dp(80)
-            lp.height = dp(60)
-            lp.setMargins(dp(5), dp(5), dp(5), dp(5))
+            lp.width = dp(66)
+            lp.height = dp(54)
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4))
             grid.addView(row, lp)
         }
 
@@ -820,7 +829,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 else -> dp(205)
             }
             lp.height = dp(56)
-            lp.setMargins(dp(5), dp(5), dp(5), dp(5))
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4))
             sheetBody.addView(row, lp)
         }
     }
@@ -921,6 +930,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun toggleAutoNext() {
         autoNext = !autoNext
+        MainActivity.nativePlayerChannel?.invokeMethod("setAutoNext", mapOf("enabled" to autoNext))
         showToast("Auto Next: ${if (autoNext) "ON" else "OFF"}")
         setMode(Mode.DOCK)
     }
