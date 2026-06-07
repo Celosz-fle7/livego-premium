@@ -9,7 +9,11 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val nativePlayerChannel = "livego/native_surface_player"
+    private val nativePlayerChannelName = "livego/native_surface_player"
+
+    companion object {
+        var nativePlayerChannel: MethodChannel? = null
+    }
 
     private fun forceBlackWindow() {
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
@@ -28,56 +32,58 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, nativePlayerChannel)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "open" -> {
-                        val url = call.argument<String>("url").orEmpty()
-                        if (url.isBlank()) {
-                            result.error("EMPTY_URL", "Native player URL is empty", null)
-                            return@setMethodCallHandler
-                        }
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, nativePlayerChannelName)
+        nativePlayerChannel = channel
 
-                        val title = call.argument<String>("title").orEmpty()
-                        val episode = call.argument<Int>("episode") ?: 1
-                        val totalEpisodes = call.argument<Int>("totalEpisodes") ?: 0
-                        val headersAny = call.argument<Map<String, Any>>("headers") ?: emptyMap()
-
-                        val headerKeys = ArrayList<String>()
-                        val headerValues = ArrayList<String>()
-                        headersAny.forEach { (key, value) ->
-                            val v = value.toString()
-                            if (key.isNotBlank() && v.isNotBlank()) {
-                                headerKeys.add(key)
-                                headerValues.add(v)
-                            }
-                        }
-
-                        val intent = Intent(this, TvNativeSurfacePlayerActivity::class.java).apply {
-                            putExtra("url", url)
-                            putExtra("title", title)
-                            putExtra("description", call.argument<String>("description").orEmpty())
-                            putExtra("source", call.argument<String>("source").orEmpty())
-                            putExtra("category", call.argument<String>("category").orEmpty())
-                            putExtra("episode", episode)
-                            putExtra("totalEpisodes", totalEpisodes)
-                            putStringArrayListExtra("headerKeys", headerKeys)
-                            putStringArrayListExtra("headerValues", headerValues)
-                            putStringArrayListExtra("qualityLabels", stringListArg(call, "qualityLabels"))
-                            putStringArrayListExtra("qualityUrls", stringListArg(call, "qualityUrls"))
-                            putStringArrayListExtra("subtitleLabels", stringListArg(call, "subtitleLabels"))
-                            putStringArrayListExtra("subtitleUrls", stringListArg(call, "subtitleUrls"))
-                            putStringArrayListExtra("subtitleFormats", stringListArg(call, "subtitleFormats"))
-                            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                        }
-                        startActivity(intent)
-                        overridePendingTransition(0, 0)
-                        result.success(true)
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "open" -> {
+                    val url = call.argument<String>("url").orEmpty()
+                    if (url.isBlank()) {
+                        result.error("EMPTY_URL", "Native player URL is empty", null)
+                        return@setMethodCallHandler
                     }
 
-                    else -> result.notImplemented()
+                    val title = call.argument<String>("title").orEmpty()
+                    val episode = call.argument<Int>("episode") ?: 1
+                    val totalEpisodes = call.argument<Int>("totalEpisodes") ?: 0
+                    val headersAny = call.argument<Map<String, Any>>("headers") ?: emptyMap()
+
+                    val headerKeys = ArrayList<String>()
+                    val headerValues = ArrayList<String>()
+                    headersAny.forEach { (key, value) ->
+                        val v = value.toString()
+                        if (key.isNotBlank() && v.isNotBlank()) {
+                            headerKeys.add(key)
+                            headerValues.add(v)
+                        }
+                    }
+
+                    val intent = Intent(this, TvNativeSurfacePlayerActivity::class.java).apply {
+                        putExtra("url", url)
+                        putExtra("title", title)
+                        putExtra("description", call.argument<String>("description").orEmpty())
+                        putExtra("source", call.argument<String>("source").orEmpty())
+                        putExtra("category", call.argument<String>("category").orEmpty())
+                        putExtra("episode", episode)
+                        putExtra("totalEpisodes", totalEpisodes)
+                        putStringArrayListExtra("headerKeys", headerKeys)
+                        putStringArrayListExtra("headerValues", headerValues)
+                        putStringArrayListExtra("qualityLabels", stringListArg(call, "qualityLabels"))
+                        putStringArrayListExtra("qualityUrls", stringListArg(call, "qualityUrls"))
+                        putStringArrayListExtra("subtitleLabels", stringListArg(call, "subtitleLabels"))
+                        putStringArrayListExtra("subtitleUrls", stringListArg(call, "subtitleUrls"))
+                        putStringArrayListExtra("subtitleFormats", stringListArg(call, "subtitleFormats"))
+                        addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                    }
+                    startActivity(intent)
+                    overridePendingTransition(0, 0)
+                    result.success(true)
                 }
+
+                else -> result.notImplemented()
             }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,5 +95,10 @@ class MainActivity : FlutterActivity() {
     override fun onResume() {
         super.onResume()
         forceBlackWindow()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) nativePlayerChannel = null
+        super.onDestroy()
     }
 }

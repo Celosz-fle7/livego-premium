@@ -89,6 +89,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   @override
   void initState() {
     super.initState();
+    _nativeSurfacePlayer.setMethodCallHandler(_handleNativeSurfaceMethod);
     _episode = widget.episode ?? int.tryParse(widget.item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(widget.item);
     _episode = _episode.clamp(1, 999).toInt();
     _episodeCursor = _episode;
@@ -235,6 +236,96 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _lastQualityLabels = qualityLabels;
   }
 
+  int _nativePayloadTotal(StreamInfo stream) {
+    if (stream.totalEpisodes > 1) return stream.totalEpisodes.clamp(1, 999).toInt();
+    if (widget.item.episodes > 1) return widget.item.episodes.clamp(1, 999).toInt();
+    return _episodeTotal();
+  }
+
+  Map<String, Object?> _nativePlayerPayload(StreamInfo stream, String url) {
+    return <String, Object?>{
+      'url': url,
+      'title': widget.item.title,
+      'description': widget.item.description,
+      'source': widget.item.source,
+      'category': widget.item.category,
+      'episode': _episode,
+      'totalEpisodes': _nativePayloadTotal(stream),
+      'headers': stream.headers,
+      'qualityLabels': stream.qualities.map((e) => e.label).toList(),
+      'qualityUrls': stream.qualities.map((e) => e.url).toList(),
+      'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
+      'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
+      'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
+    };
+  }
+
+  Future<dynamic> _handleNativeSurfaceMethod(MethodCall call) async {
+    if (call.method == 'resolveEpisode') {
+      return _resolveEpisodeForNative(call.arguments);
+    }
+    if (call.method == 'nativeClosed') {
+      _closeFromNative();
+      return true;
+    }
+    return null;
+  }
+
+  Future<Map<String, Object?>> _resolveEpisodeForNative(Object? args) async {
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    final nextEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
+    final requestedQuality = '${raw['quality'] ?? _activeQuality}'.trim().isEmpty ? 'Auto' : '${raw['quality'] ?? _activeQuality}'.trim();
+
+    final previousEpisode = _episode;
+    final previousStream = _streamInfo;
+    try {
+      _episode = nextEpisode.clamp(1, 999).toInt();
+      _episodeCursor = _episode;
+      final item = _playableItem();
+      final resolved = await _service.resolveStream(
+        item,
+        chapterId: item.chapterId,
+        episode: _episode,
+      );
+
+      final stream = resolved.stream;
+      _streamInfo = stream;
+      _activeQuality = requestedQuality;
+      final url = _safeUrlForQuality(stream, requestedQuality).trim();
+      if (url.isEmpty) throw StateError('Stream kosong');
+
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = '';
+          _status = 'Native episode $_episode';
+          _qualityCursor = _qualityIndexFor(requestedQuality);
+        });
+      }
+
+      return _nativePlayerPayload(stream, url);
+    } catch (error) {
+      _episode = previousEpisode;
+      _episodeCursor = previousEpisode;
+      _streamInfo = previousStream;
+      return <String, Object?>{
+        'error': '$error',
+        'episode': previousEpisode,
+      };
+    }
+  }
+
+  void _closeFromNative() {
+    if (!mounted || _closing) return;
+    _closing = true;
+    _allowRoutePop = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
+    });
+  }
+
   Future<void> _load() async {
     final token = ++_loadToken;
     final item = _playableItem();
@@ -305,21 +396,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!_active(token)) return true;
 
     try {
-      await _nativeSurfacePlayer.invokeMethod<bool>('open', {
-        'url': url,
-        'title': widget.item.title,
-        'description': widget.item.description,
-        'source': widget.item.source,
-        'category': widget.item.category,
-        'episode': _episode,
-        'totalEpisodes': _episodeTotal(),
-        'headers': stream.headers,
-        'qualityLabels': stream.qualities.map((e) => e.label).toList(),
-        'qualityUrls': stream.qualities.map((e) => e.url).toList(),
-        'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
-        'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
-        'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
-      });
+      await _nativeSurfacePlayer.invokeMethod<bool>('open', _nativePlayerPayload(stream, url));
 
       if (!mounted || !_active(token)) return true;
 
@@ -329,15 +406,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _mode = _Explorer3Mode.watching;
       });
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _allowRoutePop = true;
-          _closing = true;
-        });
-        Navigator.of(context).pop();
-      });
-
+      // Keep the Flutter route alive behind the native Activity.
+      // Native can ask this State to resolve next/previous/selected episodes.
       return true;
     } catch (error) {
       if (!mounted || !_active(token)) return true;
@@ -1176,6 +1246,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _rootFocus.dispose();
     _controller?.removeListener(_onControllerTick);
     _controller?.dispose();
+    _nativeSurfacePlayer.setMethodCallHandler(null);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }

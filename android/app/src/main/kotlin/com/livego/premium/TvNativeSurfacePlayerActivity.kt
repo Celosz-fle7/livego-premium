@@ -27,32 +27,36 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import io.flutter.plugin.common.MethodChannel
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
 class TvNativeSurfacePlayerActivity : Activity() {
-    private enum class Mode { CLEAN, DOCK, EPISODE, QUALITY, SUBTITLE, OPTIONS }
+    private enum class Mode { CLEAN, DOCK, EPISODE, QUALITY, SUBTITLE, AUDIO, OPTIONS }
 
     private data class QualityRow(val label: String, val url: String)
     private data class SubtitleRow(val label: String, val url: String, val format: String)
+    private data class AudioRow(val label: String, val language: String?)
 
     private var player: ExoPlayer? = null
-    private lateinit var root: FrameLayout
     private lateinit var playerView: PlayerView
     private lateinit var topInfo: LinearLayout
     private lateinit var bottomDock: LinearLayout
-    private lateinit var panelShell: LinearLayout
+    private lateinit var sidePanel: LinearLayout
+    private lateinit var bottomSheet: LinearLayout
     private lateinit var titleText: TextView
     private lateinit var descText: TextView
-    private lateinit var metaText: TextView
+    private lateinit var tagRow: LinearLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var leftTime: TextView
     private lateinit var rightTime: TextView
     private lateinit var controlRow: LinearLayout
-    private lateinit var hintText: TextView
-    private lateinit var panelTitle: TextView
-    private lateinit var panelBody: LinearLayout
+    private lateinit var sheetTitle: TextView
+    private lateinit var sheetBody: GridLayout
+    private lateinit var sideTitle: TextView
+    private lateinit var sideBody: LinearLayout
+    private lateinit var toastText: TextView
 
     private val controlButtons = ArrayList<TextView>()
     private val handler = Handler(Looper.getMainLooper())
@@ -68,17 +72,21 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var episodeCursor = 1
     private var qualityCursor = 0
     private var subtitleCursor = 0
+    private var audioCursor = 0
     private var optionCursor = 0
     private var speedIndex = 1
     private var fitCover = false
     private var muted = false
+    private var autoNext = false
     private var mode = Mode.DOCK
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
+    private var sentClosed = false
 
     private val speeds = floatArrayOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
     private val qualities = ArrayList<QualityRow>()
     private val subtitles = ArrayList<SubtitleRow>()
+    private val audioRows = ArrayList<AudioRow>()
     private val headers = linkedMapOf<String, String>()
 
     private val tick = object : Runnable {
@@ -90,6 +98,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private val hideDockTask = Runnable {
         if (mode == Mode.DOCK) setMode(Mode.CLEAN)
+    }
+
+    private val toastHideTask = Runnable {
+        toastText.visibility = View.GONE
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,19 +122,19 @@ class TvNativeSurfacePlayerActivity : Activity() {
         totalEpisodes = intent.getIntExtra("totalEpisodes", 0)
         episodeCursor = episode
 
-        readHeaders()
-        readQualities()
-        readSubtitles()
+        readHeadersFromIntent()
+        readQualitiesFromIntent()
+        readSubtitlesFromIntent()
 
-        root = buildRoot()
-        setContentView(root)
+        setContentView(buildRoot())
         createPlayer(currentUrl, keepPositionMs = 0L, playWhenReady = true)
 
         setMode(Mode.DOCK)
         handler.post(tick)
     }
 
-    private fun readHeaders() {
+    private fun readHeadersFromIntent() {
+        headers.clear()
         val keys = intent.getStringArrayListExtra("headerKeys") ?: arrayListOf()
         val values = intent.getStringArrayListExtra("headerValues") ?: arrayListOf()
         for (i in 0 until min(keys.size, values.size)) {
@@ -132,11 +144,22 @@ class TvNativeSurfacePlayerActivity : Activity() {
         }
     }
 
-    private fun readQualities() {
+    private fun readQualitiesFromIntent() {
         val labels = intent.getStringArrayListExtra("qualityLabels") ?: arrayListOf()
         val urls = intent.getStringArrayListExtra("qualityUrls") ?: arrayListOf()
+        setQualities(labels, urls, currentUrl)
+    }
+
+    private fun readSubtitlesFromIntent() {
+        val labels = intent.getStringArrayListExtra("subtitleLabels") ?: arrayListOf()
+        val urls = intent.getStringArrayListExtra("subtitleUrls") ?: arrayListOf()
+        val formats = intent.getStringArrayListExtra("subtitleFormats") ?: arrayListOf()
+        setSubtitles(labels, urls, formats)
+    }
+
+    private fun setQualities(labels: List<String>, urls: List<String>, activeUrl: String) {
         qualities.clear()
-        qualities.add(QualityRow("Auto", currentUrl))
+        qualities.add(QualityRow("Auto", activeUrl))
         for (i in 0 until min(labels.size, urls.size)) {
             val label = labels[i].ifBlank { "Quality ${i + 1}" }
             val url = urls[i]
@@ -144,21 +167,19 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 qualities.add(QualityRow(label, url))
             }
         }
-        qualityCursor = qualities.indexOfFirst { it.url == currentUrl }.coerceAtLeast(0)
+        qualityCursor = qualities.indexOfFirst { it.url == activeUrl }.coerceAtLeast(0)
     }
 
-    private fun readSubtitles() {
-        val labels = intent.getStringArrayListExtra("subtitleLabels") ?: arrayListOf()
-        val urls = intent.getStringArrayListExtra("subtitleUrls") ?: arrayListOf()
-        val formats = intent.getStringArrayListExtra("subtitleFormats") ?: arrayListOf()
+    private fun setSubtitles(labels: List<String>, urls: List<String>, formats: List<String>) {
         subtitles.clear()
-        subtitles.add(SubtitleRow("OFF", "", ""))
+        subtitles.add(SubtitleRow("Matikan", "", ""))
         for (i in 0 until min(labels.size, urls.size)) {
             val label = labels[i].ifBlank { "Subtitle ${i + 1}" }
             val url = urls[i]
             val format = formats.getOrNull(i) ?: ""
             if (url.isNotBlank()) subtitles.add(SubtitleRow(label, url, format))
         }
+        subtitleCursor = subtitleCursor.coerceIn(0, max(0, subtitles.size - 1))
     }
 
     private fun blackWindow() {
@@ -186,24 +207,41 @@ class TvNativeSurfacePlayerActivity : Activity() {
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         frame.addView(playerView, FrameLayout.LayoutParams(-1, -1))
 
+        buildTopInfo(frame)
+        buildBottomDock(frame)
+        buildSidePanel(frame)
+        buildBottomSheet(frame)
+        buildToast(frame)
+        return frame
+    }
+
+    private fun buildTopInfo(frame: FrameLayout) {
         topInfo = LinearLayout(this)
         topInfo.orientation = LinearLayout.VERTICAL
-        topInfo.setPadding(dp(42), dp(28), dp(42), dp(18))
-        topInfo.background = verticalGradient(0x99000000.toInt(), 0x22000000)
-        titleText = label(title, 24f, Color.WHITE, true)
+        topInfo.setPadding(dp(42), dp(30), dp(42), dp(20))
+        topInfo.background = verticalGradient(0x99000000.toInt(), 0x11000000)
+
+        titleText = label(titleLine(), 24f, Color.WHITE, true)
         titleText.maxLines = 1
         topInfo.addView(titleText, LinearLayout.LayoutParams(-1, -2))
+
         descText = label(description.ifBlank { " " }, 14f, 0xFFE5E7EB.toInt(), false)
         descText.maxLines = 2
         val descLp = LinearLayout.LayoutParams(-1, -2)
-        descLp.setMargins(0, dp(8), 0, dp(10))
+        descLp.setMargins(0, dp(8), 0, dp(12))
         topInfo.addView(descText, descLp)
-        metaText = label(metaLine(), 12f, 0xFFD7E8F6.toInt(), true)
-        topInfo.addView(metaText, LinearLayout.LayoutParams(-1, -2))
+
+        tagRow = LinearLayout(this)
+        tagRow.orientation = LinearLayout.HORIZONTAL
+        topInfo.addView(tagRow, LinearLayout.LayoutParams(-1, dp(32)))
+        updateTags()
+
         val topParams = FrameLayout.LayoutParams(-1, -2)
         topParams.gravity = Gravity.TOP
         frame.addView(topInfo, topParams)
+    }
 
+    private fun buildBottomDock(frame: FrameLayout) {
         bottomDock = LinearLayout(this)
         bottomDock.orientation = LinearLayout.VERTICAL
         bottomDock.setPadding(dp(28), dp(18), dp(28), dp(18))
@@ -216,8 +254,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         rightTime = label("00:00", 17f, Color.WHITE, true)
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         progressBar.max = 1000
-        val timeLeftParams = LinearLayout.LayoutParams(dp(82), -2)
-        timeRow.addView(leftTime, timeLeftParams)
+        timeRow.addView(leftTime, LinearLayout.LayoutParams(dp(82), -2))
         val progressParams = LinearLayout.LayoutParams(0, dp(12), 1f)
         progressParams.setMargins(dp(10), 0, dp(10), 0)
         timeRow.addView(progressBar, progressParams)
@@ -227,25 +264,24 @@ class TvNativeSurfacePlayerActivity : Activity() {
         controlRow = LinearLayout(this)
         controlRow.orientation = LinearLayout.HORIZONTAL
         controlRow.gravity = Gravity.CENTER
-        val controlLp = LinearLayout.LayoutParams(-1, dp(70))
+        val controlLp = LinearLayout.LayoutParams(-1, dp(72))
         controlLp.setMargins(0, dp(18), 0, 0)
         bottomDock.addView(controlRow, controlLp)
 
-        repeat(9) { index ->
-            val button = label("", 13f, Color.WHITE, true)
+        repeat(10) { index ->
+            val width = when (index) {
+                4 -> dp(118)
+                6 -> dp(92)
+                else -> dp(72)
+            }
+            val button = label("", 12f, Color.WHITE, true)
             button.gravity = Gravity.CENTER
             button.maxLines = 2
-            val lp = LinearLayout.LayoutParams(if (index == 4) dp(128) else dp(76), -1)
+            val lp = LinearLayout.LayoutParams(width, -1)
             if (index > 0) lp.leftMargin = dp(8)
             controlRow.addView(button, lp)
             controlButtons.add(button)
         }
-
-        hintText = label("←/→ pilih kontrol • OK aktifkan • DOWN episode • UP/More opsi • BACK hide/exit", 12f, 0xFFC9D7E3.toInt(), true)
-        hintText.gravity = Gravity.CENTER
-        val hintLp = LinearLayout.LayoutParams(-1, -2)
-        hintLp.setMargins(0, dp(12), 0, 0)
-        bottomDock.addView(hintText, hintLp)
 
         val dockParams = FrameLayout.LayoutParams(-1, -2)
         dockParams.gravity = Gravity.BOTTOM
@@ -253,28 +289,69 @@ class TvNativeSurfacePlayerActivity : Activity() {
         dockParams.rightMargin = dp(38)
         dockParams.bottomMargin = dp(32)
         frame.addView(bottomDock, dockParams)
+    }
 
-        panelShell = LinearLayout(this)
-        panelShell.orientation = LinearLayout.VERTICAL
-        panelShell.setPadding(dp(20), dp(18), dp(20), dp(18))
-        panelShell.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
-        panelShell.visibility = View.GONE
-        panelTitle = label("Panel", 22f, Color.WHITE, true)
-        panelShell.addView(panelTitle, LinearLayout.LayoutParams(-1, -2))
-        panelBody = LinearLayout(this)
-        panelBody.orientation = LinearLayout.VERTICAL
-        val bodyLp = LinearLayout.LayoutParams(-1, -1)
+    private fun buildSidePanel(frame: FrameLayout) {
+        sidePanel = LinearLayout(this)
+        sidePanel.orientation = LinearLayout.VERTICAL
+        sidePanel.setPadding(dp(22), dp(22), dp(22), dp(22))
+        sidePanel.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
+        sidePanel.visibility = View.GONE
+        sideTitle = label("Daftar Episode", 22f, Color.WHITE, true)
+        sidePanel.addView(sideTitle, LinearLayout.LayoutParams(-1, -2))
+        sideBody = LinearLayout(this)
+        sideBody.orientation = LinearLayout.VERTICAL
+        val bodyLp = LinearLayout.LayoutParams(-1, 0, 1f)
         bodyLp.setMargins(0, dp(16), 0, 0)
-        panelShell.addView(panelBody, bodyLp)
+        sidePanel.addView(sideBody, bodyLp)
+        val params = FrameLayout.LayoutParams(dp(512), -1)
+        params.gravity = Gravity.RIGHT
+        params.topMargin = dp(24)
+        params.rightMargin = dp(24)
+        params.bottomMargin = dp(24)
+        frame.addView(sidePanel, params)
+    }
 
-        val panelParams = FrameLayout.LayoutParams(dp(460), -1)
-        panelParams.gravity = Gravity.RIGHT
-        panelParams.topMargin = dp(24)
-        panelParams.rightMargin = dp(24)
-        panelParams.bottomMargin = dp(24)
-        frame.addView(panelShell, panelParams)
+    private fun buildBottomSheet(frame: FrameLayout) {
+        bottomSheet = LinearLayout(this)
+        bottomSheet.orientation = LinearLayout.VERTICAL
+        bottomSheet.setPadding(dp(36), dp(20), dp(36), dp(22))
+        bottomSheet.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
+        bottomSheet.visibility = View.GONE
 
-        return frame
+        val handle = View(this)
+        handle.background = roundedBg(0xAA8AB3C9.toInt(), dp(5), 0x00000000)
+        val handleLp = LinearLayout.LayoutParams(dp(130), dp(5))
+        handleLp.gravity = Gravity.CENTER_HORIZONTAL
+        bottomSheet.addView(handle, handleLp)
+
+        sheetTitle = label("Panel", 22f, Color.WHITE, true)
+        sheetTitle.gravity = Gravity.CENTER
+        val titleLp = LinearLayout.LayoutParams(-1, -2)
+        titleLp.setMargins(0, dp(16), 0, dp(14))
+        bottomSheet.addView(sheetTitle, titleLp)
+
+        sheetBody = GridLayout(this)
+        sheetBody.columnCount = 5
+        bottomSheet.addView(sheetBody, LinearLayout.LayoutParams(-1, -2))
+
+        val params = FrameLayout.LayoutParams(-1, -2)
+        params.gravity = Gravity.BOTTOM
+        params.leftMargin = dp(38)
+        params.rightMargin = dp(38)
+        params.bottomMargin = dp(32)
+        frame.addView(bottomSheet, params)
+    }
+
+    private fun buildToast(frame: FrameLayout) {
+        toastText = label("", 13f, Color.WHITE, true)
+        toastText.gravity = Gravity.CENTER
+        toastText.setPadding(dp(22), dp(12), dp(22), dp(12))
+        toastText.background = roundedBg(0xEE111827.toInt(), dp(18), 0x33555555)
+        toastText.visibility = View.GONE
+        val params = FrameLayout.LayoutParams(-2, -2)
+        params.gravity = Gravity.CENTER
+        frame.addView(toastText, params)
     }
 
     private fun createPlayer(url: String, keepPositionMs: Long, playWhenReady: Boolean) {
@@ -292,6 +369,18 @@ class TvNativeSurfacePlayerActivity : Activity() {
         player = exo
         playerView.player = exo
         exo.repeatMode = Player.REPEAT_MODE_OFF
+        exo.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED && autoNext) {
+                    requestEpisode((episode + 1).coerceAtMost(totalEpisodes.coerceAtLeast(episode)))
+                }
+                refreshAudioRows()
+            }
+
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                refreshAudioRows()
+            }
+        })
         exo.setMediaItem(buildMediaItem(url))
         exo.prepare()
         if (keepPositionMs > 0) exo.seekTo(keepPositionMs)
@@ -301,6 +390,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         old?.release()
         currentUrl = url
+        handler.postDelayed({ refreshAudioRows() }, 1200)
     }
 
     private fun buildMediaItem(url: String): MediaItem {
@@ -320,6 +410,118 @@ class TvNativeSurfacePlayerActivity : Activity() {
             builder.setSubtitleConfigurations(listOf(config))
         }
         return builder.build()
+    }
+
+    private fun refreshAudioRows() {
+        val previous = audioRows.getOrNull(audioCursor)?.label
+        audioRows.clear()
+        audioRows.add(AudioRow("Auto", null))
+        val p = player ?: return
+
+        val seen = HashSet<String>()
+        for (group in p.currentTracks.groups) {
+            if (group.type != C.TRACK_TYPE_AUDIO) continue
+            for (i in 0 until group.length) {
+                if (!group.isTrackSupported(i)) continue
+                val format = group.getTrackFormat(i)
+                val language = format.language ?: ""
+                val labelParts = ArrayList<String>()
+                if (language.isNotBlank()) labelParts.add(language)
+                if (!format.label.isNullOrBlank()) labelParts.add(format.label!!)
+                if (format.channelCount > 0) labelParts.add("${format.channelCount}ch")
+                val label = labelParts.joinToString(" ").ifBlank { "Audio ${audioRows.size}" }
+                if (seen.add(label)) audioRows.add(AudioRow(label, language.ifBlank { null }))
+            }
+        }
+        audioCursor = audioRows.indexOfFirst { it.label == previous }.takeIf { it >= 0 } ?: 0
+    }
+
+    private fun requestEpisode(targetEpisode: Int) {
+        if (targetEpisode < 1) {
+            showToast("Tidak ada episode sebelumnya")
+            return
+        }
+        if (totalEpisodes > 1 && targetEpisode > totalEpisodes) {
+            showToast("Episode terakhir")
+            return
+        }
+
+        showToast("Memuat Episode $targetEpisode...")
+        val args = mapOf(
+            "episode" to targetEpisode,
+            "quality" to (qualities.getOrNull(qualityCursor)?.label ?: "Auto")
+        )
+
+        val channel = MainActivity.nativePlayerChannel
+        if (channel == null) {
+            showToast("Resolver Flutter tidak tersedia")
+            return
+        }
+
+        channel.invokeMethod("resolveEpisode", args, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                runOnUiThread {
+                    val data = result as? Map<*, *>
+                    if (data == null) {
+                        showToast("Resolver kosong")
+                        return@runOnUiThread
+                    }
+                    val error = data["error"]?.toString().orEmpty()
+                    if (error.isNotBlank()) {
+                        showToast(error.take(80))
+                        return@runOnUiThread
+                    }
+                    applyResolvedPayload(data)
+                }
+            }
+
+            override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                runOnUiThread { showToast(errorMessage ?: errorCode) }
+            }
+
+            override fun notImplemented() {
+                runOnUiThread { showToast("Resolver episode belum aktif") }
+            }
+        })
+    }
+
+    private fun applyResolvedPayload(data: Map<*, *>) {
+        val url = data["url"]?.toString().orEmpty()
+        if (url.isBlank()) {
+            showToast("URL episode kosong")
+            return
+        }
+
+        title = data["title"]?.toString().orEmpty().ifBlank { title }
+        description = data["description"]?.toString().orEmpty()
+        source = data["source"]?.toString().orEmpty()
+        category = data["category"]?.toString().orEmpty()
+        episode = (data["episode"] as? Number)?.toInt() ?: data["episode"]?.toString()?.toIntOrNull() ?: episode
+        totalEpisodes = (data["totalEpisodes"] as? Number)?.toInt() ?: data["totalEpisodes"]?.toString()?.toIntOrNull() ?: totalEpisodes
+        episodeCursor = episode
+
+        headers.clear()
+        val headersMap = data["headers"] as? Map<*, *>
+        headersMap?.forEach { (key, value) ->
+            val k = key?.toString().orEmpty()
+            val v = value?.toString().orEmpty()
+            if (k.isNotBlank() && v.isNotBlank()) headers[k] = v
+        }
+
+        setQualities(listFrom(data["qualityLabels"]), listFrom(data["qualityUrls"]), url)
+        setSubtitles(listFrom(data["subtitleLabels"]), listFrom(data["subtitleUrls"]), listFrom(data["subtitleFormats"]))
+
+        titleText.text = titleLine()
+        descText.text = description.ifBlank { " " }
+        updateTags()
+        createPlayer(url, keepPositionMs = 0L, playWhenReady = true)
+        showToast("Episode $episode")
+        setMode(Mode.DOCK)
+    }
+
+    private fun listFrom(value: Any?): List<String> {
+        val list = value as? List<*> ?: return emptyList()
+        return list.map { it?.toString().orEmpty() }
     }
 
     private fun label(text: String, sp: Float, color: Int, bold: Boolean): TextView {
@@ -354,24 +556,27 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     private fun normalBg(): GradientDrawable = roundedBg(0x55203245, dp(16), 0x334E6B7D)
-    private fun activePanelBg(): GradientDrawable = selectedBg()
     private fun rowBg(focused: Boolean): GradientDrawable = if (focused) selectedBg() else roundedBg(0x55314257, dp(14), 0x334E6B7D)
-
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
-    private fun metaLine(): String {
-        val parts = ArrayList<String>()
-        if (source.isNotBlank()) parts.add(source)
-        if (category.isNotBlank()) parts.add(category)
-        parts.add(episodeLabel())
-        val quality = qualities.getOrNull(qualityCursor)?.label ?: "Auto"
-        parts.add(quality)
-        val sub = subtitles.getOrNull(subtitleCursor)?.label ?: "OFF"
-        if (sub != "OFF") parts.add("Sub $sub")
-        return parts.joinToString("  •  ")
-    }
+    private fun titleLine(): String = "$title - Ep $episode${if (totalEpisodes > 1 && totalEpisodes < 999) " / $totalEpisodes" else ""}"
 
-    private fun episodeLabel(): String = if (totalEpisodes > 1 && totalEpisodes < 999) "EP $episode / $totalEpisodes" else "EP $episode"
+    private fun updateTags() {
+        tagRow.removeAllViews()
+        val tags = ArrayList<String>()
+        tags.add("Gratis")
+        if (category.isNotBlank()) tags.add(category)
+        if (source.isNotBlank()) tags.add(source)
+        tags.take(4).forEach { tag ->
+            val chip = label(tag, 12f, 0xFFE5E7EB.toInt(), false)
+            chip.gravity = Gravity.CENTER
+            chip.setPadding(dp(10), 0, dp(10), 0)
+            chip.background = roundedBg(0x663A3A3A, dp(11), 0x55FFFFFF)
+            val lp = LinearLayout.LayoutParams(-2, dp(28))
+            lp.rightMargin = dp(8)
+            tagRow.addView(chip, lp)
+        }
+    }
 
     private fun fmt(ms: Long): String {
         val safe = max(0L, ms)
@@ -389,19 +594,29 @@ class TvNativeSurfacePlayerActivity : Activity() {
             Mode.CLEAN -> {
                 topInfo.visibility = View.GONE
                 bottomDock.visibility = View.GONE
-                panelShell.visibility = View.GONE
+                sidePanel.visibility = View.GONE
+                bottomSheet.visibility = View.GONE
             }
             Mode.DOCK -> {
                 topInfo.visibility = View.VISIBLE
                 bottomDock.visibility = View.VISIBLE
-                panelShell.visibility = View.GONE
+                sidePanel.visibility = View.GONE
+                bottomSheet.visibility = View.GONE
                 handler.postDelayed(hideDockTask, 5000)
             }
-            Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.OPTIONS -> {
+            Mode.EPISODE -> {
                 topInfo.visibility = View.GONE
                 bottomDock.visibility = View.GONE
-                panelShell.visibility = View.VISIBLE
-                updatePanel()
+                sidePanel.visibility = View.VISIBLE
+                bottomSheet.visibility = View.GONE
+                updateEpisodePanel()
+            }
+            Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> {
+                topInfo.visibility = View.VISIBLE
+                bottomDock.visibility = View.GONE
+                sidePanel.visibility = View.GONE
+                bottomSheet.visibility = View.VISIBLE
+                updateBottomSheet()
             }
         }
         updateDock()
@@ -415,12 +630,12 @@ class TvNativeSurfacePlayerActivity : Activity() {
         progressBar.progress = if (duration > 0) ((position.toDouble() / duration.toDouble()) * 1000.0).toInt().coerceIn(0, 1000) else 0
         leftTime.text = fmt(position)
         rightTime.text = fmt(duration)
-        metaText.text = metaLine()
+        titleText.text = titleLine()
         updateDock()
     }
 
     private fun updateDock() {
-        if (controlButtons.size < 9) return
+        if (controlButtons.size < 10) return
         val speed = speeds[speedIndex]
         val speedText = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
         val labels = listOf(
@@ -429,9 +644,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
             "⏭\nNext",
             "☰\nEpisode",
             qualities.getOrNull(qualityCursor)?.label ?: "Auto",
-            "▣\nFit",
-            "↻\n$speedText",
-            "♡\nFav",
+            "▣\n${if (fitCover) "Cover" else "Fit"}",
+            "↻\n${if (autoNext) "Auto ON" else speedText}",
+            "♪\nAudio",
+            "CC\nSubtitle",
             "≡\nMore"
         )
         for (i in controlButtons.indices) {
@@ -443,39 +659,30 @@ class TvNativeSurfacePlayerActivity : Activity() {
         }
     }
 
-    private fun updatePanel() {
-        panelBody.removeAllViews()
-        when (mode) {
-            Mode.EPISODE -> buildEpisodePanel()
-            Mode.QUALITY -> buildChoicePanel("Kualitas Video", qualities.map { it.label }, qualityCursor)
-            Mode.SUBTITLE -> buildChoicePanel("Subtitle", subtitles.map { it.label }, subtitleCursor)
-            Mode.OPTIONS -> buildChoicePanel("Options", optionRows(), optionCursor)
-            else -> Unit
-        }
-    }
-
-    private fun buildEpisodePanel() {
-        panelTitle.text = "Daftar Episode"
+    private fun updateEpisodePanel() {
+        sideBody.removeAllViews()
+        sideTitle.text = "Daftar Episode"
         val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else max(episode, 1)
+
         val chip = label("$total Ep", 13f, 0xFFE9F8FF.toInt(), true)
         chip.gravity = Gravity.CENTER
         chip.background = roundedBg(0x55314257, dp(14), 0x554FC3FF)
-        val chipLp = LinearLayout.LayoutParams(dp(86), dp(36))
-        panelBody.addView(chip, chipLp)
+        sideBody.addView(chip, LinearLayout.LayoutParams(dp(86), dp(36)))
 
         val scroll = ScrollView(this)
         val grid = GridLayout(this)
         grid.columnCount = 5
-        grid.useDefaultMargins = false
 
         val startRaw = (episodeCursor - 22).coerceIn(1, total)
         val endRaw = (startRaw + 44).coerceAtMost(total)
         val start = (endRaw - 44).coerceAtLeast(1)
+
         for (ep in start..endRaw) {
             val row = label("EPISODE\n$ep", 13f, Color.WHITE, true)
             row.gravity = Gravity.CENTER
             row.maxLines = 2
             row.background = rowBg(ep == episodeCursor)
+            if (ep == episode) row.text = "DIPUTAR\n$ep"
             val lp = GridLayout.LayoutParams()
             lp.width = dp(78)
             lp.height = dp(58)
@@ -486,36 +693,60 @@ class TvNativeSurfacePlayerActivity : Activity() {
         scroll.addView(grid)
         val scrollLp = LinearLayout.LayoutParams(-1, 0, 1f)
         scrollLp.setMargins(0, dp(18), 0, 0)
-        panelBody.addView(scroll, scrollLp)
-        hintText.text = "UP/DOWN/LEFT/RIGHT pilih episode • OK apply • BACK kembali"
+        sideBody.addView(scroll, scrollLp)
     }
 
-    private fun buildChoicePanel(title: String, rows: List<String>, cursor: Int) {
-        panelTitle.text = title
-        val safeRows = rows.ifEmpty { listOf("Tidak tersedia") }
-        safeRows.take(12).forEachIndexed { index, text ->
-            val row = label(text, 15f, Color.WHITE, true)
-            row.gravity = Gravity.CENTER_VERTICAL
-            row.setPadding(dp(16), 0, dp(16), 0)
-            row.background = rowBg(index == cursor)
-            val lp = LinearLayout.LayoutParams(-1, dp(52))
-            lp.setMargins(0, dp(8), 0, 0)
-            panelBody.addView(row, lp)
+    private fun updateBottomSheet() {
+        sheetBody.removeAllViews()
+        when (mode) {
+            Mode.QUALITY -> buildSheet("Kualitas Video", qualities.map { it.label }, qualityCursor, 5)
+            Mode.SUBTITLE -> buildSheet("CC", subtitles.map { it.label }, subtitleCursor, 5)
+            Mode.AUDIO -> {
+                refreshAudioRows()
+                buildSheet("Audio Track", audioRows.map { it.label }, audioCursor, 2)
+            }
+            Mode.OPTIONS -> buildSheet("More", optionRows(), optionCursor, 3)
+            else -> Unit
         }
-        hintText.text = "UP/DOWN pilih • OK apply • BACK kembali"
+    }
+
+    private fun buildSheet(title: String, rows: List<String>, cursor: Int, columns: Int) {
+        sheetTitle.text = title
+        sheetBody.columnCount = columns
+        val safeRows = rows.ifEmpty { listOf("Tidak tersedia") }
+        safeRows.forEachIndexed { index, text ->
+            val row = label(text, 14f, Color.WHITE, true)
+            row.gravity = Gravity.CENTER
+            row.setPadding(dp(14), 0, dp(14), 0)
+            row.background = rowBg(index == cursor)
+            val lp = GridLayout.LayoutParams()
+            lp.width = if (columns <= 2) dp(520) else dp(250)
+            lp.height = dp(58)
+            lp.setMargins(dp(6), dp(6), dp(6), dp(6))
+            sheetBody.addView(row, lp)
+        }
     }
 
     private fun optionRows(): List<String> {
         val speed = speeds[speedIndex]
         val speedText = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
         return listOf(
-            "Speed  $speedText",
-            "Layar  ${if (fitCover) "Cover" else "Fit"}",
-            "Volume  ${if (muted) "Mute" else "Normal"}",
-            "Quality  ${qualities.getOrNull(qualityCursor)?.label ?: "Auto"}",
-            "Subtitle  ${subtitles.getOrNull(subtitleCursor)?.label ?: "OFF"}",
-            "Kembali ke kontrol"
+            "Speed $speedText",
+            "Auto Next ${if (autoNext) "ON" else "OFF"}",
+            "Layar ${if (fitCover) "Cover" else "Fit"}",
+            "Volume ${if (muted) "Mute" else "Normal"}",
+            "Quality",
+            "Subtitle",
+            "Audio",
+            "Kembali"
         )
+    }
+
+    private fun showToast(text: String) {
+        toastText.text = text
+        toastText.visibility = View.VISIBLE
+        handler.removeCallbacks(toastHideTask)
+        handler.postDelayed(toastHideTask, 1600)
     }
 
     private fun allowMove(): Boolean {
@@ -527,7 +758,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun moveDock(delta: Int) {
         if (!allowMove()) return
-        selectedControl = (selectedControl + delta).coerceIn(0, 8)
+        selectedControl = (selectedControl + delta).coerceIn(0, 9)
         setMode(Mode.DOCK)
     }
 
@@ -537,13 +768,26 @@ class TvNativeSurfacePlayerActivity : Activity() {
             Mode.EPISODE -> {
                 val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else episode
                 episodeCursor = (episodeCursor + delta).coerceIn(1, total)
+                updateEpisodePanel()
             }
-            Mode.QUALITY -> qualityCursor = (qualityCursor + delta).coerceIn(0, max(0, qualities.size - 1))
-            Mode.SUBTITLE -> subtitleCursor = (subtitleCursor + delta).coerceIn(0, max(0, subtitles.size - 1))
-            Mode.OPTIONS -> optionCursor = (optionCursor + delta).coerceIn(0, 5)
+            Mode.QUALITY -> {
+                qualityCursor = (qualityCursor + delta).coerceIn(0, max(0, qualities.size - 1))
+                updateBottomSheet()
+            }
+            Mode.SUBTITLE -> {
+                subtitleCursor = (subtitleCursor + delta).coerceIn(0, max(0, subtitles.size - 1))
+                updateBottomSheet()
+            }
+            Mode.AUDIO -> {
+                audioCursor = (audioCursor + delta).coerceIn(0, max(0, audioRows.size - 1))
+                updateBottomSheet()
+            }
+            Mode.OPTIONS -> {
+                optionCursor = (optionCursor + delta).coerceIn(0, 7)
+                updateBottomSheet()
+            }
             else -> Unit
         }
-        updatePanel()
     }
 
     private fun togglePlay() {
@@ -562,18 +806,27 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun changeSpeed() {
         speedIndex = (speedIndex + 1) % speeds.size
         player?.setPlaybackSpeed(speeds[speedIndex])
+        showToast("Speed ${speeds[speedIndex]}x")
         setMode(Mode.DOCK)
     }
 
     private fun toggleFit() {
         fitCover = !fitCover
         playerView.resizeMode = if (fitCover) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
+        showToast("Layar: ${if (fitCover) "Cover" else "Fit"}")
+        setMode(Mode.DOCK)
+    }
+
+    private fun toggleAutoNext() {
+        autoNext = !autoNext
+        showToast("Auto Next: ${if (autoNext) "ON" else "OFF"}")
         setMode(Mode.DOCK)
     }
 
     private fun toggleMute() {
         muted = !muted
         player?.volume = if (muted) 0f else 1f
+        showToast("Volume: ${if (muted) "Mute" else "Normal"}")
         setMode(Mode.DOCK)
     }
 
@@ -583,6 +836,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val pos = p?.currentPosition ?: 0L
         val playing = p?.isPlaying ?: true
         createPlayer(row.url, pos, playing)
+        showToast("Quality: ${row.label}")
         setMode(Mode.DOCK)
     }
 
@@ -591,44 +845,49 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val pos = p?.currentPosition ?: 0L
         val playing = p?.isPlaying ?: true
         createPlayer(currentUrl, pos, playing)
+        showToast("Subtitle: ${subtitles.getOrNull(subtitleCursor)?.label ?: "OFF"}")
         setMode(Mode.DOCK)
     }
 
-    private fun selectEpisode() {
-        if (episodeCursor == episode) {
-            setMode(Mode.DOCK)
-            return
-        }
-        hintText.text = "Episode reload butuh resolver bridge Flutter"
+    private fun applyAudio() {
+        val row = audioRows.getOrNull(audioCursor) ?: return
+        val builder = player?.trackSelectionParameters?.buildUpon() ?: return
+        builder.setPreferredAudioLanguage(row.language)
+        player?.trackSelectionParameters = builder.build()
+        showToast("Audio: ${row.label}")
         setMode(Mode.DOCK)
     }
 
     private fun activateDock() {
         when (selectedControl) {
-            0 -> hintText.text = "Prev butuh resolver bridge Flutter"
+            0 -> requestEpisode(episode - 1)
             1 -> togglePlay()
-            2 -> hintText.text = "Next butuh resolver bridge Flutter"
+            2 -> requestEpisode(episode + 1)
             3 -> setMode(Mode.EPISODE)
             4 -> setMode(Mode.QUALITY)
             5 -> toggleFit()
-            6 -> changeSpeed()
-            7 -> hintText.text = "Favorite tahap berikutnya"
-            8 -> setMode(Mode.OPTIONS)
+            6 -> toggleAutoNext()
+            7 -> setMode(Mode.AUDIO)
+            8 -> setMode(Mode.SUBTITLE)
+            9 -> setMode(Mode.OPTIONS)
         }
     }
 
     private fun activatePanel() {
         when (mode) {
-            Mode.EPISODE -> selectEpisode()
+            Mode.EPISODE -> requestEpisode(episodeCursor)
             Mode.QUALITY -> applyQuality()
             Mode.SUBTITLE -> applySubtitle()
+            Mode.AUDIO -> applyAudio()
             Mode.OPTIONS -> when (optionCursor) {
                 0 -> changeSpeed()
-                1 -> toggleFit()
-                2 -> toggleMute()
-                3 -> setMode(Mode.QUALITY)
-                4 -> setMode(Mode.SUBTITLE)
-                5 -> setMode(Mode.DOCK)
+                1 -> toggleAutoNext()
+                2 -> toggleFit()
+                3 -> toggleMute()
+                4 -> setMode(Mode.QUALITY)
+                5 -> setMode(Mode.SUBTITLE)
+                6 -> setMode(Mode.AUDIO)
+                7 -> setMode(Mode.DOCK)
             }
             else -> Unit
         }
@@ -639,7 +898,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (now - lastBackMs < 350L) return
         lastBackMs = now
         when (mode) {
-            Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.OPTIONS -> setMode(Mode.DOCK)
+            Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
             Mode.DOCK -> setMode(Mode.CLEAN)
             Mode.CLEAN -> finish()
         }
@@ -705,7 +964,6 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 return true
             }
         }
-
         return super.dispatchKeyEvent(event)
     }
 
@@ -719,6 +977,13 @@ class TvNativeSurfacePlayerActivity : Activity() {
         playerView.player = null
         player?.release()
         player = null
+        notifyClosed()
         super.onDestroy()
+    }
+
+    private fun notifyClosed() {
+        if (sentClosed) return
+        sentClosed = true
+        MainActivity.nativePlayerChannel?.invokeMethod("nativeClosed", emptyMap<String, Any>())
     }
 }
