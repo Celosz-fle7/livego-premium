@@ -333,32 +333,69 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     widget.onRequestExit?.call();
   }
 
+  ContentItem _playerItem(ContentItem item) {
+    final fallbackEpisode = LiveGoLocalStore.continueEpisode(item);
+    final itemChapter = int.tryParse(item.chapterId.trim()) ?? fallbackEpisode;
+    final chapter = itemChapter.clamp(1, 999).toString();
+
+    return ContentItem(
+      id: item.id,
+      title: item.title,
+      source: item.source,
+      category: item.category,
+      description: item.description,
+      posterUrl: item.posterUrl,
+      backdropUrl: item.backdropUrl,
+      rating: item.rating,
+      episodes: item.episodes <= 0 ? 1 : item.episodes,
+      updated: item.updated,
+      platformSlug: item.platformSlug,
+      chapterId: chapter,
+      lang: item.lang,
+    );
+  }
+
   void _openDetail(ContentItem item) {
+    // TV fast path: OK on poster plays immediately.
+    //
+    // Detail remains available from other screens later, but Home should not
+    // force a remote user through Detail just to start playback.
     if (_openingDetail || !mounted) return;
     _openingDetail = true;
+
     final returnZone = _zone;
     final returnPlatform = _platformIndex;
     final returnCategory = _categoryIndex;
     final returnGrid = _gridIndex;
-    TvDetailRoute.open(
-      context,
-      item: item,
-      onPlayerRouteOpen: widget.onPlayerRouteOpen,
-      onPlayerRouteClosed: widget.onPlayerRouteClosed,
-    ).whenComplete(() {
-      _openingDetail = false;
+    final episode = int.tryParse(item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(item);
+    final playerItem = _playerItem(item);
+
+    widget.onPlayerRouteOpen?.call();
+
+    Future<void>.delayed(const Duration(milliseconds: 16), () async {
       if (!mounted) return;
-      _zone = returnZone;
-      _platformIndex = returnPlatform;
-      _categoryIndex = returnCategory;
-      _gridIndex = returnGrid;
-      ref.read(tvHomeProvider.notifier).restore(
-            zone: returnZone,
-            platformIndex: returnPlatform,
-            categoryIndex: returnCategory,
-            gridIndex: returnGrid,
-          );
-      _scheduleFocusEntry(preferBanner: returnZone == TvZone.banner);
+      try {
+        await TvPlayerEntry.open(
+          context,
+          item: playerItem,
+          episode: episode.clamp(1, 999).toInt(),
+        );
+      } finally {
+        widget.onPlayerRouteClosed?.call();
+        _openingDetail = false;
+        if (!mounted) return;
+        _zone = returnZone;
+        _platformIndex = returnPlatform;
+        _categoryIndex = returnCategory;
+        _gridIndex = returnGrid;
+        ref.read(tvHomeProvider.notifier).restore(
+              zone: returnZone,
+              platformIndex: returnPlatform,
+              categoryIndex: returnCategory,
+              gridIndex: returnGrid,
+            );
+        _scheduleFocusEntry(preferBanner: returnZone == TvZone.banner);
+      }
     });
   }
 

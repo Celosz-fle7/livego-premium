@@ -45,6 +45,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   bool _loading = true;
   bool _controls = true;
   bool _closing = false;
+  bool _allowRoutePop = false;
   bool _surfaceReady = false;
   String _status = 'Membuka Explorer 3...';
   String _error = '';
@@ -215,6 +216,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
               ? 'surface-ready-by-motion'
               : 'surface-ready-by-timeout';
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_closing) _rootFocus.requestFocus();
+        });
         return;
       }
 
@@ -274,10 +278,46 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _scheduleHideControls();
   }
 
+  void _handleBackIntent() {
+    if (_closing) return;
+
+    if (_controller != null && _controls && !_loading && _error.isEmpty) {
+      setState(() => _controls = false);
+      return;
+    }
+
+    _close();
+  }
+
   void _close() {
     if (_closing) return;
-    _closing = true;
-    Navigator.of(context).maybePop();
+
+    setState(() {
+      _closing = true;
+      _allowRoutePop = true;
+      _controls = false;
+      _status = 'Keluar player...';
+    });
+
+    _hideControlsTimer?.cancel();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+        return;
+      }
+
+      // If pop fails, never leave closing=true forever.
+      if (!mounted) return;
+      setState(() {
+        _closing = false;
+        _allowRoutePop = false;
+        _status = 'PLAY';
+      });
+      _rootFocus.requestFocus();
+    });
   }
 
   bool _isBack(LogicalKeyboardKey key) {
@@ -304,11 +344,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
 
     if (_isBack(key)) {
-      if (_controller != null && _controls && !_loading && _error.isEmpty) {
-        setState(() => _controls = false);
-      } else {
-        _close();
-      }
+      _handleBackIntent();
       return KeyEventResult.handled;
     }
 
@@ -337,7 +373,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowDown ||
         key == LogicalKeyboardKey.contextMenu) {
-      setState(() => _controls = true);
+      setState(() {
+        _controls = true;
+        _status = 'CONTROL';
+      });
+      _rootFocus.requestFocus();
       _scheduleHideControls();
       return KeyEventResult.handled;
     }
@@ -515,9 +555,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final c = _controller;
 
     return PopScope(
-      canPop: false,
+      canPop: _allowRoutePop,
       onPopInvoked: (didPop) {
-        if (!didPop) _close();
+        if (!didPop) _handleBackIntent();
       },
       child: Focus(
         focusNode: _rootFocus,
