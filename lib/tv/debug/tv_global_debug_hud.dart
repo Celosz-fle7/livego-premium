@@ -164,8 +164,8 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
     SchedulerBinding.instance.addTimingsCallback(_handleFrameTimings);
     TvGlobalDebugErrors.lastError.addListener(_refresh);
     TvDebugRecorder.revision.addListener(_refresh);
-    _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) => _refresh(record: true));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(record: true));
+    _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) => _refresh(true));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh(true));
   }
 
   @override
