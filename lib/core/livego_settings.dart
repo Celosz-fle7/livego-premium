@@ -4,7 +4,7 @@ class LiveGoSettings {
   static const appName = 'LiveGo';
 
   static String language = 'id';
-  static String defaultPlatform = 'dobda_freereels';
+  static String defaultPlatform = 'dobda_shortmax';
   static String quality = 'Auto';
   static String layoutMode = 'TV';
   static String drmMode = 'Auto';
@@ -113,7 +113,7 @@ class LiveGoSettings {
 
   static void reset() {
     language = 'id';
-    defaultPlatform = 'dobda_freereels';
+    defaultPlatform = 'dobda_shortmax';
     quality = 'Auto';
     layoutMode = 'TV';
     drmMode = 'Auto';

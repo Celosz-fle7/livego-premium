@@ -100,29 +100,19 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final pa = _sourcePriority(a);
     final pb = _sourcePriority(b);
     if (pa != pb) return pa.compareTo(pb);
-    final ba = LiveGoCatalog.backendLabel(a);
-    final bb = LiveGoCatalog.backendLabel(b);
-    final backend = ba.compareTo(bb);
-    if (backend != 0) return backend;
     return LiveGoCatalog.label(a).compareTo(LiveGoCatalog.label(b));
   }
 
   int _sourcePriority(String slug) {
-    final lower = slug.toLowerCase();
-    if (lower.contains('aicin') || lower.contains('aichin')) return 900;
-    if (slug == 'dobda_shortmax') return 0;
-    if (slug == 'dobda_netshort') return 1;
-    if (slug == 'dobda_pinedrama') return 2;
-    if (slug == 'dobda_flickreels') return 3;
-    if (slug == 'dobda_melolo') return 4;
-    if (LiveGoCatalog.isDobdaPlatform(slug)) return 20;
-    if (slug == 'shortmax') return 100;
-    if (slug == 'netshort') return 101;
-    if (slug == 'pinedrama') return 102;
-    if (slug == 'dramabox') return 103;
-    if (slug == 'flickreels') return 104;
-    if (slug == 'melolo') return 850;
-    return 400;
+    const order = <String, int>{
+      'dobda_shortmax': 0,
+      'dobda_netshort': 1,
+      'dobda_pinedrama': 2,
+      'dobda_freereels': 3,
+      'dobda_flickreels': 4,
+      'dobda_meloshort': 5,
+    };
+    return order[slug] ?? 99;
   }
 
   void _captureInitial() {
@@ -201,32 +191,24 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return clean.take(6).toList();
   }
 
-  bool _isAicinLike(String slug) {
-    final lower = slug.toLowerCase();
-    return lower.contains('aicin') || lower.contains('aichin');
-  }
-
   void _repairDraft() {
     final all = LiveGoCatalog.allPlatforms.toSet();
     _draftActive = _draftActive.where(all.contains).toSet();
 
     if (_draftActive.isEmpty) {
-      final fallback = _platforms.firstWhere(
-        (slug) => !_isAicinLike(slug),
-        orElse: () => _platforms.isNotEmpty ? _platforms.first : 'shortmax',
-      );
+      final fallback = _platforms.isNotEmpty ? _platforms.first : 'dobda_shortmax';
       _draftActive.add(fallback);
     }
 
-    _draftHome = _draftHome.where((slug) => _draftActive.contains(slug) && !_isAicinLike(slug)).toList();
+    _draftHome = _draftHome.where(_draftActive.contains).toList();
     if (_draftHome.isEmpty) {
-      final preferred = _platforms.where((slug) => _draftActive.contains(slug) && !_isAicinLike(slug)).take(6).toList();
+      final preferred = _platforms.where(_draftActive.contains).take(6).toList();
       _draftHome.addAll(preferred);
     }
     if (_draftHome.isEmpty) _draftHome.add(_draftActive.first);
     if (_draftHome.length > 6) _draftHome = _draftHome.take(6).toList();
 
-    if (!_draftActive.contains(_draftDefault) || _isAicinLike(_draftDefault)) {
+    if (!_draftActive.contains(_draftDefault)) {
       _draftDefault = _draftHome.isNotEmpty ? _draftHome.first : _draftActive.first;
     }
 
@@ -359,7 +341,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           return;
         }
         _draftActive.add(slug);
-        if (!_isAicinLike(slug) && _draftHome.length < 6) {
+        if (_draftHome.length < 6) {
           _draftHome.add(slug);
         }
       }
@@ -615,8 +597,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                       child: Column(
                         children: [
                           for (var i = 0; i < platforms.length; i++) ...[
-                            if (i == 0 || LiveGoCatalog.backendLabel(platforms[i]) != LiveGoCatalog.backendLabel(platforms[i - 1]))
-                              _SourceGroupHeaderLite(text: LiveGoCatalog.backendLabel(platforms[i]), height: _groupHeaderHeight),
+                            if (i == 0)
+                              const _SourceGroupHeaderLite(text: 'LIVEGO SOURCE', height: _groupHeaderHeight),
                             _SourceRowLite(
                               height: _rowHeight,
                               title: LiveGoCatalog.label(platforms[i]),
@@ -664,23 +646,16 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   String _subtitleFor(String slug) {
-    if (_isAicinLike(slug)) return 'Eksperimen. Tidak dipakai default karena player bisa lama.';
-    if (LiveGoCatalog.isDobdaPlatform(slug)) return 'Dobda cepat untuk TV. Cocok jadi pilihan utama.';
-    if (slug == 'melolo') return 'Eksperimen/encrypted. Aktifkan hanya kalau perlu.';
-    return 'Anichin API. Aktifkan sesuai kebutuhan.';
+    return 'Source LiveGo untuk Beranda TV. Kategori: Home dan LiveGo.';
   }
 
   String _statusTextFor(String slug) {
-    if (_isAicinLike(slug)) return 'BETA';
     if (!_draftActive.contains(slug)) return 'OFF';
-    if (LiveGoCatalog.isDobdaPlatform(slug)) return 'CEPAT';
-    if (slug == 'melolo') return 'BETA';
     return 'AKTIF';
   }
 
   Color _statusColorFor(String slug) {
     if (!_draftActive.contains(slug)) return Colors.white38;
-    if (_isAicinLike(slug) || slug == 'melolo') return Colors.orangeAccent;
 
     // ON state must not look like the cursor. Cursor/focus is white; active ON
     // state is green.
