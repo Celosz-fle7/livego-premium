@@ -29,7 +29,7 @@ class LiveGoApiPlatform {
     required this.supportedLangs,
     required this.categories,
     this.endpointSlug = '',
-    this.backend = LiveGoApiBackend.anichin,
+    this.backend = LiveGoApiBackend.dobda,
     this.enabledByDefault = false,
     this.supportsSubtitle = false,
     this.streamFromAllEpisodes = false,
@@ -198,7 +198,7 @@ class LiveGoApiPlatforms {
     var clean = requested.trim().toLowerCase();
     if (clean.isEmpty) return config.defaultLang;
 
-    // Aplikasi pakai kode Indonesia `id`, NetShort Anichin API pakai `in`.
+    // Aplikasi pakai kode Indonesia `id`; legacy NetShort alias `in` tetap dinormalisasi.
     if (config.slug == 'netshort' && clean == 'id') clean = 'in';
     if (config.slug != 'netshort' && clean == 'in' && config.supportedLangs.contains('id')) {
       clean = 'id';
