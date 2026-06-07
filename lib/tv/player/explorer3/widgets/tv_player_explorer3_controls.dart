@@ -45,7 +45,7 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
 
   String _episodeLabel() {
     final total = totalEpisodes;
-    if (total == null || total <= 1) return 'EP $episode';
+    if (total == null || total <= 1 || total >= 999) return 'EP $episode';
     return 'EP $episode / $total';
   }
 
@@ -162,8 +162,8 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               status.trim().isEmpty
-                  ? '←/→ pilih kontrol • OK aktifkan • BACK sembunyi/keluar'
-                  : '$status  •  ←/→ pilih kontrol • OK aktifkan • BACK sembunyi/keluar',
+                  ? '←/→ pilih kontrol • OK aktifkan • DOWN episode • UP/MENU opsi • BACK sembunyi/keluar'
+                  : '$status  •  ←/→ pilih kontrol • OK aktifkan • DOWN episode • BACK sembunyi/keluar',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -175,6 +175,303 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class TvPlayerExplorer3InfoOverlay extends StatelessWidget {
+  final String title;
+  final int episode;
+  final int totalEpisodes;
+  final double speed;
+  final String quality;
+  final String subtitle;
+  final bool autoNext;
+  final bool muted;
+
+  const TvPlayerExplorer3InfoOverlay({
+    super.key,
+    required this.title,
+    required this.episode,
+    required this.totalEpisodes,
+    required this.speed,
+    required this.quality,
+    required this.subtitle,
+    required this.autoNext,
+    required this.muted,
+  });
+
+  String _speedText() => '${speed.toStringAsFixed(speed == speed.roundToDouble() ? 0 : 2)}x';
+
+  @override
+  Widget build(BuildContext context) {
+    final total = totalEpisodes <= 1 || totalEpisodes >= 999 ? '' : ' / $totalEpisodes';
+    return IgnorePointer(
+      child: Positioned(
+        left: 48,
+        right: 48,
+        top: 0,
+        child: SafeArea(
+          top: true,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 28),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'EP $episode$total • $_speedText() • $quality • Sub: $subtitle • Next: ${autoNext ? 'Auto' : 'Manual'} • ${muted ? 'Mute' : 'Audio Source'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TvPlayerExplorer3EpisodePanel extends StatelessWidget {
+  final int selected;
+  final int cursor;
+  final int total;
+
+  const TvPlayerExplorer3EpisodePanel({
+    super.key,
+    required this.selected,
+    required this.cursor,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeTotal = total.clamp(1, 999).toInt();
+    final start = (cursor - 5).clamp(1, safeTotal).toInt();
+    final end = (start + 10).clamp(1, safeTotal).toInt();
+    final fixedStart = (end - 10).clamp(1, safeTotal).toInt();
+    final rows = [for (var ep = fixedStart; ep <= end; ep++) ep];
+
+    return _PanelShell(
+      width: 390,
+      title: 'Episode',
+      subtitle: 'UP/DOWN pilih • OK buka • BACK kembali',
+      child: Column(
+        children: [
+          for (final ep in rows)
+            _ChoiceRow(
+              label: 'Episode $ep',
+              value: ep == selected ? 'Now' : '',
+              focused: ep == cursor,
+              selected: ep == selected,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class TvPlayerExplorer3ChoicePanel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<String> choices;
+  final int cursor;
+
+  const TvPlayerExplorer3ChoicePanel({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.choices,
+    required this.cursor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = choices.isEmpty ? const <String>['Tidak tersedia'] : choices;
+    final safeCursor = cursor.clamp(0, rows.length - 1).toInt();
+
+    return _PanelShell(
+      width: 330,
+      title: title,
+      subtitle: subtitle,
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++)
+            _ChoiceRow(
+              label: rows[i],
+              value: i == safeCursor ? 'OK' : '',
+              focused: i == safeCursor,
+              selected: false,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class TvPlayerExplorer3OptionsPanel extends StatelessWidget {
+  final int cursor;
+  final String speed;
+  final bool autoNext;
+  final bool fitCover;
+  final bool muted;
+  final String quality;
+  final String subtitle;
+
+  const TvPlayerExplorer3OptionsPanel({
+    super.key,
+    required this.cursor,
+    required this.speed,
+    required this.autoNext,
+    required this.fitCover,
+    required this.muted,
+    required this.quality,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <({String label, String value})>[
+      (label: 'Speed', value: speed),
+      (label: 'Next Episode', value: autoNext ? 'Auto' : 'Manual'),
+      (label: 'Layar', value: fitCover ? 'Cover' : 'Fit'),
+      (label: 'Volume', value: muted ? 'Mute' : 'Normal'),
+      (label: 'Quality', value: quality),
+      (label: 'Subtitle', value: subtitle),
+    ];
+    final safeCursor = cursor.clamp(0, rows.length - 1).toInt();
+
+    return _PanelShell(
+      width: 330,
+      title: 'Options',
+      subtitle: 'UP/DOWN pilih • LEFT/RIGHT/OK ubah • BACK kembali',
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++)
+            _ChoiceRow(
+              label: rows[i].label,
+              value: rows[i].value,
+              focused: i == safeCursor,
+              selected: false,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelShell extends StatelessWidget {
+  final double width;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _PanelShell({
+    required this.width,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
+        boxShadow: const [
+          BoxShadow(color: Colors.black87, blurRadius: 24),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool focused;
+  final bool selected;
+
+  const _ChoiceRow({
+    required this.label,
+    required this.value,
+    required this.focused,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 80),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        gradient: focused ? AppTheme.activeGradient : null,
+        color: focused ? null : (selected ? AppTheme.surface3.withOpacity(0.92) : Colors.white.withOpacity(0.045)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: focused ? AppTheme.whiteGlow : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12),
+          width: focused ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: focused ? Colors.white : Colors.white70,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+          if (value.isNotEmpty)
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: focused ? Colors.white : AppTheme.cyan,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+        ],
       ),
     );
   }
