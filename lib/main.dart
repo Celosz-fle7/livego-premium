@@ -6,6 +6,7 @@ import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
 import 'core/livego_local_store.dart';
 import 'tv/tv_app.dart';
+import 'tv/debug/tv_global_debug_hud.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -43,7 +44,9 @@ class LiveGoPremiumApp extends StatelessWidget {
       builder: (context, child) {
         return ColoredBox(
           color: Colors.black,
-          child: child ?? const SizedBox.shrink(),
+          child: TvGlobalDebugHud(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       home: const AdaptiveRoot(),
