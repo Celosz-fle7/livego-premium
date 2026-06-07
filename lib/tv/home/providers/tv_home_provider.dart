@@ -67,12 +67,12 @@ class TvHomeContentState {
 class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentController() : super(const TvHomeContentState());
 
-  static const int _maxTvHomeItems = 35;
+  static const int _maxTvHomeItems = 30;
 
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
-  String _lastPlatform = 'shortmax';
-  String _lastCategory = 'Populer';
+  String _lastPlatform = 'dobda_shortmax';
+  String _lastCategory = 'Home';
 
   List<ContentItem> _prepareItems(List<ContentItem> rows) {
     return ContentHealthService.filterPlayable(rows)

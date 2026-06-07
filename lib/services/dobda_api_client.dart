@@ -17,14 +17,14 @@ class DobdaApiClient {
 
 
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) async {
     return homeFeed(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -32,7 +32,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -45,7 +45,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> homeFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -70,14 +70,25 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> liveGoFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
+    const queries = <String>[
+      'dub',
+      'dubbing',
+      'sulih',
+      'indo',
+      'sub indo',
+      'id',
+    ];
+
     final results = await Future.wait<List<ContentItem>>([
-      _safeRows(_searchRaw(query: 'dub', platform: platform, lang: lang, page: page), '$platform/livego-dub'),
-      _safeRows(_searchRaw(query: 'dubbing', platform: platform, lang: lang, page: page), '$platform/livego-dubbing'),
-      _safeRows(_searchRaw(query: 'sulih', platform: platform, lang: lang, page: page), '$platform/livego-sulih'),
+      for (final query in queries)
+        _safeRows(
+          _searchRaw(query: query, platform: platform, lang: lang, page: page),
+          '$platform/livego-$query',
+        ),
     ]);
 
     final merged = <ContentItem>[];
@@ -85,7 +96,8 @@ class DobdaApiClient {
 
     for (final rows in results) {
       for (final item in rows) {
-        if (!_isCleanDobdaItem(item, requireDubbed: true)) continue;
+        if (!_isCleanDobdaItem(item)) continue;
+        if (!_isLiveGoRecommendation(item)) continue;
         final key = _contentKey(item);
         if (seen.add(key)) merged.add(item);
       }
@@ -96,7 +108,7 @@ class DobdaApiClient {
 
   // Migrasi aman untuk setting/cache lama yang masih menyimpan kategori Indonesia.
   static Future<List<ContentItem>> indonesiaFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -104,7 +116,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
@@ -118,7 +130,7 @@ class DobdaApiClient {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -525,6 +537,18 @@ class DobdaApiClient {
 
   static String _contentKey(ContentItem item) => '${item.platformSlug}:${item.id}';
 
+  static bool _isLiveGoRecommendation(ContentItem item) {
+    final text = ' ${_searchBlob(item)} ';
+    return _isDubbed(item) ||
+        _looksIndonesian(item) ||
+        text.contains(' sub indo ') ||
+        text.contains(' subtitle indonesia ') ||
+        text.contains(' bahasa indonesia ') ||
+        text.contains(' indo ') ||
+        text.contains('[id]') ||
+        text.contains('(id)');
+  }
+
   static bool _isDubbed(ContentItem item) {
     final text = _searchBlob(item);
     return text.contains('(dub') ||
@@ -571,6 +595,10 @@ class DobdaApiClient {
       ' kuat ',
       ' kontrak ',
       ' sulih ',
+      ' sub indo ',
+      ' bahasa indonesia ',
+      ' indonesia ',
+      ' indo ',
       ' selesai ',
     ];
     return markers.any(text.contains);

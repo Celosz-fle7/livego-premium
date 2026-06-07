@@ -27,7 +27,7 @@ class LiveGoCatalog {
   static List<String> get allPlatforms => LiveGoApiGateway.supportedPlatforms;
   static List<String> get platformLabels => platforms.map(label).toList();
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'shortmax' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_shortmax' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
 
@@ -80,7 +80,7 @@ class LiveGoCatalog {
   }) async {
     for (final candidate in ApiPlatformFallbackRouter.fallbackOnly(preferredPlatform, max: 3)) {
       final lang = languageFor(candidate);
-      final endpoint = isDobdaPlatform(candidate) ? 'home_clean_v2' : 'home';
+      const endpoint = 'home_clean_v2';
       final cached = await _readExpiredItems(
         platform: candidate,
         endpoint: endpoint,
@@ -111,8 +111,8 @@ class LiveGoCatalog {
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'shortmax'}) async {
-    final endpoint = isDobdaPlatform(platform) ? 'home_clean_v2' : 'home';
+  static Future<List<ContentItem>> home({String platform = 'dobda_shortmax'}) async {
+    const endpoint = 'home_clean_v2';
     final lang = languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
@@ -171,8 +171,8 @@ class LiveGoCatalog {
 
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'shortmax',
-    String category = 'Populer',
+    String platform = 'dobda_shortmax',
+    String category = 'Home',
     bool allowExpired = true,
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -188,23 +188,12 @@ class LiveGoCatalog {
     final cleanCached = ContentHealthService.filterPlayable(cached ?? const <ContentItem>[]);
     if (cleanCached.isNotEmpty) return cleanCached.take(FeedConfig.itemsPerCategory).toList(growable: false);
 
-    if (endpoint != 'home') {
-      final homeCached = await LiveGoContentCache.readItems(
-        platform: platform,
-        endpoint: 'home',
-        params: {'lang': lang},
-        allowExpired: allowExpired,
-      );
-      final cleanHome = ContentHealthService.filterPlayable(homeCached ?? const <ContentItem>[]);
-      if (cleanHome.isNotEmpty) return cleanHome.take(FeedConfig.itemsPerCategory).toList(growable: false);
-    }
-
     return const <ContentItem>[];
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'shortmax',
-    String category = 'Populer',
+    String platform = 'dobda_shortmax',
+    String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
     final endpoint = key.isEmpty ? 'home' : key;
@@ -295,13 +284,13 @@ class LiveGoCatalog {
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'shortmax'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
     return [];
   }
 
-  static Future<ContentItem> hero({String platform = 'shortmax'}) async {
+  static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
     try {
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
@@ -309,7 +298,7 @@ class LiveGoCatalog {
     return MockCatalog.hero;
   }
 
-  static Future<List<ContentItem>> search(String query, {String platform = 'shortmax'}) async {
+  static Future<List<ContentItem>> search(String query, {String platform = 'dobda_shortmax'}) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
     final cached = await LiveGoContentCache.readItems(
@@ -361,7 +350,7 @@ class LiveGoCatalog {
     }
 
     if (merged.isEmpty) {
-      for (final platform in ApiPlatformFallbackRouter.candidates(platforms.isEmpty ? 'shortmax' : platforms.first, max: 5)) {
+      for (final platform in ApiPlatformFallbackRouter.candidates(platforms.isEmpty ? 'dobda_shortmax' : platforms.first, max: 5)) {
         if (platforms.contains(platform)) continue;
         mergeRows(await search(clean, platform: platform));
         if (merged.isNotEmpty) break;
@@ -410,9 +399,9 @@ class LiveGoCatalog {
     final cached = await LiveGoContentCache.readEpisodes(item);
 
     // Older fast-start builds could cache a synthetic fallback containing only
-    // Episode 1 before /allepisode finished. Do not trust a single-row episode
+    // Episode 1 before /detail finished. Do not trust a single-row episode
     // cache for providers that normally expose a full episode list; refresh it
-    // from Anichin so the player sheet shows all episodes again.
+    // from the active LiveGo source so the player sheet shows all episodes again.
     if (cached != null && cached.length > 1) return cached;
 
     final rows = await LiveGoApiManager.fetchEpisodes(
