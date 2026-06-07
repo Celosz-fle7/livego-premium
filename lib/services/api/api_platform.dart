@@ -358,12 +358,24 @@ class LiveGoApiPlatforms {
     ),
   ];
 
-  static List<String> get supportedSlugs => all
-      .map((e) => e.slug)
-      .toList();
+  /// TV starter pack yang diexpose ke Home/Source Manager.
+  ///
+  /// Platform lain tetap ada di registry untuk developer/fallback internal,
+  /// tapi tidak dibuat membanjiri UI. Aicin-like source tidak masuk daftar ini.
+  static const List<String> tvStarterSlugs = <String>[
+    'dobda_shortmax',
+    'dobda_netshort',
+    'dobda_pinedrama',
+    'dobda_freereels',
+    'dobda_flickreels',
+    'dobda_meloshort',
+  ];
 
-  static List<String> get defaultSlugs => all
-      .where((e) => e.enabledByDefault)
+  static List<String> get supportedSlugs => List<String>.unmodifiable(tvStarterSlugs);
+
+  static List<String> get defaultSlugs => List<String>.unmodifiable(tvStarterSlugs);
+
+  static List<String> get allKnownSlugs => all
       .map((e) => e.slug)
       .toList();
 
@@ -372,7 +384,14 @@ class LiveGoApiPlatforms {
       .map((e) => e.slug)
       .toList();
 
-  static bool supports(String platform) => bySlugOrNull(platform) != null;
+  static bool supports(String platform) {
+    final slug = normalizeSlug(platform);
+    if (supportedSlugs.contains(slug)) return true;
+    for (final item in all) {
+      if (item.apiSlug == slug && supportedSlugs.contains(item.slug)) return true;
+    }
+    return false;
+  }
 
   static LiveGoApiPlatform bySlug(String platform) {
     return bySlugOrNull(platform) ?? all.first;

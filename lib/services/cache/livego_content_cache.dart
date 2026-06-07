@@ -10,7 +10,7 @@ import '../feed/feed_config.dart';
 class LiveGoContentCache {
   LiveGoContentCache._();
 
-  static const int maxItemsPerList = FeedConfig.itemsPerCategory;
+  static const int maxItemsPerList = FeedConfig.rawItemsPerCategory;
   static const int maxJsonCacheBytes = 30 * 1024 * 1024;
 
   static const Duration homeTtl = FeedConfig.hardHomeCacheTtl;
