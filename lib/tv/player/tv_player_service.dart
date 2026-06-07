@@ -114,6 +114,75 @@ class TvPlayerService implements PlaybackContract {
     }
   }
 
+  /// Background-only stream prefetch.
+  ///
+  /// This is intentionally softer than resolveStream():
+  /// - cache hits are returned immediately
+  /// - success is saved to TvPlayerCacheManager
+  /// - failure is NOT marked as failed/cooldown
+  ///   because prefetch can timeout without meaning the episode is broken
+  Future<TvPlayerStreamResolveResult> prefetchStream(
+    ContentItem item, {
+    required String chapterId,
+    required int episode,
+  }) async {
+    final cachedStream = TvPlayerCacheManager.streamFor(
+      item,
+      chapterId: chapterId,
+      episode: episode,
+    );
+    if (cachedStream != null && cachedStream.url.trim().isNotEmpty) {
+      return TvPlayerStreamResolveResult(
+        stream: cachedStream,
+        source: 'prefetchCache',
+        elapsedMs: 0,
+      );
+    }
+
+    if (TvPlayerCacheManager.isStreamRecentlyFailed(
+      item,
+      chapterId: chapterId,
+      episode: episode,
+    )) {
+      return const TvPlayerStreamResolveResult(
+        stream: StreamInfo.empty,
+        source: 'prefetchSkippedFailedCooldown',
+        elapsedMs: 0,
+      );
+    }
+
+    final budgetKey = _streamBudgetKey(item, chapterId, episode);
+    final existing = _inFlight[budgetKey];
+    if (existing != null) {
+      return existing;
+    }
+
+    final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode);
+    _inFlight[budgetKey] = request;
+    try {
+      final result = await request;
+      if (result.hasStream) {
+        TvPlayerCacheManager.saveStream(
+          item,
+          chapterId: chapterId,
+          episode: episode,
+          stream: result.stream,
+        );
+      }
+      return result.hasStream
+          ? TvPlayerStreamResolveResult(
+              stream: result.stream,
+              source: 'prefetch:${result.source}',
+              elapsedMs: result.elapsedMs,
+            )
+          : result;
+    } finally {
+      if (_inFlight[budgetKey] == request) {
+        _inFlight.remove(budgetKey);
+      }
+    }
+  }
+
   Future<TvPlayerStreamResolveResult> _resolveStreamUncached(
     ContentItem item, {
     required String chapterId,
