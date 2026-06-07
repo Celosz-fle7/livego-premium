@@ -76,6 +76,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   int _subtitleCursor = 0;
   int _optionCursor = 0;
   int _lastCursorMoveMs = 0;
+  int _lastPlayerUiTickMs = 0;
 
   double _speed = 1.0;
   _Explorer3Mode _mode = _Explorer3Mode.controls;
@@ -318,7 +319,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       await controller.play();
 
       final old = _controller;
+      old?.removeListener(_onControllerTick);
       _controller = controller;
+      controller.addListener(_onControllerTick);
       await old?.dispose();
 
       if (!_active(token)) return;
@@ -332,6 +335,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _surfaceTimer?.cancel();
       _surfaceTimer = null;
       _detectVideoPlayback(token);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_closing) _onControllerTick();
+      });
       _scheduleAutoHide();
     } catch (_) {
       await controller.dispose();
@@ -371,9 +377,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       final currentPos = c.value.position;
       final hasMotion = currentPos.inMilliseconds > 50;
       final hasSize = c.value.size.width > 0 && c.value.size.height > 0;
+      final hasPlaybackSignal = c.value.isPlaying || hasMotion || !c.value.isBuffering;
       final timedOut = checkCount >= maxChecks;
+      final sizeStableEnough = hasSize && checkCount >= 8;
 
-      if ((hasMotion && hasSize) || timedOut) {
+      if ((hasSize && hasPlaybackSignal) || sizeStableEnough || timedOut) {
         _surfaceTimer?.cancel();
         _surfaceTimer = null;
         if (!_active(token)) return;
@@ -390,12 +398,47 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     checkProgress();
   }
 
+  void _onControllerTick() {
+    if (!mounted || _closing) return;
+
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.hasError) return;
+
+    final value = c.value;
+    final hasSize = value.size.width > 0 && value.size.height > 0;
+    final hasPlaybackSignal = value.isPlaying ||
+        value.position.inMilliseconds > 0 ||
+        !value.isBuffering;
+
+    if (!_surfaceReady && hasSize && hasPlaybackSignal) {
+      setState(() {
+        _surfaceReady = true;
+        _loading = false;
+        _status = value.isPlaying ? 'PLAY' : 'PAUSE';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_closing) _rootFocus.requestFocus();
+      });
+      return;
+    }
+
+    // Keep the visible progress text fresh without adding a recorder/timer.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= 500) {
+      _lastPlayerUiTickMs = now;
+      setState(() {});
+    }
+  }
+
   Future<void> _disposeController() async {
     _surfaceTimer?.cancel();
     _surfaceTimer = null;
     final c = _controller;
     _controller = null;
-    if (c != null) await c.dispose();
+    if (c != null) {
+      c.removeListener(_onControllerTick);
+      await c.dispose();
+    }
   }
 
   void _cancelAutoHide() {
@@ -1080,6 +1123,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _hideControlsTimer?.cancel();
     _statusTimer?.cancel();
     _rootFocus.dispose();
+    _controller?.removeListener(_onControllerTick);
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
