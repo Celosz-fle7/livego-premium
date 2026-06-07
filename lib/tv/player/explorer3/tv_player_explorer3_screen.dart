@@ -55,6 +55,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   String _debugPathTail = '-';
   String _debugHeaderKeys = '-';
   int _debugToken = 0;
+  int _controlCursor = 1;
+  int _lastControlMoveMs = 0;
+  double _speed = 1.0;
   Timer? _surfaceTimer;
   Timer? _hideControlsTimer;
   Timer? _statusTimer;
@@ -166,6 +169,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       }
 
       setState(() => _debugPhase = 'play');
+      await controller.setPlaybackSpeed(_speed);
       await controller.play();
 
       final old = _controller;
@@ -278,6 +282,108 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _scheduleHideControls();
   }
 
+  void _showControlStatus(String message) {
+    _statusTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _status = message;
+      _controls = true;
+    });
+    _statusTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted || _loading || _error.isNotEmpty) return;
+      setState(() => _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE');
+    });
+    _scheduleHideControls();
+  }
+
+  bool _allowControlMove() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastControlMoveMs < 95) return false;
+    _lastControlMoveMs = now;
+    return true;
+  }
+
+  void _moveControlCursor(int delta) {
+    if (!_allowControlMove()) return;
+    setState(() {
+      _controls = true;
+      _controlCursor = (_controlCursor + delta).clamp(0, 7).toInt();
+      _status = 'CONTROL';
+    });
+    _scheduleHideControls();
+  }
+
+  int _episodeTotal() {
+    final total = widget.item.episodes;
+    if (total <= 0) return 999;
+    return total.clamp(1, 999).toInt();
+  }
+
+  Future<void> _changeEpisode(int delta) async {
+    if (_loading) return;
+    final total = _episodeTotal();
+    final next = (_episode + delta).clamp(1, total).toInt();
+    if (next == _episode) {
+      _showControlStatus(delta < 0 ? 'Episode pertama' : 'Episode terakhir');
+      return;
+    }
+
+    setState(() {
+      _episode = next;
+      _status = 'EP $_episode';
+      _controls = true;
+    });
+    await _load();
+  }
+
+  Future<void> _cycleSpeed() async {
+    final speeds = <double>[0.75, 1.0, 1.25, 1.5, 2.0];
+    var index = speeds.indexWhere((value) => (value - _speed).abs() < 0.01);
+    if (index < 0) index = 1;
+    final next = speeds[(index + 1) % speeds.length];
+
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      await c.setPlaybackSpeed(next);
+    }
+    if (!mounted) return;
+    setState(() {
+      _speed = next;
+      _status = 'Speed ${next.toStringAsFixed(next == next.roundToDouble() ? 0 : 2)}x';
+      _controls = true;
+    });
+    _scheduleHideControls();
+  }
+
+  void _activateControl() {
+    switch (_controlCursor) {
+      case 0:
+        unawaited(_changeEpisode(-1));
+        return;
+      case 1:
+        unawaited(_togglePlay());
+        return;
+      case 2:
+        unawaited(_changeEpisode(1));
+        return;
+      case 3:
+        _showControlStatus('Episode panel patch berikutnya');
+        return;
+      case 4:
+        _showControlStatus('Quality: ${LiveGoSettings.quality}');
+        return;
+      case 5:
+        _showControlStatus('Subtitle patch berikutnya');
+        return;
+      case 6:
+        unawaited(_cycleSpeed());
+        return;
+      case 7:
+        _showControlStatus('More options patch berikutnya');
+        return;
+    }
+  }
+
   void _handleBackIntent() {
     if (_closing) return;
 
@@ -356,17 +462,29 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
 
     if (_isSelect(key)) {
-      unawaited(_togglePlay());
+      if (_controls) {
+        _activateControl();
+      } else {
+        unawaited(_togglePlay());
+      }
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowLeft) {
-      unawaited(_seekBy(const Duration(seconds: -10)));
+      if (_controls) {
+        _moveControlCursor(-1);
+      } else {
+        unawaited(_seekBy(const Duration(seconds: -10)));
+      }
       return KeyEventResult.handled;
     }
 
     if (key == LogicalKeyboardKey.arrowRight) {
-      unawaited(_seekBy(const Duration(seconds: 10)));
+      if (_controls) {
+        _moveControlCursor(1);
+      } else {
+        unawaited(_seekBy(const Duration(seconds: 10)));
+      }
       return KeyEventResult.handled;
     }
 
@@ -596,7 +714,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                         controller: c,
                         title: widget.item.title,
                         episode: _episode,
+                        totalEpisodes: widget.item.episodes <= 0 ? null : widget.item.episodes,
                         status: _status,
+                        selectedIndex: _controlCursor,
+                        isPlaying: c.value.isPlaying,
+                        speed: _speed,
                       ),
                     ),
                   ),
