@@ -12,6 +12,13 @@ class FeedConfig {
   /// Ini menjaga request API tetap hemat dan sinkron dengan konsep Home + LiveGo.
   static const Duration activeRefreshInterval = Duration(hours: 6);
 
+  /// Cache Home API bawaan provider.
+  /// Setelah 6 jam, Home boleh refresh 1x saat user aktif.
+  static const Duration homeApiTtl = Duration(hours: 6);
+
+  /// Cache LiveGo Recommendation dari keyword Indo/dub/sub.
+  static const Duration liveGoRecommendationTtl = Duration(hours: 12);
+
   /// Cache keras tetap lebih lama supaya app tidak kosong/offline kalau API lambat.
   static const Duration hardHomeCacheTtl = Duration(hours: 12);
 

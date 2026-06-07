@@ -191,6 +191,8 @@ class LiveGoContentCache {
 
   static Duration _ttlFor(String endpoint) {
     final key = endpoint.toLowerCase();
+    if (key == 'home' || key == 'home_clean_v2') return FeedConfig.homeApiTtl;
+    if (key == 'livego' || key.contains('livego')) return FeedConfig.liveGoRecommendationTtl;
     if (key.contains('latest')) return latestTtl;
     if (key.contains('search')) return searchTtl;
     if (key.contains('detail')) return detailTtl;

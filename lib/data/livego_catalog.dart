@@ -60,6 +60,13 @@ class LiveGoCatalog {
     );
   }
 
+  static Duration _homeCategoryTtl(String endpoint) {
+    final key = endpoint.trim().toLowerCase();
+    if (key == 'livego') return FeedConfig.liveGoRecommendationTtl;
+    if (key == 'home' || key == 'home_clean_v2') return FeedConfig.homeApiTtl;
+    return FeedConfig.hardHomeCacheTtl;
+  }
+
   static Future<List<ContentItem>> _readExpiredItems({
     required String platform,
     required String endpoint,
@@ -104,6 +111,7 @@ class LiveGoCatalog {
           endpoint: endpoint,
           params: {'lang': lang},
           items: rows,
+          ttl: _homeCategoryTtl(endpoint),
         );
         return rows;
       }
@@ -136,6 +144,7 @@ class LiveGoCatalog {
         endpoint: endpoint,
         params: {'lang': lang},
         items: rows,
+        ttl: _homeCategoryTtl(endpoint),
       );
       return rows;
     }
@@ -152,6 +161,7 @@ class LiveGoCatalog {
         endpoint: endpoint,
         params: {'lang': lang},
         items: discoverRows,
+        ttl: _homeCategoryTtl(endpoint),
       );
       return discoverRows;
     }
@@ -237,6 +247,7 @@ class LiveGoCatalog {
         endpoint: endpoint,
         params: {'lang': lang},
         items: cleanRows,
+        ttl: _homeCategoryTtl(endpoint),
       );
       return FeedLimiter.prepare(cleanRows, visitSeed: visitSeed);
     }
@@ -257,6 +268,7 @@ class LiveGoCatalog {
         endpoint: endpoint,
         params: {'lang': lang},
         items: rows,
+        ttl: _homeCategoryTtl(endpoint),
       );
       return FeedLimiter.prepare(rows, visitSeed: visitSeed);
     }
