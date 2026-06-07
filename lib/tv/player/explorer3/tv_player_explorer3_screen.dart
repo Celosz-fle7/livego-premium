@@ -985,7 +985,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final aspect = value?.aspectRatio.toStringAsFixed(3) ?? '-';
 
     final lines = <String>[
-      'LIVEGO PLAYER SAFE DIAG',
+      'LIVEGO PLAYER SAFE DIAG V3',
       'mode=${_mode.name} loading=$_loading surface=$_surfaceReady closing=$_closing',
       'q=$_activeQuality codec=$_lastCodecHint',
       'host=$_lastStreamHost',
@@ -1111,7 +1111,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                 _videoSurface(),
                 if (!_surfaceReady)
                   const ColoredBox(color: Colors.black),
-                _playerDiagnosticOverlay(),
                 if (_loading || _error.isNotEmpty)
                   _statusCenter(
                     title: _error.isEmpty ? _status : 'Gagal membuka video',
@@ -1218,6 +1217,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                       ),
                     ),
                   ),
+                _playerDiagnosticOverlay(),
               ],
             ),
           ),
