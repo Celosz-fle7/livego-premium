@@ -18,6 +18,13 @@ class MainActivity : FlutterActivity() {
         window.decorView.setBackgroundColor(Color.BLACK)
     }
 
+    private fun stringListArg(call: io.flutter.plugin.common.MethodCall, name: String): ArrayList<String> {
+        val raw = call.argument<List<Any>>(name) ?: emptyList()
+        val out = ArrayList<String>()
+        raw.forEach { out.add(it.toString()) }
+        return out
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -53,6 +60,11 @@ class MainActivity : FlutterActivity() {
                             putExtra("totalEpisodes", totalEpisodes)
                             putStringArrayListExtra("headerKeys", headerKeys)
                             putStringArrayListExtra("headerValues", headerValues)
+                            putStringArrayListExtra("qualityLabels", stringListArg(call, "qualityLabels"))
+                            putStringArrayListExtra("qualityUrls", stringListArg(call, "qualityUrls"))
+                            putStringArrayListExtra("subtitleLabels", stringListArg(call, "subtitleLabels"))
+                            putStringArrayListExtra("subtitleUrls", stringListArg(call, "subtitleUrls"))
+                            putStringArrayListExtra("subtitleFormats", stringListArg(call, "subtitleFormats"))
                             addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
                         }
                         startActivity(intent)

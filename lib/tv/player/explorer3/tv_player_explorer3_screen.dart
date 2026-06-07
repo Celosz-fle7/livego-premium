@@ -311,6 +311,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         'episode': _episode,
         'totalEpisodes': _episodeTotal(),
         'headers': stream.headers,
+        'qualityLabels': stream.qualities.map((e) => e.label).toList(),
+        'qualityUrls': stream.qualities.map((e) => e.url).toList(),
+        'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
+        'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
+        'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
       });
 
       if (!mounted || !_active(token)) return true;

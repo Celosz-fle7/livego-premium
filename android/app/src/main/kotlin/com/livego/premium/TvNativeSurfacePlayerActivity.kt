@@ -16,7 +16,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -28,6 +30,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 class TvNativeSurfacePlayerActivity : Activity() {
+    private enum class PanelMode { DOCK, EPISODE, QUALITY, SUBTITLE, OPTIONS }
+
+    private data class QualityRow(val label: String, val url: String)
+    private data class SubtitleRow(val label: String, val url: String, val format: String)
+
     private var player: ExoPlayer? = null
     private lateinit var playerView: PlayerView
     private lateinit var overlay: LinearLayout
@@ -35,20 +42,34 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private lateinit var infoText: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var dockRow: LinearLayout
+    private lateinit var panelBox: LinearLayout
     private lateinit var hintText: TextView
+
     private val dockButtons = ArrayList<TextView>()
+    private val panelRows = ArrayList<TextView>()
     private val handler = Handler(Looper.getMainLooper())
 
     private var title = "LiveGO Player"
     private var episode = 1
     private var totalEpisodes = 0
     private var selectedControl = 1
+    private var qualityCursor = 0
+    private var subtitleCursor = 0
+    private var optionCursor = 0
+    private var episodeCursor = 1
     private var speedIndex = 1
     private var overlayVisible = true
     private var fitCover = false
+    private var muted = false
+    private var panelMode = PanelMode.DOCK
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
+    private var currentUrl = ""
+
     private val speeds = floatArrayOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+    private val qualities = ArrayList<QualityRow>()
+    private val subtitles = ArrayList<SubtitleRow>()
+    private val headers = linkedMapOf<String, String>()
 
     private val progressTask = object : Runnable {
         override fun run() {
@@ -57,14 +78,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
         }
     }
 
-    private val hideTask = Runnable { setOverlayVisible(false) }
+    private val hideTask = Runnable { hideOverlayIfDock() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         blackWindow()
 
-        val url = intent.getStringExtra("url").orEmpty()
-        if (url.isBlank()) {
+        currentUrl = intent.getStringExtra("url").orEmpty()
+        if (currentUrl.isBlank()) {
             finish()
             return
         }
@@ -72,37 +93,58 @@ class TvNativeSurfacePlayerActivity : Activity() {
         title = intent.getStringExtra("title").orEmpty().ifBlank { "LiveGO Player" }
         episode = intent.getIntExtra("episode", 1)
         totalEpisodes = intent.getIntExtra("totalEpisodes", 0)
+        episodeCursor = episode
 
-        val headerKeys = intent.getStringArrayListExtra("headerKeys") ?: arrayListOf()
-        val headerValues = intent.getStringArrayListExtra("headerValues") ?: arrayListOf()
-        val headers = linkedMapOf<String, String>()
-        for (i in 0 until min(headerKeys.size, headerValues.size)) {
-            val k = headerKeys[i]
-            val v = headerValues[i]
-            if (k.isNotBlank() && v.isNotBlank()) headers[k] = v
-        }
+        readHeaders()
+        readQualities()
+        readSubtitles()
 
         setContentView(buildRoot())
-
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(headers)
-            .setUserAgent(headers["User-Agent"] ?: "LiveGO Premium TV")
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
-        val exo = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
-
-        player = exo
-        playerView.player = exo
-        exo.repeatMode = Player.REPEAT_MODE_OFF
-        exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
-        exo.prepare()
-        exo.playWhenReady = true
+        createPlayer(currentUrl, keepPositionMs = 0L, playWhenReady = true)
 
         showOverlayAndScheduleHide()
         handler.post(progressTask)
-        updateDock()
+        updateAllUi()
+    }
+
+    private fun readHeaders() {
+        val keys = intent.getStringArrayListExtra("headerKeys") ?: arrayListOf()
+        val values = intent.getStringArrayListExtra("headerValues") ?: arrayListOf()
+        for (i in 0 until min(keys.size, values.size)) {
+            val k = keys[i]
+            val v = values[i]
+            if (k.isNotBlank() && v.isNotBlank()) headers[k] = v
+        }
+    }
+
+    private fun readQualities() {
+        val labels = intent.getStringArrayListExtra("qualityLabels") ?: arrayListOf()
+        val urls = intent.getStringArrayListExtra("qualityUrls") ?: arrayListOf()
+        qualities.clear()
+        qualities.add(QualityRow("Auto", currentUrl))
+        for (i in 0 until min(labels.size, urls.size)) {
+            val label = labels[i].ifBlank { "Quality ${i + 1}" }
+            val url = urls[i]
+            if (url.isNotBlank() && qualities.none { it.url == url }) {
+                qualities.add(QualityRow(label, url))
+            }
+        }
+        qualityCursor = qualities.indexOfFirst { it.url == currentUrl }.coerceAtLeast(0)
+    }
+
+    private fun readSubtitles() {
+        val labels = intent.getStringArrayListExtra("subtitleLabels") ?: arrayListOf()
+        val urls = intent.getStringArrayListExtra("subtitleUrls") ?: arrayListOf()
+        val formats = intent.getStringArrayListExtra("subtitleFormats") ?: arrayListOf()
+        subtitles.clear()
+        subtitles.add(SubtitleRow("OFF", "", ""))
+        for (i in 0 until min(labels.size, urls.size)) {
+            val label = labels[i].ifBlank { "Subtitle ${i + 1}" }
+            val url = urls[i]
+            val format = formats.getOrNull(i) ?: ""
+            if (url.isNotBlank()) subtitles.add(SubtitleRow(label, url, format))
+        }
+        subtitleCursor = 0
     }
 
     private fun blackWindow() {
@@ -162,6 +204,13 @@ class TvNativeSurfacePlayerActivity : Activity() {
             dockButtons.add(b)
         }
 
+        panelBox = LinearLayout(this)
+        panelBox.orientation = LinearLayout.VERTICAL
+        panelBox.visibility = View.GONE
+        val panelParams = LinearLayout.LayoutParams(-1, -2)
+        panelParams.setMargins(0, 14, 0, 0)
+        overlay.addView(panelBox, panelParams)
+
         hintText = label("←/→ pilih kontrol • OK aktifkan • BACK sembunyi/keluar", 12f, 0xFFB8C5D6.toInt(), true)
         hintText.gravity = Gravity.CENTER
         val hintParams = LinearLayout.LayoutParams(-1, -2)
@@ -175,6 +224,52 @@ class TvNativeSurfacePlayerActivity : Activity() {
         params.bottomMargin = 36
         root.addView(overlay, params)
         return root
+    }
+
+    private fun createPlayer(url: String, keepPositionMs: Long, playWhenReady: Boolean) {
+        val old = player
+        old?.pause()
+
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setUserAgent(headers["User-Agent"] ?: "LiveGO Premium TV")
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
+        val exo = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build()
+
+        player = exo
+        playerView.player = exo
+        exo.repeatMode = Player.REPEAT_MODE_OFF
+        exo.setMediaItem(buildMediaItem(url))
+        exo.prepare()
+        if (keepPositionMs > 0) exo.seekTo(keepPositionMs)
+        exo.playWhenReady = playWhenReady
+        exo.setPlaybackSpeed(speeds[speedIndex])
+        exo.volume = if (muted) 0f else 1f
+
+        old?.release()
+        currentUrl = url
+    }
+
+    private fun buildMediaItem(url: String): MediaItem {
+        val builder = MediaItem.Builder().setUri(Uri.parse(url))
+        val sub = subtitles.getOrNull(subtitleCursor)
+        if (sub != null && sub.url.isNotBlank()) {
+            val mime = when (sub.format.lowercase(Locale.US)) {
+                "vtt", "webvtt" -> MimeTypes.TEXT_VTT
+                "srt", "subrip" -> MimeTypes.APPLICATION_SUBRIP
+                else -> MimeTypes.TEXT_VTT
+            }
+            val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub.url))
+                .setMimeType(mime)
+                .setLanguage(sub.label.take(8))
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+            builder.setSubtitleConfigurations(listOf(config))
+        }
+        return builder.build()
     }
 
     private fun label(text: String, sp: Float, color: Int, bold: Boolean): TextView {
@@ -223,8 +318,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun showOverlayAndScheduleHide() {
         setOverlayVisible(true)
-        handler.removeCallbacks(hideTask)
-        handler.postDelayed(hideTask, 5000)
+        if (panelMode == PanelMode.DOCK) {
+            handler.removeCallbacks(hideTask)
+            handler.postDelayed(hideTask, 5000)
+        }
+    }
+
+    private fun hideOverlayIfDock() {
+        if (panelMode == PanelMode.DOCK) setOverlayVisible(false)
     }
 
     private fun setOverlayVisible(visible: Boolean) {
@@ -251,6 +352,11 @@ class TvNativeSurfacePlayerActivity : Activity() {
         updateDock()
     }
 
+    private fun updateAllUi() {
+        updateDock()
+        updatePanel()
+    }
+
     private fun updateDock() {
         val p = player
         val speed = speeds[speedIndex]
@@ -268,9 +374,91 @@ class TvNativeSurfacePlayerActivity : Activity() {
         for (i in dockButtons.indices) {
             val b = dockButtons[i]
             b.text = labels[i]
-            b.background = if (i == selectedControl) selectedBg() else roundedBg(0x55203245, 18, 0x334E6B7D)
-            b.setTextColor(if (i == selectedControl) Color.WHITE else 0xFFD8E4F0.toInt())
+            b.background = if (i == selectedControl && panelMode == PanelMode.DOCK) selectedBg() else roundedBg(0x55203245, 18, 0x334E6B7D)
+            b.setTextColor(if (i == selectedControl && panelMode == PanelMode.DOCK) Color.WHITE else 0xFFD8E4F0.toInt())
         }
+    }
+
+    private fun updatePanel() {
+        panelBox.removeAllViews()
+        panelRows.clear()
+
+        if (panelMode == PanelMode.DOCK) {
+            panelBox.visibility = View.GONE
+            return
+        }
+
+        panelBox.visibility = View.VISIBLE
+        when (panelMode) {
+            PanelMode.EPISODE -> buildRows(
+                title = "Episode",
+                rows = episodeRows(),
+                cursor = episodeCursorForRows(),
+            )
+            PanelMode.QUALITY -> buildRows(
+                title = "Quality",
+                rows = qualities.map { it.label },
+                cursor = qualityCursor.coerceIn(0, max(0, qualities.size - 1)),
+            )
+            PanelMode.SUBTITLE -> buildRows(
+                title = "Subtitle",
+                rows = subtitles.map { it.label },
+                cursor = subtitleCursor.coerceIn(0, max(0, subtitles.size - 1)),
+            )
+            PanelMode.OPTIONS -> buildRows(
+                title = "Options",
+                rows = optionRows(),
+                cursor = optionCursor.coerceIn(0, 5),
+            )
+            PanelMode.DOCK -> Unit
+        }
+    }
+
+    private fun buildRows(title: String, rows: List<String>, cursor: Int) {
+        val titleView = label(title, 16f, Color.WHITE, true)
+        titleView.gravity = Gravity.CENTER
+        panelBox.addView(titleView, LinearLayout.LayoutParams(-1, -2))
+
+        val safeRows = rows.ifEmpty { listOf("Tidak tersedia") }
+        safeRows.take(11).forEachIndexed { index, row ->
+            val v = label(row, 13f, Color.WHITE, true)
+            v.gravity = Gravity.CENTER_VERTICAL
+            v.setPadding(18, 10, 18, 10)
+            v.background = if (index == cursor) selectedBg() else roundedBg(0x44203245, 16, 0x334E6B7D)
+            val lp = LinearLayout.LayoutParams(-1, 48)
+            lp.setMargins(0, 7, 0, 0)
+            panelBox.addView(v, lp)
+            panelRows.add(v)
+        }
+    }
+
+    private fun episodeRows(): List<String> {
+        if (totalEpisodes <= 1 || totalEpisodes >= 999) return listOf("Episode $episode", "Episode list penuh butuh resolver bridge")
+        val start = (episodeCursor - 5).coerceIn(1, totalEpisodes)
+        val end = (start + 10).coerceAtMost(totalEpisodes)
+        val fixedStart = (end - 10).coerceAtLeast(1)
+        return (fixedStart..end).map { ep -> if (ep == episode) "Episode $ep  •  Now" else "Episode $ep" }
+    }
+
+    private fun episodeCursorForRows(): Int {
+        if (totalEpisodes <= 1 || totalEpisodes >= 999) return 0
+        val start = (episodeCursor - 5).coerceIn(1, totalEpisodes)
+        val end = (start + 10).coerceAtMost(totalEpisodes)
+        val fixedStart = (end - 10).coerceAtLeast(1)
+        return (episodeCursor - fixedStart).coerceIn(0, 10)
+    }
+
+    private fun optionRows(): List<String> {
+        val speed = speeds[speedIndex]
+        val speedText = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
+        return listOf(
+            "Speed  $speedText",
+            "Layar  ${if (fitCover) "Cover" else "Fit"}",
+            "Volume  ${if (muted) "Mute" else "Normal"}",
+            "Quality  ${qualities.getOrNull(qualityCursor)?.label ?: "Auto"}",
+            "Subtitle  ${subtitles.getOrNull(subtitleCursor)?.label ?: "OFF"}",
+            "Back to controls"
+        )
     }
 
     private fun allowMove(): Boolean {
@@ -284,7 +472,23 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (!allowMove()) return
         selectedControl = (selectedControl + delta).coerceIn(0, 7)
         showOverlayAndScheduleHide()
-        updateDock()
+        updateAllUi()
+    }
+
+    private fun movePanel(delta: Int) {
+        if (!allowMove()) return
+        when (panelMode) {
+            PanelMode.EPISODE -> {
+                val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else episode
+                episodeCursor = (episodeCursor + delta).coerceIn(1, total)
+            }
+            PanelMode.QUALITY -> qualityCursor = (qualityCursor + delta).coerceIn(0, max(0, qualities.size - 1))
+            PanelMode.SUBTITLE -> subtitleCursor = (subtitleCursor + delta).coerceIn(0, max(0, subtitles.size - 1))
+            PanelMode.OPTIONS -> optionCursor = (optionCursor + delta).coerceIn(0, 5)
+            PanelMode.DOCK -> Unit
+        }
+        updatePanel()
+        showOverlayAndScheduleHide()
     }
 
     private fun togglePlay() {
@@ -307,73 +511,182 @@ class TvNativeSurfacePlayerActivity : Activity() {
         speedIndex = (speedIndex + 1) % speeds.size
         player?.setPlaybackSpeed(speeds[speedIndex])
         showOverlayAndScheduleHide()
-        updateDock()
+        updateAllUi()
     }
 
     private fun toggleFit() {
         fitCover = !fitCover
         playerView.resizeMode = if (fitCover) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
-        hintText.text = if (fitCover) "Layar Cover" else "Layar Fit"
         showOverlayAndScheduleHide()
+        updateAllUi()
+    }
+
+    private fun toggleMute() {
+        muted = !muted
+        player?.volume = if (muted) 0f else 1f
+        showOverlayAndScheduleHide()
+        updateAllUi()
+    }
+
+    private fun showPanel(mode: PanelMode) {
+        panelMode = mode
+        handler.removeCallbacks(hideTask)
+        setOverlayVisible(true)
+        updateAllUi()
+    }
+
+    private fun applyQuality() {
+        val row = qualities.getOrNull(qualityCursor) ?: return
+        val p = player
+        val position = p?.currentPosition ?: 0L
+        val playing = p?.isPlaying ?: true
+        createPlayer(row.url, keepPositionMs = position, playWhenReady = playing)
+        panelMode = PanelMode.DOCK
+        showOverlayAndScheduleHide()
+        updateAllUi()
+    }
+
+    private fun applySubtitle() {
+        val p = player
+        val position = p?.currentPosition ?: 0L
+        val playing = p?.isPlaying ?: true
+        createPlayer(currentUrl, keepPositionMs = position, playWhenReady = playing)
+        panelMode = PanelMode.DOCK
+        showOverlayAndScheduleHide()
+        updateAllUi()
     }
 
     private fun activateControl() {
         when (selectedControl) {
-            0 -> hintText.text = "Prev episode native batch berikutnya"
+            0 -> hintText.text = "Prev episode butuh resolver bridge Flutter"
             1 -> togglePlay()
-            2 -> hintText.text = "Next episode native batch berikutnya"
-            3 -> hintText.text = "Episode panel native batch berikutnya"
-            4 -> hintText.text = "Quality panel native batch berikutnya"
-            5 -> hintText.text = "Subtitle panel native batch berikutnya"
+            2 -> hintText.text = "Next episode butuh resolver bridge Flutter"
+            3 -> showPanel(PanelMode.EPISODE)
+            4 -> showPanel(PanelMode.QUALITY)
+            5 -> showPanel(PanelMode.SUBTITLE)
             6 -> changeSpeed()
-            7 -> toggleFit()
+            7 -> showPanel(PanelMode.OPTIONS)
         }
         showOverlayAndScheduleHide()
     }
 
+    private fun activatePanel() {
+        when (panelMode) {
+            PanelMode.EPISODE -> {
+                hintText.text = if (episodeCursor == episode) {
+                    "Episode $episode sedang diputar"
+                } else {
+                    "Episode reload butuh resolver bridge Flutter"
+                }
+                panelMode = PanelMode.DOCK
+            }
+            PanelMode.QUALITY -> applyQuality()
+            PanelMode.SUBTITLE -> applySubtitle()
+            PanelMode.OPTIONS -> activateOption()
+            PanelMode.DOCK -> activateControl()
+        }
+        updateAllUi()
+    }
+
+    private fun activateOption() {
+        when (optionCursor) {
+            0 -> changeSpeed()
+            1 -> toggleFit()
+            2 -> toggleMute()
+            3 -> showPanel(PanelMode.QUALITY)
+            4 -> showPanel(PanelMode.SUBTITLE)
+            5 -> panelMode = PanelMode.DOCK
+        }
+    }
+
+    private fun handleBack() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackMs < 350L) return
+        lastBackMs = now
+
+        if (panelMode != PanelMode.DOCK) {
+            panelMode = PanelMode.DOCK
+            showOverlayAndScheduleHide()
+            updateAllUi()
+            return
+        }
+
+        if (overlayVisible) {
+            setOverlayVisible(false)
+        } else {
+            finish()
+        }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return true
+
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                val now = System.currentTimeMillis()
-                if (now - lastBackMs < 350L) return true
-                lastBackMs = now
-                if (overlayVisible) setOverlayVisible(false) else finish()
+                handleBack()
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_SPACE -> {
                 if (event.repeatCount == 0) {
-                    if (overlayVisible) activateControl() else togglePlay()
+                    if (!overlayVisible) togglePlay()
+                    else if (panelMode == PanelMode.DOCK) activateControl()
+                    else activatePanel()
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (overlayVisible) moveControl(-1) else seekBy(-10_000L)
+                if (!overlayVisible) seekBy(-10_000L)
+                else if (panelMode == PanelMode.DOCK) moveControl(-1)
+                else {
+                    panelMode = PanelMode.DOCK
+                    updateAllUi()
+                }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (overlayVisible) moveControl(1) else seekBy(10_000L)
+                if (!overlayVisible) seekBy(10_000L)
+                else if (panelMode == PanelMode.DOCK) moveControl(1)
+                else activatePanel()
                 return true
             }
+
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (!overlayVisible) showOverlayAndScheduleHide()
+                else if (panelMode == PanelMode.DOCK) showPanel(PanelMode.OPTIONS)
+                else movePanel(-1)
+                return true
+            }
+
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (!overlayVisible) showPanel(PanelMode.EPISODE)
+                else if (panelMode == PanelMode.DOCK) showPanel(PanelMode.EPISODE)
+                else movePanel(1)
+                return true
+            }
+
+            KeyEvent.KEYCODE_MENU -> {
+                showPanel(PanelMode.OPTIONS)
+                return true
+            }
+
             KeyEvent.KEYCODE_MEDIA_REWIND -> {
                 seekBy(-10_000L)
                 return true
             }
+
             KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                 seekBy(10_000L)
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_MENU -> {
-                showOverlayAndScheduleHide()
-                return true
-            }
         }
+
         return super.dispatchKeyEvent(event)
     }
 
