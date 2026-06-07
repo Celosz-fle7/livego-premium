@@ -53,13 +53,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   int _loadToken = 0;
   late int _episode;
+  String _chapterId = '';
   bool _loading = true;
   bool _closing = false;
   bool _allowRoutePop = false;
   bool _surfaceReady = false;
   bool _muted = false;
   bool _fitCover = false;
-  bool _showPlayerDiag = true;
+  bool _showPlayerDiag = false;
 
   String _status = 'Membuka player...';
   String _error = '';
@@ -93,6 +94,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _episode = widget.episode ?? int.tryParse(widget.item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(widget.item);
     _episode = _episode.clamp(1, 999).toInt();
     _episodeCursor = _episode;
+    _chapterId = widget.item.chapterId.trim().isNotEmpty ? widget.item.chapterId.trim() : '$_episode';
     LiveGoLocalStore.addHistory(widget.item);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -116,7 +118,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
       updated: widget.item.updated,
       platformSlug: widget.item.platformSlug,
-      chapterId: '$_episode',
+      chapterId: _chapterId.trim().isNotEmpty ? _chapterId.trim() : '$_episode',
       lang: widget.item.lang,
     );
   }
@@ -250,6 +252,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       'source': widget.item.source,
       'category': widget.item.category,
       'episode': _episode,
+      'chapterId': _chapterId,
       'totalEpisodes': _nativePayloadTotal(stream),
       'headers': stream.headers,
       'qualityLabels': stream.qualities.map((e) => e.label).toList(),
@@ -271,16 +274,77 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     return null;
   }
 
+  Future<MapEntry<int, String>> _resolveOrderedEpisodeTarget(int requestedEpisode) async {
+    final currentEpisode = _episode;
+    final currentChapterId = _chapterId.trim();
+    final delta = requestedEpisode == currentEpisode ? 0 : (requestedEpisode > currentEpisode ? 1 : -1);
+
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 4));
+      final cleanRows = rows
+          .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
+          .toList(growable: false);
+
+      if (cleanRows.length <= 1) {
+        final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+        return MapEntry(safeEpisode, '$safeEpisode');
+      }
+
+      int indexOfCurrent() {
+        final byChapterId = currentChapterId.isNotEmpty
+            ? cleanRows.indexWhere((episode) => episode.id.trim() == currentChapterId)
+            : -1;
+        if (byChapterId >= 0) return byChapterId;
+        return cleanRows.indexWhere((episode) => episode.index == currentEpisode);
+      }
+
+      MapEntry<int, String> fromRow(dynamic row) {
+        final rawIndex = row.index is int ? row.index as int : requestedEpisode;
+        final index = rawIndex > 0 ? rawIndex : requestedEpisode;
+        final rawId = '${row.id}'.trim();
+        final chapterId = rawId.isNotEmpty ? rawId : '$index';
+        return MapEntry(index.clamp(1, 999).toInt(), chapterId);
+      }
+
+      final currentPos = indexOfCurrent();
+
+      // Native Auto Next / Prev sends current +/- 1.
+      // Treat that as movement by provider row order, not raw episode math.
+      if ((requestedEpisode - currentEpisode).abs() == 1 && currentPos >= 0) {
+        final nextPos = currentPos + delta;
+        if (nextPos >= 0 && nextPos < cleanRows.length) {
+          return fromRow(cleanRows[nextPos]);
+        }
+        return MapEntry(currentEpisode, currentChapterId.isNotEmpty ? currentChapterId : '$currentEpisode');
+      }
+
+      // Direct episode grid selection still tries exact displayed index first.
+      final exact = cleanRows.indexWhere((episode) => episode.index == requestedEpisode);
+      if (exact >= 0) return fromRow(cleanRows[exact]);
+
+      final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+      return MapEntry(safeEpisode, '$safeEpisode');
+    } catch (_) {
+      final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+      return MapEntry(safeEpisode, '$safeEpisode');
+    }
+  }
+
   Future<Map<String, Object?>> _resolveEpisodeForNative(Object? args) async {
     final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
-    final nextEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
+    final requestedEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
     final requestedQuality = '${raw['quality'] ?? _activeQuality}'.trim().isEmpty ? 'Auto' : '${raw['quality'] ?? _activeQuality}'.trim();
 
     final previousEpisode = _episode;
+    final previousChapterId = _chapterId;
     final previousStream = _streamInfo;
+
     try {
-      _episode = nextEpisode.clamp(1, 999).toInt();
+      final target = await _resolveOrderedEpisodeTarget(requestedEpisode);
+      _episode = target.key.clamp(1, 999).toInt();
+      _chapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$_episode';
       _episodeCursor = _episode;
+
       final item = _playableItem();
       final resolved = await _service.resolveStream(
         item,
@@ -306,11 +370,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return _nativePlayerPayload(stream, url);
     } catch (error) {
       _episode = previousEpisode;
+      _chapterId = previousChapterId;
       _episodeCursor = previousEpisode;
       _streamInfo = previousStream;
       return <String, Object?>{
         'error': '$error',
         'episode': previousEpisode,
+        'chapterId': previousChapterId,
       };
     }
   }
@@ -1195,38 +1261,38 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     required String subtitle,
     required bool loading,
   }) {
+    if (loading) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              color: AppTheme.cyan,
+              strokeWidth: 3,
+            ),
+          ),
+        ),
+      );
+    }
+
     return ColoredBox(
-      color: Colors.black.withOpacity(0.70),
+      color: Colors.black.withOpacity(0.82),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (loading) ...[
-              const CircularProgressIndicator(color: AppTheme.cyan),
-              const SizedBox(height: 18),
-            ],
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                decoration: TextDecoration.none,
-              ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
+          child: Text(
+            '$title\n$subtitle',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+              decoration: TextDecoration.none,
             ),
-            const SizedBox(height: 10),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
