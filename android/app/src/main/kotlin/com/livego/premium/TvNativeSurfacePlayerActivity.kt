@@ -33,7 +33,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 class TvNativeSurfacePlayerActivity : Activity() {
-    private enum class Mode { CLEAN, DOCK, EPISODE, QUALITY, SUBTITLE, AUDIO, OPTIONS }
+    private enum class Mode { CLEAN, DOCK, DOCK_PROGRESS, EPISODE, QUALITY, SUBTITLE, AUDIO, OPTIONS }
 
     private data class QualityRow(val label: String, val url: String)
     private data class SubtitleRow(val label: String, val url: String, val format: String)
@@ -246,7 +246,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun buildBottomDock(frame: FrameLayout) {
         bottomDock = LinearLayout(this)
         bottomDock.orientation = LinearLayout.VERTICAL
-        bottomDock.setPadding(dp(28), dp(18), dp(28), dp(18))
+        bottomDock.setPadding(dp(22), dp(16), dp(22), dp(16))
         bottomDock.background = roundedBg(0xDD071321.toInt(), dp(24), 0x772A9FD6)
 
         val timeRow = LinearLayout(this)
@@ -266,30 +266,30 @@ class TvNativeSurfacePlayerActivity : Activity() {
         controlRow = LinearLayout(this)
         controlRow.orientation = LinearLayout.HORIZONTAL
         controlRow.gravity = Gravity.CENTER
-        val controlLp = LinearLayout.LayoutParams(-1, dp(72))
+        val controlLp = LinearLayout.LayoutParams(-1, dp(66))
         controlLp.setMargins(0, dp(18), 0, 0)
         bottomDock.addView(controlRow, controlLp)
 
         repeat(10) { index ->
             val width = when (index) {
-                4 -> dp(118)
-                6 -> dp(92)
-                else -> dp(72)
+                4 -> dp(96)
+                6 -> dp(82)
+                else -> dp(62)
             }
             val button = label("", 12f, Color.WHITE, true)
             button.gravity = Gravity.CENTER
             button.maxLines = 2
             val lp = LinearLayout.LayoutParams(width, -1)
-            if (index > 0) lp.leftMargin = dp(8)
+            if (index > 0) lp.leftMargin = dp(6)
             controlRow.addView(button, lp)
             controlButtons.add(button)
         }
 
         val dockParams = FrameLayout.LayoutParams(-1, -2)
         dockParams.gravity = Gravity.BOTTOM
-        dockParams.leftMargin = dp(38)
-        dockParams.rightMargin = dp(38)
-        dockParams.bottomMargin = dp(32)
+        dockParams.leftMargin = dp(24)
+        dockParams.rightMargin = dp(24)
+        dockParams.bottomMargin = dp(24)
         frame.addView(bottomDock, dockParams)
     }
 
@@ -317,7 +317,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun buildBottomSheet(frame: FrameLayout) {
         bottomSheet = LinearLayout(this)
         bottomSheet.orientation = LinearLayout.VERTICAL
-        bottomSheet.setPadding(dp(36), dp(20), dp(36), dp(22))
+        bottomSheet.setPadding(dp(24), dp(18), dp(24), dp(20))
         bottomSheet.background = roundedBg(0xEE071321.toInt(), dp(24), 0x7734C8FF)
         bottomSheet.visibility = View.GONE
 
@@ -339,9 +339,9 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         val params = FrameLayout.LayoutParams(-1, -2)
         params.gravity = Gravity.BOTTOM
-        params.leftMargin = dp(38)
-        params.rightMargin = dp(38)
-        params.bottomMargin = dp(32)
+        params.leftMargin = dp(24)
+        params.rightMargin = dp(24)
+        params.bottomMargin = dp(24)
         frame.addView(bottomSheet, params)
     }
 
@@ -635,6 +635,12 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 bottomSheet.visibility = View.GONE
                 handler.postDelayed(hideDockTask, 5000)
             }
+            Mode.DOCK_PROGRESS -> {
+                topInfo.visibility = View.VISIBLE
+                bottomDock.visibility = View.VISIBLE
+                sidePanel.visibility = View.GONE
+                bottomSheet.visibility = View.GONE
+            }
             Mode.EPISODE -> {
                 topInfo.visibility = View.GONE
                 bottomDock.visibility = View.GONE
@@ -661,6 +667,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
         progressBar.progress = if (duration > 0) ((position.toDouble() / duration.toDouble()) * 1000.0).toInt().coerceIn(0, 1000) else 0
         leftTime.text = fmt(position)
         rightTime.text = fmt(duration)
+        val progressFocused = mode == Mode.DOCK_PROGRESS
+        progressBar.alpha = if (progressFocused) 1.0f else 0.82f
+        leftTime.setTextColor(if (progressFocused) 0xFF35CBFF.toInt() else Color.WHITE)
+        rightTime.setTextColor(if (progressFocused) 0xFF35CBFF.toInt() else Color.WHITE)
         titleText.text = titleLine()
         updateDock()
     }
@@ -679,7 +689,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             "↻\n${if (autoNext) "Auto ON" else speedText}",
             "♪\nAudio",
             "CC\nSubtitle",
-            "≡\nMore"
+            "☰\nEpisode"
         )
         for (i in controlButtons.indices) {
             val b = controlButtons[i]
@@ -730,8 +740,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun updateBottomSheet() {
         sheetBody.removeAllViews()
         when (mode) {
-            Mode.QUALITY -> buildSheet("Kualitas Video", qualities.map { it.label }, qualityCursor, 5)
-            Mode.SUBTITLE -> buildSheet("CC", subtitles.map { it.label }, subtitleCursor, 5)
+            Mode.QUALITY -> buildSheet("Kualitas Video", qualities.map { it.label }, qualityCursor, 4)
+            Mode.SUBTITLE -> buildSheet("CC", subtitles.map { it.label }, subtitleCursor, 4)
             Mode.AUDIO -> {
                 refreshAudioRows()
                 buildSheet("Audio Track", audioRows.map { it.label }, audioCursor, 2)
@@ -751,9 +761,13 @@ class TvNativeSurfacePlayerActivity : Activity() {
             row.setPadding(dp(14), 0, dp(14), 0)
             row.background = rowBg(index == cursor)
             val lp = GridLayout.LayoutParams()
-            lp.width = if (columns <= 2) dp(520) else dp(250)
-            lp.height = dp(58)
-            lp.setMargins(dp(6), dp(6), dp(6), dp(6))
+            lp.width = when {
+                columns <= 2 -> dp(430)
+                columns == 3 -> dp(250)
+                else -> dp(205)
+            }
+            lp.height = dp(56)
+            lp.setMargins(dp(5), dp(5), dp(5), dp(5))
             sheetBody.addView(row, lp)
         }
     }
@@ -827,11 +841,15 @@ class TvNativeSurfacePlayerActivity : Activity() {
         setMode(Mode.DOCK)
     }
 
-    private fun seekBy(ms: Long) {
+    private fun seekBy(ms: Long, revealControls: Boolean = true) {
         val p = player ?: return
         val duration = if (p.duration > 0) p.duration else Long.MAX_VALUE
         p.seekTo((p.currentPosition + ms).coerceIn(0L, duration))
-        setMode(Mode.DOCK)
+        if (revealControls) {
+            setMode(Mode.DOCK)
+        } else {
+            updateProgress()
+        }
     }
 
     private fun changeSpeed() {
@@ -900,7 +918,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             6 -> toggleAutoNext()
             7 -> setMode(Mode.AUDIO)
             8 -> setMode(Mode.SUBTITLE)
-            9 -> setMode(Mode.OPTIONS)
+            9 -> setMode(Mode.EPISODE)
         }
     }
 
@@ -929,13 +947,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (now - lastBackMs < 350L) return
         lastBackMs = now
         when (mode) {
-            // List/panel BACK closes the panel only, never exits player.
             Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
-
-            // Controls BACK hides controls first. Press BACK again from clean video to exit.
-            Mode.DOCK -> setMode(Mode.CLEAN)
-
-            // Clean video BACK exits player.
+            Mode.DOCK, Mode.DOCK_PROGRESS -> setMode(Mode.CLEAN)
             Mode.CLEAN -> finish()
         }
     }
@@ -948,55 +961,91 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 back()
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_SPACE -> {
                 if (event.repeatCount == 0) {
-                    if (mode == Mode.CLEAN) togglePlay()
-                    else if (mode == Mode.DOCK) activateDock()
-                    else activatePanel()
+                    when (mode) {
+                        Mode.CLEAN -> togglePlay()
+                        Mode.DOCK -> activateDock()
+                        Mode.DOCK_PROGRESS -> togglePlay()
+                        Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> activatePanel()
+                    }
                 }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (mode == Mode.CLEAN) seekBy(-10_000L)
-                else if (mode == Mode.DOCK) moveDock(-1)
-                else if (mode == Mode.EPISODE) movePanel(-1)
-                else setMode(Mode.DOCK)
+                when (mode) {
+                    Mode.CLEAN -> seekBy(-10_000L, revealControls = false)
+                    Mode.DOCK -> moveDock(-1)
+                    Mode.DOCK_PROGRESS -> seekBy(-10_000L, revealControls = false)
+                    Mode.EPISODE -> movePanel(-1)
+                    Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
+                }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (mode == Mode.CLEAN) seekBy(10_000L)
-                else if (mode == Mode.DOCK) moveDock(1)
-                else if (mode == Mode.EPISODE) movePanel(1)
-                else activatePanel()
+                when (mode) {
+                    Mode.CLEAN -> seekBy(10_000L, revealControls = false)
+                    Mode.DOCK -> moveDock(1)
+                    Mode.DOCK_PROGRESS -> seekBy(10_000L, revealControls = false)
+                    Mode.EPISODE -> movePanel(1)
+                    Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> activatePanel()
+                }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_UP -> {
-                if (mode == Mode.CLEAN) setMode(Mode.DOCK)
-                else if (mode == Mode.DOCK) setMode(Mode.OPTIONS)
-                else if (mode == Mode.EPISODE) movePanel(-5)
-                else movePanel(-1)
+                when (mode) {
+                    // Controls hidden: UP shows controls.
+                    Mode.CLEAN -> setMode(Mode.DOCK)
+
+                    // Controls visible: UP goes to progress bar, not More.
+                    Mode.DOCK -> setMode(Mode.DOCK_PROGRESS)
+
+                    // Progress focused: UP hides controls.
+                    Mode.DOCK_PROGRESS -> setMode(Mode.CLEAN)
+
+                    Mode.EPISODE -> movePanel(-5)
+                    Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> movePanel(-1)
+                }
                 return true
             }
+
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (mode == Mode.CLEAN || mode == Mode.DOCK) setMode(Mode.EPISODE)
-                else if (mode == Mode.EPISODE) movePanel(5)
-                else movePanel(1)
+                when (mode) {
+                    // Controls hidden: DOWN is quick episode list.
+                    Mode.CLEAN -> setMode(Mode.EPISODE)
+
+                    // Controls visible: DOWN must not open episode list.
+                    Mode.DOCK -> setMode(Mode.DOCK)
+
+                    // Progress focused: DOWN returns to dock buttons.
+                    Mode.DOCK_PROGRESS -> setMode(Mode.DOCK)
+
+                    Mode.EPISODE -> movePanel(5)
+                    Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> movePanel(1)
+                }
                 return true
             }
+
             KeyEvent.KEYCODE_MENU -> {
                 setMode(Mode.OPTIONS)
                 return true
             }
+
             KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                seekBy(-10_000L)
+                seekBy(-10_000L, revealControls = mode != Mode.CLEAN && mode != Mode.DOCK_PROGRESS)
                 return true
             }
+
             KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                seekBy(10_000L)
+                seekBy(10_000L, revealControls = mode != Mode.CLEAN && mode != Mode.DOCK_PROGRESS)
                 return true
             }
         }
