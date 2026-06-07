@@ -46,6 +46,7 @@ enum _Explorer3Mode {
 class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-explorer3-root');
   final TvPlayerService _service = const TvPlayerService();
+  static const MethodChannel _nativeSurfacePlayer = MethodChannel('livego/native_surface_player');
 
   VideoPlayerController? _controller;
   StreamInfo _streamInfo = StreamInfo.empty;
@@ -282,6 +283,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         }
       });
 
+      final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
+      if (nativeOpened) return;
+
       await _startController(token, stream, url);
     } catch (error) {
       if (!_active(token)) return;
@@ -294,6 +298,45 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _status = 'ERROR';
         _mode = _Explorer3Mode.controls;
       });
+    }
+  }
+
+  Future<bool> _openNativeSurfacePlayer(int token, StreamInfo stream, String url) async {
+    if (!_active(token)) return true;
+
+    try {
+      await _nativeSurfacePlayer.invokeMethod<bool>('open', {
+        'url': url,
+        'title': widget.item.title,
+        'episode': _episode,
+        'totalEpisodes': _episodeTotal(),
+        'headers': stream.headers,
+      });
+
+      if (!mounted || !_active(token)) return true;
+
+      setState(() {
+        _loading = false;
+        _status = 'Native Surface Player';
+        _mode = _Explorer3Mode.watching;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _allowRoutePop = true;
+          _closing = true;
+        });
+        Navigator.of(context).pop();
+      });
+
+      return true;
+    } catch (error) {
+      if (!mounted || !_active(token)) return true;
+      setState(() {
+        _status = 'Flutter fallback: $error';
+      });
+      return false;
     }
   }
 
