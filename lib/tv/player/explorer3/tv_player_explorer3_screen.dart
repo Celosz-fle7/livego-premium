@@ -86,6 +86,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Timer? _surfaceTimer;
   Timer? _hideControlsTimer;
   Timer? _statusTimer;
+  Timer? _prefetchTimer;
+  final Set<String> _prefetchKeys = <String>{};
 
   @override
   void initState() {
@@ -119,6 +121,27 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       updated: widget.item.updated,
       platformSlug: widget.item.platformSlug,
       chapterId: _chapterId.trim().isNotEmpty ? _chapterId.trim() : '$_episode',
+      lang: widget.item.lang,
+    );
+  }
+
+  ContentItem _playableItemFor({
+    required int episode,
+    required String chapterId,
+  }) {
+    return ContentItem(
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: chapterId.trim().isNotEmpty ? chapterId.trim() : '$episode',
       lang: widget.item.lang,
     );
   }
@@ -330,6 +353,145 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
   }
 
+  Future<List<MapEntry<int, String>>> _orderedPrefetchTargets(int count) async {
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 4));
+      final cleanRows = rows
+          .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
+          .toList(growable: false);
+
+      if (cleanRows.length <= 1) {
+        return List<MapEntry<int, String>>.generate(count, (index) {
+          final episode = (_episode + index + 1).clamp(1, 999).toInt();
+          return MapEntry(episode, '$episode');
+        });
+      }
+
+      int currentIndex() {
+        final currentChapterId = _chapterId.trim();
+        final byChapterId = currentChapterId.isNotEmpty
+            ? cleanRows.indexWhere((episode) => episode.id.trim() == currentChapterId)
+            : -1;
+        if (byChapterId >= 0) return byChapterId;
+        return cleanRows.indexWhere((episode) => episode.index == _episode);
+      }
+
+      MapEntry<int, String> fromRow(dynamic row) {
+        final rawIndex = row.index is int ? row.index as int : 0;
+        final index = rawIndex > 0 ? rawIndex : 1;
+        final rawId = '${row.id}'.trim();
+        final chapterId = rawId.isNotEmpty ? rawId : '$index';
+        return MapEntry(index.clamp(1, 999).toInt(), chapterId);
+      }
+
+      final current = currentIndex();
+      if (current < 0) {
+        return List<MapEntry<int, String>>.generate(count, (index) {
+          final episode = (_episode + index + 1).clamp(1, 999).toInt();
+          return MapEntry(episode, '$episode');
+        });
+      }
+
+      final targets = <MapEntry<int, String>>[];
+      for (var offset = 1; offset <= count; offset += 1) {
+        final nextIndex = current + offset;
+        if (nextIndex < 0 || nextIndex >= cleanRows.length) break;
+        targets.add(fromRow(cleanRows[nextIndex]));
+      }
+      return targets;
+    } catch (_) {
+      return List<MapEntry<int, String>>.generate(count, (index) {
+        final episode = (_episode + index + 1).clamp(1, 999).toInt();
+        return MapEntry(episode, '$episode');
+      });
+    }
+  }
+
+  String _prefetchKeyFor(int episode, String chapterId) {
+    return [
+      widget.item.platformSlug.trim(),
+      widget.item.id.trim(),
+      chapterId.trim(),
+      episode,
+      _activeQuality.trim(),
+    ].join('|');
+  }
+
+  bool _rememberPrefetchKey(String key) {
+    if (_prefetchKeys.contains(key)) return false;
+    _prefetchKeys.add(key);
+    if (_prefetchKeys.length > 96) {
+      _prefetchKeys.remove(_prefetchKeys.first);
+    }
+    return true;
+  }
+
+  void _cancelLightPrefetch() {
+    _prefetchTimer?.cancel();
+    _prefetchTimer = null;
+  }
+
+  void _scheduleLightPrefetch({Duration delay = const Duration(seconds: 10)}) {
+    _cancelLightPrefetch();
+
+    final token = _loadToken;
+    final episodeSnapshot = _episode;
+    final chapterSnapshot = _chapterId;
+
+    _prefetchTimer = Timer(delay, () {
+      if (!_active(token)) return;
+      if (_episode != episodeSnapshot || _chapterId != chapterSnapshot) return;
+      unawaited(_prefetchNextStreams(token, episodeSnapshot, chapterSnapshot));
+    });
+  }
+
+  Future<void> _prefetchNextStreams(
+    int token,
+    int baseEpisode,
+    String baseChapterId,
+  ) async {
+    if (!_active(token)) return;
+
+    final targets = await _orderedPrefetchTargets(2);
+    for (final target in targets) {
+      if (!_active(token)) return;
+      if (_episode != baseEpisode || _chapterId != baseChapterId) return;
+
+      final targetEpisode = target.key.clamp(1, 999).toInt();
+      final targetChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$targetEpisode';
+
+      if (targetEpisode == _episode && targetChapterId == _chapterId.trim()) {
+        continue;
+      }
+
+      final key = _prefetchKeyFor(targetEpisode, targetChapterId);
+      if (!_rememberPrefetchKey(key)) continue;
+
+      final item = _playableItemFor(
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
+
+      try {
+        final result = await _service
+            .prefetchStream(
+              item,
+              chapterId: item.chapterId,
+              episode: targetEpisode,
+            )
+            .timeout(const Duration(seconds: 7));
+
+        if (result.hasStream) {
+          debugPrint('LIVEGO TV PLAYER PREFETCH OK ep=$targetEpisode chapter=$targetChapterId source=${result.source}');
+        } else {
+          debugPrint('LIVEGO TV PLAYER PREFETCH MISS ep=$targetEpisode chapter=$targetChapterId source=${result.source}');
+        }
+      } catch (error) {
+        debugPrint('LIVEGO TV PLAYER PREFETCH SKIP ep=$targetEpisode chapter=$targetChapterId error=$error');
+      }
+    }
+  }
+
   Future<Map<String, Object?>> _resolveEpisodeForNative(Object? args) async {
     final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
     final requestedEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
@@ -367,6 +529,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         });
       }
 
+      _scheduleLightPrefetch();
       return _nativePlayerPayload(stream, url);
     } catch (error) {
       _episode = previousEpisode;
@@ -389,6 +552,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   void _exitFlutterPlayerRoute({required String source}) {
     if (!mounted) return;
 
+    _cancelLightPrefetch();
     _cancelAutoHide();
     _statusTimer?.cancel();
     _surfaceTimer?.cancel();
@@ -431,6 +595,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Future<void> _load() async {
     final token = ++_loadToken;
     final item = _playableItem();
+
+    _cancelLightPrefetch();
 
     _surfaceTimer?.cancel();
     _surfaceTimer = null;
@@ -477,7 +643,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       });
 
       final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
-      if (nativeOpened) return;
+      if (nativeOpened) {
+        _scheduleLightPrefetch();
+        return;
+      }
 
       await _startController(token, stream, url);
     } catch (error) {
@@ -561,6 +730,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_closing) _onControllerTick();
       });
+      _scheduleLightPrefetch();
       _scheduleAutoHide();
     } catch (_) {
       await controller.dispose();
@@ -1322,6 +1492,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   @override
   void dispose() {
+    _prefetchTimer?.cancel();
     _surfaceTimer?.cancel();
     _hideControlsTimer?.cancel();
     _statusTimer?.cancel();
