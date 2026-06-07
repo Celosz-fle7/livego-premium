@@ -728,10 +728,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
             "‹‹\nPrev",
             if (player?.isPlaying == true) "⏸\nPause" else "▶\nPlay",
             "Next\n››",
-            "☰\nEpisode",
+            "↻\n$speedText",
             qualities.getOrNull(qualityCursor)?.label ?: "Auto",
             "⛶\n${if (fitCover) "Cover" else "Fit"}",
-            "↻\n${if (autoNext) "Auto ON" else speedText}",
+            "Auto\n${if (autoNext) "ON" else "OFF"}",
             "♪\nAudio",
             "CC\nSub",
             "☰\nEpisode"
@@ -741,6 +741,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             b.text = labels[i]
             b.textSize = when (i) {
                 1 -> 14.5f
+                3 -> 13.0f
                 4 -> 14.0f
                 8 -> 12.5f
                 else -> 12.0f
@@ -964,7 +965,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             0 -> requestEpisode(episode - 1)
             1 -> togglePlay()
             2 -> requestEpisode(episode + 1)
-            3 -> setMode(Mode.EPISODE)
+            3 -> changeSpeed()
             4 -> setMode(Mode.QUALITY)
             5 -> toggleFit()
             6 -> toggleAutoNext()
