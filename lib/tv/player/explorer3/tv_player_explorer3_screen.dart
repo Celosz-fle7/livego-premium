@@ -62,6 +62,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   String _status = 'Membuka player...';
   String _error = '';
   String _subtitleStatus = 'Auto';
+  String _activeQuality = 'Auto';
 
   int _controlCursor = 1;
   int _episodeCursor = 1;
@@ -154,6 +155,38 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     return 0;
   }
 
+  bool _looksUnsafeForLowEndTv(StreamQuality quality) {
+    final joined = '${quality.label} ${quality.url}'.toLowerCase();
+    return joined.contains('h265') ||
+        joined.contains('hevc') ||
+        joined.contains('x265') ||
+        joined.contains('10bit') ||
+        joined.contains('10-bit');
+  }
+
+  String _safeAutoUrl(StreamInfo stream) {
+    final qualities = stream.qualities;
+    if (qualities.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
+
+    final safe = qualities.where((q) => q.url.trim().isNotEmpty && !_looksUnsafeForLowEndTv(q)).toList();
+    final pool = safe.isNotEmpty ? safe : qualities.where((q) => q.url.trim().isNotEmpty).toList();
+    if (pool.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
+
+    pool.sort((a, b) {
+      final ah = a.height <= 0 ? 9999 : a.height;
+      final bh = b.height <= 0 ? 9999 : b.height;
+      return ah.compareTo(bh);
+    });
+    return pool.first.url;
+  }
+
+  String _safeUrlForQuality(StreamInfo stream, String quality) {
+    final q = quality.trim();
+    if (q.isEmpty || q.toLowerCase() == 'auto') return _safeAutoUrl(stream);
+    final selected = stream.urlForQuality(q).trim();
+    return selected.isNotEmpty ? selected : _safeAutoUrl(stream);
+  }
+
   Future<void> _load() async {
     final token = ++_loadToken;
     final item = _playableItem();
@@ -180,13 +213,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       final stream = resolved.stream;
       _streamInfo = stream;
 
-      final preferred = stream.urlForQuality(LiveGoSettings.quality).trim();
-      final url = preferred.isNotEmpty ? preferred : stream.url.trim();
+      // Always start TV playback with a safe Auto stream.
+      // Saved/high quality can be re-applied manually from the Quality panel.
+      final url = _safeUrlForQuality(stream, _activeQuality).trim();
       if (url.isEmpty) throw StateError('Stream kosong');
 
       setState(() {
         _status = 'Menyiapkan video...';
-        _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
+        _qualityCursor = _qualityIndexFor(_activeQuality);
         if (stream.subtitles.isEmpty) {
           _subtitleStatus = LiveGoSettings.subtitlesEnabled ? 'Tidak tersedia' : 'OFF';
           _subtitleCursor = LiveGoSettings.subtitlesEnabled ? 1 : 0;
@@ -353,7 +387,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _episodeCursor = _episode;
         _status = 'Episode';
       } else if (mode == _Explorer3Mode.quality) {
-        _qualityCursor = _qualityIndexFor(LiveGoSettings.quality);
+        _qualityCursor = _qualityIndexFor(_activeQuality);
         _status = 'Quality';
       } else if (mode == _Explorer3Mode.subtitle) {
         _subtitleCursor = _subtitleCursor.clamp(0, _subtitleChoices.length - 1).toInt();
@@ -498,6 +532,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final label = choices[safe];
 
     setState(() {
+      _activeQuality = label;
       LiveGoSettings.quality = label;
       _status = 'Quality $label';
       _mode = _Explorer3Mode.controls;
@@ -989,7 +1024,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                     episode: _episode,
                     totalEpisodes: _episodeTotal(),
                     speed: _speed,
-                    quality: LiveGoSettings.quality,
+                    quality: _activeQuality,
                     subtitle: _subtitleStatus,
                     autoNext: LiveGoSettings.autoNextEnabled,
                     muted: _muted,
@@ -1078,7 +1113,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                         autoNext: LiveGoSettings.autoNextEnabled,
                         fitCover: _fitCover,
                         muted: _muted,
-                        quality: LiveGoSettings.quality,
+                        quality: _activeQuality,
                         subtitle: _subtitleStatus,
                       ),
                     ),
