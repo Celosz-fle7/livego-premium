@@ -7,6 +7,7 @@ import '../../models/stream_info.dart';
 import '../../services/player/playback_contract.dart';
 import '../../services/player/playback_resolver.dart';
 import '../../services/player/playback_timeout_config.dart';
+import 'cache/tv_player_cache_manager.dart';
 
 class TvPlayerStreamResolveResult {
   final StreamInfo stream;
@@ -42,6 +43,33 @@ class TvPlayerService implements PlaybackContract {
     final budgetKey = _streamBudgetKey(item, chapterId, episode);
     _pruneRequestBudget();
 
+    final cachedStream = TvPlayerCacheManager.streamFor(
+      item,
+      chapterId: chapterId,
+      episode: episode,
+    );
+    if (cachedStream != null && cachedStream.url.trim().isNotEmpty) {
+      debugPrint('LIVEGO TV STREAM CACHE HIT ep=$episode chapter=$chapterId');
+      return TvPlayerStreamResolveResult(
+        stream: cachedStream,
+        source: 'cache',
+        elapsedMs: 0,
+      );
+    }
+
+    if (TvPlayerCacheManager.isStreamRecentlyFailed(
+      item,
+      chapterId: chapterId,
+      episode: episode,
+    )) {
+      debugPrint('LIVEGO TV STREAM CACHE FAILED_COOLDOWN ep=$episode chapter=$chapterId');
+      return const TvPlayerStreamResolveResult(
+        stream: StreamInfo.empty,
+        source: 'cacheFailedCooldown',
+        elapsedMs: 0,
+      );
+    }
+
     final blockedUntil = _recentMiss[budgetKey];
     if (blockedUntil != null && DateTime.now().isBefore(blockedUntil)) {
       debugPrint('LIVEGO TV STREAM BUDGET RECENT_MISS SKIP ep=$episode chapter=$chapterId');
@@ -64,8 +92,19 @@ class TvPlayerService implements PlaybackContract {
       final result = await request;
       if (result.hasStream) {
         _recentMiss.remove(budgetKey);
+        TvPlayerCacheManager.saveStream(
+          item,
+          chapterId: chapterId,
+          episode: episode,
+          stream: result.stream,
+        );
       } else {
         _recentMiss[budgetKey] = DateTime.now().add(_streamMissCooldown);
+        TvPlayerCacheManager.markStreamFailed(
+          item,
+          chapterId: chapterId,
+          episode: episode,
+        );
       }
       return result;
     } finally {
@@ -189,6 +228,9 @@ class TvPlayerService implements PlaybackContract {
   }
 
   Future<List<LiveGoEpisode>> episodes(ContentItem item) {
-    return LiveGoCatalog.episodes(item);
+    return TvPlayerCacheManager.episodesFor(
+      item,
+      loader: () => LiveGoCatalog.episodes(item),
+    );
   }
 }
