@@ -382,13 +382,49 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _closeFromNative() {
-    if (!mounted || _closing) return;
-    _closing = true;
-    _allowRoutePop = true;
+    if (!mounted) return;
+    _exitFlutterPlayerRoute(source: 'nativeClosed');
+  }
+
+  void _exitFlutterPlayerRoute({required String source}) {
+    if (!mounted) return;
+
+    _cancelAutoHide();
+    _statusTimer?.cancel();
+    _surfaceTimer?.cancel();
+
+    setState(() {
+      _closing = true;
+      _allowRoutePop = true;
+      _mode = _Explorer3Mode.watching;
+      _status = source;
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+
       final navigator = Navigator.of(context);
-      if (navigator.canPop()) navigator.pop();
+      if (navigator.canPop()) {
+        navigator.pop();
+        return;
+      }
+
+      final rootNavigator = Navigator.of(context, rootNavigator: true);
+      if (rootNavigator.canPop()) {
+        rootNavigator.pop();
+        return;
+      }
+
+      // Safety fallback: if there is no pop target, do not leave the
+      // player route permanently black and locked. Re-enable BACK handling.
+      if (!mounted) return;
+      setState(() {
+        _closing = false;
+        _allowRoutePop = false;
+        _mode = _Explorer3Mode.controls;
+        _status = 'Tekan BACK untuk keluar';
+      });
+      _rootFocus.requestFocus();
     });
   }
 
@@ -999,7 +1035,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _handleBackIntent() {
-    if (_closing) return;
+    // If a previous nativeClosed pop failed and left a black screen, BACK must
+    // still be able to recover instead of being ignored forever.
+    if (_closing && !_allowRoutePop) return;
+    if (_closing && _allowRoutePop) {
+      _exitFlutterPlayerRoute(source: 'backWhileClosing');
+      return;
+    }
 
     if (_loading || _error.isNotEmpty) {
       _close();
@@ -1027,34 +1069,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _close() {
-    if (_closing) return;
-
-    setState(() {
-      _closing = true;
-      _allowRoutePop = true;
-      _mode = _Explorer3Mode.watching;
-      _status = 'Keluar player...';
-    });
-
-    _cancelAutoHide();
-    _statusTimer?.cancel();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final navigator = Navigator.of(context);
-      if (navigator.canPop()) {
-        navigator.pop();
-        return;
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _closing = false;
-        _allowRoutePop = false;
-        _status = 'PLAY';
-      });
-      _rootFocus.requestFocus();
-    });
+    if (_closing && !_allowRoutePop) return;
+    _exitFlutterPlayerRoute(source: 'back');
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
