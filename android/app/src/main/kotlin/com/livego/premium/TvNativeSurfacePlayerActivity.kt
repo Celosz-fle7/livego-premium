@@ -82,6 +82,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
     private var sentClosed = false
+    private var episodeResolveInFlight = false
+    private var autoNextRequestedForEpisode = -1
 
     private val speeds = floatArrayOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
     private val qualities = ArrayList<QualityRow>()
@@ -371,8 +373,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
         exo.repeatMode = Player.REPEAT_MODE_OFF
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED && autoNext) {
-                    requestEpisode((episode + 1).coerceAtMost(totalEpisodes.coerceAtLeast(episode)))
+                if (playbackState == Player.STATE_ENDED && autoNext && autoNextRequestedForEpisode != episode) {
+                    autoNextRequestedForEpisode = episode
+                    val nextEpisode = episode + 1
+                    if (totalEpisodes > 1 && nextEpisode > totalEpisodes) {
+                        showToast("Episode terakhir")
+                    } else {
+                        requestEpisode(nextEpisode)
+                    }
                 }
                 refreshAudioRows()
             }
@@ -437,16 +445,30 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     private fun requestEpisode(targetEpisode: Int) {
+        if (episodeResolveInFlight) {
+            showToast("Masih memuat episode...")
+            return
+        }
+
         if (targetEpisode < 1) {
             showToast("Tidak ada episode sebelumnya")
             return
         }
+
         if (totalEpisodes > 1 && targetEpisode > totalEpisodes) {
             showToast("Episode terakhir")
             return
         }
 
+        if (targetEpisode == episode) {
+            showToast("Episode $episode sedang diputar")
+            setMode(Mode.DOCK)
+            return
+        }
+
+        episodeResolveInFlight = true
         showToast("Memuat Episode $targetEpisode...")
+
         val args = mapOf(
             "episode" to targetEpisode,
             "quality" to (qualities.getOrNull(qualityCursor)?.label ?: "Auto")
@@ -454,6 +476,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         val channel = MainActivity.nativePlayerChannel
         if (channel == null) {
+            episodeResolveInFlight = false
             showToast("Resolver Flutter tidak tersedia")
             return
         }
@@ -461,6 +484,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         channel.invokeMethod("resolveEpisode", args, object : MethodChannel.Result {
             override fun success(result: Any?) {
                 runOnUiThread {
+                    episodeResolveInFlight = false
                     val data = result as? Map<*, *>
                     if (data == null) {
                         showToast("Resolver kosong")
@@ -476,11 +500,17 @@ class TvNativeSurfacePlayerActivity : Activity() {
             }
 
             override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
-                runOnUiThread { showToast(errorMessage ?: errorCode) }
+                runOnUiThread {
+                    episodeResolveInFlight = false
+                    showToast(errorMessage ?: errorCode)
+                }
             }
 
             override fun notImplemented() {
-                runOnUiThread { showToast("Resolver episode belum aktif") }
+                runOnUiThread {
+                    episodeResolveInFlight = false
+                    showToast("Resolver episode belum aktif")
+                }
             }
         })
     }
@@ -514,6 +544,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         titleText.text = titleLine()
         descText.text = description.ifBlank { " " }
         updateTags()
+        autoNextRequestedForEpisode = -1
         createPlayer(url, keepPositionMs = 0L, playWhenReady = true)
         showToast("Episode $episode")
         setMode(Mode.DOCK)
@@ -898,12 +929,14 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (now - lastBackMs < 350L) return
         lastBackMs = now
         when (mode) {
-            // Panel/sheet still closes one step back to controls.
+            // List/panel BACK closes the panel only, never exits player.
             Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
 
-            // Do not hide controls into a black/clean intermediate screen.
-            // From player controls, BACK must exit to the previous grid/detail source in one press.
-            Mode.DOCK, Mode.CLEAN -> finish()
+            // Controls BACK hides controls first. Press BACK again from clean video to exit.
+            Mode.DOCK -> setMode(Mode.CLEAN)
+
+            // Clean video BACK exits player.
+            Mode.CLEAN -> finish()
         }
     }
 
