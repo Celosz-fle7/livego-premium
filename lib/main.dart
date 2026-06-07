@@ -14,14 +14,52 @@ void main() {
 
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
+      TvGlobalDebugErrors.reportFlutter(details);
       debugPrint('LIVEGO FLUTTER ERROR: ${details.exception}');
       final stack = details.stack;
       if (stack != null) debugPrint(stack.toString());
     };
 
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      TvGlobalDebugErrors.reportFlutter(details);
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: ColoredBox(
+          color: Colors.black,
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.center,
+              child: Container(
+                margin: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(22),
+                constraints: const BoxConstraints(maxWidth: 900),
+                decoration: BoxDecoration(
+                  color: const Color(0xEE000000),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.redAccent, width: 2),
+                ),
+                child: Text(
+                  'LIVEGO WIDGET ERROR\\n${details.exception}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    height: 1.25,
+                    fontWeight: FontWeight.w900,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    };
+
     await LiveGoLocalStore.init();
     runApp(const LiveGoPremiumApp());
   }, (Object error, StackTrace stackTrace) {
+    TvGlobalDebugErrors.report(error, stackTrace);
     debugPrint('LIVEGO ZONE ERROR: $error');
     debugPrint(stackTrace.toString());
   });

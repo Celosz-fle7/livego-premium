@@ -4,6 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+class TvGlobalDebugErrors {
+  static final ValueNotifier<String> lastError = ValueNotifier<String>('-');
+
+  static void report(Object error, [StackTrace? stackTrace]) {
+    final raw = '$error';
+    final clean = raw.replaceAll('\n', ' ').trim();
+    final text = clean.isEmpty ? error.runtimeType.toString() : clean;
+    lastError.value = text.length > 220 ? '${text.substring(0, 220)}...' : text;
+    debugPrint('LIVEGO GLOBAL ERROR HUD: ${lastError.value}');
+    if (stackTrace != null) debugPrint(stackTrace.toString());
+  }
+
+  static void reportFlutter(FlutterErrorDetails details) {
+    report(details.exception, details.stack);
+  }
+}
+
 /// Global TV debug overlay.
 ///
 /// Lives above MaterialApp routes through MaterialApp.builder, so it should be
@@ -36,11 +53,13 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
   int _keyCount = 0;
   String _primaryFocus = '-';
   String _route = '-';
+  String _lastError = '-';
 
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    TvGlobalDebugErrors.lastError.addListener(_refresh);
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) => _refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
@@ -48,6 +67,7 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    TvGlobalDebugErrors.lastError.removeListener(_refresh);
     _ticker?.cancel();
     super.dispose();
   }
@@ -84,6 +104,7 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
         contextAlive ? 'ctx' : 'noctx',
       ].join('/');
       _route = route;
+      _lastError = TvGlobalDebugErrors.lastError.value;
     });
   }
 
@@ -126,6 +147,7 @@ class _TvGlobalDebugHudState extends State<TvGlobalDebugHud> {
       'route=$_route',
       'screen=$sizeText',
       'mode=global-root no-consume',
+      if (_lastError != '-') 'ERR=$_lastError',
     ];
 
     return IgnorePointer(
