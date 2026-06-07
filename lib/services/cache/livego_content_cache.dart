@@ -252,7 +252,7 @@ class LiveGoContentCache {
         rating: double.tryParse('${json['rating'] ?? 8.0}') ?? 8.0,
         episodes: int.tryParse('${json['episodes'] ?? 1}') ?? 1,
         updated: json['updated'] == true,
-        platformSlug: '${json['platformSlug'] ?? 'shortmax'}',
+        platformSlug: '${json['platformSlug'] ?? 'dobda_freereels'}',
         chapterId: '${json['chapterId'] ?? '1'}',
         lang: '${json['lang'] ?? 'id'}',
       );

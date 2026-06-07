@@ -227,6 +227,6 @@ class LiveGoApiManager {
 
   static String _normalizePlatform(String value) {
     final clean = value.trim().toLowerCase();
-    return clean.isEmpty ? 'shortmax' : clean;
+    return clean.isEmpty ? 'dobda_freereels' : clean;
   }
 }
