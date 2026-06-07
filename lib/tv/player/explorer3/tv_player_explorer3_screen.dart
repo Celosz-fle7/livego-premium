@@ -58,10 +58,16 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   bool _surfaceReady = false;
   bool _muted = false;
   bool _fitCover = false;
+  bool _showPlayerDiag = true;
 
   String _status = 'Membuka player...';
   String _error = '';
   String _subtitleStatus = 'Auto';
+  String _lastStreamUrl = '-';
+  String _lastStreamHost = '-';
+  String _lastStreamTail = '-';
+  String _lastCodecHint = '-';
+  String _lastQualityLabels = '-';
   String _activeQuality = 'Auto';
 
   int _controlCursor = 1;
@@ -187,6 +193,46 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     return selected.isNotEmpty ? selected : _safeAutoUrl(stream);
   }
 
+  void _setStreamDiagnostic(StreamInfo stream, String url) {
+    Uri? uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      uri = null;
+    }
+
+    final lower = url.toLowerCase();
+    final hint = lower.contains('h265') || lower.contains('hevc') || lower.contains('x265')
+        ? 'HEVC/H265'
+        : lower.contains('h264') || lower.contains('avc')
+            ? 'H264/AVC'
+            : lower.contains('.m3u8')
+                ? 'HLS unknown'
+                : lower.contains('.mp4')
+                    ? 'MP4 unknown'
+                    : 'unknown';
+
+    final qualityLabels = stream.qualities.isEmpty
+        ? 'none'
+        : stream.qualities
+            .map((q) {
+              final qLower = '${q.label} ${q.url}'.toLowerCase();
+              final unsafe = qLower.contains('h265') ||
+                  qLower.contains('hevc') ||
+                  qLower.contains('x265') ||
+                  qLower.contains('10bit') ||
+                  qLower.contains('10-bit');
+              return unsafe ? '${q.label}!' : q.label;
+            })
+            .join(',');
+
+    _lastStreamUrl = url;
+    _lastStreamHost = uri?.host.isNotEmpty == true ? uri!.host : '-';
+    _lastStreamTail = url.length <= 42 ? url : url.substring(url.length - 42);
+    _lastCodecHint = hint;
+    _lastQualityLabels = qualityLabels;
+  }
+
   Future<void> _load() async {
     final token = ++_loadToken;
     final item = _playableItem();
@@ -217,6 +263,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       // Saved/high quality can be re-applied manually from the Quality panel.
       final url = _safeUrlForQuality(stream, _activeQuality).trim();
       if (url.isEmpty) throw StateError('Stream kosong');
+      _setStreamDiagnostic(stream, url);
 
       setState(() {
         _status = 'Menyiapkan video...';
@@ -927,6 +974,58 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     );
   }
 
+  Widget _playerDiagnosticOverlay() {
+    if (!_showPlayerDiag) return const SizedBox.shrink();
+
+    final c = _controller;
+    final value = c?.value;
+    final size = value?.size;
+    final pos = value?.position.inMilliseconds ?? 0;
+    final dur = value?.duration.inMilliseconds ?? 0;
+    final aspect = value?.aspectRatio.toStringAsFixed(3) ?? '-';
+
+    final lines = <String>[
+      'LIVEGO PLAYER SAFE DIAG',
+      'mode=${_mode.name} loading=$_loading surface=$_surfaceReady closing=$_closing',
+      'q=$_activeQuality codec=$_lastCodecHint',
+      'host=$_lastStreamHost',
+      'tail=$_lastStreamTail',
+      'qualities=$_lastQualityLabels',
+      'ctrl=${c != null} init=${value?.isInitialized ?? false} play=${value?.isPlaying ?? false} buf=${value?.isBuffering ?? false} err=${value?.hasError ?? false}',
+      'size=${size == null ? '-' : '${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'} aspect=$aspect',
+      'pos=${pos}ms dur=${dur}ms',
+    ];
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Container(
+            margin: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 760),
+            decoration: BoxDecoration(
+              color: const Color(0xE6000000),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.75)),
+              boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 14)],
+            ),
+            child: Text(
+              lines.join('\n'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11.5,
+                height: 1.16,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _statusCenter({
     required String title,
     required String subtitle,
@@ -1012,6 +1111,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                 _videoSurface(),
                 if (!_surfaceReady)
                   const ColoredBox(color: Colors.black),
+                _playerDiagnosticOverlay(),
                 if (_loading || _error.isNotEmpty)
                   _statusCenter(
                     title: _error.isEmpty ? _status : 'Gagal membuka video',
