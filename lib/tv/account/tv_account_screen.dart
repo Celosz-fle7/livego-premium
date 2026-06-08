@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../screens/tv_settings_screen.dart';
 import '../layout/tv_safe_zone.dart';
 import '../screens/tv_source_manager_screen.dart';
+import 'tv_account_config.dart';
 import 'tv_account_menu_data.dart';
 import 'widgets/tv_account_header.dart';
 
@@ -34,20 +35,20 @@ class TvAccountScreen extends StatefulWidget {
 }
 
 class _TvAccountScreenState extends State<TvAccountScreen> {
-  static const int _backGuardMs = 420;
-  static const int _selectGuardMs = 300;
+  static const int _backGuardMs = TvAccountConfig.backGuardMs;
+  static const int _selectGuardMs = TvAccountConfig.selectGuardMs;
 
-  static const double _topPadding = TvSafeZone.accountTop;
-  static const double _horizontalPadding = TvSafeZone.accountSide;
-  static const double _bottomPadding = TvSafeZone.bottomReach;
-  static const double _headerHeight = 98;
-  static const double _afterHeader = 14;
-  static const double _rowHeight = 86;
-  static const double _rowGap = 10;
-  static const double _footerGap = 14;
-  static const double _footerHeight = 50;
-  static const double _comfortTop = TvSafeZone.listTop;
-  static const double _comfortBottom = TvSafeZone.listBottom;
+  static const double _topPadding = TvAccountConfig.topPadding;
+  static const double _horizontalPadding = TvAccountConfig.horizontalPadding;
+  static const double _bottomPadding = TvAccountConfig.bottomPadding;
+  static const double _headerHeight = TvAccountConfig.headerHeight;
+  static const double _afterHeader = TvAccountConfig.afterHeader;
+  static const double _rowHeight = TvAccountConfig.rowHeight;
+  static const double _rowGap = TvAccountConfig.rowGap;
+  static const double _footerGap = TvAccountConfig.footerGap;
+  static const double _footerHeight = TvAccountConfig.footerHeight;
+  static const double _comfortTop = TvAccountConfig.comfortTop;
+  static const double _comfortBottom = TvAccountConfig.comfortBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-account-root');
   final ScrollController _scrollController = ScrollController();
@@ -87,7 +88,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _rootNode.requestFocus();
       if (header) {
         setState(() => _zone = _AccountZone.header);
-        if (_items.length > 4) _jumpToTop();
+        if (_items.length > TvAccountConfig.visibleMenuWithoutScroll) _jumpToTop();
       } else {
         _jumpToCursor(_cursor);
       }
@@ -148,7 +149,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
     // Account only has four visible menu items. Keep the viewport steady like a
     // fixed TV menu; aggressive UP/DOWN should move the cursor, not pull scroll.
-    if (_items.length <= 4) return;
+    if (_items.length <= TvAccountConfig.visibleMenuWithoutScroll) return;
 
     final safe = index.clamp(0, _items.length - 1).toInt();
     final position = _scrollController.position;
@@ -173,7 +174,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _moveToHeader() {
     setState(() => _zone = _AccountZone.header);
-    if (_items.length > 4) _jumpToTop();
+    if (_items.length > TvAccountConfig.visibleMenuWithoutScroll) _jumpToTop();
   }
 
   void _moveToMenu({int? index}) {
@@ -221,7 +222,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
           content: Text(message),
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppTheme.surface2,
-          duration: const Duration(seconds: 2),
+          duration: TvAccountConfig.snackDuration,
         ),
       );
     _scheduleEntry(header: false);
@@ -236,10 +237,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _push(const TvSettingsScreen());
         break;
       case TvAccountAction.about:
-        _message('LiveGo Premium TV • data sinkron dengan mode HP');
+        _message(TvAccountConfig.aboutMessage);
         break;
       case TvAccountAction.update:
-        _message('Update mengikuti build GitHub Actions terbaru.');
+        _message(TvAccountConfig.updateMessage);
         break;
 
       // These actions are intentionally navbar-owned. They are not shown in the
@@ -342,7 +343,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         onKeyEvent: _handleKey,
         child: ListView(
           controller: _scrollController,
-          cacheExtent: 420,
+          cacheExtent: TvAccountConfig.cacheExtent,
           padding: const EdgeInsets.fromLTRB(_horizontalPadding, _topPadding, _horizontalPadding, _bottomPadding),
           children: [
             TvAccountHeader(
@@ -367,7 +368,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             SizedBox(
               height: _footerHeight,
               child: Text(
-                'Remote: Header ↓/→ masuk menu • Item ←/Back ke Navbar Akun',
+                TvAccountConfig.footerHelp,
                 style: TextStyle(
                   color: AppTheme.textSoft.withOpacity(0.72),
                   fontSize: 11,
