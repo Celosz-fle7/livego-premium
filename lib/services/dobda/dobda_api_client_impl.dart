@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
@@ -7,7 +5,7 @@ import '../../models/stream_info.dart';
 import '../api/api_env.dart';
 import '../api/api_platform.dart';
 import '../api/dobda_endpoints.dart';
-import '../api/dobda_hmac_signer.dart';
+import 'dobda_http_client.dart';
 
 class DobdaApiClientImpl {
   const DobdaApiClientImpl._();
@@ -121,7 +119,7 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await _getJson(DobdaEndpoints.banner, {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.banner, {
       'category_p': config.apiSlug,
       'lang': apiLang,
     });
@@ -156,7 +154,7 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await _getJson(DobdaEndpoints.home, {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.home, {
       'category_p': config.apiSlug,
       'lang': apiLang,
     });
@@ -170,7 +168,7 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await _getJson(DobdaEndpoints.discover, {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.discover, {
       'category_p': config.apiSlug,
       'lang': apiLang,
       'page': '$page',
@@ -191,7 +189,7 @@ class DobdaApiClientImpl {
     final apiLang = _providerLang(config.slug, lang);
 
     Future<List<ContentItem>> run(String param) async {
-      final json = await _getJson(DobdaEndpoints.search, {
+      final json = await DobdaHttpClient.getJson(DobdaEndpoints.search, {
         'category_p': config.apiSlug,
         param: clean,
         'lang': apiLang,
@@ -209,7 +207,7 @@ class DobdaApiClientImpl {
   static Future<ContentItem?> detail(ContentItem item) async {
     final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final apiLang = _providerLang(config.slug, item.lang);
-    final json = await _getJson(DobdaEndpoints.detail, {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
       'category_p': config.apiSlug,
       'id': item.id,
       'lang': apiLang,
@@ -233,7 +231,7 @@ class DobdaApiClientImpl {
     final cached = _episodeMemory[key];
     if (cached != null && cached.length > 1) return cached;
 
-    final json = await _getJson(DobdaEndpoints.detail, {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
       'category_p': config.apiSlug,
       'id': item.id,
       'lang': apiLang,
@@ -404,7 +402,7 @@ class DobdaApiClientImpl {
     Duration? timeout,
   }) async {
     try {
-      var future = _getJson(DobdaEndpoints.video, {
+      var future = DobdaHttpClient.getJson(DobdaEndpoints.video, {
         'category_p': config.apiSlug,
         'id': item.id,
         'chapterId': chapterId,
@@ -457,38 +455,6 @@ class DobdaApiClientImpl {
       return ms > 2500 ? 'slow' : 'online';
     } catch (_) {
       return 'offline';
-    }
-  }
-
-  static Future<Map<String, dynamic>> _getJson(String path, Map<String, String> query) async {
-    final uri = Uri.parse(baseUrl).replace(
-      path: path,
-      queryParameters: query.isEmpty ? null : query,
-    );
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(uri).timeout(ApiEnv.timeout);
-      final headers = DobdaHmacSigner.headers(
-        method: 'GET',
-        uri: uri,
-        secret: ApiEnv.dobdaSecret,
-      );
-      for (final entry in headers.entries) {
-        request.headers.set(entry.key, entry.value);
-      }
-
-      final response = await request.close().timeout(ApiEnv.timeout);
-      final body = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('DOBDA API ${response.statusCode} ${uri.path}: $body');
-      }
-      if (body.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'success': true, 'data': decoded};
-    } finally {
-      client.close(force: true);
     }
   }
 
