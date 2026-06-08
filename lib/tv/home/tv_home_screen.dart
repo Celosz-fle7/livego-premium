@@ -281,7 +281,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // Grid title/count removed so poster grid can sit closer
                     // to Kategori. This saves vertical TV space without touching
                     // data loading or focus movement.
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     if (home.loading && gridItems.isEmpty)
                       const TvProfessionalGridSkeleton(columns: 6, rows: 2)
                     else if (gridItems.isEmpty)

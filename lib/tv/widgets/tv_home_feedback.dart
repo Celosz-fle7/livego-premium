@@ -26,29 +26,40 @@ class TvHomeStatusLine extends StatelessWidget {
             : 'Konten dari cache.');
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Icon(
-            hasError ? Icons.wifi_off_rounded : Icons.sync_rounded,
-            size: 15,
-            color: hasError ? Colors.orangeAccent.withOpacity(0.86) : TvFocusStyle.focusBlue.withOpacity(0.72),
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: (hasError ? Colors.orangeAccent : TvFocusStyle.focusBlue).withOpacity(0.075),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: (hasError ? Colors.orangeAccent : TvFocusStyle.focusBlue).withOpacity(0.18),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white60,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                decoration: TextDecoration.none,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              hasError ? Icons.wifi_off_rounded : Icons.sync_rounded,
+              size: 14,
+              color: hasError ? Colors.orangeAccent.withOpacity(0.90) : TvFocusStyle.focusBlue.withOpacity(0.78),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11.6,
+                  fontWeight: FontWeight.w800,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -70,12 +81,12 @@ class TvHomeEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: Container(
-        height: 238,
+        height: 198,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: focused ? AppTheme.surface3.withOpacity(0.88) : AppTheme.surface2.withOpacity(0.72),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2 : 1),
+          color: focused ? AppTheme.surface3.withOpacity(0.82) : AppTheme.surface2.withOpacity(0.58),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: focused ? TvFocusStyle.focusBlue : AppTheme.border, width: focused ? 2.2 : 1),
           boxShadow: focused ? [TvFocusStyle.glow(0.08, 8)] : null,
         ),
         child: Column(
@@ -84,24 +95,24 @@ class TvHomeEmptyState extends StatelessWidget {
             Icon(
               hasError ? Icons.cloud_off_rounded : Icons.movie_filter_rounded,
               color: focused ? Colors.white70 : Colors.white30,
-              size: 46,
+              size: 40,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               hasError ? 'Konten belum bisa dimuat / offline' : 'Belum ada konten di kategori ini',
               style: const TextStyle(
                 color: Colors.white70,
-                fontSize: 15,
+                fontSize: 14.2,
                 fontWeight: FontWeight.w900,
                 decoration: TextDecoration.none,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               hasError ? retryHint : 'OK refresh • LEFT ke menu • UP ke kategori',
               style: const TextStyle(
                 color: Colors.white38,
-                fontSize: 12.5,
+                fontSize: 11.8,
                 fontWeight: FontWeight.w700,
                 decoration: TextDecoration.none,
               ),
