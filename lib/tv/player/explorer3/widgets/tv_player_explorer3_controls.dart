@@ -61,15 +61,15 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.34)),
+        color: AppTheme.bgDeep.withOpacity(0.86),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.whiteGlow.withOpacity(0.24)),
         boxShadow: const [
-          BoxShadow(color: Colors.black54, blurRadius: 18),
+          BoxShadow(color: Colors.black87, blurRadius: 16),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
+        padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -82,37 +82,37 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 16.4,
                       fontWeight: FontWeight.w900,
                       decoration: TextDecoration.none,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Text(
                   _episodeLabel(),
                   style: const TextStyle(
                     color: AppTheme.cyan,
-                    fontSize: 13,
+                    fontSize: 11.8,
                     fontWeight: FontWeight.w900,
                     decoration: TextDecoration.none,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Text(
                   _fmt(value.position),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 12.6,
                     fontWeight: FontWeight.w900,
                     decoration: TextDecoration.none,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 10),
                 Expanded(
                   child: VideoProgressIndicator(
                     controller,
@@ -124,19 +124,19 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 10),
                 Text(
                   _fmt(value.duration),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 12.6,
                     fontWeight: FontWeight.w900,
                     decoration: TextDecoration.none,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 for (var i = 0; i < _items.length; i++) ...[
@@ -155,20 +155,20 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
                       selected: i == safeSelected,
                     ),
                   ),
-                  if (i < _items.length - 1) const SizedBox(width: 8),
+                  if (i < _items.length - 1) const SizedBox(width: 6),
                 ],
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 9),
             Text(
               status.trim().isEmpty
-                  ? '←/→ pilih kontrol • OK aktifkan • DOWN episode • UP/MENU opsi • BACK sembunyi/keluar'
-                  : '$status  •  ←/→ pilih kontrol • OK aktifkan • DOWN episode • BACK sembunyi/keluar',
+                  ? '←/→ kontrol • OK pilih • DOWN episode • UP opsi • BACK sembunyi'
+                  : '$status  •  ←/→ kontrol • OK pilih • DOWN episode • BACK sembunyi',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppTheme.textSoft,
-                fontSize: 12,
+                fontSize: 10.8,
                 fontWeight: FontWeight.w800,
                 decoration: TextDecoration.none,
               ),
@@ -179,6 +179,7 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
     );
   }
 }
+
 
 class TvPlayerExplorer3InfoOverlay extends StatelessWidget {
   final String title;
@@ -209,28 +210,28 @@ class TvPlayerExplorer3InfoOverlay extends StatelessWidget {
     final total = totalEpisodes <= 1 || totalEpisodes >= 999 ? '' : ' / $totalEpisodes';
     return IgnorePointer(
       child: Positioned(
-        left: 48,
-        right: 48,
+        left: 42,
+        right: 42,
         top: 0,
         child: SafeArea(
           top: true,
           child: Padding(
-            padding: const EdgeInsets.only(top: 28),
+            padding: const EdgeInsets.only(top: 22),
             child: Row(
               children: [
-                const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 26),
-                const SizedBox(width: 14),
+                const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 22),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                      const SizedBox(height: 4),
+                      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                      const SizedBox(height: 3),
                       Text(
                         'EP $episode$total • $_speedText() • $quality • Sub: $subtitle • Next: ${autoNext ? 'Auto' : 'Manual'} • ${muted ? 'Mute' : 'Audio Source'}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppTheme.textSoft, fontSize: 12.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                        style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.4, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                       ),
                     ],
                   ),
@@ -243,6 +244,7 @@ class TvPlayerExplorer3InfoOverlay extends StatelessWidget {
     );
   }
 }
+
 
 class TvPlayerExplorer3EpisodePanel extends StatelessWidget {
   final int selected;
@@ -265,7 +267,7 @@ class TvPlayerExplorer3EpisodePanel extends StatelessWidget {
     final rows = [for (var ep = fixedStart; ep <= end; ep++) ep];
 
     return _PanelShell(
-      width: 390,
+      width: 360,
       title: 'Episode',
       subtitle: 'UP/DOWN pilih • OK buka • BACK kembali',
       child: Column(
@@ -303,7 +305,7 @@ class TvPlayerExplorer3ChoicePanel extends StatelessWidget {
     final safeCursor = cursor.clamp(0, rows.length - 1).toInt();
 
     return _PanelShell(
-      width: 330,
+      width: 310,
       title: title,
       subtitle: subtitle,
       child: Column(
@@ -354,9 +356,9 @@ class TvPlayerExplorer3OptionsPanel extends StatelessWidget {
     final safeCursor = cursor.clamp(0, rows.length - 1).toInt();
 
     return _PanelShell(
-      width: 330,
+      width: 310,
       title: 'Options',
-      subtitle: 'UP/DOWN pilih • LEFT/RIGHT/OK ubah • BACK kembali',
+      subtitle: 'UP/DOWN pilih • LEFT/RIGHT/OK ubah • BACK',
       child: Column(
         children: [
           for (var i = 0; i < rows.length; i++)
@@ -389,13 +391,13 @@ class _PanelShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.cyan.withOpacity(0.38)),
+        color: AppTheme.bgDeep.withOpacity(0.90),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.whiteGlow.withOpacity(0.24)),
         boxShadow: const [
-          BoxShadow(color: Colors.black87, blurRadius: 24),
+          BoxShadow(color: Colors.black87, blurRadius: 20),
         ],
       ),
       child: Column(
@@ -403,20 +405,21 @@ class _PanelShell extends StatelessWidget {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17.4, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+            child: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10.8, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 11),
           child,
         ],
       ),
     );
   }
 }
+
 
 class _ChoiceRow extends StatelessWidget {
   final String label;
@@ -435,15 +438,15 @@ class _ChoiceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 80),
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
         gradient: focused ? AppTheme.activeGradient : null,
-        color: focused ? null : (selected ? AppTheme.surface3.withOpacity(0.92) : Colors.white.withOpacity(0.045)),
-        borderRadius: BorderRadius.circular(14),
+        color: focused ? null : (selected ? AppTheme.surface3.withOpacity(0.86) : Colors.white.withOpacity(0.040)),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: focused ? AppTheme.whiteGlow : (selected ? AppTheme.cyan.withOpacity(0.55) : Colors.white12),
-          width: focused ? 2 : 1,
+          color: focused ? AppTheme.whiteGlow : (selected ? AppTheme.cyan.withOpacity(0.50) : Colors.white12),
+          width: focused ? 1.8 : 1,
         ),
       ),
       child: Row(
@@ -455,6 +458,7 @@ class _ChoiceRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: focused ? Colors.white : Colors.white70,
+                fontSize: 12.6,
                 fontWeight: FontWeight.w900,
                 decoration: TextDecoration.none,
               ),
@@ -467,6 +471,7 @@ class _ChoiceRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: focused ? Colors.white : AppTheme.cyan,
+                fontSize: 12.0,
                 fontWeight: FontWeight.w900,
                 decoration: TextDecoration.none,
               ),
@@ -476,6 +481,7 @@ class _ChoiceRow extends StatelessWidget {
     );
   }
 }
+
 
 class _DockButton extends StatelessWidget {
   final _Explorer3ControlItem item;
@@ -490,30 +496,30 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 80),
-      height: 54,
+      height: 48,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         gradient: selected ? AppTheme.activeGradient : null,
-        color: selected ? null : AppTheme.surface2.withOpacity(0.86),
-        borderRadius: BorderRadius.circular(16),
+        color: selected ? null : AppTheme.surface2.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: selected ? AppTheme.whiteGlow : AppTheme.border,
-          width: selected ? 2 : 1,
+          color: selected ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.72),
+          width: selected ? 1.8 : 1,
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(item.icon, color: Colors.white, size: 20),
-          const SizedBox(height: 3),
+          Icon(item.icon, color: Colors.white, size: 18),
+          const SizedBox(height: 2),
           Text(
             item.label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: selected ? Colors.white : AppTheme.textSoft,
-              fontSize: 10.5,
+              fontSize: 9.8,
               fontWeight: FontWeight.w900,
               decoration: TextDecoration.none,
             ),
@@ -523,6 +529,7 @@ class _DockButton extends StatelessWidget {
     );
   }
 }
+
 
 class _Explorer3ControlItem {
   final IconData icon;
