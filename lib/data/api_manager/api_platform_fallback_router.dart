@@ -58,6 +58,7 @@ class ApiPlatformFallbackRouter {
   }
 
   static String _normalize(String value) {
-    return value.trim().toLowerCase();
+    final clean = value.trim().toLowerCase();
+    return clean.isEmpty ? 'dobda_freereels' : clean;
   }
 }
