@@ -194,14 +194,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _anchorGridRow({required int targetIndex, required int previousIndex}) {
     // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 224 and default mainAxisSpacing: 16, so
-    // the vertical row stride is stable: 240px. Unlike the v1 test, this uses
+    // TvPosterGrid uses mainAxisExtent: 182 and mainAxisSpacing: 12, so
+    // the vertical row stride is stable: 194px. Unlike the v1 test, this uses
     // actual row delta from index math and clamps aggressive repeat movement
     // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
     // post-frame ensureVisible.
     if (!_scroll.hasClients || _gridColumns <= 0) return;
 
-    const rowStride = 240.0;
+    const rowStride = 194.0;
     final previousRow = previousIndex ~/ _gridColumns;
     final targetRow = targetIndex ~/ _gridColumns;
     final deltaRows = targetRow - previousRow;
@@ -222,6 +222,17 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     if ((target - position.pixels).abs() < 1) return;
     position.jumpTo(target);
+  }
+
+  void _focusGridAfterRowScroll(int target, int previous, {double anchorAlignment = 0.58}) {
+    final safeTarget = _safe(target, _gridNodes.length);
+    if (_focusGrid(safeTarget, anchorRow: true, anchorAlignment: anchorAlignment)) return;
+
+    _anchorGridRow(targetIndex: safeTarget, previousIndex: previous);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusGrid(safeTarget, throttle: false, anchorRow: false);
+    });
   }
 
   bool _focusRows({bool preferMyList = false}) {
@@ -305,9 +316,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     switch (_zone) {
       case TvZone.grid:
         if (_focusGrid(_gridIndex, throttle: throttle)) return;
-        if (_focusRows(preferMyList: true)) return;
-        if (_focusCategory(_categoryIndex, throttle: throttle)) return;
-        break;
+        _pinPlayerReturnFocus(
+          zone: TvZone.grid,
+          platformIndex: _platformIndex,
+          categoryIndex: _categoryIndex,
+          gridIndex: _gridIndex,
+        );
+        return;
       case TvZone.category:
         if (_focusCategory(_categoryIndex, throttle: throttle)) return;
         break;
@@ -334,6 +349,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }) {
     if (!mounted) return;
 
+    _focusEntryToken++;
     _zone = zone;
     _platformIndex = platformIndex;
     _categoryIndex = categoryIndex;
@@ -346,13 +362,48 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           gridIndex: gridIndex,
         );
 
-    if (zone == TvZone.grid && _gridNodes.isNotEmpty) {
-      final safeGrid = _safe(gridIndex, _gridNodes.length);
-      _gridIndex = safeGrid;
-      if (_focusGrid(safeGrid, throttle: false)) return;
+    if (zone != TvZone.grid) {
+      _restoreZoneFocus(throttle: false);
+      return;
+    }
 
-      if (attempt < 5) {
+    if (_gridNodes.isEmpty) {
+      if (attempt < 14) {
+        Future<void>.delayed(const Duration(milliseconds: 70), () {
+          _pinPlayerReturnFocus(
+            zone: zone,
+            platformIndex: platformIndex,
+            categoryIndex: categoryIndex,
+            gridIndex: gridIndex,
+            attempt: attempt + 1,
+          );
+        });
+      }
+      return;
+    }
+
+    final safeGrid = _safe(gridIndex, _gridNodes.length);
+    _gridIndex = safeGrid;
+
+    if (_scroll.hasClients) {
+      final position = _scroll.position;
+      final nodeAttached = _gridNodes[safeGrid].context != null;
+      if (!nodeAttached || attempt == 0) {
+        final target = position.maxScrollExtent;
+        if ((target - position.pixels).abs() > 1) {
+          try {
+            position.jumpTo(target);
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (_focusGrid(safeGrid, throttle: false)) return;
+
+    if (attempt < 14) {
+      Future<void>.delayed(const Duration(milliseconds: 70), () {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           _pinPlayerReturnFocus(
             zone: zone,
             platformIndex: platformIndex,
@@ -361,27 +412,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
             attempt: attempt + 1,
           );
         });
-        return;
-      }
-
-      _rememberFocus(TvZone.grid, safeGrid);
-      return;
-    }
-
-    if (attempt < 3) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pinPlayerReturnFocus(
-          zone: zone,
-          platformIndex: platformIndex,
-          categoryIndex: categoryIndex,
-          gridIndex: gridIndex,
-          attempt: attempt + 1,
-        );
       });
       return;
     }
 
-    _restoreZoneFocus(throttle: false);
+    _rememberFocus(TvZone.grid, safeGrid);
   }
 
   void _moveToNav() {
@@ -473,6 +508,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (platforms.isEmpty) return;
     final target = _safe(index, platforms.length);
     final selectedPlatform = platforms[target];
+    if (target == _platformIndex) {
+      if (!_focusCategory(_categoryIndex, throttle: false)) {
+        _focusGrid(_gridIndex, throttle: false);
+      }
+      return;
+    }
     final categories = LiveGoCatalog.categoriesFor(selectedPlatform);
     final rememberedCategory = LiveGoSettings.tvLastHomeCategories[selectedPlatform] ?? 0;
     setState(() {
@@ -491,6 +532,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final categories = _categories;
     if (categories.isEmpty) return;
     final target = _safe(index, categories.length);
+    if (target == _categoryIndex) {
+      if (!_focusGrid(_gridIndex, throttle: false)) {
+        _focusEmpty(throttle: false);
+      }
+      return;
+    }
     setState(() {
       _categoryIndex = target;
       _gridIndex = 0;
@@ -654,7 +701,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           if (!_focusCategory(_categoryIndex)) _focusPlatform(_platformIndex);
         }
       } else {
-        _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
+        _focusGridAfterRowScroll(current - _gridColumns, current, anchorAlignment: 0.42);
       }
       return KeyEventResult.handled;
     }
@@ -664,7 +711,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         final target = (nextRowStart + col)
             .clamp(nextRowStart, _gridNodes.length - 1)
             .toInt();
-        _focusGrid(target, anchorRow: true, anchorAlignment: 0.58);
+        _focusGridAfterRowScroll(target, current, anchorAlignment: 0.58);
       }
       return KeyEventResult.handled;
     }

@@ -51,10 +51,10 @@ class TvPosterTile extends StatelessWidget {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(11),
                       border: Border.all(
                         color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.34),
-                        width: focused ? 2.4 : 0.6,
+                        width: focused ? 2.0 : 0.5,
                       ),
                     ),
                     child: ClipRRect(
@@ -78,16 +78,16 @@ class TvPosterTile extends StatelessWidget {
                                   tv: true,
                                 ),
                           if (focused) ...[
-                            Positioned(top: 7, left: 7, child: _TvPosterBadge(text: '${item.episodes} Ep')),
-                            if (item.updated) const Positioned(top: 7, right: 7, child: _TvPosterBadge(text: 'UPDATE')),
-                            Positioned(right: 7, bottom: 10, child: _TvPosterBadge(text: item.rating.toStringAsFixed(1))),
+                            Positioned(top: 5, left: 5, child: _TvPosterBadge(text: '${item.episodes} Ep')),
+                            if (item.updated) const Positioned(top: 5, right: 5, child: _TvPosterBadge(text: 'UPDATE')),
+                            Positioned(right: 5, bottom: 7, child: _TvPosterBadge(text: item.rating.toStringAsFixed(1))),
                           ],
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 5),
                 Text(
                   item.title,
                   maxLines: 2,
@@ -95,9 +95,9 @@ class TvPosterTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11.8,
+                    fontSize: 10.4,
                     fontWeight: FontWeight.w900,
-                    height: 1.06,
+                    height: 1.02,
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -117,7 +117,7 @@ class _TvPosterBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: AppTheme.bgDeep.withOpacity(0.82),
         borderRadius: BorderRadius.circular(999),
@@ -127,7 +127,7 @@ class _TvPosterBadge extends StatelessWidget {
         text,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 8.2,
+          fontSize: 7.4,
           fontWeight: FontWeight.w900,
           decoration: TextDecoration.none,
         ),
