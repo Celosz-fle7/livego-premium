@@ -103,6 +103,25 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _loadHome(clearPrevious: true);
   }
 
+  void _enterHomeBrowseMode({TvZone? zone}) {
+    if (!mounted) return;
+    final targetZone = zone ?? _zone;
+    if (_homeBrowseMode && _zone == targetZone) return;
+    setState(() {
+      _homeBrowseMode = true;
+      _zone = targetZone;
+    });
+  }
+
+  void _enterHomeTopMode() {
+    if (!mounted) return;
+    if (!_homeBrowseMode && _zone == TvZone.banner) return;
+    setState(() {
+      _homeBrowseMode = false;
+      _zone = TvZone.banner;
+    });
+  }
+
   void _loadHome({bool clearPrevious = false}) {
     final platform = _platformSlug;
     final category = _categoryLabel;
@@ -437,29 +456,23 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _scrollHomeToGridEntry() {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;
-    final target = TvSafeZone.homeGridEntryOffset
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
+    final target = _homeBrowseMode
+        ? position.minScrollExtent
+        : TvSafeZone.homeGridEntryOffset
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
     if ((position.pixels - target).abs() < 1) return;
-    unawaited(_scroll.animateTo(
-      target,
-      duration: const Duration(milliseconds: 130),
-      curve: Curves.easeOutCubic,
-    ));
+    position.jumpTo(target);
   }
 
   void _snapHomeToStickySourceHeader() {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;
-    final target = TvSafeZone.homeGridEntryOffset
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
-
-    // Exact lock for Grid row 0 -> Category/Platform.
-    // The previous one-direction correction allowed a small banner peek on some
-    // TV viewports because the scroll position could stop just above the sticky
-    // source header boundary. Keep the source header pinned and hide Banner until
-    // the user explicitly presses UP from Platform.
+    final target = _homeBrowseMode
+        ? position.minScrollExtent
+        : TvSafeZone.homeGridEntryOffset
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
     if ((position.pixels - target).abs() < 1) return;
     position.jumpTo(target);
   }
@@ -479,26 +492,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusGridEntryFromBanner() {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(_gridIndex, _gridNodes.length);
-    final node = _gridNodes[target];
-
-    _scrollHomeToGridEntry();
-
-    final ok = _requestGridNode(node);
-    if (ok) {
-      _gridIndex = target;
-      _rememberFocus(TvZone.grid, target);
-      _lockStickySourceHeaderAfterFocus();
-      return true;
-    }
+    _cancelHomeSelectionCommit();
+    _enterHomeBrowseMode(zone: TvZone.grid);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _scrollHomeToGridEntry();
       final retryNode = _gridNodes.isEmpty ? null : _gridNodes[_safe(target, _gridNodes.length)];
       if (retryNode == null) return;
       if (_requestGridNode(retryNode)) {
         _gridIndex = target;
         _rememberFocus(TvZone.grid, target);
-        _lockStickySourceHeaderAfterFocus();
+      } else {
+        _scheduleFocusEntry(preferBanner: false);
       }
     });
 
@@ -507,9 +513,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   void _returnFromGridToBanner() {
     _cancelHomeSelectionCommit();
-    if (_zone != TvZone.banner) {
-      setState(() => _zone = TvZone.banner);
-    }
+    _enterHomeTopMode();
     _scrollHomeToTop();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -721,7 +725,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusBanner();
+      _returnFromGridToBanner();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -762,6 +766,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
+      _enterHomeBrowseMode(zone: TvZone.category);
       if (!_focusRows()) {
         if (!_focusGrid(_gridIndex)) _focusEmpty();
       }

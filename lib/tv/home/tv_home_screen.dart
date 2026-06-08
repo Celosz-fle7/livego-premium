@@ -84,6 +84,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _categoryIndex = 0;
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
+  bool _homeBrowseMode = false;
   bool _openingDetail = false;
   int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
@@ -164,11 +165,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   }
 
   double _homeGridTopPadding() {
-    // Banner mode should keep the first Home look compact. Once focus enters
-    // Platform/Kategori/Grid, reserve a small safe zone so the first grid row
-    // does not hide under the pinned source header.
-    if (_zone == TvZone.banner || _bannerNode.hasFocus) return 0;
-    return TvSafeZone.homeGridUnderStickyTopPadding;
+    // HOME_TOP renders Banner + source header, so grid remains compact.
+    // HOME_BROWSE removes Banner from the sliver tree and gives the first
+    // grid row a small safe zone below Platform/Kategori.
+    return _homeBrowseMode ? TvSafeZone.homeGridUnderStickyTopPadding : 0;
   }
 
   @override
@@ -223,32 +223,33 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             controller: _scroll,
             cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate.fixed([
-                    TvHeroBannerFocus(
-                      item: home.hero,
-                      focusNode: _bannerNode,
-                      onFocus: () => this._rememberFocus(TvZone.banner, 0),
-                      onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
-                      onKey: (node, event) => this._bannerKey(home.hero, event),
-                    ),
-                    if (home.refreshing || home.hasError || home.fromCache)
-                      TvHomeStatusLine(
-                        refreshing: home.refreshing,
-                        hasError: home.hasError,
-                        fromCache: home.fromCache,
+              if (!_homeBrowseMode)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate.fixed([
+                      TvHeroBannerFocus(
+                        item: home.hero,
+                        focusNode: _bannerNode,
+                        onFocus: () => this._rememberFocus(TvZone.banner, 0),
+                        onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
+                        onKey: (node, event) => this._bannerKey(home.hero, event),
                       ),
-                    TvOfflineBanner(
-                      visible: home.offline || (home.hasError && home.fromCache),
-                      fromCache: home.fromCache,
-                      refreshing: home.refreshing,
-                    ),
-                    const SizedBox(height: 8),
-                  ]),
+                      if (home.refreshing || home.hasError || home.fromCache)
+                        TvHomeStatusLine(
+                          refreshing: home.refreshing,
+                          hasError: home.hasError,
+                          fromCache: home.fromCache,
+                        ),
+                      TvOfflineBanner(
+                        visible: home.offline || (home.hasError && home.fromCache),
+                        fromCache: home.fromCache,
+                        refreshing: home.refreshing,
+                      ),
+                      const SizedBox(height: 8),
+                    ]),
+                  ),
                 ),
-              ),
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _HomeStickySourceHeaderDelegate(
