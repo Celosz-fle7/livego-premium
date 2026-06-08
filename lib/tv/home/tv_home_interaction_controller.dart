@@ -602,8 +602,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      final next = current + _gridColumns;
-      if (next < _gridNodes.length) _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
+      final nextRowStart = (row + 1) * _gridColumns;
+      if (nextRowStart < _gridNodes.length) {
+        final target = (nextRowStart + col)
+            .clamp(nextRowStart, _gridNodes.length - 1)
+            .toInt();
+        _focusGrid(target, anchorRow: true, anchorAlignment: 0.58);
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
