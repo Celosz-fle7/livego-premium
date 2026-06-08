@@ -163,6 +163,14 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     super.dispose();
   }
 
+  double _homeGridTopPadding() {
+    // Banner mode should keep the first Home look compact. Once focus enters
+    // Platform/Kategori/Grid, reserve a small safe zone so the first grid row
+    // does not hide under the pinned source header.
+    if (_zone == TvZone.banner || _bannerNode.hasFocus) return 0;
+    return TvSafeZone.homeGridUnderStickyTopPadding;
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<TvNavigationState>(tvNavigationProvider, (previous, next) {
