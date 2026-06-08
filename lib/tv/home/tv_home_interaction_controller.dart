@@ -394,7 +394,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
               categoryIndex: returnCategory,
               gridIndex: returnGrid,
             );
-        _scheduleFocusEntry(preferBanner: returnZone == TvZone.banner);
+
+        // Returning from Player must go back to the exact poster/grid cell that
+        // opened it. _scheduleFocusEntry only runs when Home has no focus; on
+        // real TV boxes a stale category/platform focus can remain attached and
+        // skip the restore. Force the saved zone/index once after the route pop.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _zone = returnZone;
+          _platformIndex = returnPlatform;
+          _categoryIndex = returnCategory;
+          _gridIndex = returnGrid;
+          _restoreZoneFocus(throttle: false);
+        });
       }
     });
   }
