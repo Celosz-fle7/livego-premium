@@ -445,9 +445,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         .clamp(position.minScrollExtent, position.maxScrollExtent)
         .toDouble();
 
-    // Only correct upward drift. When the user is deep in the grid, keep the
-    // current scroll position stable and do not pull the screen down.
-    if (position.pixels + 1 >= target) return;
+    // Exact lock for Grid row 0 -> Category/Platform.
+    // The previous one-direction correction allowed a small banner peek on some
+    // TV viewports because the scroll position could stop just above the sticky
+    // source header boundary. Keep the source header pinned and hide Banner until
+    // the user explicitly presses UP from Platform.
+    if ((position.pixels - target).abs() < 1) return;
     position.jumpTo(target);
   }
 
