@@ -6,6 +6,7 @@ import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
 import '../layout/tv_safe_zone.dart';
+import 'tv_settings_config.dart';
 
 part 'tv_settings_models.dart';
 part 'tv_settings_widgets.dart';
@@ -27,21 +28,21 @@ class TvSettingsScreen extends StatefulWidget {
 }
 
 class _TvSettingsScreenState extends State<TvSettingsScreen> {
-  static const double _topPadding = TvSafeZone.settingsTop;
-  static const double _horizontalPadding = TvSafeZone.settingsSide;
-  static const double _bottomPadding = TvSafeZone.bottomReach;
-  static const double _headerHeight = 96;
-  static const double _pillsHeight = 42;
-  static const double _sectionTitleHeight = 31;
-  static const double _sectionGap = 16;
-  static const double _cardVerticalPadding = 6;
-  static const double _descriptionHeight = 48;
-  static const double _radioRowHeight = 55;
-  static const double _tileRowHeight = 82;
-  static const double _gridRowHeight = 122;
-  static const double _footerHeight = 48;
-  static const double _comfortTop = TvSafeZone.listTop;
-  static const double _comfortBottom = TvSafeZone.listBottom;
+  static const double _topPadding = TvSettingsConfig.topPadding;
+  static const double _horizontalPadding = TvSettingsConfig.horizontalPadding;
+  static const double _bottomPadding = TvSettingsConfig.bottomPadding;
+  static const double _headerHeight = TvSettingsConfig.headerHeight;
+  static const double _pillsHeight = TvSettingsConfig.pillsHeight;
+  static const double _sectionTitleHeight = TvSettingsConfig.sectionTitleHeight;
+  static const double _sectionGap = TvSettingsConfig.sectionGap;
+  static const double _cardVerticalPadding = TvSettingsConfig.cardVerticalPadding;
+  static const double _descriptionHeight = TvSettingsConfig.descriptionHeight;
+  static const double _radioRowHeight = TvSettingsConfig.radioRowHeight;
+  static const double _tileRowHeight = TvSettingsConfig.tileRowHeight;
+  static const double _gridRowHeight = TvSettingsConfig.gridRowHeight;
+  static const double _footerHeight = TvSettingsConfig.footerHeight;
+  static const double _comfortTop = TvSettingsConfig.comfortTop;
+  static const double _comfortBottom = TvSettingsConfig.comfortBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-settings-root');
   final ScrollController _scrollController = ScrollController();
@@ -156,7 +157,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   bool _ignoreRepeatedBack() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < 420) return true;
+    if (now - _lastBackHandledMs < TvSettingsConfig.backGuardMs) return true;
     _lastBackHandledMs = now;
     return false;
   }
@@ -215,11 +216,11 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   double _cursorOffset(int cursor) {
     final sections = _sections;
-    var offset = _topPadding + _headerHeight + 12 + _pillsHeight + 14;
+    var offset = _topPadding + _headerHeight + TvSettingsConfig.headerToPillsGap + _pillsHeight + TvSettingsConfig.pillsToSectionsGap;
     var rowIndex = 0;
 
     for (final section in sections) {
-      offset += _sectionTitleHeight + 10;
+      offset += _sectionTitleHeight + TvSettingsConfig.sectionTitleGap;
       offset += _cardVerticalPadding;
       if (section.description != null) offset += _descriptionHeight;
 
@@ -301,7 +302,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   String _nextDrm(int delta) {
-    const values = ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'];
+    const values = TvSettingsConfig.drmValues;
     final current = values.indexOf(LiveGoSettings.drmMode);
     final base = current < 0 ? 0 : current;
     final next = (base + delta) % values.length;
@@ -346,7 +347,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         case _SettingKind.reset:
           LiveGoSettings.reset();
           LiveGoSettings.layoutMode = 'TV';
-          LiveGoSettings.setTvHomeGrid(6);
+          LiveGoSettings.setTvHomeGrid(TvSettingsConfig.resetTvGrid);
           break;
       }
     });
@@ -461,7 +462,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       }
       sectionWidgets.addAll([
         SizedBox(height: _sectionTitleHeight, child: _SectionTitle(section.title)),
-        const SizedBox(height: 10),
+        const SizedBox(height: TvSettingsConfig.sectionTitleGap),
         _SettingsCard(description: section.description, children: rows),
         const SizedBox(height: _sectionGap),
       ]);
@@ -484,7 +485,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             child: ListView(
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(_horizontalPadding, _topPadding, _horizontalPadding, _bottomPadding),
-              cacheExtent: 420,
+              cacheExtent: TvSettingsConfig.cacheExtent,
               children: [
                 _Header(
                   height: _headerHeight,
@@ -492,25 +493,25 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
                   focused: _zone == TvZone.nav,
                   onTap: _handleBack,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: TvSettingsConfig.headerToPillsGap),
                 const SizedBox(
                   height: _pillsHeight,
                   child: Row(
                     children: [
                       _HeaderPill('Display'),
-                      SizedBox(width: 10),
+                      SizedBox(width: TvSettingsConfig.pillGap),
                       _HeaderPill('Source'),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: TvSettingsConfig.pillsToSectionsGap),
                 ...sectionWidgets,
                 SizedBox(
                   height: _footerHeight,
                   child: Text(
                     _zone == TvZone.settings
-                        ? 'Remote: ↑↓ pilih item • OK/→ ubah nilai • ←/Back kembali'
-                        : 'Remote: ↓/→ masuk pengaturan • ←/Back kembali',
+                        ? TvSettingsConfig.footerSettingsHelp
+                        : TvSettingsConfig.footerNavHelp,
                     style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
                   ),
                 ),
