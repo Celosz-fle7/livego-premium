@@ -240,6 +240,48 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
+
+    // Text edit/IME mode owns LEFT/RIGHT/UP/DOWN while the keyboard is active.
+    // Without this guard, LEFT can leak to the TV navbar and make Search feel
+    // like it exits the keyboard unexpectedly.
+    if (_editingInput || _textNode.hasFocus) {
+      if (tvIsBackKey(key)) {
+        _exitTextEdit(refocusBox: true);
+        return KeyEventResult.handled;
+      }
+
+      if (key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.numpadEnter ||
+          key == LogicalKeyboardKey.select) {
+        _exitTextEdit(refocusBox: true);
+        if (!ref.read(tvSearchProvider).loading) {
+          _submitSearch(_controller.text);
+        }
+        return KeyEventResult.handled;
+      }
+
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _exitTextEdit(refocusBox: false);
+        final search = ref.read(tvSearchProvider);
+        if (search.loading) {
+          _focusInput(throttle: false);
+        } else if (_resultNodes.isNotEmpty) {
+          _focusGrid(_gridIndex);
+        } else {
+          _focusEmpty();
+        }
+        return KeyEventResult.handled;
+      }
+
+      if (key == LogicalKeyboardKey.arrowLeft ||
+          key == LogicalKeyboardKey.arrowRight ||
+          key == LogicalKeyboardKey.arrowUp) {
+        return KeyEventResult.handled;
+      }
+
+      return KeyEventResult.ignored;
+    }
+
     if (tvIsBackKey(key)) {
       _handleBack();
       return KeyEventResult.handled;
@@ -259,12 +301,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       }
       return KeyEventResult.handled;
     }
-    if (tvIsSelectKey(key) || key == LogicalKeyboardKey.arrowRight) {
-      if (!_editingInput) {
-        _enterTextEdit();
-      } else if (!ref.read(tvSearchProvider).loading) {
-        _submitSearch(_controller.text);
-      }
+    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
+      _enterTextEdit();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
