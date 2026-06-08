@@ -89,6 +89,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _lastEmptyFocusMs = 0;
   int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
+  String _loadedPlatformSlug = '';
+  String _loadedCategoryLabel = '';
+  Timer? _homeSelectionCommitTimer;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
@@ -147,6 +150,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   @override
   void dispose() {
+    _homeSelectionCommitTimer?.cancel();
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
     _bannerNode.dispose();

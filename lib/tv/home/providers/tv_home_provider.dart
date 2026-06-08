@@ -46,13 +46,6 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       state = state.copyWith(refreshing: true, hasError: false, offline: false);
     }
 
-    final online = await _repository.isOnline();
-    if (!_active(token)) return;
-    if (!online) {
-      _showOffline();
-      return;
-    }
-
     try {
       final cached = await _repository.loadCached(platform, selectedCategory);
       if (!_active(token)) return;
@@ -64,6 +57,13 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       }
     } catch (error) {
       debugPrint('TV HOME CACHE LOAD ERROR: $error');
+    }
+
+    final online = await _repository.isOnline();
+    if (!_active(token)) return;
+    if (!online) {
+      _showOffline();
+      return;
     }
 
     try {

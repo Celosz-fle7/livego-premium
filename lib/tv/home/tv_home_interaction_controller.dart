@@ -104,11 +104,54 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _loadHome({bool clearPrevious = false}) {
+    final platform = _platformSlug;
+    final category = _categoryLabel;
+    _loadedPlatformSlug = platform;
+    _loadedCategoryLabel = category;
     ref.read(tvHomeContentProvider.notifier).load(
-          platform: _platformSlug,
-          selectedCategory: _categoryLabel,
+          platform: platform,
+          selectedCategory: category,
           clearPrevious: clearPrevious,
         );
+  }
+
+  bool _isLoadedHomeSelection(String platform, String category) {
+    return _loadedPlatformSlug == platform && _loadedCategoryLabel == category;
+  }
+
+  void _cancelHomeSelectionCommit() {
+    _homeSelectionCommitTimer?.cancel();
+    _homeSelectionCommitTimer = null;
+  }
+
+  void _scheduleHomeSelectionCommit(TvZone zone) {
+    final platform = _platformSlug;
+    final category = _categoryLabel;
+    if (_isLoadedHomeSelection(platform, category)) return;
+
+    _cancelHomeSelectionCommit();
+    _homeSelectionCommitTimer = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      if (_platformSlug != platform || _categoryLabel != category) return;
+
+      setState(() {
+        _gridIndex = 0;
+        _gridItems = const <ContentItem>[];
+        _zone = zone;
+      });
+
+      _rememberSelection();
+      _loadHome(clearPrevious: true);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (zone == TvZone.platform) {
+          _focusPlatform(_platformIndex, throttle: false);
+        } else if (zone == TvZone.category) {
+          _focusCategory(_categoryIndex, throttle: false);
+        }
+      });
+    });
   }
 
   void _rememberFocus(TvZone zone, int index) {
@@ -137,6 +180,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (ok) {
       _platformIndex = target;
       _rememberFocus(TvZone.platform, target);
+      _scheduleHomeSelectionCommit(TvZone.platform);
     }
     return ok;
   }
@@ -148,6 +192,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (ok) {
       _categoryIndex = target;
       _rememberFocus(TvZone.category, target);
+      _scheduleHomeSelectionCommit(TvZone.category);
     }
     return ok;
   }
@@ -419,6 +464,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _selectPlatform(int index) {
+    _cancelHomeSelectionCommit();
     final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return;
     final target = _safe(index, platforms.length);
@@ -438,6 +484,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _selectCategory(int index) {
+    _cancelHomeSelectionCommit();
     final categories = _categories;
     if (categories.isEmpty) return;
     final target = _safe(index, categories.length);

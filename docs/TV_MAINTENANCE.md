@@ -188,3 +188,14 @@ Home grid finishing rules:
 - Home grid uses 7 columns and a 205px poster row height for a smaller finish layout.
 - Home grid bottom padding uses `TvSafeZone.homeGridBottomReach` to reduce black empty bottom area.
 - DOWN above a partial last row must jump to the last existing poster.
+
+## Home Cache-First Selection Rule
+
+Home platform/category switching must feel instant on TV:
+- RAM cache is checked first.
+- Disk cache must be checked before network-status checks.
+- If disk cache exists, show it immediately and refresh in background.
+- Moving focus across Platform/Category chips auto-commits after a short debounce.
+- OK still commits immediately.
+- Do not wait for the user to press Home/LiveGo again after the chip focus already moved.
+- Debounce prevents API spam during fast remote movement.
