@@ -225,7 +225,7 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
     return PopScope(
       canPop: !_busy,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
+        backgroundColor: AppTheme.bg,
         body: SafeArea(
           child: Focus(
             focusNode: _rootNode,
@@ -414,7 +414,7 @@ class _Button extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final border = focused ? Colors.white : AppTheme.borderSoft.withOpacity(0.54);
-    final background = focused ? AppTheme.accent : AppTheme.surface2.withOpacity(0.82);
+    final background = focused ? AppTheme.cyan : AppTheme.surface2.withOpacity(0.82);
 
     return InkWell(
       canRequestFocus: false,
@@ -432,7 +432,7 @@ class _Button extends StatelessWidget {
           boxShadow: focused
               ? [
                   BoxShadow(
-                    color: AppTheme.accent.withOpacity(0.32),
+                    color: AppTheme.cyan.withOpacity(0.32),
                     blurRadius: 18,
                     spreadRadius: 1,
                   ),
