@@ -470,7 +470,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             setMode(Mode.DOCK)
         }
         episodeResolveTimeoutTask = task
-        handler.postDelayed(task, 12_000L)
+        handler.postDelayed(task, TvNativePlayerTiming.EPISODE_RESOLVE_TIMEOUT_MS)
     }
 
     private fun requestEpisode(targetEpisode: Int) {
@@ -707,7 +707,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 bottomDock.visibility = View.VISIBLE
                 sidePanel.visibility = View.GONE
                 bottomSheet.visibility = View.GONE
-                handler.postDelayed(hideDockTask, 5000)
+                handler.postDelayed(hideDockTask, TvNativePlayerTiming.DOCK_AUTO_HIDE_MS)
             }
             Mode.DOCK_PROGRESS -> {
                 topInfo.visibility = View.VISIBLE
@@ -877,12 +877,12 @@ class TvNativeSurfacePlayerActivity : Activity() {
         toastText.text = text
         toastText.visibility = View.VISIBLE
         handler.removeCallbacks(toastHideTask)
-        handler.postDelayed(toastHideTask, 1600)
+        handler.postDelayed(toastHideTask, TvNativePlayerTiming.TOAST_HIDE_MS)
     }
 
     private fun allowMove(): Boolean {
         val now = System.currentTimeMillis()
-        if (now - lastMoveMs < 90L) return false
+        if (now - lastMoveMs < TvNativePlayerTiming.MOVE_GUARD_MS) return false
         lastMoveMs = now
         return true
     }
@@ -1031,7 +1031,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun back() {
         val now = System.currentTimeMillis()
-        if (now - lastBackMs < 350L) return
+        if (now - lastBackMs < TvNativePlayerTiming.BACK_GUARD_MS) return
         lastBackMs = now
         when (mode) {
             Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)

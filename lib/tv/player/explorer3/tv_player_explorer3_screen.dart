@@ -10,6 +10,7 @@ import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../tv_player_service.dart';
+import 'tv_player_explorer3_native_payload.dart';
 import 'widgets/tv_player_explorer3_controls.dart';
 
 /// TV Player Explorer 3.
@@ -272,23 +273,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   Map<String, Object?> _nativePlayerPayload(StreamInfo stream, String url) {
-    return <String, Object?>{
-      'url': url,
-      'title': widget.item.title,
-      'description': widget.item.description,
-      'source': widget.item.source,
-      'category': widget.item.category,
-      'episode': _episode,
-      'chapterId': _chapterId,
-      'totalEpisodes': _nativePayloadTotal(stream),
-      'headers': stream.headers,
-      'qualityLabels': stream.qualities.map((e) => e.label).toList(),
-      'qualityUrls': stream.qualities.map((e) => e.url).toList(),
-      'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
-      'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
-      'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
-      'autoNextEnabled': LiveGoSettings.autoNextEnabled,
-    };
+    return TvPlayerExplorer3NativePayload.build(
+      item: widget.item,
+      stream: stream,
+      url: url,
+      episode: _episode,
+      chapterId: _chapterId,
+      totalEpisodes: _nativePayloadTotal(stream),
+    );
   }
 
   Future<dynamic> _handleNativeSurfaceMethod(MethodCall call) async {

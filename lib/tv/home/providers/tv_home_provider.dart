@@ -8,6 +8,7 @@ import '../../../models/content_item.dart';
 import '../../../services/content/content_health_service.dart';
 import '../../../services/network/livego_network_status.dart';
 import '../../cache/tv_ram_cache.dart';
+import 'tv_home_content_state.dart';
 
 /// Cache-first TV Home content state.
 ///
@@ -19,46 +20,6 @@ import '../../cache/tv_ram_cache.dart';
 /// This replaces the old FutureBuilder-wrapped Home body. Data refresh now lives
 /// in Riverpod, so Home can rebuild from one stable state object and focus
 /// movement no longer recreates FutureBuilder work.
-class TvHomeContentState {
-  final ContentItem? hero;
-  final List<ContentItem> items;
-  final bool loading;
-  final bool refreshing;
-  final bool hasError;
-  final bool fromCache;
-  final bool offline;
-
-  const TvHomeContentState({
-    this.hero,
-    this.items = const <ContentItem>[],
-    this.loading = true,
-    this.refreshing = false,
-    this.hasError = false,
-    this.fromCache = false,
-    this.offline = false,
-  });
-
-  TvHomeContentState copyWith({
-    ContentItem? hero,
-    List<ContentItem>? items,
-    bool? loading,
-    bool? refreshing,
-    bool? hasError,
-    bool? fromCache,
-    bool? offline,
-  }) {
-    return TvHomeContentState(
-      hero: hero ?? this.hero,
-      items: items ?? this.items,
-      loading: loading ?? this.loading,
-      refreshing: refreshing ?? this.refreshing,
-      hasError: hasError ?? this.hasError,
-      fromCache: fromCache ?? this.fromCache,
-      offline: offline ?? this.offline,
-    );
-  }
-}
-
 /// ARCHITECTURE LOCK:
 /// This controller owns Home data/loading/error/retry/cache state only.
 /// Focus index and TV zones stay in `tv_home_focus_state.dart`.
