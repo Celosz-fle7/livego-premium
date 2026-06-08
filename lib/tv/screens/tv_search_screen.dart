@@ -433,7 +433,18 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                 padding: const EdgeInsets.all(TvSearchConfig.inputBorderPadding),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(TvSearchConfig.inputBorderRadius),
-                                  border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppTheme.surface3.withOpacity(focused ? 0.98 : 0.82),
+                                      AppTheme.bgDeep.withOpacity(0.96),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.55),
+                                    width: focused ? 2.2 : 1.0,
+                                  ),
                                 ),
                                 child: TextField(
                                   controller: _controller,
@@ -441,7 +452,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                   readOnly: !_editingInput,
                                   showCursor: _editingInput,
                                   enableInteractiveSelection: _editingInput,
-                                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                                  style: const TextStyle(color: Colors.white, fontSize: 15.4, fontWeight: FontWeight.w900),
                                   textInputAction: TextInputAction.search,
                                   onTap: _enterTextEdit,
                                   onSubmitted: (v) {
@@ -451,8 +462,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                   onChanged: (v) => ref.read(tvSearchProvider.notifier).setDraft(v),
                                   decoration: InputDecoration(
                                     hintText: TvSearchConfig.hint,
-                                    hintStyle: const TextStyle(color: Colors.white38),
-                                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan),
+                                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.40), fontWeight: FontWeight.w700),
+                                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan, size: 22),
                                     suffixIcon: search.query.isEmpty
                                         ? null
                                         : IconButton(
@@ -460,10 +471,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                               _controller.clear();
                                               _submitSearch('');
                                             },
-                                            icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                                            icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
                                           ),
                                     filled: true,
-                                    fillColor: AppTheme.surface,
+                                    fillColor: AppTheme.surface2.withOpacity(0.72),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 13),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(TvSearchConfig.inputFieldRadius), borderSide: BorderSide.none),
                                   ),
                                 ),
@@ -478,21 +490,33 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: TvSearchConfig.loadingTopPadding),
                             child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  CircularProgressIndicator(color: AppTheme.cyan),
-                                  SizedBox(height: TvSearchConfig.loadingTextGap),
-                                  Text(
-                                    TvSearchConfig.loadingText,
-                                    style: TextStyle(
-                                      color: AppTheme.textSoft,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      decoration: TextDecoration.none,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surface2.withOpacity(0.74),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: AppTheme.borderSoft.withOpacity(0.72)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(color: AppTheme.cyan, strokeWidth: 2.4),
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: TvSearchConfig.loadingTextGap),
+                                    Text(
+                                      TvSearchConfig.loadingText,
+                                      style: TextStyle(
+                                        color: AppTheme.textSoft,
+                                        fontSize: 12.4,
+                                        fontWeight: FontWeight.w800,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           )
@@ -523,12 +547,23 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             },
                           )
                         else ...[
-                          Row(
-                            children: [
-                              Text('${visibleResults.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                              const Spacer(),
-                              Text(TvSearchConfig.resultHelp, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-                            ],
+                          Container(
+                            height: 34,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface2.withOpacity(0.60),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppTheme.borderSoft.withOpacity(0.72)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.search_rounded, color: AppTheme.cyan.withOpacity(0.88), size: 16),
+                                const SizedBox(width: 7),
+                                Text('${visibleResults.length} hasil', style: const TextStyle(color: Colors.white, fontSize: 13.2, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                                const Spacer(),
+                                Text(TvSearchConfig.resultHelp, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.76), fontSize: 10.4, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: TvSearchConfig.loadingTextGap),
                         ],

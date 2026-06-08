@@ -13,16 +13,16 @@ class TvSearchConfig {
   static const int minColumns = 4;
   static const int maxColumns = 7;
 
-  static const double headerToInputGap = 14;
-  static const double inputBorderPadding = 3;
-  static const double inputBorderRadius = 22;
-  static const double inputFieldRadius = 19;
-  static const double keyboardGap = 10;
-  static const double afterKeyboardGap = 16;
-  static const double loadingTopPadding = 70;
-  static const double loadingTextGap = 12;
+  static const double headerToInputGap = 12;
+  static const double inputBorderPadding = 2.5;
+  static const double inputBorderRadius = 20;
+  static const double inputFieldRadius = 17;
+  static const double keyboardGap = 8;
+  static const double afterKeyboardGap = 12;
+  static const double loadingTopPadding = 52;
+  static const double loadingTextGap = 10;
   static const double resultHelpGap = 12;
-  static const double posterMainAxisExtent = 224;
+  static const double posterMainAxisExtent = 228;
 
   static const double gridTopMargin = TvSafeZone.listTop;
   static const double gridBottomMargin = TvSafeZone.gridBottom;
@@ -40,7 +40,7 @@ class TvSearchConfig {
   static const String noResultTitle = 'Tidak ada hasil';
   static const String retrySubtitle = 'OK coba lagi • UP ke input • LEFT ke navbar';
   static const String errorTitle = 'Pencarian gagal dimuat';
-  static const String resultHelp = '↑ input • OK detail • ← navbar • Back input';
+  static const String resultHelp = '↑ Input • OK Detail • ← Navbar • BACK Input';
 
   static int columnsFor(double width) {
     return (width / resultTileWidthTarget).floor().clamp(minColumns, maxColumns).toInt();

@@ -9,22 +9,23 @@ class TvSearchKeyboardPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: AppTheme.surface.withOpacity(0.74),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.borderSoft),
+          color: AppTheme.surface2.withOpacity(0.58),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderSoft.withOpacity(0.70)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.keyboard_rounded, color: AppTheme.cyan, size: 20),
-            const SizedBox(width: 10),
+            const Icon(Icons.keyboard_rounded, color: AppTheme.cyan, size: 18),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Keyboard TV: ketik kata kunci lalu tekan Enter/Search. D-Pad bawah masuk hasil, BACK dari hasil kembali ke input.',
+                'OK/RIGHT ketik • ENTER cari • DOWN hasil • BACK tutup keyboard',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.86), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
+                style: TextStyle(color: AppTheme.textSoft.withOpacity(0.88), fontSize: 11.4, fontWeight: FontWeight.w800, decoration: TextDecoration.none),
               ),
             ),
           ],
