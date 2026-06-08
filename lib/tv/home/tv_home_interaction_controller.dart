@@ -325,65 +325,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _focusBanner(throttle: throttle);
   }
 
-  void _pinPlayerReturnFocus({
-    required TvZone zone,
-    required int platformIndex,
-    required int categoryIndex,
-    required int gridIndex,
-    int attempt = 0,
-  }) {
-    if (!mounted) return;
-
-    _zone = zone;
-    _platformIndex = platformIndex;
-    _categoryIndex = categoryIndex;
-    _gridIndex = gridIndex;
-
-    ref.read(tvHomeProvider.notifier).restore(
-          zone: zone,
-          platformIndex: platformIndex,
-          categoryIndex: categoryIndex,
-          gridIndex: gridIndex,
-        );
-
-    if (zone == TvZone.grid && _gridNodes.isNotEmpty) {
-      final safeGrid = _safe(gridIndex, _gridNodes.length);
-      _gridIndex = safeGrid;
-      if (_focusGrid(safeGrid, throttle: false)) return;
-
-      if (attempt < 5) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _pinPlayerReturnFocus(
-            zone: zone,
-            platformIndex: platformIndex,
-            categoryIndex: categoryIndex,
-            gridIndex: safeGrid,
-            attempt: attempt + 1,
-          );
-        });
-        return;
-      }
-
-      _rememberFocus(TvZone.grid, safeGrid);
-      return;
-    }
-
-    if (attempt < 3) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _pinPlayerReturnFocus(
-          zone: zone,
-          platformIndex: platformIndex,
-          categoryIndex: categoryIndex,
-          gridIndex: gridIndex,
-          attempt: attempt + 1,
-        );
-      });
-      return;
-    }
-
-    _restoreZoneFocus(throttle: false);
-  }
-
   void _moveToNav() {
     widget.onMoveToNav?.call();
   }
@@ -454,16 +395,18 @@ extension TvHomeInteractionController on _TvHomeScreenState {
               gridIndex: returnGrid,
             );
 
-
         // Returning from Player must go back to the exact poster/grid cell that
-        // opened it. Keep Home pinned to the saved grid while Flutter rebuilds
-        // after the native/Flutter player route closes.
-        _pinPlayerReturnFocus(
-          zone: returnZone,
-          platformIndex: returnPlatform,
-          categoryIndex: returnCategory,
-          gridIndex: returnGrid,
-        );
+        // opened it. _scheduleFocusEntry only runs when Home has no focus; on
+        // real TV boxes a stale category/platform focus can remain attached and
+        // skip the restore. Force the saved zone/index once after the route pop.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _zone = returnZone;
+          _platformIndex = returnPlatform;
+          _categoryIndex = returnCategory;
+          _gridIndex = returnGrid;
+          _restoreZoneFocus(throttle: false);
+        });
       }
     });
   }
@@ -669,8 +612,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
-      _gridIndex = current;
-      _rememberFocus(TvZone.grid, current);
       _openDetail(item);
       return KeyEventResult.handled;
     }
