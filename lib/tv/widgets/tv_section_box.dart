@@ -9,6 +9,7 @@ class TvSectionBox extends StatelessWidget {
   final String hint;
   final double height;
   final Widget child;
+  final VoidCallback? onHeaderTap;
 
   const TvSectionBox({
     super.key,
@@ -17,6 +18,7 @@ class TvSectionBox extends StatelessWidget {
     required this.hint,
     required this.height,
     required this.child,
+    this.onHeaderTap,
   });
 
   @override
@@ -40,16 +42,20 @@ class TvSectionBox extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 96,
-              height: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.035),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withOpacity(0.055)),
-              ),
-              child: Row(
+            InkWell(
+              canRequestFocus: false,
+              onTap: onHeaderTap,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: 96,
+                height: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: onHeaderTap == null ? Colors.white.withOpacity(0.035) : AppTheme.cyan.withOpacity(0.055),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: onHeaderTap == null ? Colors.white.withOpacity(0.055) : AppTheme.cyan.withOpacity(0.22)),
+                ),
+                child: Row(
                 children: [
                   Container(
                     width: 26,
@@ -95,7 +101,8 @@ class TvSectionBox extends StatelessWidget {
                       ],
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),

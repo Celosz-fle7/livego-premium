@@ -8,8 +8,8 @@ class TvSourceManagerConfig {
   const TvSourceManagerConfig._();
 
   static const String fallbackPlatform = 'dobda_freereels';
-  static const int maxActivePlatforms = 6;
-  static const int maxHomePlatforms = 6;
+  static const int maxActivePlatforms = 999;
+  static const int maxHomePlatforms = 999;
   static const int maxCategoriesPerPlatform = 6;
   static const int recommendedPriorityLimit = 50;
   static const int betaPriorityStart = 850;
@@ -23,16 +23,17 @@ class TvSourceManagerConfig {
   static const double afterHeader = 10;
   static const double panelPadding = 8;
   static const double groupHeaderHeight = 30;
-  static const double rowHeight = 138;
+  static const double rowHeight = 82;
+  static const double categoryRowHeight = 138;
   static const double footerHeight = 38;
   static const double comfortTop = TvSafeZone.listTop;
   static const double comfortBottom = TvSafeZone.listBottom;
 
   static const String sourceGroupTitle = 'LIVEGO SOURCE';
   static const String footerHelp =
-      'OK ON/OFF • RIGHT kategori • BACK satu langkah';
+      'OK ON/OFF platform • BACK simpan atau batal';
   static const String subtitle =
-      'Source Beranda TV. Pilih platform dan kategori aktif.';
+      'Source Beranda TV. Pilih platform aktif. Kategori diatur dari shortcut Kategori Home.';
 
   static const Map<String, int> sourceOrder = <String, int>{
     'dobda_freereels': 0,
