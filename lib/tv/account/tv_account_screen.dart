@@ -367,13 +367,24 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
             const SizedBox(height: _footerGap),
             SizedBox(
               height: _footerHeight,
-              child: Text(
-                TvAccountConfig.footerHelp,
-                style: TextStyle(
-                  color: AppTheme.textSoft.withOpacity(0.72),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  decoration: TextDecoration.none,
+              child: Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface2.withOpacity(0.42),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: AppTheme.borderSoft.withOpacity(0.42)),
+                ),
+                child: Text(
+                  TvAccountConfig.footerHelp,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppTheme.textSoft.withOpacity(0.74),
+                    fontSize: 10.8,
+                    fontWeight: FontWeight.w800,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ),
@@ -404,30 +415,40 @@ class _AccountDeterministicRow extends StatelessWidget {
       child: InkWell(
         canRequestFocus: false,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         focusColor: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.94),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
-            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.08), blurRadius: 18)] : null,
+            gradient: focused
+                ? LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      AppTheme.surface3.withOpacity(0.98),
+                      AppTheme.surface2.withOpacity(0.88),
+                    ],
+                  )
+                : null,
+            color: focused ? null : AppTheme.surface.withOpacity(0.86),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.70), width: focused ? 2.1 : 1),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.09), blurRadius: 16)] : null,
           ),
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.55) : Colors.white10),
+                  color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2.withOpacity(0.78),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.42) : Colors.white10),
                 ),
-                child: Icon(item.icon, color: Colors.white, size: 26),
+                child: Icon(item.icon, color: Colors.white, size: 24),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -439,19 +460,19 @@ class _AccountDeterministicRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: focused ? Colors.white : AppTheme.text,
-                        fontSize: 17,
+                        fontSize: 15.8,
                         fontWeight: FontWeight.w900,
                         decoration: TextDecoration.none,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
                     Text(
                       item.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppTheme.textSoft,
-                        fontSize: 11.5,
+                      style: TextStyle(
+                        color: AppTheme.textSoft.withOpacity(focused ? 0.92 : 0.74),
+                        fontSize: 10.8,
                         fontWeight: FontWeight.w700,
                         decoration: TextDecoration.none,
                       ),
@@ -459,26 +480,26 @@ class _AccountDeterministicRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: focused ? AppTheme.cyan.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                  color: focused ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.045),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: focused ? AppTheme.cyan.withOpacity(0.42) : Colors.white10),
+                  border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.34) : Colors.white10),
                 ),
                 child: Text(
                   item.badge,
                   style: TextStyle(
                     color: focused ? AppTheme.cyan : AppTheme.textSoft,
-                    fontSize: 10.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                     decoration: TextDecoration.none,
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              Icon(Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.cyan : Colors.white38, size: 28),
+              const SizedBox(width: 10),
+              Icon(Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.whiteGlow : Colors.white38, size: 26),
             ],
           ),
         ),

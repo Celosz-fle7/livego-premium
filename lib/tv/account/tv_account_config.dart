@@ -14,12 +14,12 @@ class TvAccountConfig {
   static const double topPadding = TvSafeZone.accountTop;
   static const double horizontalPadding = TvSafeZone.accountSide;
   static const double bottomPadding = TvSafeZone.bottomReach;
-  static const double headerHeight = 98;
-  static const double afterHeader = 14;
-  static const double rowHeight = 86;
-  static const double rowGap = 10;
-  static const double footerGap = 14;
-  static const double footerHeight = 50;
+  static const double headerHeight = 92;
+  static const double afterHeader = 12;
+  static const double rowHeight = 80;
+  static const double rowGap = 8;
+  static const double footerGap = 10;
+  static const double footerHeight = 38;
   static const double comfortTop = TvSafeZone.listTop;
   static const double comfortBottom = TvSafeZone.listBottom;
   static const double cacheExtent = 420;
@@ -27,7 +27,7 @@ class TvAccountConfig {
   static const Duration snackDuration = Duration(seconds: 2);
 
   static const String footerHelp =
-      'Remote: Header ↓/→ masuk menu • Item ←/Back ke Navbar Akun';
+      '↓/→ masuk menu • OK buka • ←/BACK ke Navbar Akun';
   static const String aboutMessage =
       'LiveGo Premium TV • data sinkron dengan mode HP';
   static const String updateMessage =
