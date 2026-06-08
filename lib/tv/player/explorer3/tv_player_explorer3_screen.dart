@@ -328,9 +328,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         return cleanRows.indexWhere((episode) => episode.index == currentEpisode);
       }
 
-      MapEntry<int, String> fromRow(dynamic row, {int? fallbackIndex}) {
-        final rawIndex = row.index is int ? row.index as int : (fallbackIndex ?? requestedEpisode);
-        final index = rawIndex > 0 ? rawIndex : (fallbackIndex ?? requestedEpisode);
+      MapEntry<int, String> fromRow(dynamic row) {
+        final rawIndex = row.index is int ? row.index as int : requestedEpisode;
+        final index = rawIndex > 0 ? rawIndex : requestedEpisode;
         final rawId = '${row.id}'.trim();
         final chapterId = rawId.isNotEmpty ? rawId : '$index';
         return MapEntry(index.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt(), chapterId);
@@ -348,16 +348,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         return MapEntry(currentEpisode, currentChapterId.isNotEmpty ? currentChapterId : '$currentEpisode');
       }
 
-      // Direct episode grid selection: provider row order is the source of truth.
-      // Some APIs expose non-sequential/empty episode.index values, so EP 2 must
-      // still map to the second provider row instead of blindly chapterId "2".
-      final ordinal = requestedEpisode - 1;
-      if (ordinal >= 0 && ordinal < cleanRows.length) {
-        return fromRow(cleanRows[ordinal], fallbackIndex: requestedEpisode);
-      }
-
+      // Direct episode grid selection still tries exact displayed index first.
       final exact = cleanRows.indexWhere((episode) => episode.index == requestedEpisode);
-      if (exact >= 0) return fromRow(cleanRows[exact], fallbackIndex: requestedEpisode);
+      if (exact >= 0) return fromRow(cleanRows[exact]);
 
       final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
       return MapEntry(safeEpisode, '$safeEpisode');
@@ -1045,7 +1038,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
 
     final target = await _resolveOrderedEpisodeTarget(requested);
-    if (!mounted) return;
     final nextEpisode = target.key.clamp(1, total).toInt();
     final nextChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$nextEpisode';
 

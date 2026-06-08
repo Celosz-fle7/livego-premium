@@ -1036,10 +1036,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         when (mode) {
             Mode.EPISODE, Mode.QUALITY, Mode.SUBTITLE, Mode.AUDIO, Mode.OPTIONS -> setMode(Mode.DOCK)
             Mode.DOCK, Mode.DOCK_PROGRESS -> setMode(Mode.CLEAN)
-            Mode.CLEAN -> {
-                notifyClosed()
-                finish()
-            }
+            Mode.CLEAN -> finish()
         }
     }
 

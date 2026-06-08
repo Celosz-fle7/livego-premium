@@ -312,10 +312,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   items: gridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 24),
-                  mainAxisExtent: 182,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
+                  mainAxisExtent: 228,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);
@@ -326,7 +324,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   },
                   onKey: (i, item, node, event) => this._gridKey(i, item, event),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              const SliverToBoxAdapter(child: SizedBox(height: TvSafeZone.smallTail)),
             ],
           ),
       ),
