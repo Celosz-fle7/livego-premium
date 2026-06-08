@@ -194,6 +194,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   bool _focusPlatform(int index, {bool throttle = true}) {
     if (_platformNodes.isEmpty) return false;
+    if (!_homeBrowseMode) _enterHomeBrowseMode(zone: TvZone.platform);
     final target = _safe(index, _platformNodes.length);
     final ok = tvFocus(_platformNodes[target], alignment: 0.08, throttle: throttle);
     if (ok) {
@@ -206,6 +207,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   bool _focusCategory(int index, {bool throttle = true}) {
     if (_categoryNodes.isEmpty) return false;
+    if (!_homeBrowseMode) _enterHomeBrowseMode(zone: TvZone.category);
     final target = _safe(index, _categoryNodes.length);
     final ok = tvFocus(_categoryNodes[target], alignment: 0.12, throttle: throttle);
     if (ok) {
@@ -223,6 +225,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     double anchorAlignment = 0.58,
   }) {
     if (_gridNodes.isEmpty) return false;
+    if (!_homeBrowseMode) _enterHomeBrowseMode(zone: TvZone.grid);
     final target = _safe(index, _gridNodes.length);
     final previous = _gridIndex;
     final node = _gridNodes[target];
@@ -690,9 +693,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (!_focusPlatform(_platformIndex)) {
-        if (!_focusCategory(_categoryIndex)) _focusGridEntryFromBanner();
-      }
+      _cancelHomeSelectionCommit();
+      _enterHomeBrowseMode(zone: TvZone.platform);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!_focusPlatform(_platformIndex, throttle: false)) {
+          if (!_focusCategory(_categoryIndex, throttle: false)) _focusGrid(_gridIndex, throttle: false);
+        }
+      });
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key) && hero != null) {

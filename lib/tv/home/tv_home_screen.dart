@@ -30,6 +30,7 @@ import '../widgets/tv_offline_banner.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_professional_loading.dart';
+import 'zones/tv_home_top_zone.dart';
 
 
 part 'tv_home_interaction_controller.dart';
@@ -224,33 +225,31 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
               if (!_homeBrowseMode)
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate.fixed([
-                      TvHeroBannerFocus(
-                        item: home.hero,
-                        focusNode: _bannerNode,
-                        onFocus: () => this._rememberFocus(TvZone.banner, 0),
-                        onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
-                        onKey: (node, event) => this._bannerKey(home.hero, event),
-                      ),
-                      if (home.refreshing || home.hasError || home.fromCache)
-                        TvHomeStatusLine(
-                          refreshing: home.refreshing,
-                          hasError: home.hasError,
-                          fromCache: home.fromCache,
-                        ),
-                      TvOfflineBanner(
-                        visible: home.offline || (home.hasError && home.fromCache),
-                        fromCache: home.fromCache,
-                        refreshing: home.refreshing,
-                      ),
-                      const SizedBox(height: 8),
-                    ]),
+                TvHomeTopZone(
+                  padding: padding,
+                  banner: TvHeroBannerFocus(
+                    item: home.hero,
+                    focusNode: _bannerNode,
+                    onFocus: () => this._rememberFocus(TvZone.banner, 0),
+                    onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
+                    onKey: (node, event) => this._bannerKey(home.hero, event),
                   ),
+                  below: [
+                    if (home.refreshing || home.hasError || home.fromCache)
+                      TvHomeStatusLine(
+                        refreshing: home.refreshing,
+                        hasError: home.hasError,
+                        fromCache: home.fromCache,
+                      ),
+                    TvOfflineBanner(
+                      visible: home.offline || (home.hasError && home.fromCache),
+                      fromCache: home.fromCache,
+                      refreshing: home.refreshing,
+                    ),
+                  ],
                 ),
-              SliverPersistentHeader(
+              if (_homeBrowseMode)
+                SliverPersistentHeader(
                 pinned: true,
                 delegate: _HomeStickySourceHeaderDelegate(
                   height: 114,
@@ -300,9 +299,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
-                sliver: SliverList(
+              if (_homeBrowseMode)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
+                  sliver: SliverList(
                   delegate: SliverChildListDelegate.fixed([
                     TvHomeProfessionalRows(
                       key: _rowsKey,
@@ -342,7 +342,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   ]),
                 ),
               ),
-              if (!home.loading && gridItems.isNotEmpty)
+              if (_homeBrowseMode && !home.loading && gridItems.isNotEmpty)
                 TvPosterGrid(
                   items: gridItems,
                   nodes: _gridNodes,
