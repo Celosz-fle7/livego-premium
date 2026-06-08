@@ -72,3 +72,17 @@ Reason:
 - `core-ktx` can pull a newer Kotlin stdlib.
 - The current Android/Flutter build may still resolve older `kotlin-stdlib-jdk7/jdk8`.
 - Mixing those versions causes `checkReleaseDuplicateClasses` failures.
+
+## Kotlin Dependency Alignment Rule
+
+Release build can fail with duplicate Kotlin classes when Gradle resolves mixed stdlib versions, for example:
+- `kotlin-stdlib:1.8.22`
+- `kotlin-stdlib-jdk7:1.7.10`
+- `kotlin-stdlib-jdk8:1.7.10`
+
+Root Gradle now aligns these artifacts to `1.8.22`:
+- `kotlin-stdlib`
+- `kotlin-stdlib-jdk7`
+- `kotlin-stdlib-jdk8`
+
+Do not remove this alignment while Media3/updater/native Android dependencies are active.
