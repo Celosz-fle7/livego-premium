@@ -259,3 +259,20 @@ git add pubspec.yaml
 git commit -m "Bump version for update"
 git push
 ```
+
+## Fixed Release Signing Rule
+
+Android app updates require the same signing certificate for every release APK.
+Do not publish TV release APKs signed with an ephemeral CI debug key.
+
+GitHub Actions required secrets:
+- `LIVEGO_RELEASE_KEYSTORE_BASE64`
+- `LIVEGO_RELEASE_STORE_PASSWORD`
+- `LIVEGO_RELEASE_KEY_ALIAS`
+- `LIVEGO_RELEASE_KEY_PASSWORD`
+
+After fixed signing is introduced:
+- Uninstall old debug-signed APK once.
+- Install the first fixed-signed APK manually.
+- Future app updates must use the same fixed signing key.
+- Never delete or lose the signing keystore backup.

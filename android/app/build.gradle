@@ -23,6 +23,16 @@ if (flutterVersionName == null) {
     flutterVersionName = "1.0"
 }
 
+def livegoReleaseStoreFile = System.getenv("LIVEGO_RELEASE_STORE_FILE")
+def livegoReleaseStorePassword = System.getenv("LIVEGO_RELEASE_STORE_PASSWORD")
+def livegoReleaseKeyAlias = System.getenv("LIVEGO_RELEASE_KEY_ALIAS")
+def livegoReleaseKeyPassword = System.getenv("LIVEGO_RELEASE_KEY_PASSWORD")
+def livegoHasReleaseSigning =
+        livegoReleaseStoreFile != null && livegoReleaseStoreFile.trim().length() > 0 &&
+        livegoReleaseStorePassword != null && livegoReleaseStorePassword.trim().length() > 0 &&
+        livegoReleaseKeyAlias != null && livegoReleaseKeyAlias.trim().length() > 0 &&
+        livegoReleaseKeyPassword != null && livegoReleaseKeyPassword.trim().length() > 0
+
 android {
     namespace = "com.livego.premium"
     compileSdk = flutter.compileSdkVersion
@@ -44,11 +54,23 @@ android {
         versionName = flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            if (livegoHasReleaseSigning) {
+                storeFile = file(livegoReleaseStoreFile)
+                storePassword = livegoReleaseStorePassword
+                keyAlias = livegoReleaseKeyAlias
+                keyPassword = livegoReleaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            if (!livegoHasReleaseSigning) {
+                throw new GradleException("Missing LiveGo release signing env. Set LIVEGO_RELEASE_STORE_FILE, LIVEGO_RELEASE_STORE_PASSWORD, LIVEGO_RELEASE_KEY_ALIAS, and LIVEGO_RELEASE_KEY_PASSWORD.")
+            }
+            signingConfig = signingConfigs.release
         }
     }
 }

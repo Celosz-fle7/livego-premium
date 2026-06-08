@@ -32,10 +32,26 @@ jobs:
       - name: Pub get
         run: flutter pub get
 
+      - name: Decode fixed release keystore
+        env:
+          LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$LIVEGO_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "Missing secret LIVEGO_RELEASE_KEYSTORE_BASE64"
+            exit 1
+          fi
+          echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
+          ls -lh android/app/livego-release-key.jks
+
       - name: Analyze
         run: flutter analyze || true
 
       - name: Build universal release APK
+        env:
+          LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
+          LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+          LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+          LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
         run: flutter build apk --release
 
       - name: Prepare files
