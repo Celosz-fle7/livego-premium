@@ -338,7 +338,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   items: gridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, TvSafeZone.homeGridUnderStickyTopPadding, padding.right, TvSafeZone.homeGridBottomReach),
+                  padding: EdgeInsets.fromLTRB(padding.left, _homeGridTopPadding(), padding.right, TvSafeZone.homeGridBottomReach),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 14,
                   mainAxisExtent: 205,
