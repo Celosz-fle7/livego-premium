@@ -6,6 +6,7 @@ import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../layout/tv_safe_zone.dart';
+import 'tv_source_manager_config.dart';
 
 part 'tv_source_manager_widgets.dart';
 
@@ -24,19 +25,19 @@ class TvSourceManagerScreen extends StatefulWidget {
 }
 
 class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
-  static const int _backGuardMs = 420;
+  static const int _backGuardMs = TvSourceManagerConfig.backGuardMs;
 
-  static const double _topPadding = TvSafeZone.sourceTop;
-  static const double _horizontalPadding = TvSafeZone.sourceSide;
-  static const double _bottomPadding = TvSafeZone.bottomReach;
-  static const double _headerHeight = 76;
-  static const double _afterHeader = 14;
-  static const double _panelPadding = 10;
-  static const double _groupHeaderHeight = 36;
-  static const double _rowHeight = 149;
-  static const double _footerHeight = 52;
-  static const double _comfortTop = TvSafeZone.listTop;
-  static const double _comfortBottom = TvSafeZone.listBottom;
+  static const double _topPadding = TvSourceManagerConfig.topPadding;
+  static const double _horizontalPadding = TvSourceManagerConfig.horizontalPadding;
+  static const double _bottomPadding = TvSourceManagerConfig.bottomPadding;
+  static const double _headerHeight = TvSourceManagerConfig.headerHeight;
+  static const double _afterHeader = TvSourceManagerConfig.afterHeader;
+  static const double _panelPadding = TvSourceManagerConfig.panelPadding;
+  static const double _groupHeaderHeight = TvSourceManagerConfig.groupHeaderHeight;
+  static const double _rowHeight = TvSourceManagerConfig.rowHeight;
+  static const double _footerHeight = TvSourceManagerConfig.footerHeight;
+  static const double _comfortTop = TvSourceManagerConfig.comfortTop;
+  static const double _comfortBottom = TvSourceManagerConfig.comfortBottom;
 
   final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-source-root');
   final ScrollController _scrollController = ScrollController();
@@ -104,15 +105,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   int _sourcePriority(String slug) {
-    const order = <String, int>{
-      'dobda_freereels': 0,
-      'dobda_goodshort': 1,
-      'dobda_dramawave': 2,
-      'dobda_reelshort': 3,
-      'dobda_reelife': 4,
-      'dobda_rapidtv': 5,
-    };
-    return order[slug] ?? 99;
+    return TvSourceManagerConfig.sourcePriority(slug);
   }
 
   void _captureInitial() {
@@ -188,7 +181,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     final saved = _draftCategories[slug] ?? available.take(2).toList();
     final clean = saved.where(available.contains).toList();
     if (clean.isEmpty) return available.take(1).toList();
-    return clean.take(6).toList();
+    return clean.take(TvSourceManagerConfig.maxCategoriesPerPlatform).toList();
   }
 
   void _repairDraft() {
@@ -196,7 +189,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _draftActive = _draftActive.where(all.contains).toSet();
 
     if (_draftActive.isEmpty) {
-      final fallback = _platforms.isNotEmpty ? _platforms.first : 'dobda_shortmax';
+      final fallback = _platforms.isNotEmpty ? _platforms.first : TvSourceManagerConfig.fallbackPlatform;
       _draftActive.add(fallback);
     }
 
@@ -206,7 +199,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       _draftHome.addAll(preferred);
     }
     if (_draftHome.isEmpty) _draftHome.add(_draftActive.first);
-    if (_draftHome.length > 6) _draftHome = _draftHome.take(6).toList();
+    if (_draftHome.length > TvSourceManagerConfig.maxHomePlatforms) _draftHome = _draftHome.take(TvSourceManagerConfig.maxHomePlatforms).toList();
 
     if (!_draftActive.contains(_draftDefault)) {
       _draftDefault = _draftHome.isNotEmpty ? _draftHome.first : _draftActive.first;
@@ -216,7 +209,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       final available = _availableCategories(slug);
       final saved = _draftCategories[slug] ?? available.take(2).toList();
       final clean = saved.where(available.contains).toList();
-      _draftCategories[slug] = clean.isEmpty ? available.take(1).toList() : clean.take(6).toList();
+      _draftCategories[slug] = clean.isEmpty ? available.take(1).toList() : clean.take(TvSourceManagerConfig.maxCategoriesPerPlatform).toList();
     }
   }
 
@@ -336,12 +329,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         _draftActive.remove(slug);
         _draftHome.remove(slug);
       } else {
-        if (_draftActive.length >= 6) {
+        if (_draftActive.length >= TvSourceManagerConfig.maxActivePlatforms) {
           _toast('Maksimal 6 platform aktif. Matikan salah satu dulu.');
           return;
         }
         _draftActive.add(slug);
-        if (_draftHome.length < 6) {
+        if (_draftHome.length < TvSourceManagerConfig.maxHomePlatforms) {
           _draftHome.add(slug);
         }
       }
@@ -368,7 +361,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
       } else {
         selected.add(cat);
       }
-      _draftCategories[slug] = selected.take(6).toList();
+      _draftCategories[slug] = selected.take(TvSourceManagerConfig.maxCategoriesPerPlatform).toList();
       _repairDraft();
     });
   }
@@ -598,7 +591,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                         children: [
                           for (var i = 0; i < platforms.length; i++) ...[
                             if (i == 0)
-                              const _SourceGroupHeaderLite(text: 'LIVEGO SOURCE', height: _groupHeaderHeight),
+                              const _SourceGroupHeaderLite(text: TvSourceManagerConfig.sourceGroupTitle, height: _groupHeaderHeight),
                             _SourceRowLite(
                               height: _rowHeight,
                               title: LiveGoCatalog.label(platforms[i]),
@@ -606,8 +599,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                               statusText: _statusTextFor(platforms[i]),
                               statusColor: _statusColorFor(platforms[i]),
                               active: _draftActive.contains(platforms[i]),
-                              recommended: _sourcePriority(platforms[i]) < 50,
-                              beta: _sourcePriority(platforms[i]) >= 850,
+                              recommended: TvSourceManagerConfig.isRecommended(platforms[i]),
+                              beta: TvSourceManagerConfig.isBeta(platforms[i]),
                               categories: _availableCategories(platforms[i]),
                               selectedCategories: _selectedCategories(platforms[i]),
                               platformFocused: _zone == _SourceZone.platform && _platformIndex == i,
@@ -623,7 +616,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                   SizedBox(
                     height: _footerHeight,
                     child: Text(
-                      'OK ON/OFF platform • RIGHT kategori • OK kategori ON/OFF • BACK satu langkah',
+                      TvSourceManagerConfig.footerHelp,
                       style: TextStyle(
                         color: AppTheme.textSoft.withOpacity(0.72),
                         fontSize: 11.5,
@@ -646,7 +639,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   }
 
   String _subtitleFor(String slug) {
-    return 'Source LiveGo untuk Beranda TV. Kategori: Home dan LiveGo.';
+    return TvSourceManagerConfig.subtitle;
   }
 
   String _statusTextFor(String slug) {
