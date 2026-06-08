@@ -444,18 +444,24 @@ class _DetailBody extends StatelessWidget {
                     child: _RoundIconButton(node: backNode, icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
                   ),
                   const SizedBox(width: TvContentDetailConfig.actionButtonGap),
-                  Text(TvContentDetailConfig.pageLabel, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                  Text(TvContentDetailConfig.pageLabel, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.85), fontSize: 12.2, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 ],
               ),
               const SizedBox(height: TvContentDetailConfig.headerToContentGap),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(TvContentDetailConfig.posterRadius),
-                    child: SizedBox(
-                      width: TvContentDetailConfig.posterWidth,
-                      height: TvContentDetailConfig.posterHeight,
+                  Container(
+                    width: TvContentDetailConfig.posterWidth,
+                    height: TvContentDetailConfig.posterHeight,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface2.withOpacity(0.72),
+                      borderRadius: BorderRadius.circular(TvContentDetailConfig.posterRadius),
+                      border: Border.all(color: AppTheme.borderSoft.withOpacity(0.76)),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(TvContentDetailConfig.posterRadius - 4),
                       child: LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
                     ),
                   ),
@@ -464,7 +470,7 @@ class _DetailBody extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: TvContentDetailConfig.titleFontSize, fontWeight: FontWeight.w900, decoration: TextDecoration.none, height: 1.05)),
+                        Text(item.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: TvContentDetailConfig.titleFontSize, fontWeight: FontWeight.w900, decoration: TextDecoration.none, height: 1.02)),
                         const SizedBox(height: TvContentDetailConfig.titleToPillGap),
                         Wrap(
                           spacing: TvContentDetailConfig.episodeChipSpacing,
@@ -485,7 +491,7 @@ class _DetailBody extends StatelessWidget {
                           item.description.trim().isEmpty ? TvContentDetailConfig.emptyDescription : item.description.trim(),
                           maxLines: 5,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppTheme.textSoft, fontSize: 15.2, fontWeight: FontWeight.w700, height: 1.45, decoration: TextDecoration.none),
+                          style: const TextStyle(color: AppTheme.textSoft, fontSize: 14.4, fontWeight: FontWeight.w700, height: 1.40, decoration: TextDecoration.none),
                         ),
                         const SizedBox(height: TvContentDetailConfig.actionGap),
                         Row(
@@ -518,9 +524,9 @@ class _DetailBody extends StatelessWidget {
               if (episodes.isNotEmpty) ...[
                 Row(
                   children: [
-                    const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                    const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                     const SizedBox(width: TvContentDetailConfig.episodeTitleGap),
-                    Text('${episodes.length} tersedia', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                    Text('${episodes.length} tersedia', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.4, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                   ],
                 ),
                 const SizedBox(height: TvContentDetailConfig.titleToPillGap),
@@ -552,7 +558,7 @@ class _DetailDegradedNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
       decoration: BoxDecoration(
         color: Colors.orangeAccent.withOpacity(0.10),
         borderRadius: BorderRadius.circular(TvContentDetailConfig.backButtonRadius),
@@ -587,7 +593,7 @@ class _DetailEpisodeFallbackHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.72),
         borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
@@ -658,14 +664,18 @@ class _InfoPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: AppTheme.surface.withOpacity(0.84), borderRadius: BorderRadius.circular(999), border: Border.all(color: AppTheme.cyan.withOpacity(0.20))),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppTheme.surface2.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppTheme.cyan.withOpacity(0.22)),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppTheme.cyan, size: 15),
+          Icon(icon, color: AppTheme.cyan.withOpacity(0.92), size: 14),
           const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 11.4, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
         ],
       ),
     );
@@ -703,17 +713,17 @@ class _DetailButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: TvContentDetailConfig.actionButtonHorizontalPadding),
               decoration: BoxDecoration(
                 gradient: primary ? AppTheme.activeGradient : null,
-                color: primary ? null : AppTheme.surface.withOpacity(0.90),
+                color: primary ? null : AppTheme.surface2.withOpacity(0.88),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: focused ? AppTheme.whiteGlow : (primary ? Colors.white24 : AppTheme.border), width: focused ? 2 : 1),
-                boxShadow: focused ? [TvFocusStyle.glow(0.10, 8)] : null,
+                border: Border.all(color: focused ? AppTheme.whiteGlow : (primary ? Colors.white24 : AppTheme.borderSoft.withOpacity(0.76)), width: focused ? 2.2 : 1),
+                boxShadow: focused ? [TvFocusStyle.glow(0.12, 9)] : null,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: Colors.white, size: 24),
-                  const SizedBox(width: 8),
-                  Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                  Icon(icon, color: Colors.white, size: 22),
+                  const SizedBox(width: 7),
+                  Text(label, style: const TextStyle(color: Colors.white, fontSize: 14.2, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 ],
               ),
             ),
@@ -752,11 +762,11 @@ class _EpisodeChip extends StatelessWidget {
               height: TvContentDetailConfig.episodeChipHeight,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.86),
+                color: focused ? AppTheme.surface3.withOpacity(0.98) : AppTheme.surface.withOpacity(0.78),
                 borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
-                border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
+                border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.72), width: focused ? 2.2 : 1),
               ),
-              child: Text('Episode ${episode.index}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              child: Text('Episode ${episode.index}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.2, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
             ),
           ),
         );

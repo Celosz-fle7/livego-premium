@@ -23,36 +23,36 @@ class TvContentDetailConfig {
     Duration(milliseconds: 300),
   ];
 
-  static const double horizontalPadding = 46;
+  static const double horizontalPadding = 44;
   static const double topPadding = 24;
   static const double bottomPadding = TvReachability.contentBottomPadding;
   static const double backButtonSize = 48;
   static const double backButtonRadius = 16;
   static const double backRowGap = 14;
-  static const double headerToContentGap = 22;
-  static const double posterWidth = 210;
-  static const double posterHeight = 314;
-  static const double posterRadius = 24;
-  static const double posterToInfoGap = 28;
-  static const double titleFontSize = 34;
+  static const double headerToContentGap = 18;
+  static const double posterWidth = 204;
+  static const double posterHeight = 306;
+  static const double posterRadius = 22;
+  static const double posterToInfoGap = 24;
+  static const double titleFontSize = 32;
   static const double titleToPillGap = 12;
   static const double degradedNoticeGap = 14;
-  static const double descriptionGap = 18;
-  static const double actionGap = 26;
+  static const double descriptionGap = 16;
+  static const double actionGap = 22;
   static const double actionButtonGap = 14;
-  static const double episodeSectionGap = 28;
+  static const double episodeSectionGap = 24;
   static const double episodeTitleGap = 10;
   static const double episodeGridGap = 12;
   static const double episodeChipSpacing = 10;
   static const double episodeChipRunSpacing = 10;
 
-  static const double actionButtonHeight = 54;
-  static const double actionButtonMinWidth = 158;
+  static const double actionButtonHeight = 50;
+  static const double actionButtonMinWidth = 148;
   static const double actionButtonHorizontalPadding = 22;
 
-  static const double episodeChipWidth = 132;
-  static const double episodeChipHeight = 58;
-  static const double episodeChipRadius = 18;
+  static const double episodeChipWidth = 124;
+  static const double episodeChipHeight = 52;
+  static const double episodeChipRadius = 16;
 
   static const String pageLabel = 'Detail Konten';
   static const String emptyDescription = 'Deskripsi belum tersedia dari API.';
