@@ -1027,6 +1027,51 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
   }
 
+  Future<void> _openEpisodeTarget(
+    int requestedEpisode, {
+    String? boundaryStatus,
+  }) async {
+    if (_loading) return;
+
+    final total = _episodeTotal();
+    final requested = requestedEpisode.clamp(1, total).toInt();
+
+    if (requested == _episode) {
+      if (boundaryStatus != null) {
+        _showStatus(boundaryStatus);
+      } else {
+        _showControls();
+      }
+      return;
+    }
+
+    setState(() {
+      _status = 'Mencari EP $requested...';
+      _mode = _Explorer3Mode.controls;
+    });
+
+    final target = await _resolveOrderedEpisodeTarget(requested);
+    if (!mounted || _loading) return;
+
+    final nextEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final nextChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$nextEpisode';
+
+    if (nextEpisode == _episode && nextChapterId == _chapterId.trim()) {
+      _showControls();
+      return;
+    }
+
+    setState(() {
+      _episode = nextEpisode;
+      _chapterId = nextChapterId;
+      _episodeCursor = nextEpisode;
+      _error = '';
+      _status = 'EP $nextEpisode';
+      _mode = _Explorer3Mode.controls;
+    });
+    await _load();
+  }
+
   Future<void> _changeEpisode(int delta) async {
     if (_loading) return;
     final total = _episodeTotal();
@@ -1037,13 +1082,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return;
     }
 
-    setState(() {
-      _episode = next;
-      _episodeCursor = next;
-      _status = 'EP $next';
-      _mode = _Explorer3Mode.controls;
-    });
-    await _load();
+    await _openEpisodeTarget(next);
   }
 
   Future<void> _selectEpisodeCursor() async {
@@ -1056,12 +1095,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return;
     }
 
-    setState(() {
-      _episode = next;
-      _status = 'EP $next';
-      _mode = _Explorer3Mode.controls;
-    });
-    await _load();
+    await _openEpisodeTarget(next);
   }
 
   Future<void> _applyQualityChoice() async {

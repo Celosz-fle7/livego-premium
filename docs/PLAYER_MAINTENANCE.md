@@ -248,3 +248,14 @@ Aturan:
 - Episode panel tetap render visible window kecil, bukan semua episode.
 - Window episode tetap 11 row agar RAM/FPS aman.
 - Jika batas episode diubah, ubah Player dan Episode Panel bersama-sama.
+
+## Explorer3 Episode Route Rule
+
+Explorer3 episode switching must update both episode number and provider chapter id.
+
+Rules:
+- Do not switch episodes by setting `_episode` only.
+- `_changeEpisode()` and `_selectEpisodeCursor()` must resolve target through `_resolveOrderedEpisodeTarget()`.
+- Always update `_episode`, `_chapterId`, and `_episodeCursor` together before `_load()`.
+- This fixes the case where the episode list appears but every selection keeps playing the first/original chapter.
+- Do not patch old `tv_player_screen.dart` for Explorer3 runtime bugs unless it is proven active again.
