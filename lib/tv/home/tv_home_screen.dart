@@ -94,8 +94,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   Timer? _homeSelectionCommitTimer;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
-  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
-  int get _homeGridLimit => (_gridColumns * 5).clamp(35, 50).toInt();
+  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(6, 10).toInt();
+  int get _homeGridLimit => (_gridColumns * 4).clamp(24, 40).toInt();
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -317,9 +317,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   nodes: _gridNodes,
                   columns: _gridColumns,
                   padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 14,
-                  mainAxisExtent: 205,
+                  mainAxisExtent: 228,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);

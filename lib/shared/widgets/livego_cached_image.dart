@@ -14,7 +14,7 @@ class LiveGoImageCacheManager {
     Config(
       key,
       stalePeriod: const Duration(days: 7),
-      maxNrOfCacheObjects: 1200,
+      maxNrOfCacheObjects: 720,
       repo: JsonCacheInfoRepository(databaseName: key),
       fileService: HttpFileService(),
     ),
@@ -245,13 +245,13 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
 
     switch (widget.role) {
       case LiveGoImageRole.thumbnail:
-        return decodeWidth.clamp(120, 240).toInt();
+        return decodeWidth.clamp(96, 180).toInt();
       case LiveGoImageRole.poster:
-        return decodeWidth.clamp(150, 320).toInt();
+        return decodeWidth.clamp(120, 240).toInt();
       case LiveGoImageRole.detail:
         return decodeWidth.clamp(220, 560).toInt();
       case LiveGoImageRole.banner:
-        return decodeWidth.clamp(300, 860).toInt();
+        return decodeWidth.clamp(240, 640).toInt();
     }
   }
 
@@ -269,7 +269,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return maxConfigured;
     }
 
-    final maxDpr = widget.tv ? 1.45 : 2.5;
+    final maxDpr = widget.tv ? 1.15 : 2.5;
     final dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, maxDpr).toDouble();
     final px = (logicalWidth * dpr).round();
     return _clampInt(px, ImageQualityConfig.minDecodeWidth, maxConfigured);

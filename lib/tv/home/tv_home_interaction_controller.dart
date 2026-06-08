@@ -246,7 +246,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // post-frame ensureVisible.
     if (!_scroll.hasClients || _gridColumns <= 0) return;
 
-    const rowStride = 219.0;
+    const rowStride = 244.0;
     final previousRow = previousIndex ~/ _gridColumns;
     final targetRow = targetIndex ~/ _gridColumns;
     final deltaRows = targetRow - previousRow;

@@ -199,3 +199,13 @@ Home platform/category switching must feel instant on TV:
 - OK still commits immediately.
 - Do not wait for the user to press Home/LiveGo again after the chip focus already moved.
 - Debounce prevents API spam during fast remote movement.
+
+## Home Cache and Image Responsiveness Rule
+
+Home must not feel like first launch after category/platform was already loaded.
+Rules:
+- RAM cache must be used even when `clearPrevious=true` for matching platform/category.
+- Disk cache is still checked before network.
+- TV image decode widths stay small to protect RAM/FPS.
+- TV Home grid remains 6 columns; do not switch to 7 just to reduce blank space.
+- Heavy high-quality image upgrade must not fight first Home render or remote focus.

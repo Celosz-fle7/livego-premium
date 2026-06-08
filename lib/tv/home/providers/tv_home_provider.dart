@@ -33,7 +33,10 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     _lastCategory = selectedCategory;
     final token = ++_loadToken;
 
-    final ramState = clearPrevious ? null : _repository.readRam(platform, selectedCategory);
+    // Even when the UI asks to clear previous content, show matching RAM cache
+    // immediately if the same platform/category was already loaded before.
+    // This prevents category/platform switching from feeling like first launch.
+    final ramState = _repository.readRam(platform, selectedCategory);
     if (ramState != null && ramState.items.isNotEmpty) {
       final next = _repository.asRefreshingCache(ramState);
       _lastGoodState = next;
