@@ -44,8 +44,8 @@ class LiveGoApiPlatform {
 class LiveGoApiPlatforms {
   static const List<LiveGoApiPlatform> all = [
     // DOBDA FAMILY = ON / active.
-    // ANICHIN FAMILY = OFF / reserved, tidak masuk Home/Source Manager.
-    // Nama platform bisa mirip, tapi registry aktif di bawah ini murni Dobda clean starter.
+    // ANICHIN FAMILY = OFF / legacy/reserved, tidak masuk Home/Source Manager.
+    // Nama source bisa mirip, tapi registry aktif di bawah ini murni Dobda clean starter.
     LiveGoApiPlatform(
       slug: 'dobda_freereels',
       endpointSlug: 'freereels',

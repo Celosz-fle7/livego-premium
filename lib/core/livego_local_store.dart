@@ -327,8 +327,22 @@ class LiveGoLocalStore {
       LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 5).toInt();
       LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(6, 10).toInt();
 
-      final active = _stringList(json['activePlatforms']).where(supported.contains).toList();
-      final home = _stringList(json['homePlatforms']).where(supported.contains).toList();
+      final savedActivePlatforms = _stringList(json['activePlatforms']);
+      final savedHomePlatforms = _stringList(json['homePlatforms']);
+      var active = _dedupeSupported(savedActivePlatforms, supported);
+      var home = _dedupeSupported(savedHomePlatforms, supported);
+      final hasLegacyApiSource = savedActivePlatforms.any(_isLegacyApiSource) ||
+          savedHomePlatforms.any(_isLegacyApiSource) ||
+          _isLegacyApiSource(json['defaultPlatform']);
+
+      // Kalau setting lama masih berisi Anichin-style source, reset ke Dobda clean starter.
+      // Ini mencegah Home/Source Manager campur engine lama dengan Dobda aktif.
+      if (hasLegacyApiSource && active.length < 2) {
+        active = List<String>.from(LiveGoSettings.defaultPlatforms);
+      }
+      if (hasLegacyApiSource && home.length < 2) {
+        home = List<String>.from(LiveGoSettings.defaultPlatforms);
+      }
       if (active.isNotEmpty) {
         LiveGoSettings.activePlatforms
           ..clear()
@@ -345,7 +359,7 @@ class LiveGoLocalStore {
             : LiveGoSettings.defaultPlatforms.first);
       }
 
-      final savedDefault = _string(json['defaultPlatform'], LiveGoSettings.homePlatforms.first);
+      final savedDefault = _normalizeSavedPlatform(_string(json['defaultPlatform'], LiveGoSettings.homePlatforms.first));
       LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.contains(savedDefault)
           ? savedDefault
           : LiveGoSettings.homePlatforms.first;
@@ -353,7 +367,7 @@ class LiveGoLocalStore {
       final languages = json['platformLanguages'];
       if (languages is Map) {
         for (final entry in languages.entries) {
-          final slug = '${entry.key}';
+          final slug = _normalizeSavedPlatform(entry.key);
           if (supported.contains(slug)) {
             LiveGoSettings.setLanguageForPlatform(slug, '${entry.value}');
           }
@@ -363,7 +377,7 @@ class LiveGoLocalStore {
       final categories = json['homeCategories'];
       if (categories is Map) {
         for (final entry in categories.entries) {
-          final slug = '${entry.key}';
+          final slug = _normalizeSavedPlatform(entry.key);
           if (!supported.contains(slug)) continue;
           LiveGoSettings.setCategoriesFor(slug, _stringList(entry.value));
         }
@@ -373,7 +387,7 @@ class LiveGoLocalStore {
       if (tvLastCategories is Map) {
         LiveGoSettings.tvLastHomeCategories.clear();
         for (final entry in tvLastCategories.entries) {
-          final slug = '${entry.key}';
+          final slug = _normalizeSavedPlatform(entry.key);
           if (!supported.contains(slug)) continue;
           final max = LiveGoSettings.categoriesFor(slug).length - 1;
           if (max < 0) continue;
@@ -383,6 +397,42 @@ class LiveGoLocalStore {
     } catch (e) {
       if (kDebugMode) debugPrint('LIVEGO SETTINGS LOAD ERROR: $e');
     }
+  }
+
+  static List<String> _dedupeSupported(List<String> values, Set<String> supported) {
+    final out = <String>[];
+    final seen = <String>{};
+    for (final value in values) {
+      final slug = _normalizeSavedPlatform(value);
+      if (!supported.contains(slug)) continue;
+      if (seen.add(slug)) out.add(slug);
+    }
+    return out;
+  }
+
+  static bool _isLegacyApiSource(Object? value) {
+    final slug = '${value ?? ''}'.trim().toLowerCase();
+    return const <String>{
+      'shortmax',
+      'netshort',
+      'pinedrama',
+      'flickreels',
+      'meloshort',
+      'dramabox',
+      'melolo',
+      'dobda_shortmax',
+      'dobda_netshort',
+      'dobda_pinedrama',
+      'dobda_flickreels',
+      'dobda_meloshort',
+      'dobda_melolo',
+    }.contains(slug);
+  }
+
+  static String _normalizeSavedPlatform(Object? value) {
+    final slug = '${value ?? ''}'.trim().toLowerCase();
+    if (_isLegacyApiSource(slug)) return 'dobda_freereels';
+    return slug;
   }
 
   static String _string(Object? value, String fallback) {
