@@ -17,14 +17,14 @@ class DobdaApiClient {
 
 
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
   }) async {
     return homeFeed(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -32,7 +32,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -45,7 +45,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> homeFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -70,7 +70,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> liveGoFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -108,7 +108,7 @@ class DobdaApiClient {
 
   // Migrasi aman untuk setting/cache lama yang masih menyimpan kategori Indonesia.
   static Future<List<ContentItem>> indonesiaFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -116,7 +116,7 @@ class DobdaApiClient {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
@@ -130,7 +130,7 @@ class DobdaApiClient {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) async {

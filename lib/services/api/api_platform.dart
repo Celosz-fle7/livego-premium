@@ -43,48 +43,9 @@ class LiveGoApiPlatform {
 
 class LiveGoApiPlatforms {
   static const List<LiveGoApiPlatform> all = [
-    // Dobda-only starter registry.
-    // Anichin/Aicin-like platform configs were removed from active registry
-    // after backup/api-before-clean to keep API/Home management simple.
-    LiveGoApiPlatform(
-      slug: 'dobda_shortmax',
-      endpointSlug: 'shortmax',
-      name: 'ShortMax',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-    LiveGoApiPlatform(
-      slug: 'dobda_netshort',
-      endpointSlug: 'netshort',
-      name: 'NetShort',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-    LiveGoApiPlatform(
-      slug: 'dobda_pinedrama',
-      endpointSlug: 'pinedrama',
-      name: 'PineDrama',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
+    // DOBDA FAMILY = ON / active.
+    // ANICHIN FAMILY = OFF / reserved, tidak masuk Home/Source Manager.
+    // Nama platform bisa mirip, tapi registry aktif di bawah ini murni Dobda clean starter.
     LiveGoApiPlatform(
       slug: 'dobda_freereels',
       endpointSlug: 'freereels',
@@ -99,9 +60,9 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_flickreels',
-      endpointSlug: 'flickreels',
-      name: 'FlickReels',
+      slug: 'dobda_goodshort',
+      endpointSlug: 'goodshort',
+      name: 'GoodShort',
       backend: LiveGoApiBackend.dobda,
       defaultLang: 'id',
       searchParam: 'query',
@@ -112,9 +73,48 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_meloshort',
-      endpointSlug: 'meloshort',
-      name: 'MeloShort',
+      slug: 'dobda_dramawave',
+      endpointSlug: 'dramawave',
+      name: 'DramaWave',
+      backend: LiveGoApiBackend.dobda,
+      defaultLang: 'id',
+      searchParam: 'query',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      categories: ['Home', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_reelshort',
+      endpointSlug: 'reelshort',
+      name: 'ReelShort',
+      backend: LiveGoApiBackend.dobda,
+      defaultLang: 'id',
+      searchParam: 'query',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      categories: ['Home', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_reelife',
+      endpointSlug: 'reelife',
+      name: 'ReelLife',
+      backend: LiveGoApiBackend.dobda,
+      defaultLang: 'id',
+      searchParam: 'query',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      categories: ['Home', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_rapidtv',
+      endpointSlug: 'rapidtv',
+      name: 'RapidTV',
       backend: LiveGoApiBackend.dobda,
       defaultLang: 'id',
       searchParam: 'query',
@@ -129,15 +129,15 @@ class LiveGoApiPlatforms {
 
   /// TV starter pack yang diexpose ke Home/Source Manager.
   ///
-  /// Registry aktif sengaja dipersempit ke 6 Dobda starter supaya API/Home tidak
-  /// membingungkan. Provider client lama belum dihapus sampai hasil test aman.
+  /// Anichin-style source disimpan sebagai legacy/off. Yang ON hanya Dobda clean
+  /// starter supaya Home tidak campur antara engine Anichin dan engine Dobda.
   static const List<String> tvStarterSlugs = <String>[
-    'dobda_shortmax',
-    'dobda_netshort',
-    'dobda_pinedrama',
     'dobda_freereels',
-    'dobda_flickreels',
-    'dobda_meloshort',
+    'dobda_goodshort',
+    'dobda_dramawave',
+    'dobda_reelshort',
+    'dobda_reelife',
+    'dobda_rapidtv',
   ];
 
   static List<String> get supportedSlugs => List<String>.unmodifiable(tvStarterSlugs);
@@ -198,9 +198,9 @@ class LiveGoApiPlatforms {
     var clean = requested.trim().toLowerCase();
     if (clean.isEmpty) return config.defaultLang;
 
-    // Aplikasi pakai kode Indonesia `id`; legacy NetShort alias `in` tetap dinormalisasi.
-    if (config.slug == 'netshort' && clean == 'id') clean = 'in';
-    if (config.slug != 'netshort' && clean == 'in' && config.supportedLangs.contains('id')) {
+    // Legacy NetShort alias `in` tetap dinormalisasi hanya jika source itu diaktifkan lagi.
+    if (config.apiSlug == 'netshort' && clean == 'id') clean = 'in';
+    if (config.apiSlug != 'netshort' && clean == 'in' && config.supportedLangs.contains('id')) {
       clean = 'id';
     }
 

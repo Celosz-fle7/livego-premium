@@ -105,12 +105,12 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   int _sourcePriority(String slug) {
     const order = <String, int>{
-      'dobda_shortmax': 0,
-      'dobda_netshort': 1,
-      'dobda_pinedrama': 2,
-      'dobda_freereels': 3,
-      'dobda_flickreels': 4,
-      'dobda_meloshort': 5,
+      'dobda_freereels': 0,
+      'dobda_goodshort': 1,
+      'dobda_dramawave': 2,
+      'dobda_reelshort': 3,
+      'dobda_reelife': 4,
+      'dobda_rapidtv': 5,
     };
     return order[slug] ?? 99;
   }

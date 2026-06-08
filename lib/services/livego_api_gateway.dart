@@ -19,14 +19,14 @@ class LiveGoApiGateway {
   static bool isDobda(String platform) => true;
 
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
   }) {
     return DobdaApiClient.home(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
     int page = 1,
   }) {
@@ -34,7 +34,7 @@ class LiveGoApiGateway {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -48,7 +48,7 @@ class LiveGoApiGateway {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
   }) {
     return DobdaApiClient.banner(platform: platform, lang: lang);
@@ -56,7 +56,7 @@ class LiveGoApiGateway {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String lang = 'id',
   }) {
     return DobdaApiClient.search(query: query, platform: platform, lang: lang);

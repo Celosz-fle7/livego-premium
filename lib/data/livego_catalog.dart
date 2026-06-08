@@ -27,7 +27,7 @@ class LiveGoCatalog {
   static List<String> get allPlatforms => LiveGoApiGateway.supportedPlatforms;
   static List<String> get platformLabels => platforms.map(label).toList();
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_shortmax' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_freereels' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
 
@@ -119,7 +119,7 @@ class LiveGoCatalog {
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> home({String platform = 'dobda_freereels'}) async {
     const endpoint = 'home_clean_v2';
     final lang = languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -181,7 +181,7 @@ class LiveGoCatalog {
 
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String category = 'Home',
     bool allowExpired = true,
   }) async {
@@ -202,7 +202,7 @@ class LiveGoCatalog {
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -296,13 +296,13 @@ class LiveGoCatalog {
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'dobda_freereels'}) async {
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
     return [];
   }
 
-  static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
+  static Future<ContentItem> hero({String platform = 'dobda_freereels'}) async {
     try {
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
@@ -310,7 +310,7 @@ class LiveGoCatalog {
     return MockCatalog.hero;
   }
 
-  static Future<List<ContentItem>> search(String query, {String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> search(String query, {String platform = 'dobda_freereels'}) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
     final cached = await LiveGoContentCache.readItems(
@@ -362,7 +362,7 @@ class LiveGoCatalog {
     }
 
     if (merged.isEmpty) {
-      for (final platform in ApiPlatformFallbackRouter.candidates(platforms.isEmpty ? 'dobda_shortmax' : platforms.first, max: 5)) {
+      for (final platform in ApiPlatformFallbackRouter.candidates(platforms.isEmpty ? 'dobda_freereels' : platforms.first, max: 5)) {
         if (platforms.contains(platform)) continue;
         mergeRows(await search(clean, platform: platform));
         if (merged.isNotEmpty) break;

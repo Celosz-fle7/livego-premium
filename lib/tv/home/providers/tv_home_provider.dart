@@ -71,7 +71,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
 
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
-  String _lastPlatform = 'dobda_shortmax';
+  String _lastPlatform = 'dobda_freereels';
   String _lastCategory = 'Home';
 
   List<ContentItem> _prepareItems(List<ContentItem> rows) {
