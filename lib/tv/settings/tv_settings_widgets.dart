@@ -20,39 +20,49 @@ class _Header extends StatelessWidget {
       child: InkWell(
         canRequestFocus: false,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         focusColor: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: AppTheme.surface.withOpacity(0.96),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 1.8 : 1),
-            boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 14)],
+            gradient: focused
+                ? LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      AppTheme.surface3.withOpacity(0.98),
+                      AppTheme.surface2.withOpacity(0.88),
+                    ],
+                  )
+                : null,
+            color: focused ? null : AppTheme.surface.withOpacity(0.88),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.74), width: focused ? 2.1 : 1),
+            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.09), blurRadius: 16)] : const [BoxShadow(color: Colors.black38, blurRadius: 12)],
           ),
           child: Row(
             children: [
               if (showBackButton) ...[
                 Container(
-                  width: 54,
-                  height: 54,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: focused ? AppTheme.surface3 : AppTheme.surface2,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: focused ? AppTheme.cyan : Colors.white10, width: focused ? 2 : 1),
+                    color: focused ? AppTheme.surface3 : AppTheme.surface2.withOpacity(0.78),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.42) : Colors.white10, width: focused ? 2 : 1),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
               ],
               Container(
-                width: 64,
-                height: 64,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   gradient: AppTheme.activeGradient,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 32),
+                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 29),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -60,11 +70,11 @@ class _Header extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.2, decoration: TextDecoration.none)),
-                    SizedBox(height: 8),
-                    Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                    SizedBox(height: 6),
-                    Text('Rapikan mode tampilan, source, izin, dan cache dari satu tempat.', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                    Text('CONTROL CENTER', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 10.2, letterSpacing: 1.1, decoration: TextDecoration.none)),
+                    SizedBox(height: 5),
+                    Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                    SizedBox(height: 4),
+                    Text('Mode TV, source, izin, dan cache dari satu tempat.', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textSoft, fontSize: 11, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
                   ],
                 ),
               ),
@@ -84,13 +94,13 @@ class _HeaderPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surface3,
+        color: AppTheme.surface3.withOpacity(0.82),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.62)),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11.5, decoration: TextDecoration.none)),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10.8, decoration: TextDecoration.none)),
     );
   }
 }
@@ -102,8 +112,8 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 7),
-      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 12.5, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none)),
+      padding: const EdgeInsets.only(left: 4, top: 5),
+      child: Text(text.toUpperCase(), style: const TextStyle(color: Colors.white60, fontSize: 11.8, fontWeight: FontWeight.w900, letterSpacing: 1.0, decoration: TextDecoration.none)),
     );
   }
 }
@@ -117,21 +127,21 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.border),
+        color: AppTheme.surface.withOpacity(0.84),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.74)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (description != null) ...[
             SizedBox(
-              height: 48,
+              height: 42,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-                child: Text(description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 3),
+                child: Text(description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.4, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               ),
             ),
           ],
@@ -164,24 +174,24 @@ class _DeterministicSettingRow extends StatelessWidget {
       child: InkWell(
         canRequestFocus: false,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         focusColor: Colors.transparent,
         child: Column(
           children: [
             Expanded(
               child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 3),
-                padding: EdgeInsets.symmetric(horizontal: isRadio ? 12 : 13, vertical: isRadio ? 11 : 9),
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: EdgeInsets.symmetric(horizontal: isRadio ? 11 : 12, vertical: isRadio ? 9 : 8),
                 decoration: BoxDecoration(
-                  color: focused ? AppTheme.surface3 : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: focused ? accent : Colors.transparent, width: 2),
+                  color: focused ? AppTheme.surface3.withOpacity(0.96) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: focused ? AppTheme.whiteGlow : Colors.transparent, width: focused ? 2.1 : 1),
                   boxShadow: null,
                 ),
                 child: isRadio ? _RadioContent(item: item, focused: focused) : _TileContent(item: item, focused: focused, accent: accent),
               ),
             ),
-            const Divider(color: AppTheme.border, height: 1),
+            Divider(color: AppTheme.borderSoft.withOpacity(0.58), height: 1),
           ],
         ),
       ),
@@ -199,12 +209,12 @@ class _RadioContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft, size: 24),
-        const SizedBox(width: 14),
+        Icon(item.active ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, color: item.active || focused ? AppTheme.cyan : AppTheme.textSoft, size: 22),
+        const SizedBox(width: 12),
         Expanded(
-          child: Text(item.title, style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 15.5, decoration: TextDecoration.none)),
+          child: Text(item.title, style: TextStyle(color: item.active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 14.4, decoration: TextDecoration.none)),
         ),
-        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11.5, decoration: TextDecoration.none)),
+        if (item.active) const Text('AKTIF', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 10.8, decoration: TextDecoration.none)),
       ],
     );
   }
@@ -222,40 +232,40 @@ class _TileContent extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: AppTheme.surface3,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: focused ? accent.withOpacity(0.85) : AppTheme.border),
+            color: AppTheme.surface3.withOpacity(0.82),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.44) : AppTheme.borderSoft.withOpacity(0.70)),
           ),
-          child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 23),
+          child: Icon(item.icon, color: item.danger ? accent : Colors.white, size: 21),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-              const SizedBox(height: 5),
-              Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11.5, height: 1.25, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
+              Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+              const SizedBox(height: 4),
+              Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10.8, height: 1.20, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
               if (item.showGridBar) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 9),
                 _TvGridStepper(value: LiveGoSettings.tvHomeGrid, focused: focused),
               ],
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         if (item.switchValue != null)
           _SwitchPill(value: item.switchValue!, focused: focused)
         else if (item.showGridBar)
-          Text('←  ${LiveGoSettings.tvHomeGrid}  →', style: TextStyle(color: focused ? accent : AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 12.5, decoration: TextDecoration.none))
+          Text('←  ${LiveGoSettings.tvHomeGrid}  →', style: TextStyle(color: focused ? accent : AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11.6, decoration: TextDecoration.none))
         else
-          Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 12.5, decoration: TextDecoration.none)),
-        const SizedBox(width: 12),
-        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 26),
+          Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 11.6, decoration: TextDecoration.none)),
+        const SizedBox(width: 10),
+        Icon(item.danger ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_right_rounded, color: focused ? accent : Colors.white38, size: 24),
       ],
     );
   }
@@ -270,16 +280,16 @@ class _SwitchPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 58,
-      height: 30,
+      width: 54,
+      height: 28,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : AppTheme.surface3,
+        color: value ? AppTheme.cyan.withOpacity(focused ? 0.95 : 0.78) : AppTheme.surface3.withOpacity(0.86),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: focused ? Colors.white70 : Colors.transparent),
+        border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.70) : Colors.transparent),
       ),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+      child: Container(width: 22, height: 22, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
     );
   }
 }
@@ -294,26 +304,26 @@ class _TvGridStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget box(String text, {bool active = false}) {
       return Container(
-        width: active ? 56 : 36,
-        height: 28,
+        width: active ? 52 : 34,
+        height: 26,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: active || focused ? AppTheme.cyan.withOpacity(0.75) : Colors.white12),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: active || focused ? AppTheme.whiteGlow.withOpacity(0.64) : Colors.white12),
         ),
-        child: Text(text, style: TextStyle(color: active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 12, decoration: TextDecoration.none)),
+        child: Text(text, style: TextStyle(color: active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11.4, decoration: TextDecoration.none)),
       );
     }
 
     return Row(
       children: [
         box('-'),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         box('$value', active: true),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         box('+'),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(child: _GridPreview(value: value)),
       ],
     );
@@ -331,10 +341,10 @@ class _GridPreview extends StatelessWidget {
         final active = i < value;
         return Expanded(
           child: Container(
-            height: 6,
+            height: 5,
             margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
             decoration: BoxDecoration(
-              color: active ? AppTheme.cyan : AppTheme.border,
+              color: active ? AppTheme.cyan : AppTheme.borderSoft.withOpacity(0.72),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
