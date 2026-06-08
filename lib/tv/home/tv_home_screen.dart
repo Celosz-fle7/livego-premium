@@ -21,6 +21,7 @@ import 'providers/tv_home_provider.dart';
 import 'providers/tv_home_content_state.dart';
 import 'focus/tv_home_focus_state.dart';
 import '../providers/tv_remote_owner.dart';
+import '../source_manager/tv_source_manager_screen.dart';
 import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
@@ -242,6 +243,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       label: 'Platform',
                       hint: LiveGoCatalog.label(_platformSlug),
                       height: 52,
+                      onHeaderTap: this._openPlatformManager,
                       child: TvChipRow(
                         labels: platforms,
                         selected: _platformIndex,
@@ -260,6 +262,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       label: 'Kategori',
                       hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
                       height: 52,
+                      onHeaderTap: this._openCategoryManager,
                       child: TvChipRow(
                         labels: categories,
                         selected: _categoryIndex,

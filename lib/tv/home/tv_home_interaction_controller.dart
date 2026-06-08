@@ -378,6 +378,40 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     widget.onRequestExit?.call();
   }
 
+  Future<void> _openPlatformManager() async {
+    _cancelHomeSelectionCommit();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const TvSourceManagerScreen(
+          initialMode: TvSourceManagerMode.platform,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _refreshIfSettingsChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusPlatform(_platformIndex, throttle: false);
+    });
+  }
+
+  Future<void> _openCategoryManager() async {
+    _cancelHomeSelectionCommit();
+    final platform = _platformSlug;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TvSourceManagerScreen(
+          initialMode: TvSourceManagerMode.category,
+          initialPlatformSlug: platform,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _refreshIfSettingsChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusCategory(_categoryIndex, throttle: false);
+    });
+  }
+
   void _scrollHomeToTop() {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;

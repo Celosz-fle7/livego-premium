@@ -221,3 +221,13 @@ Final Home remote UX:
 - BACK from Grid returns to the first Home look/Banner.
 - BACK from Banner opens the Shell exit popup.
 - Do not make Platform/Category disappear during normal grid browsing.
+
+## Source Manager Migration Links Repair
+
+Final rule after Dobda migration:
+- Source Manager default route opens platform mode.
+- Platform mode shows all supported user platforms and does not show category chips in every row.
+- Home Platform header opens Source Manager platform mode.
+- Home Kategori header opens Source Manager category mode for the current platform only.
+- Category mode can edit Home/LiveGo for that one platform.
+- The old 6-platform limit is only a starter default, not a Source Manager lock.

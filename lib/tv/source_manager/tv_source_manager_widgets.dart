@@ -75,7 +75,7 @@ class _SourceHeaderLite extends StatelessWidget {
                 border: Border.all(color: AppTheme.cyan.withOpacity(0.28)),
               ),
               child: Text(
-                '$activeCount/6 AKTIF',
+                '$activeCount AKTIF',
                 style: const TextStyle(color: AppTheme.cyan, fontSize: 11.2, fontWeight: FontWeight.w900, decoration: TextDecoration.none),
               ),
             ),
@@ -124,6 +124,7 @@ class _SourceRowLite extends StatelessWidget {
   final bool active;
   final bool recommended;
   final bool beta;
+  final bool showCategories;
   final List<String> categories;
   final List<String> selectedCategories;
   final bool platformFocused;
@@ -140,6 +141,7 @@ class _SourceRowLite extends StatelessWidget {
     required this.active,
     required this.recommended,
     required this.beta,
+    required this.showCategories,
     required this.categories,
     required this.selectedCategories,
     required this.platformFocused,
@@ -149,7 +151,7 @@ class _SourceRowLite extends StatelessWidget {
   });
 
   List<int> _visibleIndexes() {
-    if (categories.isEmpty) return const <int>[];
+    if (!showCategories || categories.isEmpty) return const <int>[];
     const maxVisible = 6;
     if (categories.length <= maxVisible) return List<int>.generate(categories.length, (i) => i);
     final safe = categoryIndex.clamp(0, categories.length - 1).toInt();
@@ -224,10 +226,11 @@ class _SourceRowLite extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Expanded(
-                    flex: 38,
-                    child: Container(
+                  if (showCategories) ...[
+                    const SizedBox(height: 6),
+                    Expanded(
+                      flex: 38,
+                      child: Container(
                       padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
                       decoration: _decoration(categoryFocused),
                       child: Row(
@@ -273,8 +276,9 @@ class _SourceRowLite extends StatelessWidget {
                           ],
                         ],
                       ),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
