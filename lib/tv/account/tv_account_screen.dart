@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../screens/tv_settings_screen.dart';
 import '../layout/tv_safe_zone.dart';
 import '../screens/tv_source_manager_screen.dart';
+import '../update/tv_update_screen.dart';
 import 'tv_account_config.dart';
 import 'tv_account_menu_data.dart';
 import 'widgets/tv_account_header.dart';
@@ -240,7 +241,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _message(TvAccountConfig.aboutMessage);
         break;
       case TvAccountAction.update:
-        _message(TvAccountConfig.updateMessage);
+        _push(const TvUpdateScreen());
         break;
 
       // These actions are intentionally navbar-owned. They are not shown in the
