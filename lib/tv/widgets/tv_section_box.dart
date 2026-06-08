@@ -24,14 +24,14 @@ class TvSectionBox extends StatelessWidget {
     return RepaintBoundary(
       child: Container(
         height: height,
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xF4071326), Color(0xF0010409)],
           ),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppTheme.borderSoft.withOpacity(0.92), width: 1.0),
           boxShadow: [
             const BoxShadow(color: Colors.black54, blurRadius: 11),
@@ -41,28 +41,28 @@ class TvSectionBox extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 116,
+              width: 96,
               height: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.035),
-                borderRadius: BorderRadius.circular(17),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.white.withOpacity(0.055)),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 30,
-                    height: 30,
+                    width: 26,
+                    height: 26,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: AppTheme.cyan.withOpacity(0.11),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppTheme.cyan.withOpacity(0.18)),
                     ),
-                    child: Icon(icon, color: AppTheme.cyan.withOpacity(0.92), size: 17),
+                    child: Icon(icon, color: AppTheme.cyan.withOpacity(0.92), size: 15),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -74,9 +74,9 @@ class TvSectionBox extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: TvFocusStyle.focusBlue.withOpacity(0.78),
-                            fontSize: 9.4,
+                            fontSize: 8.8,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 1.3,
+                            letterSpacing: 0.9,
                             decoration: TextDecoration.none,
                           ),
                         ),
@@ -87,7 +87,7 @@ class TvSectionBox extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white70,
-                            fontSize: 10.8,
+                            fontSize: 9.8,
                             fontWeight: FontWeight.w800,
                             decoration: TextDecoration.none,
                           ),
@@ -98,7 +98,7 @@ class TvSectionBox extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(child: child),
           ],
         ),

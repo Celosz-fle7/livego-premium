@@ -34,12 +34,12 @@ class TvChipRow extends StatelessWidget {
           onKey: (node, event) => onKey(i, event),
         );
 
-    if (count <= 5) {
+    if (count <= 6) {
       return Row(
         children: List.generate(count, (i) {
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: i == count - 1 ? 0 : 10),
+              padding: EdgeInsets.only(right: i == count - 1 ? 0 : 6),
               child: chipAt(i),
             ),
           );
@@ -52,8 +52,8 @@ class TvChipRow extends StatelessWidget {
       child: Row(
         children: List.generate(count, (i) {
           return Padding(
-            padding: EdgeInsets.only(right: i == count - 1 ? 0 : 8),
-            child: SizedBox(width: 144, child: chipAt(i)),
+            padding: EdgeInsets.only(right: i == count - 1 ? 0 : 6),
+            child: SizedBox(width: 126, child: chipAt(i)),
           );
         }),
       ),
@@ -100,8 +100,8 @@ class _TvChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               focusColor: Colors.transparent,
               child: Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: active
@@ -128,7 +128,7 @@ class _TvChip extends StatelessWidget {
                         height: 6,
                         decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 5),
                     ],
                     Flexible(
                       child: Text(
@@ -137,7 +137,7 @@ class _TvChip extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: selected ? Colors.white : AppTheme.textSoft,
-                          fontSize: 12.4,
+                          fontSize: 11.2,
                           fontWeight: FontWeight.w900,
                           decoration: TextDecoration.none,
                         ),
