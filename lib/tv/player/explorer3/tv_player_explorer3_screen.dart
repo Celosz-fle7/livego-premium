@@ -11,6 +11,7 @@ import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../tv_player_service.dart';
 import 'tv_player_explorer3_native_payload.dart';
+import 'tv_player_explorer3_timing.dart';
 import 'widgets/tv_player_explorer3_controls.dart';
 
 /// TV Player Explorer 3.
@@ -97,7 +98,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     super.initState();
     _nativeSurfacePlayer.setMethodCallHandler(_handleNativeSurfaceMethod);
     _episode = widget.episode ?? int.tryParse(widget.item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(widget.item);
-    _episode = _episode.clamp(1, 999).toInt();
+    _episode = _episode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
     _episodeCursor = _episode;
     _chapterId = widget.item.chapterId.trim().isNotEmpty ? widget.item.chapterId.trim() : '$_episode';
     LiveGoLocalStore.addHistory(widget.item);
@@ -153,12 +154,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   int _episodeTotal() {
     final fromStream = _streamInfo.totalEpisodes;
-    if (fromStream > 1) return fromStream.clamp(1, 999).toInt();
+    if (fromStream > 1) return fromStream.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
     final fromWarmList = _episodeListTotal;
-    if (fromWarmList > 1) return fromWarmList.clamp(1, 999).toInt();
+    if (fromWarmList > 1) return fromWarmList.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
     final fromItem = widget.item.episodes;
-    if (fromItem > 1) return fromItem.clamp(1, 999).toInt();
-    return 999;
+    if (fromItem > 1) return fromItem.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    return TvPlayerExplorer3Timing.maxEpisode;
   }
 
   List<String> get _qualityChoices {
@@ -309,13 +310,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final delta = requestedEpisode == currentEpisode ? 0 : (requestedEpisode > currentEpisode ? 1 : -1);
 
     try {
-      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 4));
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeResolveTimeout);
       final cleanRows = rows
           .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
           .toList(growable: false);
 
       if (cleanRows.length <= 1) {
-        final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+        final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
         return MapEntry(safeEpisode, '$safeEpisode');
       }
 
@@ -332,7 +333,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         final index = rawIndex > 0 ? rawIndex : requestedEpisode;
         final rawId = '${row.id}'.trim();
         final chapterId = rawId.isNotEmpty ? rawId : '$index';
-        return MapEntry(index.clamp(1, 999).toInt(), chapterId);
+        return MapEntry(index.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt(), chapterId);
       }
 
       final currentPos = indexOfCurrent();
@@ -351,10 +352,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       final exact = cleanRows.indexWhere((episode) => episode.index == requestedEpisode);
       if (exact >= 0) return fromRow(cleanRows[exact]);
 
-      final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+      final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
       return MapEntry(safeEpisode, '$safeEpisode');
     } catch (_) {
-      final safeEpisode = requestedEpisode.clamp(1, 999).toInt();
+      final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
       return MapEntry(safeEpisode, '$safeEpisode');
     }
   }
@@ -364,7 +365,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _episodeWarmupTimer = null;
   }
 
-  void _scheduleEpisodeListWarmup({Duration delay = const Duration(seconds: 1)}) {
+  void _scheduleEpisodeListWarmup({Duration delay = TvPlayerExplorer3Timing.episodeWarmupDelay}) {
     _cancelEpisodeListWarmup();
 
     final token = _loadToken;
@@ -385,7 +386,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!_rememberPrefetchKey(key)) return;
 
     try {
-      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 5));
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeWarmupTimeout);
       if (!_active(token)) return;
 
       var maxIndex = 0;
@@ -397,7 +398,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       if (inferredTotal > 1 && inferredTotal != _episodeListTotal) {
         if (!mounted) return;
         setState(() {
-          _episodeListTotal = inferredTotal.clamp(1, 999).toInt();
+          _episodeListTotal = inferredTotal.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
         });
       }
 
@@ -409,14 +410,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   Future<List<MapEntry<int, String>>> _orderedPrefetchTargets(int count) async {
     try {
-      final rows = await _service.episodes(_playableItem()).timeout(const Duration(seconds: 4));
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeResolveTimeout);
       final cleanRows = rows
           .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
           .toList(growable: false);
 
       if (cleanRows.length <= 1) {
         return List<MapEntry<int, String>>.generate(count, (index) {
-          final episode = (_episode + index + 1).clamp(1, 999).toInt();
+          final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
           return MapEntry(episode, '$episode');
         });
       }
@@ -435,13 +436,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         final index = rawIndex > 0 ? rawIndex : 1;
         final rawId = '${row.id}'.trim();
         final chapterId = rawId.isNotEmpty ? rawId : '$index';
-        return MapEntry(index.clamp(1, 999).toInt(), chapterId);
+        return MapEntry(index.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt(), chapterId);
       }
 
       final current = currentIndex();
       if (current < 0) {
         return List<MapEntry<int, String>>.generate(count, (index) {
-          final episode = (_episode + index + 1).clamp(1, 999).toInt();
+          final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
           return MapEntry(episode, '$episode');
         });
       }
@@ -455,7 +456,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return targets;
     } catch (_) {
       return List<MapEntry<int, String>>.generate(count, (index) {
-        final episode = (_episode + index + 1).clamp(1, 999).toInt();
+        final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
         return MapEntry(episode, '$episode');
       });
     }
@@ -474,7 +475,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   bool _rememberPrefetchKey(String key) {
     if (_prefetchKeys.contains(key)) return false;
     _prefetchKeys.add(key);
-    if (_prefetchKeys.length > 96) {
+    if (_prefetchKeys.length > TvPlayerExplorer3Timing.prefetchKeyLimit) {
       _prefetchKeys.remove(_prefetchKeys.first);
     }
     return true;
@@ -485,7 +486,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _prefetchTimer = null;
   }
 
-  void _scheduleLightPrefetch({Duration delay = const Duration(seconds: 10)}) {
+  void _scheduleLightPrefetch({Duration delay = TvPlayerExplorer3Timing.lightPrefetchDelay}) {
     _cancelLightPrefetch();
 
     final token = _loadToken;
@@ -506,12 +507,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   ) async {
     if (!_active(token)) return;
 
-    final targets = await _orderedPrefetchTargets(2);
+    final targets = await _orderedPrefetchTargets(TvPlayerExplorer3Timing.defaultPrefetchCount);
     for (final target in targets) {
       if (!_active(token)) return;
       if (_episode != baseEpisode || _chapterId != baseChapterId) return;
 
-      final targetEpisode = target.key.clamp(1, 999).toInt();
+      final targetEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
       final targetChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$targetEpisode';
 
       if (targetEpisode == _episode && targetChapterId == _chapterId.trim()) {
@@ -533,7 +534,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
               chapterId: item.chapterId,
               episode: targetEpisode,
             )
-            .timeout(const Duration(seconds: 7));
+            .timeout(TvPlayerExplorer3Timing.lightPrefetchTimeout);
 
         if (result.hasStream) {
           debugPrint('LIVEGO TV PLAYER PREFETCH OK ep=$targetEpisode chapter=$targetChapterId source=${result.source}');
@@ -557,7 +558,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     try {
       final target = await _resolveOrderedEpisodeTarget(requestedEpisode);
-      _episode = target.key.clamp(1, 999).toInt();
+      _episode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
       _chapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$_episode';
       _episodeCursor = _episode;
 
@@ -756,7 +757,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     try {
       await controller.initialize().timeout(
-        const Duration(seconds: 22),
+        TvPlayerExplorer3Timing.fallbackControllerInitTimeout,
         onTimeout: () => throw TimeoutException('Initialize video timeout'),
       );
       if (!_active(token)) {
@@ -799,8 +800,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   void _detectVideoPlayback(int token) {
     int checkCount = 0;
-    const maxChecks = 60;
-    const checkInterval = Duration(milliseconds: 100);
+    final maxChecks = TvPlayerExplorer3Timing.surfaceMaxChecks;
+    final checkInterval = TvPlayerExplorer3Timing.surfaceCheckInterval;
 
     void checkProgress() {
       if (!_active(token)) return;
@@ -876,7 +877,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     // Keep the visible progress text fresh without adding a recorder/timer.
     final now = DateTime.now().millisecondsSinceEpoch;
-    if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= 500) {
+    if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= TvPlayerExplorer3Timing.playerUiTickMs) {
       _lastPlayerUiTickMs = now;
       setState(() {});
     }
@@ -900,7 +901,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   void _scheduleAutoHide() {
     _cancelAutoHide();
-    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+    _hideControlsTimer = Timer(TvPlayerExplorer3Timing.autoHideDelay, () {
       if (!mounted || _loading || _error.isNotEmpty) return;
       if (_mode == _Explorer3Mode.controls) {
         setState(() => _mode = _Explorer3Mode.watching);
@@ -951,7 +952,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _rootFocus.requestFocus();
   }
 
-  void _showStatus(String message, {Duration duration = const Duration(seconds: 2)}) {
+  void _showStatus(String message, {Duration duration = TvPlayerExplorer3Timing.statusDelay}) {
     _statusTimer?.cancel();
     if (!mounted) return;
     setState(() {
@@ -965,7 +966,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
   }
 
-  bool _allowCursorMove([int ms = 90]) {
+  bool _allowCursorMove([int ms = TvPlayerExplorer3Timing.cursorMoveGuardMs]) {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastCursorMoveMs < ms) return false;
     _lastCursorMoveMs = now;
