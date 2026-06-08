@@ -239,14 +239,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _anchorGridRow({required int targetIndex, required int previousIndex}) {
     // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 228 and default mainAxisSpacing: 16,
-    // so the vertical row stride is stable: 244px. Unlike the v1 test, this uses
+    // TvPosterGrid uses mainAxisExtent: 205 and mainAxisSpacing: 14,
+    // so the vertical row stride is stable: 219px. Unlike the v1 test, this uses
     // actual row delta from index math and clamps aggressive repeat movement
     // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
     // post-frame ensureVisible.
     if (!_scroll.hasClients || _gridColumns <= 0) return;
 
-    const rowStride = 244.0;
+    const rowStride = 219.0;
     final previousRow = previousIndex ~/ _gridColumns;
     final targetRow = targetIndex ~/ _gridColumns;
     final deltaRows = targetRow - previousRow;
@@ -442,12 +442,26 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(_gridIndex, _gridNodes.length);
     final node = _gridNodes[target];
-    final ok = _requestGridNode(node);
-    if (!ok) return false;
 
-    _gridIndex = target;
-    _rememberFocus(TvZone.grid, target);
     _scrollHomeToGridEntry();
+
+    final ok = _requestGridNode(node);
+    if (ok) {
+      _gridIndex = target;
+      _rememberFocus(TvZone.grid, target);
+      return true;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final retryNode = _gridNodes.isEmpty ? null : _gridNodes[_safe(target, _gridNodes.length)];
+      if (retryNode == null) return;
+      if (_requestGridNode(retryNode)) {
+        _gridIndex = target;
+        _rememberFocus(TvZone.grid, target);
+      }
+    });
+
     return true;
   }
 

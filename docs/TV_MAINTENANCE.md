@@ -231,3 +231,13 @@ Final rule after Dobda migration:
 - Home Kategori header opens Source Manager category mode for the current platform only.
 - Category mode can edit Home/LiveGo for that one platform.
 - The old 6-platform limit is only a starter default, not a Source Manager lock.
+
+## Home Grid 7 Sticky Source Header Rule
+
+Final Home layout rule:
+- TV Home grid is fixed at 7 columns.
+- Poster grid uses compact 7-column sizing: mainAxisExtent 205, spacing 12/14.
+- Platform and Kategori are pinned with SliverPersistentHeader.
+- DOWN once from Banner slides into grid mode while Platform/Kategori stay visible.
+- BACK from Grid returns to the first Banner look.
+- Do not silently revert TV Home grid back to 6.

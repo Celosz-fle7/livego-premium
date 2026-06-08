@@ -95,8 +95,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   Timer? _homeSelectionCommitTimer;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
-  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(6, 10).toInt();
-  int get _homeGridLimit => (_gridColumns * 4).clamp(24, 40).toInt();
+  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
+  int get _homeGridLimit => (_gridColumns * 5).clamp(35, 50).toInt();
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -238,44 +238,63 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       refreshing: home.refreshing,
                     ),
                     const SizedBox(height: 8),
-                    TvSectionBox(
-                      icon: Icons.apps_rounded,
-                      label: 'Platform',
-                      hint: LiveGoCatalog.label(_platformSlug),
-                      height: 52,
-                      onHeaderTap: this._openPlatformManager,
-                      child: TvChipRow(
-                        labels: platforms,
-                        selected: _platformIndex,
-                        nodes: _platformNodes,
-                        onTap: this._selectPlatform,
-                        onFocus: (i) {
-                          _platformIndex = i;
-                          this._rememberFocus(TvZone.platform, i);
-                        },
-                        onKey: this._platformKey,
-                      ),
+                  ]),
+                ),
+              ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _HomeStickySourceHeaderDelegate(
+                  height: 114,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 6),
+                    child: Column(
+                      children: [
+                        TvSectionBox(
+                          icon: Icons.apps_rounded,
+                          label: 'Platform',
+                          hint: LiveGoCatalog.label(_platformSlug),
+                          height: 52,
+                          onHeaderTap: this._openPlatformManager,
+                          child: TvChipRow(
+                            labels: platforms,
+                            selected: _platformIndex,
+                            nodes: _platformNodes,
+                            onTap: this._selectPlatform,
+                            onFocus: (i) {
+                              _platformIndex = i;
+                              this._rememberFocus(TvZone.platform, i);
+                            },
+                            onKey: this._platformKey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TvSectionBox(
+                          icon: Icons.tune_rounded,
+                          label: 'Kategori',
+                          hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
+                          height: 52,
+                          onHeaderTap: this._openCategoryManager,
+                          child: TvChipRow(
+                            labels: categories,
+                            selected: _categoryIndex,
+                            nodes: _categoryNodes,
+                            onTap: this._selectCategory,
+                            onFocus: (i) {
+                              _categoryIndex = i;
+                              this._rememberFocus(TvZone.category, i);
+                            },
+                            onKey: this._categoryKey,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    TvSectionBox(
-                      icon: Icons.tune_rounded,
-                      label: 'Kategori',
-                      hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
-                      height: 52,
-                      onHeaderTap: this._openCategoryManager,
-                      child: TvChipRow(
-                        labels: categories,
-                        selected: _categoryIndex,
-                        nodes: _categoryNodes,
-                        onTap: this._selectCategory,
-                        onFocus: (i) {
-                          _categoryIndex = i;
-                          this._rememberFocus(TvZone.category, i);
-                        },
-                        onKey: this._categoryKey,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate.fixed([
                     TvHomeProfessionalRows(
                       key: _rowsKey,
                       onOpen: this._openDetail,
@@ -290,7 +309,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // data loading or focus movement.
                     const SizedBox(height: 6),
                     if (home.loading && gridItems.isEmpty)
-                      const TvProfessionalGridSkeleton(columns: 6, rows: 2)
+                      const TvProfessionalGridSkeleton(columns: 7, rows: 2)
                     else if (gridItems.isEmpty)
                       ListenableBuilder(
                         listenable: _emptyNode,
@@ -320,7 +339,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   nodes: _gridNodes,
                   columns: _gridColumns,
                   padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
-                  mainAxisExtent: 228,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 14,
+                  mainAxisExtent: 205,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);
@@ -337,6 +358,47 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     );
       },
     );
+  }
+}
+
+
+class _HomeStickySourceHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  const _HomeStickySourceHeaderDelegate({
+    required this.child,
+    required this.height,
+  });
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppTheme.bg.withOpacity(0.98),
+        boxShadow: overlapsContent
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : const [],
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _HomeStickySourceHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child || height != oldDelegate.height;
   }
 }
 
