@@ -469,6 +469,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _snapHomeToStickySourceHeader();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _snapHomeToStickySourceHeader();
+      });
     });
   }
 
