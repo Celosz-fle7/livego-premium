@@ -194,14 +194,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _anchorGridRow({required int targetIndex, required int previousIndex}) {
     // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 224 and default mainAxisSpacing: 16, so
-    // the vertical row stride is stable: 240px. Unlike the v1 test, this uses
+    // TvPosterGrid uses mainAxisExtent: 205 and mainAxisSpacing: 14, so
+    // the vertical row stride is stable: 219px. Unlike the v1 test, this uses
     // actual row delta from index math and clamps aggressive repeat movement
     // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
     // post-frame ensureVisible.
     if (!_scroll.hasClients || _gridColumns <= 0) return;
 
-    const rowStride = 240.0;
+    const rowStride = 219.0;
     final previousRow = previousIndex ~/ _gridColumns;
     final targetRow = targetIndex ~/ _gridColumns;
     final deltaRows = targetRow - previousRow;
@@ -353,6 +353,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       chapterId: chapter,
       lang: item.lang,
     );
+  }
+
+  void _openGridItem(int index, ContentItem item) {
+    final target = _safe(index, _gridNodes.length);
+    _gridIndex = target;
+    _rememberFocus(TvZone.grid, target);
+    _openDetail(item);
   }
 
   void _openDetail(ContentItem item) {
@@ -603,11 +610,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       final next = current + _gridColumns;
-      if (next < _gridNodes.length) _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
+      if (next < _gridNodes.length) {
+        _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
+        return KeyEventResult.handled;
+      }
+      final lastIndex = _gridNodes.length - 1;
+      final lastRow = lastIndex ~/ _gridColumns;
+      if (lastRow > row) {
+        _focusGrid(lastIndex, anchorRow: true, anchorAlignment: 0.58);
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
-      _openDetail(item);
+      _openGridItem(current, item);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;

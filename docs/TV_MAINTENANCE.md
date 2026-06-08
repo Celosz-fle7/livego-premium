@@ -179,3 +179,12 @@ Aturan:
 - Gunakan route hitam opaque dengan transitionDuration zero.
 - Detail, Download, History/Favorite/Search/Home harus masuk Player lewat route hitam.
 - Video/Player blank putih yang muncul sebelum loading biasanya berasal dari route/parent, bukan VideoPlayer.
+
+## Home Grid Return And Bottom Rule
+
+Home grid finishing rules:
+- Opening Player from grid must remember TvZone.grid before pushing Player.
+- Returning from Player must restore the exact grid index, not category.
+- Home grid uses 7 columns and a 205px poster row height for a smaller finish layout.
+- Home grid bottom padding uses `TvSafeZone.homeGridBottomReach` to reduce black empty bottom area.
+- DOWN above a partial last row must jump to the last existing poster.

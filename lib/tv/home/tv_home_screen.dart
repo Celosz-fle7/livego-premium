@@ -91,8 +91,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _settingsVersion = LiveGoLocalStore.version.value;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
-  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(6, 10).toInt();
-  int get _homeGridLimit => (_gridColumns * 4).clamp(24, 40).toInt();
+  int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
+  int get _homeGridLimit => (_gridColumns * 5).clamp(35, 50).toInt();
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -312,19 +312,20 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   items: gridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
-                  mainAxisExtent: 228,
+                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 14,
+                  mainAxisExtent: 205,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);
                   },
                   onTap: (i, item) {
-                    _gridIndex = i;
-                    this._openDetail(item);
+                    this._openGridItem(i, item);
                   },
                   onKey: (i, item, node, event) => this._gridKey(i, item, event),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: TvSafeZone.smallTail)),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
             ],
           ),
       ),

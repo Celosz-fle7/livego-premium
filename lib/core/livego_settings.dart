@@ -17,7 +17,7 @@ class LiveGoSettings {
   static bool manualRotateButton = true;
   static bool tvSourceSetupCompleted = false;
   static int mobileHomeGrid = 3;
-  static int tvHomeGrid = 6;
+  static int tvHomeGrid = 7;
   static final Map<String, int> tvLastHomeCategories = <String, int>{};
 
   static final List<String> defaultPlatforms = LiveGoApiPlatforms.defaultSlugs;
@@ -108,7 +108,7 @@ class LiveGoSettings {
 
   static void setTvHomeGrid(int value) {
     // Android TV grid range is separate from HP/mobile.
-    tvHomeGrid = value.clamp(6, 10);
+    tvHomeGrid = value.clamp(7, 10);
   }
 
   static void reset() {
