@@ -583,9 +583,9 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                     Container(
                       padding: const EdgeInsets.all(_panelPadding),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface.withOpacity(0.90),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppTheme.border),
+                        color: AppTheme.surface.withOpacity(0.82),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.74)),
                       ),
                       child: Column(
                         children: [
@@ -615,13 +615,24 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
                   const SizedBox(height: 12),
                   SizedBox(
                     height: _footerHeight,
-                    child: Text(
-                      TvSourceManagerConfig.footerHelp,
-                      style: TextStyle(
-                        color: AppTheme.textSoft.withOpacity(0.72),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        decoration: TextDecoration.none,
+                    child: Container(
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface2.withOpacity(0.42),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: AppTheme.borderSoft.withOpacity(0.42)),
+                      ),
+                      child: Text(
+                        TvSourceManagerConfig.footerHelp,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppTheme.textSoft.withOpacity(0.74),
+                          fontSize: 10.8,
+                          fontWeight: FontWeight.w800,
+                          decoration: TextDecoration.none,
+                        ),
                       ),
                     ),
                   ),

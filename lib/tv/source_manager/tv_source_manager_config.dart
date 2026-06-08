@@ -19,20 +19,20 @@ class TvSourceManagerConfig {
   static const double topPadding = TvSafeZone.sourceTop;
   static const double horizontalPadding = TvSafeZone.sourceSide;
   static const double bottomPadding = TvSafeZone.bottomReach;
-  static const double headerHeight = 76;
-  static const double afterHeader = 14;
-  static const double panelPadding = 10;
-  static const double groupHeaderHeight = 36;
-  static const double rowHeight = 149;
-  static const double footerHeight = 52;
+  static const double headerHeight = 72;
+  static const double afterHeader = 10;
+  static const double panelPadding = 8;
+  static const double groupHeaderHeight = 30;
+  static const double rowHeight = 138;
+  static const double footerHeight = 38;
   static const double comfortTop = TvSafeZone.listTop;
   static const double comfortBottom = TvSafeZone.listBottom;
 
   static const String sourceGroupTitle = 'LIVEGO SOURCE';
   static const String footerHelp =
-      'OK ON/OFF platform • RIGHT kategori • OK kategori ON/OFF • BACK satu langkah';
+      'OK ON/OFF • RIGHT kategori • BACK satu langkah';
   static const String subtitle =
-      'Source LiveGo untuk Beranda TV. Kategori: Home dan LiveGo.';
+      'Source Beranda TV. Pilih platform dan kategori aktif.';
 
   static const Map<String, int> sourceOrder = <String, int>{
     'dobda_freereels': 0,
