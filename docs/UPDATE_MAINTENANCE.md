@@ -63,3 +63,12 @@ Android:
 ## Rule
 
 Do not mix updater work with Player, Home focus, Source Manager, API provider, or cache patches.
+
+## Dependency Rule
+
+Use `androidx.core:core`, not `androidx.core:core-ktx`, for the updater FileProvider.
+
+Reason:
+- `core-ktx` can pull a newer Kotlin stdlib.
+- The current Android/Flutter build may still resolve older `kotlin-stdlib-jdk7/jdk8`.
+- Mixing those versions causes `checkReleaseDuplicateClasses` failures.
