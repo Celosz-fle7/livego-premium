@@ -438,6 +438,27 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     ));
   }
 
+  void _snapHomeToStickySourceHeader() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final target = TvSafeZone.homeGridEntryOffset
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+
+    // Only correct upward drift. When the user is deep in the grid, keep the
+    // current scroll position stable and do not pull the screen down.
+    if (position.pixels + 1 >= target) return;
+    position.jumpTo(target);
+  }
+
+  void _lockStickySourceHeaderAfterFocus() {
+    _snapHomeToStickySourceHeader();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _snapHomeToStickySourceHeader();
+    });
+  }
+
   bool _focusGridEntryFromBanner() {
     if (_gridNodes.isEmpty) return false;
     final target = _safe(_gridIndex, _gridNodes.length);
@@ -774,8 +795,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        if (!_focusCategory(_categoryIndex)) {
-          if (!_focusPlatform(_platformIndex)) _focusBanner();
+        final focusedSticky = _focusCategory(_categoryIndex, throttle: false) ||
+            _focusPlatform(_platformIndex, throttle: false);
+        if (focusedSticky) {
+          _lockStickySourceHeaderAfterFocus();
+        } else {
+          _focusBanner();
         }
       } else {
         _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
