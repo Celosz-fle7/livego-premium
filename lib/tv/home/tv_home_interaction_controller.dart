@@ -404,10 +404,18 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final target = _safe(index, _gridNodes.length);
     _gridIndex = target;
     _rememberFocus(TvZone.grid, target);
-    _openDetail(item);
+    _openDetail(
+      item,
+      forceReturnZone: TvZone.grid,
+      forceReturnGrid: target,
+    );
   }
 
-  void _openDetail(ContentItem item) {
+  void _openDetail(
+    ContentItem item, {
+    TvZone? forceReturnZone,
+    int? forceReturnGrid,
+  }) {
     // TV fast path: OK on poster plays immediately.
     //
     // Detail remains available from other screens later, but Home should not
@@ -415,10 +423,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_openingDetail || !mounted) return;
     _openingDetail = true;
 
-    final returnZone = _zone;
+    final returnZone = forceReturnZone ?? _zone;
     final returnPlatform = _platformIndex;
     final returnCategory = _categoryIndex;
-    final returnGrid = _gridIndex;
+    final returnGrid = forceReturnGrid ?? _gridIndex;
     final episode = int.tryParse(item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(item);
     final playerItem = _playerItem(item);
 
@@ -457,7 +465,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           _platformIndex = returnPlatform;
           _categoryIndex = returnCategory;
           _gridIndex = returnGrid;
-          _restoreZoneFocus(throttle: false);
+          if (returnZone == TvZone.grid) {
+            if (!_focusGrid(returnGrid, throttle: false, anchorRow: true, anchorAlignment: 0.58)) {
+              _scheduleFocusEntry(preferBanner: false);
+            }
+          } else {
+            _restoreZoneFocus(throttle: false);
+          }
         });
       }
     });

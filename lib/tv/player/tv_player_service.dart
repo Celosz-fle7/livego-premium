@@ -146,6 +146,38 @@ class TvPlayerService implements PlaybackContract {
   /// - success is saved to TvPlayerCacheManager
   /// - failure is NOT marked as failed/cooldown
   ///   because prefetch can timeout without meaning the episode is broken
+  Future<TvPlayerStreamResolveResult> resolveStreamFresh(
+    ContentItem item, {
+    required String chapterId,
+    required int episode,
+  }) async {
+    final result = await _resolveStreamUncached(item, chapterId: chapterId, episode: episode)
+        .timeout(
+          _streamResolveTimeout,
+          onTimeout: () => TvPlayerStreamResolveResult(
+            stream: StreamInfo.empty,
+            source: 'freshResolveTimeout',
+            elapsedMs: _streamResolveTimeout.inMilliseconds,
+          ),
+        );
+
+    if (result.hasStream) {
+      TvPlayerCacheManager.saveStream(
+        item,
+        chapterId: chapterId,
+        episode: episode,
+        stream: result.stream,
+      );
+    }
+    return result.hasStream
+        ? TvPlayerStreamResolveResult(
+            stream: result.stream,
+            source: 'fresh:${result.source}',
+            elapsedMs: result.elapsedMs,
+          )
+        : result;
+  }
+
   Future<TvPlayerStreamResolveResult> prefetchStream(
     ContentItem item, {
     required String chapterId,

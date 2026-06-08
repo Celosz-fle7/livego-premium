@@ -6,8 +6,11 @@ class TvPlayerCacheManager {
   const TvPlayerCacheManager._();
 
   static const Duration episodeListTtl = Duration(hours: 24);
-  static const Duration streamInfoTtl = Duration(minutes: 8);
-  static const Duration failedStreamTtl = Duration(minutes: 45);
+
+  // Stream URLs can be short-lived and episode switching must not reuse stale
+  // video URLs for too long. Keep this small; episode list cache remains long.
+  static const Duration streamInfoTtl = Duration(seconds: 90);
+  static const Duration failedStreamTtl = Duration(minutes: 3);
 
   static const int _maxEpisodeLists = 80;
   static const int _maxEpisodeInFlight = 24;
