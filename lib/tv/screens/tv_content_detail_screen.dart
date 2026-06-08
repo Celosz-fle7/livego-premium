@@ -18,6 +18,7 @@ import '../theme/tv_focus_style.dart';
 import '../player/tv_player_entry.dart';
 import '../../services/analytics/livego_analytics.dart';
 import '../widgets/tv_professional_loading.dart';
+import 'tv_content_detail_config.dart';
 
 class TvContentDetailScreen extends ConsumerStatefulWidget {
   final ContentItem item;
@@ -53,7 +54,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     super.initState();
     LiveGoAnalytics.contentOpen(widget.item.platformSlug, widget.item.id, widget.item.title);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_playNode, alignment: 0.18, throttle: false);
+      if (mounted) tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment, throttle: false);
     });
   }
 
@@ -116,7 +117,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     widget.onPlayerRouteOpen?.call();
 
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 16));
+      await Future<void>.delayed(TvContentDetailConfig.playerHandoffDelay);
       if (!mounted) return;
 
       final playerItem = _episodeItem(detail, episode);
@@ -147,7 +148,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
   void _retryDetail() {
     ref.invalidate(tvDetailProvider(widget.item));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) tvFocus(_playNode, alignment: 0.18, throttle: false);
+      if (mounted) tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment, throttle: false);
     });
   }
 
@@ -156,31 +157,31 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
       final target = _episodeCursor.clamp(0, _episodeNodes.length - 1).toInt();
       if (tvFocusComfort(_episodeNodes[target], throttle: false)) return true;
     }
-    if (tvFocus(_playNode, alignment: 0.18, throttle: false)) return true;
+    if (tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment, throttle: false)) return true;
     if (_episodeNodes.isNotEmpty) {
       final target = _episodeCursor.clamp(0, _episodeNodes.length - 1).toInt();
       if (tvFocusComfort(_episodeNodes[target], throttle: false)) return true;
     }
-    return tvFocus(_backNode, alignment: 0.06, throttle: false);
+    return tvFocus(_backNode, alignment: TvContentDetailConfig.backFocusAlignment, throttle: false);
   }
 
   void _schedulePlayerReturnFocus({required bool preferEpisode, int attempt = 0}) {
-    if (!mounted || attempt > 3) return;
+    if (!mounted || attempt > TvContentDetailConfig.maxPlayerReturnAttempts) return;
     final token = ++_playerReturnTicket;
     final delay = attempt == 0
-        ? Duration.zero
+        ? TvContentDetailConfig.playerReturnRetryDelays[0]
         : attempt == 1
-            ? const Duration(milliseconds: 50)
+            ? TvContentDetailConfig.playerReturnRetryDelays[1]
             : attempt == 2
-                ? const Duration(milliseconds: 150)
-                : const Duration(milliseconds: 300);
+                ? TvContentDetailConfig.playerReturnRetryDelays[2]
+                : TvContentDetailConfig.playerReturnRetryDelays[3];
 
     Future<void>.delayed(delay, () {
       if (!mounted || token != _playerReturnTicket) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || token != _playerReturnTicket) return;
         final ok = _focusPlayerReturnTarget(preferEpisode: preferEpisode);
-        if (!ok && attempt < 3) {
+        if (!ok && attempt < TvContentDetailConfig.maxPlayerReturnAttempts) {
           _schedulePlayerReturnFocus(preferEpisode: preferEpisode, attempt: attempt + 1);
         }
       });
@@ -197,7 +198,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
-      tvFocus(_playNode, alignment: 0.18);
+      tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -213,23 +214,23 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (_buttonIndex == 0) {
-        tvFocus(_backNode, alignment: 0.06);
+        tvFocus(_backNode, alignment: TvContentDetailConfig.backFocusAlignment);
       } else if (_buttonIndex == 2) {
         _buttonIndex = 1;
-        tvFocus(_favoriteNode, alignment: 0.18);
+        tvFocus(_favoriteNode, alignment: TvContentDetailConfig.playFocusAlignment);
       } else {
         _buttonIndex = 0;
-        tvFocus(_playNode, alignment: 0.18);
+        tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
       if (_buttonIndex == 0) {
         _buttonIndex = 1;
-        tvFocus(_favoriteNode, alignment: 0.18);
+        tvFocus(_favoriteNode, alignment: TvContentDetailConfig.playFocusAlignment);
       } else if (canRetry) {
         _buttonIndex = 2;
-        tvFocus(_retryNode, alignment: 0.18);
+        tvFocus(_retryNode, alignment: TvContentDetailConfig.playFocusAlignment);
       }
       return KeyEventResult.handled;
     }
@@ -257,12 +258,12 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (_isBack(key)) {
-      tvFocus(_playNode, alignment: 0.18, throttle: false);
+      tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment, throttle: false);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (index == 0) {
-        tvFocus(_backNode, alignment: 0.06);
+        tvFocus(_backNode, alignment: TvContentDetailConfig.backFocusAlignment);
       } else {
         _episodeCursor = index - 1;
         tvFocusComfort(_episodeNodes[_episodeCursor]);
@@ -277,11 +278,11 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      tvFocus(_playNode, alignment: 0.18);
+      tvFocus(_playNode, alignment: TvContentDetailConfig.playFocusAlignment);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      final next = index + 6;
+      final next = index + TvContentDetailConfig.episodeGridStep;
       if (next < _episodeNodes.length) {
         _episodeCursor = next;
         tvFocusComfort(_episodeNodes[next]);
@@ -331,7 +332,7 @@ class _TvContentDetailScreenState extends ConsumerState<TvContentDetailScreen> {
           },
           data: (data) {
             final detail = data.detail;
-            final episodes = data.episodes.take(80).toList(growable: false);
+            final episodes = data.episodes.take(TvContentDetailConfig.maxEpisodeChips).toList(growable: false);
             _syncEpisodes(episodes.length);
             return _DetailBody(
               scroll: _scroll,
@@ -432,7 +433,7 @@ class _DetailBody extends StatelessWidget {
           bottom: true,
           child: ListView(
             controller: scroll,
-            padding: const EdgeInsets.fromLTRB(46, 24, 46, TvReachability.contentBottomPadding),
+            padding: const EdgeInsets.fromLTRB(TvContentDetailConfig.horizontalPadding, TvContentDetailConfig.topPadding, TvContentDetailConfig.horizontalPadding, TvContentDetailConfig.bottomPadding),
             children: [
               Row(
                 children: [
@@ -442,31 +443,31 @@ class _DetailBody extends StatelessWidget {
                     onKeyEvent: onBackKey,
                     child: _RoundIconButton(node: backNode, icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
                   ),
-                  const SizedBox(width: 14),
-                  Text('Detail Konten', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                  const SizedBox(width: TvContentDetailConfig.actionButtonGap),
+                  Text(TvContentDetailConfig.pageLabel, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                 ],
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: TvContentDetailConfig.headerToContentGap),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(TvContentDetailConfig.posterRadius),
                     child: SizedBox(
-                      width: 210,
-                      height: 314,
+                      width: TvContentDetailConfig.posterWidth,
+                      height: TvContentDetailConfig.posterHeight,
                       child: LiveGoCachedImage(url: item.posterUrl, fit: BoxFit.cover, role: LiveGoImageRole.poster, tv: true),
                     ),
                   ),
-                  const SizedBox(width: 28),
+                  const SizedBox(width: TvContentDetailConfig.posterToInfoGap),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w900, decoration: TextDecoration.none, height: 1.05)),
-                        const SizedBox(height: 12),
+                        Text(item.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: TvContentDetailConfig.titleFontSize, fontWeight: FontWeight.w900, decoration: TextDecoration.none, height: 1.05)),
+                        const SizedBox(height: TvContentDetailConfig.titleToPillGap),
                         Wrap(
-                          spacing: 10,
+                          spacing: TvContentDetailConfig.episodeChipSpacing,
                           runSpacing: 8,
                           children: [
                             _InfoPill(Icons.apps_rounded, item.platformSlug),
@@ -476,17 +477,17 @@ class _DetailBody extends StatelessWidget {
                           ],
                         ),
                         if (degraded) ...[
-                          const SizedBox(height: 14),
+                          const SizedBox(height: TvContentDetailConfig.degradedNoticeGap),
                           const _DetailDegradedNotice(),
                         ],
-                        const SizedBox(height: 18),
+                        const SizedBox(height: TvContentDetailConfig.descriptionGap),
                         Text(
-                          item.description.trim().isEmpty ? 'Deskripsi belum tersedia dari API.' : item.description.trim(),
+                          item.description.trim().isEmpty ? TvContentDetailConfig.emptyDescription : item.description.trim(),
                           maxLines: 5,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: AppTheme.textSoft, fontSize: 15.2, fontWeight: FontWeight.w700, height: 1.45, decoration: TextDecoration.none),
                         ),
-                        const SizedBox(height: 26),
+                        const SizedBox(height: TvContentDetailConfig.actionGap),
                         Row(
                           children: [
                             _DetailButton(
@@ -497,7 +498,7 @@ class _DetailBody extends StatelessWidget {
                               onTap: onPlay,
                               onKey: (node, event) => onButtonKey(event),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: TvContentDetailConfig.actionButtonGap),
                             _DetailButton(
                               node: favoriteNode,
                               primary: false,
@@ -513,19 +514,19 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: TvContentDetailConfig.episodeSectionGap),
               if (episodes.isNotEmpty) ...[
                 Row(
                   children: [
                     const Text('Episode', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: TvContentDetailConfig.episodeTitleGap),
                     Text('${episodes.length} tersedia', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 12, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: TvContentDetailConfig.titleToPillGap),
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                  spacing: TvContentDetailConfig.episodeChipSpacing,
+                  runSpacing: TvContentDetailConfig.episodeChipRunSpacing,
                   children: [
                     for (var i = 0; i < episodes.length; i++)
                       _EpisodeChip(
@@ -554,7 +555,7 @@ class _DetailDegradedNotice extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       decoration: BoxDecoration(
         color: Colors.orangeAccent.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TvContentDetailConfig.backButtonRadius),
         border: Border.all(color: Colors.orangeAccent.withOpacity(0.32)),
       ),
       child: const Row(
@@ -563,7 +564,7 @@ class _DetailDegradedNotice extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Detail lengkap/episode sedang lambat. Data dasar tetap bisa dipakai, Play masih bisa dicoba.',
+              TvContentDetailConfig.degradedText,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -589,7 +590,7 @@ class _DetailEpisodeFallbackHint extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: AppTheme.surface.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
         border: Border.all(color: AppTheme.border),
       ),
       child: const Row(
@@ -598,7 +599,7 @@ class _DetailEpisodeFallbackHint extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Episode list belum tersedia. Tekan Play untuk lanjut dari episode tersimpan, atau Coba Detail untuk refresh.',
+              TvContentDetailConfig.episodeFallbackText,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -630,15 +631,15 @@ class _RoundIconButton extends StatelessWidget {
         return InkWell(
           canRequestFocus: false,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(TvContentDetailConfig.backButtonRadius),
           child: AnimatedContainer(
             duration: TvFocusStyle.fast,
-            width: 48,
-            height: 48,
+            width: TvContentDetailConfig.backButtonSize,
+            height: TvContentDetailConfig.backButtonSize,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(TvContentDetailConfig.backButtonRadius),
               border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
             ),
             child: Icon(icon, color: Colors.white, size: 25),
@@ -697,9 +698,9 @@ class _DetailButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             child: AnimatedContainer(
               duration: TvFocusStyle.fast,
-              height: 54,
-              constraints: const BoxConstraints(minWidth: 158),
-              padding: const EdgeInsets.symmetric(horizontal: 22),
+              height: TvContentDetailConfig.actionButtonHeight,
+              constraints: const BoxConstraints(minWidth: TvContentDetailConfig.actionButtonMinWidth),
+              padding: const EdgeInsets.symmetric(horizontal: TvContentDetailConfig.actionButtonHorizontalPadding),
               decoration: BoxDecoration(
                 gradient: primary ? AppTheme.activeGradient : null,
                 color: primary ? null : AppTheme.surface.withOpacity(0.90),
@@ -744,15 +745,15 @@ class _EpisodeChip extends StatelessWidget {
           child: InkWell(
             canRequestFocus: false,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
             child: AnimatedContainer(
               duration: TvFocusStyle.fast,
-              width: 132,
-              height: 58,
+              width: TvContentDetailConfig.episodeChipWidth,
+              height: TvContentDetailConfig.episodeChipHeight,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: focused ? AppTheme.surface3 : AppTheme.surface.withOpacity(0.86),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
                 border: Border.all(color: focused ? AppTheme.cyan : AppTheme.border, width: focused ? 2 : 1),
               ),
               child: Text('Episode ${episode.index}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),

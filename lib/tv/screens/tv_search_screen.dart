@@ -14,6 +14,7 @@ import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
 import '../../services/analytics/livego_analytics.dart';
 import '../widgets/tv_search_keyboard_panel.dart';
+import 'tv_search_config.dart';
 
 class TvSearchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
@@ -97,7 +98,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     _editingInput = false;
     final ok = tvFocus(
       _searchNode,
-      alignment: 0.12,
+      alignment: TvSearchConfig.inputFocusAlignment,
       throttle: throttle,
     );
     if (ok) _zone = TvZone.list;
@@ -109,8 +110,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     final target = _safe(index);
     final ok = tvFocusGrid(
       _resultNodes[target],
-      topMargin: TvSafeZone.listTop,
-      bottomMargin: TvSafeZone.gridBottom,
+      topMargin: TvSearchConfig.gridTopMargin,
+      bottomMargin: TvSearchConfig.gridBottomMargin,
       throttle: throttle,
     );
     if (ok) {
@@ -123,8 +124,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _focusEmpty({bool throttle = true}) {
     final ok = tvFocusComfort(
       _emptyNode,
-      topMargin: TvSafeZone.listTop,
-      bottomMargin: TvSafeZone.listBottom,
+      topMargin: TvSearchConfig.gridTopMargin,
+      bottomMargin: TvSearchConfig.listBottomMargin,
       throttle: throttle,
     );
     if (ok) _zone = TvZone.placeholder;
@@ -178,7 +179,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Future<void> _submitSearch(String value) async {
     final clean = value.trim();
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (_searchSubmitBusy || now - _lastSearchSubmitMs < 650) return;
+    if (_searchSubmitBusy || now - _lastSearchSubmitMs < TvSearchConfig.searchSubmitGuardMs) return;
     _lastSearchSubmitMs = now;
 
     if (clean.isEmpty) {
@@ -370,18 +371,18 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
         },
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final columns = (constraints.maxWidth / 168).floor().clamp(4, 7).toInt();
+            final columns = TvSearchConfig.columnsFor(constraints.maxWidth);
             final padding = TvSafeZone.search;
             return CustomScrollView(
               controller: _scroll,
-              cacheExtent: TvSafeZone.cacheExtent,
+              cacheExtent: TvSearchConfig.cacheExtent,
               slivers: [
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate.fixed([
-                        const TvScreenHeader(title: 'Pencarian', subtitle: 'Cari semua sumber aktif LiveGo.', icon: Icons.search_rounded),
-                        const SizedBox(height: 14),
+                        const TvScreenHeader(title: TvSearchConfig.title, subtitle: TvSearchConfig.subtitle, icon: Icons.search_rounded),
+                        const SizedBox(height: TvSearchConfig.headerToInputGap),
                         Focus(
                           focusNode: _searchNode,
                           skipTraversal: true,
@@ -391,9 +392,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             builder: (context, _) {
                               final focused = _searchNode.hasFocus || _textNode.hasFocus;
                               return Container(
-                                padding: const EdgeInsets.all(3),
+                                padding: const EdgeInsets.all(TvSearchConfig.inputBorderPadding),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(22),
+                                  borderRadius: BorderRadius.circular(TvSearchConfig.inputBorderRadius),
                                   border: Border.all(color: focused ? AppTheme.cyan : Colors.transparent, width: 2),
                                 ),
                                 child: TextField(
@@ -411,7 +412,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                   },
                                   onChanged: (v) => ref.read(tvSearchProvider.notifier).setDraft(v),
                                   decoration: InputDecoration(
-                                    hintText: 'Cari drama, CEO, cinta, balas dendam...',
+                                    hintText: TvSearchConfig.hint,
                                     hintStyle: const TextStyle(color: Colors.white38),
                                     prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.cyan),
                                     suffixIcon: search.query.isEmpty
@@ -425,27 +426,27 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                           ),
                                     filled: true,
                                     fillColor: AppTheme.surface,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(19), borderSide: BorderSide.none),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(TvSearchConfig.inputFieldRadius), borderSide: BorderSide.none),
                                   ),
                                 ),
                               );
                             },
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: TvSearchConfig.keyboardGap),
                         const TvSearchKeyboardPanel(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: TvSearchConfig.afterKeyboardGap),
                         if (search.loading)
                           Padding(
-                            padding: const EdgeInsets.only(top: 70),
+                            padding: const EdgeInsets.only(top: TvSearchConfig.loadingTopPadding),
                             child: Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
                                   CircularProgressIndicator(color: AppTheme.cyan),
-                                  SizedBox(height: 12),
+                                  SizedBox(height: TvSearchConfig.loadingTextGap),
                                   Text(
-                                    'Mencari... remote tetap aktif',
+                                    TvSearchConfig.loadingText,
                                     style: TextStyle(
                                       color: AppTheme.textSoft,
                                       fontSize: 13,
@@ -474,11 +475,11 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                                       ? Icons.wifi_off_rounded
                                       : (search.query.isNotEmpty ? Icons.search_off_rounded : Icons.travel_explore_rounded),
                                   title: search.hasError
-                                      ? 'Pencarian gagal dimuat'
-                                      : (search.query.isNotEmpty ? 'Tidak ada hasil' : 'Cari dari source aktif LiveGo'),
+                                      ? TvSearchConfig.errorTitle
+                                      : (search.query.isNotEmpty ? TvSearchConfig.noResultTitle : TvSearchConfig.emptyTitle),
                                   subtitle: search.query.isEmpty
-                                      ? 'Ketik kata kunci lalu tekan Enter/Search.'
-                                      : 'OK coba lagi • UP ke input • LEFT ke navbar',
+                                      ? TvSearchConfig.emptySubtitle
+                                      : TvSearchConfig.retrySubtitle,
                                 ),
                               );
                             },
@@ -488,10 +489,10 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                             children: [
                               Text('${visibleResults.length} hasil pencarian', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                               const Spacer(),
-                              Text('↑ input • OK detail • ← navbar • Back input', style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
+                              Text(TvSearchConfig.resultHelp, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: TvSearchConfig.loadingTextGap),
                         ],
                       ]),
                     ),
@@ -501,8 +502,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                       items: visibleResults,
                       nodes: _resultNodes,
                       columns: columns,
-                      padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
-                      mainAxisExtent: 224,
+                      padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSearchConfig.resultBottomPadding),
+                      mainAxisExtent: TvSearchConfig.posterMainAxisExtent,
                       onFocus: (i) {
                         _zone = TvZone.grid;
                         _gridIndex = i;
