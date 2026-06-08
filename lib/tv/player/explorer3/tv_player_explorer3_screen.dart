@@ -1030,17 +1030,22 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Future<void> _changeEpisode(int delta) async {
     if (_loading) return;
     final total = _episodeTotal();
-    final next = (_episode + delta).clamp(1, total).toInt();
+    final requested = (_episode + delta).clamp(1, total).toInt();
 
-    if (next == _episode) {
+    if (requested == _episode) {
       _showStatus(delta < 0 ? 'Episode pertama' : 'Episode terakhir');
       return;
     }
 
+    final target = await _resolveOrderedEpisodeTarget(requested);
+    final nextEpisode = target.key.clamp(1, total).toInt();
+    final nextChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$nextEpisode';
+
     setState(() {
-      _episode = next;
-      _episodeCursor = next;
-      _status = 'EP $next';
+      _episode = nextEpisode;
+      _chapterId = nextChapterId;
+      _episodeCursor = nextEpisode;
+      _status = 'EP $nextEpisode';
       _mode = _Explorer3Mode.controls;
     });
     await _load();
@@ -1049,16 +1054,22 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Future<void> _selectEpisodeCursor() async {
     if (_loading) return;
     final total = _episodeTotal();
-    final next = _episodeCursor.clamp(1, total).toInt();
+    final requested = _episodeCursor.clamp(1, total).toInt();
 
-    if (next == _episode) {
+    final target = await _resolveOrderedEpisodeTarget(requested);
+    final nextEpisode = target.key.clamp(1, total).toInt();
+    final nextChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$nextEpisode';
+
+    if (nextEpisode == _episode && nextChapterId == _chapterId.trim()) {
       _showControls();
       return;
     }
 
     setState(() {
-      _episode = next;
-      _status = 'EP $next';
+      _episode = nextEpisode;
+      _chapterId = nextChapterId;
+      _episodeCursor = nextEpisode;
+      _status = 'EP $nextEpisode';
       _mode = _Explorer3Mode.controls;
     });
     await _load();
