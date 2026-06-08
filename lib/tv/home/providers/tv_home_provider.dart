@@ -3,43 +3,26 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../data/livego_catalog.dart';
-import '../../../models/content_item.dart';
-import '../../../services/content/content_health_service.dart';
-import '../../../services/network/livego_network_status.dart';
-import '../../cache/tv_ram_cache.dart';
 import 'tv_home_content_state.dart';
+import 'tv_home_repository.dart';
 
-/// Cache-first TV Home content state.
-///
-/// Provider responsibility:
-/// - Home data
-/// - loading / refreshing / error / fromCache
-/// - retry and cache-first loading through LiveGoCatalog
-///
-/// This replaces the old FutureBuilder-wrapped Home body. Data refresh now lives
-/// in Riverpod, so Home can rebuild from one stable state object and focus
-/// movement no longer recreates FutureBuilder work.
 /// ARCHITECTURE LOCK:
-/// This controller owns Home data/loading/error/retry/cache state only.
+/// This controller owns Home data/loading/error/retry state only.
 /// Focus index and TV zones stay in `tv_home_focus_state.dart`.
 /// Key handling and BACK ladder stay in `tv_home_interaction_controller.dart`.
 /// UI layout stays in `tv_home_screen.dart`.
 class TvHomeContentController extends StateNotifier<TvHomeContentState> {
-  TvHomeContentController() : super(const TvHomeContentState());
+  TvHomeContentController({
+    TvHomeRepository repository = const TvHomeRepository(),
+  })  : _repository = repository,
+        super(const TvHomeContentState());
 
-  static const int _maxTvHomeItems = 30;
+  final TvHomeRepository _repository;
 
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
   String _lastPlatform = 'dobda_freereels';
   String _lastCategory = 'Home';
-
-  List<ContentItem> _prepareItems(List<ContentItem> rows) {
-    return ContentHealthService.filterPlayable(rows)
-        .take(_maxTvHomeItems)
-        .toList(growable: false);
-  }
 
   Future<void> load({
     required String platform,
@@ -49,16 +32,10 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     _lastPlatform = platform;
     _lastCategory = selectedCategory;
     final token = ++_loadToken;
-    final ramKey = TvRamCache.key('home', [platform, selectedCategory]);
-    final ramState = clearPrevious ? null : TvRamCache.instance.read<TvHomeContentState>(ramKey);
+
+    final ramState = clearPrevious ? null : _repository.readRam(platform, selectedCategory);
     if (ramState != null && ramState.items.isNotEmpty) {
-      final next = ramState.copyWith(
-        loading: false,
-        refreshing: true,
-        hasError: false,
-        fromCache: true,
-        offline: false,
-      );
+      final next = _repository.asRefreshingCache(ramState);
       _lastGoodState = next;
       state = next;
     } else if (clearPrevious) {
@@ -69,109 +46,53 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       state = state.copyWith(refreshing: true, hasError: false, offline: false);
     }
 
-    final online = await LiveGoNetworkStatus.isProbablyOnline();
-    if (token != _loadToken) return;
+    final online = await _repository.isOnline();
+    if (!_active(token)) return;
     if (!online) {
-      final last = _lastGoodState;
-      if (last != null) {
-        state = last.copyWith(
-          loading: false,
-          refreshing: false,
-          hasError: true,
-          fromCache: true,
-          offline: true,
-        );
-      } else {
-        state = const TvHomeContentState(
-          loading: false,
-          hasError: true,
-          fromCache: false,
-          offline: true,
-        );
-      }
+      _showOffline();
       return;
     }
 
     try {
-      final cached = await LiveGoCatalog.cachedHomeByCategory(
-        platform: platform,
-        category: selectedCategory,
-        allowExpired: true,
-      ).timeout(const Duration(milliseconds: 650), onTimeout: () => const <ContentItem>[]);
-
-      if (token != _loadToken) return;
-      final prepared = _prepareItems(cached);
-      if (prepared.isNotEmpty) {
-        final next = TvHomeContentState(
-          hero: prepared.first,
-          items: prepared,
-          loading: false,
-          refreshing: true,
-          fromCache: true,
-        );
-        _lastGoodState = next;
-        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
-        state = next;
+      final cached = await _repository.loadCached(platform, selectedCategory);
+      if (!_active(token)) return;
+      if (cached != null && cached.items.isNotEmpty) {
+        _remember(platform, selectedCategory, cached);
+        state = cached;
         unawaited(_refreshInBackground(platform, selectedCategory, token));
         return;
       }
-    } catch (e) {
-      debugPrint('TV HOME CACHE LOAD ERROR: $e');
+    } catch (error) {
+      debugPrint('TV HOME CACHE LOAD ERROR: $error');
     }
 
     try {
-      final items = await LiveGoCatalog.homeByCategory(
-        platform: platform,
-        category: selectedCategory,
-      ).timeout(const Duration(seconds: 10), onTimeout: () => const <ContentItem>[]);
-
-      if (token != _loadToken) return;
-      final prepared = _prepareItems(items);
-      if (prepared.isNotEmpty) {
-        LiveGoNetworkStatus.markOnline();
-        final next = TvHomeContentState(hero: prepared.first, items: prepared, loading: false);
-        _lastGoodState = next;
-        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
-        state = next;
+      final network = await _repository.loadNetwork(platform, selectedCategory);
+      if (!_active(token)) return;
+      if (network != null && network.items.isNotEmpty) {
+        _repository.markOnline();
+        _remember(platform, selectedCategory, network);
+        state = network;
         return;
       }
-    } catch (e) {
-      debugPrint('TV HOME NETWORK LOAD ERROR: $e');
+    } catch (error) {
+      debugPrint('TV HOME NETWORK LOAD ERROR: $error');
     }
 
     try {
-      final fallback = await LiveGoCatalog.cachedHomeByCategory(
-        platform: platform,
-        category: selectedCategory,
-        allowExpired: true,
-      ).timeout(const Duration(milliseconds: 800), onTimeout: () => const <ContentItem>[]);
-
-      if (token != _loadToken) return;
-      final prepared = _prepareItems(fallback);
-      if (prepared.isNotEmpty) {
-        final next = TvHomeContentState(
-          hero: prepared.first,
-          items: prepared,
-          loading: false,
-          hasError: true,
-          fromCache: true,
-        );
-        _lastGoodState = next;
-        TvRamCache.instance.write(ramKey, next, ttl: TvRamCache.homeTtl);
-        state = next;
+      final fallback = await _repository.loadFallbackCache(platform, selectedCategory);
+      if (!_active(token)) return;
+      if (fallback != null && fallback.items.isNotEmpty) {
+        _remember(platform, selectedCategory, fallback);
+        state = fallback;
         return;
       }
-    } catch (_) {}
-
-    if (token != _loadToken) return;
-    final last = _lastGoodState;
-    if (last != null) {
-      LiveGoNetworkStatus.markOffline();
-      state = last.copyWith(loading: false, refreshing: false, hasError: true, offline: true);
-    } else {
-      LiveGoNetworkStatus.markOffline();
-      state = const TvHomeContentState(loading: false, hasError: true, offline: true);
+    } catch (error) {
+      debugPrint('TV HOME FALLBACK CACHE ERROR: $error');
     }
+
+    if (!_active(token)) return;
+    _showOffline();
   }
 
   Future<void> retry() {
@@ -182,15 +103,41 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     );
   }
 
+  bool _active(int token) => token == _loadToken;
+
+  void _remember(String platform, String selectedCategory, TvHomeContentState next) {
+    _lastGoodState = next;
+    _repository.saveRam(platform, selectedCategory, next);
+  }
+
+  void _showOffline() {
+    final last = _lastGoodState;
+    _repository.markOffline();
+    if (last != null) {
+      state = last.copyWith(
+        loading: false,
+        refreshing: false,
+        hasError: true,
+        fromCache: true,
+        offline: true,
+      );
+      return;
+    }
+
+    state = const TvHomeContentState(
+      loading: false,
+      hasError: true,
+      fromCache: false,
+      offline: true,
+    );
+  }
+
   Future<void> _refreshInBackground(String platform, String selectedCategory, int token) async {
     try {
-      final fresh = await LiveGoCatalog.homeByCategory(
-        platform: platform,
-        category: selectedCategory,
-      ).timeout(const Duration(seconds: 12), onTimeout: () => const <ContentItem>[]);
+      final fresh = await _repository.refresh(platform, selectedCategory);
+      if (!_active(token)) return;
 
-      if (token != _loadToken) return;
-      if (fresh.isEmpty) {
+      if (fresh == null || fresh.items.isEmpty) {
         final last = _lastGoodState;
         if (last != null) {
           final next = last.copyWith(refreshing: false, hasError: true);
@@ -200,20 +147,12 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
         return;
       }
 
-      LiveGoNetworkStatus.markOnline();
-      final prepared = _prepareItems(fresh);
-      if (prepared.isEmpty) return;
-      final next = TvHomeContentState(hero: prepared.first, items: prepared, loading: false);
-      _lastGoodState = next;
-      TvRamCache.instance.write(
-        TvRamCache.key('home', [platform, selectedCategory]),
-        next,
-        ttl: TvRamCache.homeTtl,
-      );
-      state = next;
-    } catch (e) {
-      debugPrint('TV HOME BACKGROUND REFRESH ERROR: $e');
-      if (token != _loadToken) return;
+      _repository.markOnline();
+      _remember(platform, selectedCategory, fresh);
+      state = fresh;
+    } catch (error) {
+      debugPrint('TV HOME BACKGROUND REFRESH ERROR: $error');
+      if (!_active(token)) return;
       final last = _lastGoodState;
       if (last == null) return;
       final next = last.copyWith(refreshing: false, hasError: true);

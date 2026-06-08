@@ -1,0 +1,130 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../data/livego_catalog.dart';
+import '../../../models/content_item.dart';
+import '../../../services/content/content_health_service.dart';
+import '../../../services/network/livego_network_status.dart';
+import '../../cache/tv_ram_cache.dart';
+import 'tv_home_content_state.dart';
+
+/// Home data repository.
+///
+/// This class owns cache/network/fallback/background-refresh work.
+/// The provider/controller only decides which state should be shown.
+class TvHomeRepository {
+  const TvHomeRepository();
+
+  static const int maxTvHomeItems = 30;
+
+  String _ramKey(String platform, String selectedCategory) {
+    return TvRamCache.key('home', [platform, selectedCategory]);
+  }
+
+  List<ContentItem> _prepareItems(List<ContentItem> rows) {
+    return ContentHealthService.filterPlayable(rows)
+        .take(maxTvHomeItems)
+        .toList(growable: false);
+  }
+
+  TvHomeContentState? readRam(String platform, String selectedCategory) {
+    return TvRamCache.instance.read<TvHomeContentState>(_ramKey(platform, selectedCategory));
+  }
+
+  void saveRam(String platform, String selectedCategory, TvHomeContentState state) {
+    if (state.items.isEmpty) return;
+    TvRamCache.instance.write(
+      _ramKey(platform, selectedCategory),
+      state,
+      ttl: TvRamCache.homeTtl,
+    );
+  }
+
+  TvHomeContentState asRefreshingCache(TvHomeContentState state) {
+    return state.copyWith(
+      loading: false,
+      refreshing: true,
+      hasError: false,
+      fromCache: true,
+      offline: false,
+    );
+  }
+
+  Future<bool> isOnline() => LiveGoNetworkStatus.isProbablyOnline();
+
+  void markOnline() => LiveGoNetworkStatus.markOnline();
+
+  void markOffline() => LiveGoNetworkStatus.markOffline();
+
+  Future<TvHomeContentState?> loadCached(String platform, String selectedCategory) async {
+    final cached = await LiveGoCatalog.cachedHomeByCategory(
+      platform: platform,
+      category: selectedCategory,
+      allowExpired: true,
+    ).timeout(const Duration(milliseconds: 650), onTimeout: () => const <ContentItem>[]);
+
+    final prepared = _prepareItems(cached);
+    if (prepared.isEmpty) return null;
+
+    return TvHomeContentState(
+      hero: prepared.first,
+      items: prepared,
+      loading: false,
+      refreshing: true,
+      fromCache: true,
+    );
+  }
+
+  Future<TvHomeContentState?> loadNetwork(String platform, String selectedCategory) async {
+    final items = await LiveGoCatalog.homeByCategory(
+      platform: platform,
+      category: selectedCategory,
+    ).timeout(const Duration(seconds: 10), onTimeout: () => const <ContentItem>[]);
+
+    final prepared = _prepareItems(items);
+    if (prepared.isEmpty) return null;
+
+    return TvHomeContentState(
+      hero: prepared.first,
+      items: prepared,
+      loading: false,
+    );
+  }
+
+  Future<TvHomeContentState?> loadFallbackCache(String platform, String selectedCategory) async {
+    final fallback = await LiveGoCatalog.cachedHomeByCategory(
+      platform: platform,
+      category: selectedCategory,
+      allowExpired: true,
+    ).timeout(const Duration(milliseconds: 800), onTimeout: () => const <ContentItem>[]);
+
+    final prepared = _prepareItems(fallback);
+    if (prepared.isEmpty) return null;
+
+    return TvHomeContentState(
+      hero: prepared.first,
+      items: prepared,
+      loading: false,
+      hasError: true,
+      fromCache: true,
+    );
+  }
+
+  Future<TvHomeContentState?> refresh(String platform, String selectedCategory) async {
+    final fresh = await LiveGoCatalog.homeByCategory(
+      platform: platform,
+      category: selectedCategory,
+    ).timeout(const Duration(seconds: 12), onTimeout: () => const <ContentItem>[]);
+
+    final prepared = _prepareItems(fresh);
+    if (prepared.isEmpty) {
+      debugPrint('TV HOME BACKGROUND REFRESH EMPTY platform=$platform category=$selectedCategory');
+      return null;
+    }
+
+    return TvHomeContentState(
+      hero: prepared.first,
+      items: prepared,
+      loading: false,
+    );
+  }
+}
