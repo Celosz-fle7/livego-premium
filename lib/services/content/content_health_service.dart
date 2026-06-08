@@ -150,6 +150,12 @@ class ContentHealthService {
     // Ini indikasi konten/episode rusak dari source/API, bukan jaringan user.
     return r.contains('stream belum tersedia') ||
         r.contains('stream kosong') ||
+        r.contains('detail kosong') ||
+        r.contains('detail_empty') ||
+        r.contains('episode kosong') ||
+        r.contains('episode_empty') ||
+        r.contains('episode list kosong') ||
+        r.contains('no episodes') ||
         r.contains('stream_empty') ||
         r.contains('url video kosong') ||
         r.contains('url kosong') ||
@@ -196,6 +202,11 @@ class ContentHealthService {
     final before = _bad.length;
     _bad.removeWhere((_, record) => record.expired);
     if (_bad.length != before) await _persist();
+  }
+
+  static bool isValidFeedItem(ContentItem item) {
+    _ensureLoaded();
+    return _isValidFeedItem(item) && !isBlocked(item);
   }
 
   static List<ContentItem> filterPlayable(Iterable<ContentItem> rows) {
