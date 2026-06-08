@@ -281,7 +281,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // Grid title/count removed so poster grid can sit closer
                     // to Kategori. This saves vertical TV space without touching
                     // data loading or focus movement.
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     if (home.loading && gridItems.isEmpty)
                       const TvProfessionalGridSkeleton(columns: 6, rows: 2)
                     else if (gridItems.isEmpty)
@@ -313,7 +313,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   nodes: _gridNodes,
                   columns: _gridColumns,
                   padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
-                  mainAxisExtent: 224,
+                  mainAxisExtent: 228,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);

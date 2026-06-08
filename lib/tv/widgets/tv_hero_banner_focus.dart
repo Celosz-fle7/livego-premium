@@ -42,26 +42,26 @@ class TvHeroBannerFocus extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               focusColor: Colors.transparent,
               child: Container(
-                height: 208,
-                padding: const EdgeInsets.all(9),
+                height: 202,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [AppTheme.surface2, AppTheme.bgDeep],
                   ),
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(28),
                   border: Border.all(
                     color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.92),
-                    width: focused ? 2.2 : 1.0,
+                    width: focused ? 2.4 : 1.0,
                   ),
                 ),
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: focused ? Colors.white.withOpacity(0.13) : Colors.white.withOpacity(0.045)),
                   ),
-                  child: item != null ? HeroBanner(item: item!, tv: true) : const _TvBannerSkeleton(height: 182),
+                  child: item != null ? HeroBanner(item: item!, tv: true) : const _TvBannerSkeleton(height: 178),
                 ),
               ),
             ),
@@ -82,7 +82,7 @@ class _TvBannerSkeleton extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: AppTheme.surface2,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.border),
       ),
     );
