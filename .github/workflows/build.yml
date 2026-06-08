@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,6 +44,64 @@ jobs:
           cp app-release.apk LiveGO-Premium.apk
           zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
           ls -lh
+
+      - name: Read app version
+        id: app_version
+        shell: bash
+        run: |
+          RAW_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VERSION_NAME="${RAW_VERSION%%+*}"
+          VERSION_CODE="${RAW_VERSION##*+}"
+
+          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ] || [ "$VERSION_NAME" = "$VERSION_CODE" ]; then
+            echo "Invalid pubspec version: $RAW_VERSION"
+            exit 1
+          fi
+
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create update manifest
+        shell: bash
+        run: |
+          APK="build/app/outputs/flutter-apk/LiveGO-Premium.apk"
+          SHA256=$(sha256sum "$APK" | awk '{print $1}')
+          VERSION_NAME="${{ steps.app_version.outputs.version_name }}"
+          VERSION_CODE="${{ steps.app_version.outputs.version_code }}"
+
+          cat > build/app/outputs/flutter-apk/livego-version.json <<EOF
+          {
+            "versionName": "$VERSION_NAME",
+            "versionCode": $VERSION_CODE,
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/LiveGO-Premium.apk",
+            "sha256": "$SHA256",
+            "required": false,
+            "changelog": [
+              "Build otomatis dari main",
+              "Commit ${{ github.sha }}"
+            ]
+          }
+          EOF
+
+          cat build/app/outputs/flutter-apk/livego-version.json
+
+      - name: Publish latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.app_version.outputs.tag }}
+          name: LiveGo TV ${{ steps.app_version.outputs.version_name }}
+          body: |
+            LiveGo TV automatic release.
+
+            Version: ${{ steps.app_version.outputs.version_name }}
+            Version code: ${{ steps.app_version.outputs.version_code }}
+            Commit: ${{ github.sha }}
+          make_latest: true
+          overwrite_files: true
+          files: |
+            build/app/outputs/flutter-apk/LiveGO-Premium.apk
+            build/app/outputs/flutter-apk/livego-version.json
 
       - name: Upload compressed artifact
         uses: actions/upload-artifact@v4

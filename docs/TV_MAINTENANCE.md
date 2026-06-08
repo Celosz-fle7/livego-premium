@@ -241,3 +241,21 @@ Final Home layout rule:
 - DOWN once from Banner slides into grid mode while Platform/Kategori stay visible.
 - BACK from Grid returns to the first Banner look.
 - Do not silently revert TV Home grid back to 6.
+
+## Auto Release Update Workflow Rule
+
+Simple update flow:
+- Termux only bumps `pubspec.yaml` version and pushes to `main`.
+- GitHub Actions builds `LiveGO-Premium.apk`.
+- GitHub Actions creates `livego-version.json`.
+- GitHub Actions publishes/updates latest GitHub Release.
+- App updater reads `releases/latest/download/livego-version.json`.
+- `versionCode` must be greater than the installed app versionCode.
+
+Termux release command:
+```bash
+sed -i 's/^version: .*/version: 1.0.1+2/' pubspec.yaml
+git add pubspec.yaml
+git commit -m "Bump version for update"
+git push
+```
