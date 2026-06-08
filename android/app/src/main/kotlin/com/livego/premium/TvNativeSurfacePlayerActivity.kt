@@ -366,6 +366,9 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun createPlayer(url: String, keepPositionMs: Long, playWhenReady: Boolean) {
         val old = player
         old?.pause()
+        resetNativeVideoSurface()
+        old?.release()
+        player = null
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
@@ -407,8 +410,12 @@ class TvNativeSurfacePlayerActivity : Activity() {
         exo.setPlaybackSpeed(speeds[speedIndex])
         exo.volume = if (muted) 0f else 1f
 
-        old?.release()
         currentUrl = url
+        handler.postDelayed({
+            updateDock()
+            updateProgress()
+            refreshAudioRows()
+        }, 350)
         handler.postDelayed({ refreshAudioRows() }, 1200)
     }
 
@@ -561,8 +568,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
         source = data["source"]?.toString().orEmpty()
         category = data["category"]?.toString().orEmpty()
         episode = (data["episode"] as? Number)?.toInt() ?: data["episode"]?.toString()?.toIntOrNull() ?: episode
-        totalEpisodes = (data["totalEpisodes"] as? Number)?.toInt() ?: data["totalEpisodes"]?.toString()?.toIntOrNull() ?: totalEpisodes
-        episodeCursor = episode
+        totalEpisodes = ((data["totalEpisodes"] as? Number)?.toInt()
+            ?: data["totalEpisodes"]?.toString()?.toIntOrNull()
+            ?: totalEpisodes).coerceIn(0, 999)
+        episodeCursor = episode.coerceIn(1, episodePanelTotal())
 
         headers.clear()
         val headersMap = data["headers"] as? Map<*, *>
@@ -665,6 +674,22 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun titleLine(): String = "$title - Ep $episode${if (totalEpisodes > 1 && totalEpisodes < 999) " / $totalEpisodes" else ""}"
+
+    private fun episodePanelTotal(): Int {
+        return if (totalEpisodes > 1) totalEpisodes.coerceIn(1, 999) else max(episode, 1)
+    }
+
+    private fun resetNativeVideoSurface() {
+        playerView.player = null
+        playerView.setBackgroundColor(Color.BLACK)
+        try {
+            playerView.setShutterBackgroundColor(Color.BLACK)
+            playerView.setKeepContentOnPlayerReset(false)
+        } catch (_: Throwable) {
+            // Older/lighter Media3 builds may not expose every PlayerView helper.
+            // Black root + player=null still prevents stale last frame on most TVs.
+        }
+    }
 
     private fun updateTags() {
         tagRow.removeAllViews()
@@ -784,7 +809,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun updateEpisodePanel() {
         sideBody.removeAllViews()
         sideTitle.text = "Daftar Episode"
-        val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else max(episode, 1)
+        val total = episodePanelTotal()
 
         val chip = label("$total Ep", 12.5f, 0xFFE9F8FF.toInt(), true)
         chip.gravity = Gravity.CENTER
@@ -897,7 +922,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         if (!allowMove()) return
         when (mode) {
             Mode.EPISODE -> {
-                val total = if (totalEpisodes > 1 && totalEpisodes < 999) totalEpisodes else episode
+                val total = episodePanelTotal()
                 episodeCursor = (episodeCursor + delta).coerceIn(1, total)
                 updateEpisodePanel()
             }

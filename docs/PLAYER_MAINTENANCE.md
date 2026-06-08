@@ -259,3 +259,15 @@ Rules:
 - Always update `_episode`, `_chapterId`, and `_episodeCursor` together before `_load()`.
 - This fixes the case where the episode list appears but every selection keeps playing the first/original chapter.
 - Do not patch old `tv_player_screen.dart` for Explorer3 runtime bugs unless it is proven active again.
+
+## Native ExoPlayer Episode Surface Rule
+
+Native ExoPlayer episode switching must reset the PlayerView surface before attaching a new ExoPlayer instance.
+
+Rules:
+- Reset PlayerView.player to null before new episode/quality player creation.
+- Release the old ExoPlayer before the new instance owns the surface.
+- Keep PlayerView/root background black.
+- Episode panel total must use the resolved total even when total is 999.
+- Next/Prev/AutoNext must request episode through Flutter resolver and then apply the returned payload.
+- This prevents audio playing while the previous video frame stays frozen.
