@@ -10,6 +10,7 @@ class TvPlayerCacheManager {
   static const Duration failedStreamTtl = Duration(minutes: 45);
 
   static const int _maxEpisodeLists = 80;
+  static const int _maxEpisodeInFlight = 24;
   static const int _maxStreamEntries = 240;
   static const int _maxFailedEntries = 160;
 
@@ -52,6 +53,7 @@ class TvPlayerCacheManager {
     }();
 
     _episodeInFlight[key] = request;
+    _limitEpisodeInFlight();
     try {
       return await request;
     } finally {
@@ -144,6 +146,7 @@ class TvPlayerCacheManager {
     _streams.removeWhere((_, entry) => !entry.expiresAt.isAfter(now));
     _failedStreams.removeWhere((_, until) => !until.isAfter(now));
     _limitEpisodeLists();
+    _limitEpisodeInFlight();
     _limitStreams();
     _limitFailed();
   }
@@ -153,6 +156,14 @@ class TvPlayerCacheManager {
     final removeCount = _episodeLists.length - _maxEpisodeLists;
     for (final key in _episodeLists.keys.take(removeCount).toList()) {
       _episodeLists.remove(key);
+    }
+  }
+
+  static void _limitEpisodeInFlight() {
+    if (_episodeInFlight.length <= _maxEpisodeInFlight) return;
+    final removeCount = _episodeInFlight.length - _maxEpisodeInFlight;
+    for (final key in _episodeInFlight.keys.take(removeCount).toList()) {
+      _episodeInFlight.remove(key);
     }
   }
 

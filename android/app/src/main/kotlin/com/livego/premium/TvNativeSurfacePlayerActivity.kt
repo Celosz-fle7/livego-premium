@@ -85,6 +85,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var lastMoveMs = 0L
     private var sentClosed = false
     private var episodeResolveInFlight = false
+    private var episodeResolveTimeoutTask: Runnable? = null
     private var autoNextRequestedForEpisode = -1
 
     private val speeds = floatArrayOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
@@ -454,6 +455,24 @@ class TvNativeSurfacePlayerActivity : Activity() {
         audioCursor = audioRows.indexOfFirst { it.label == previous }.takeIf { it >= 0 } ?: 0
     }
 
+    private fun cancelEpisodeResolveTimeout() {
+        episodeResolveTimeoutTask?.let { handler.removeCallbacks(it) }
+        episodeResolveTimeoutTask = null
+    }
+
+    private fun armEpisodeResolveTimeout(targetEpisode: Int) {
+        cancelEpisodeResolveTimeout()
+        val task = Runnable {
+            if (!episodeResolveInFlight) return@Runnable
+            episodeResolveInFlight = false
+            episodeResolveTimeoutTask = null
+            showToast("Timeout Episode $targetEpisode")
+            setMode(Mode.DOCK)
+        }
+        episodeResolveTimeoutTask = task
+        handler.postDelayed(task, 12_000L)
+    }
+
     private fun requestEpisode(targetEpisode: Int) {
         if (episodeResolveInFlight) {
             showToast("Masih memuat episode...")
@@ -478,6 +497,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         episodeResolveInFlight = true
         showToast("Memuat Episode $targetEpisode...")
+        armEpisodeResolveTimeout(targetEpisode)
 
         val args = mapOf(
             "episode" to targetEpisode,
@@ -486,6 +506,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         val channel = MainActivity.nativePlayerChannel
         if (channel == null) {
+            cancelEpisodeResolveTimeout()
             episodeResolveInFlight = false
             showToast("Resolver Flutter tidak tersedia")
             return
@@ -494,6 +515,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
         channel.invokeMethod("resolveEpisode", args, object : MethodChannel.Result {
             override fun success(result: Any?) {
                 runOnUiThread {
+                    cancelEpisodeResolveTimeout()
                     episodeResolveInFlight = false
                     val data = result as? Map<*, *>
                     if (data == null) {
@@ -511,6 +533,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
             override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
                 runOnUiThread {
+                    cancelEpisodeResolveTimeout()
                     episodeResolveInFlight = false
                     showToast(errorMessage ?: errorCode)
                 }
@@ -518,6 +541,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
             override fun notImplemented() {
                 runOnUiThread {
+                    cancelEpisodeResolveTimeout()
                     episodeResolveInFlight = false
                     showToast("Resolver episode belum aktif")
                 }
@@ -1121,6 +1145,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     override fun onDestroy() {
+        cancelEpisodeResolveTimeout()
         handler.removeCallbacksAndMessages(null)
         playerView.player = null
         player?.release()

@@ -31,8 +31,14 @@ class TvPlayerService implements PlaybackContract {
   const TvPlayerService();
 
   static const Duration _streamMissCooldown = Duration(seconds: 18);
+  static const Duration _streamResolveTimeout = Duration(seconds: 14);
+  static const Duration _prefetchResolveTimeout = Duration(seconds: 8);
+  static const int _maxInFlightRequests = 24;
+  static const int _maxRecentMiss = 80;
+
   static final Map<String, Future<TvPlayerStreamResolveResult>> _inFlight =
       <String, Future<TvPlayerStreamResolveResult>>{};
+  static final Map<String, DateTime> _inFlightStartedAt = <String, DateTime>{};
   static final Map<String, DateTime> _recentMiss = <String, DateTime>{};
 
   Future<TvPlayerStreamResolveResult> resolveStream(
@@ -86,8 +92,26 @@ class TvPlayerService implements PlaybackContract {
       return existing;
     }
 
-    final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode);
+    if (_inFlight.length >= _maxInFlightRequests) {
+      debugPrint('LIVEGO TV STREAM BUDGET FULL skip ep=$episode chapter=$chapterId');
+      return const TvPlayerStreamResolveResult(
+        stream: StreamInfo.empty,
+        source: 'inFlightBudgetFull',
+        elapsedMs: 0,
+      );
+    }
+
+    final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode)
+        .timeout(
+          _streamResolveTimeout,
+          onTimeout: () => TvPlayerStreamResolveResult(
+            stream: StreamInfo.empty,
+            source: 'resolveTimeout',
+            elapsedMs: _streamResolveTimeout.inMilliseconds,
+          ),
+        );
     _inFlight[budgetKey] = request;
+    _inFlightStartedAt[budgetKey] = DateTime.now();
     try {
       final result = await request;
       if (result.hasStream) {
@@ -111,6 +135,7 @@ class TvPlayerService implements PlaybackContract {
       if (_inFlight[budgetKey] == request) {
         _inFlight.remove(budgetKey);
       }
+      _inFlightStartedAt.remove(budgetKey);
     }
   }
 
@@ -157,8 +182,26 @@ class TvPlayerService implements PlaybackContract {
       return existing;
     }
 
-    final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode);
+    _pruneRequestBudget();
+    if (_inFlight.length >= _maxInFlightRequests) {
+      return const TvPlayerStreamResolveResult(
+        stream: StreamInfo.empty,
+        source: 'prefetchBudgetFull',
+        elapsedMs: 0,
+      );
+    }
+
+    final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode)
+        .timeout(
+          _prefetchResolveTimeout,
+          onTimeout: () => TvPlayerStreamResolveResult(
+            stream: StreamInfo.empty,
+            source: 'prefetchTimeout',
+            elapsedMs: _prefetchResolveTimeout.inMilliseconds,
+          ),
+        );
     _inFlight[budgetKey] = request;
+    _inFlightStartedAt[budgetKey] = DateTime.now();
     try {
       final result = await request;
       if (result.hasStream) {
@@ -180,6 +223,7 @@ class TvPlayerService implements PlaybackContract {
       if (_inFlight[budgetKey] == request) {
         _inFlight.remove(budgetKey);
       }
+      _inFlightStartedAt.remove(budgetKey);
     }
   }
 
@@ -254,11 +298,29 @@ class TvPlayerService implements PlaybackContract {
 
   static void _pruneRequestBudget() {
     final now = DateTime.now();
-    _recentMiss.removeWhere((_, until) => !now.isBefore(until));
-    if (_recentMiss.length <= 80) return;
 
+    _recentMiss.removeWhere((_, until) => !now.isBefore(until));
+
+    // Futures cannot be cancelled, but stale references must not block a later
+    // episode request forever if a provider/API call hangs.
+    final staleWindow = _streamResolveTimeout + const Duration(seconds: 6);
+    _inFlightStartedAt.removeWhere((key, started) {
+      final stale = now.difference(started) > staleWindow;
+      if (stale) _inFlight.remove(key);
+      return stale || !_inFlight.containsKey(key);
+    });
+
+    if (_inFlight.length > _maxInFlightRequests) {
+      final removeCount = _inFlight.length - _maxInFlightRequests;
+      for (final key in _inFlight.keys.take(removeCount).toList(growable: false)) {
+        _inFlight.remove(key);
+        _inFlightStartedAt.remove(key);
+      }
+    }
+
+    if (_recentMiss.length <= _maxRecentMiss) return;
     final keys = _recentMiss.keys.toList(growable: false);
-    for (final key in keys.take(_recentMiss.length - 80)) {
+    for (final key in keys.take(_recentMiss.length - _maxRecentMiss)) {
       _recentMiss.remove(key);
     }
   }
