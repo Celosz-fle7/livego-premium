@@ -50,7 +50,7 @@ class LiveGoSettings {
       homePlatforms.remove(slug);
     } else {
       activePlatforms.add(slug);
-      if (homePlatforms.length < 6) homePlatforms.add(slug);
+      if (!homePlatforms.contains(slug)) homePlatforms.add(slug);
     }
     if (!activePlatforms.contains(defaultPlatform)) {
       defaultPlatform = activePlatforms.first;
@@ -64,7 +64,7 @@ class LiveGoSettings {
     if (homePlatforms.contains(slug)) {
       if (homePlatforms.length > 1) homePlatforms.remove(slug);
     } else {
-      if (homePlatforms.length < 6) {
+      if (!homePlatforms.contains(slug)) {
         homePlatforms.add(slug);
         activePlatforms.add(slug);
       }

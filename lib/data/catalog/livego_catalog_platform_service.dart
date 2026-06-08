@@ -9,9 +9,9 @@ class LiveGoCatalogPlatformService {
   const LiveGoCatalogPlatformService._();
 
   static List<String> get platforms {
-    final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).take(6).toList();
+    final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).toList(growable: false);
     if (chosen.isNotEmpty) return chosen;
-    final active = LiveGoSettings.activePlatforms.take(6).toList();
+    final active = LiveGoSettings.activePlatforms.toList(growable: false);
     return active.isEmpty ? LiveGoApiGateway.defaultPlatforms : active;
   }
 
@@ -23,10 +23,10 @@ class LiveGoCatalogPlatformService {
 
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_freereels' : platforms.first);
 
-  static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform).take(6).toList();
+  static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform);
 
   static List<String> availableCategoriesFor(String platform) =>
-      LiveGoApiPlatforms.categoriesFor(platform).take(8).toList();
+      LiveGoApiPlatforms.categoriesFor(platform);
 
   static List<String> languagesFor(String platform) =>
       LiveGoApiPlatforms.languagesFor(platform);

@@ -47,24 +47,18 @@ class DobdaApiClientImpl {
     String lang = 'id',
     int page = 1,
   }) async {
-    final results = await Future.wait<List<ContentItem>>([
-      _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home'),
-      _safeRows(_discoverRaw(platform: platform, lang: lang, page: page), '$platform/discover'),
-    ]);
+    // TV Home must be fast. /home is the primary fast path and must not wait
+    // for /discover. /discover is only a fallback if /home returns empty.
+    final homeRows = await _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home');
+    final cleanHome = _cleanDobdaItems(homeRows, excludeDubbed: true);
+    if (cleanHome.isNotEmpty) return cleanHome.take(60).toList(growable: false);
 
-    final merged = <ContentItem>[];
-    final seen = <String>{};
-
-    for (final rows in results) {
-      for (final item in rows) {
-        // Home Dobda jangan diisi video Dub/Sulih. Konten dub khusus masuk LiveGo.
-        if (!_isCleanDobdaItem(item, excludeDubbed: true)) continue;
-        final key = _contentKey(item);
-        if (seen.add(key)) merged.add(item);
-      }
-    }
-
-    return merged.take(60).toList();
+    final discoverRows = await _safeRows(
+      _discoverRaw(platform: platform, lang: lang, page: page),
+      '$platform/discover-fallback',
+    );
+    final cleanDiscover = _cleanDobdaItems(discoverRows, excludeDubbed: true);
+    return cleanDiscover.take(60).toList(growable: false);
   }
 
   static Future<List<ContentItem>> liveGoFeed({

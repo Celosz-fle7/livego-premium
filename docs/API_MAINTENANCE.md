@@ -145,3 +145,14 @@ Checklist:
 - Apakah provider lain tidak ikut rusak?
 
 Satu patch API harus satu root problem.
+
+## Dobda Home / LiveGo / Platform Rules
+
+Current TV API rule:
+- Home uses `/api/v2/home` as the fast path.
+- Home must not wait for `/api/v2/discover` before showing content.
+- `/api/v2/discover` is fallback/background material only.
+- LiveGo remains an app-level category built from `/api/v2/search` because Dobda has no real `/livego` endpoint.
+- Platform list must show all user-selected Home platforms.
+- The current 6 Dobda platforms are starter defaults only, not a permanent user lock.
+- Default platform list means initial/reset choice. User choice from Source Manager must remain respected.
