@@ -12,6 +12,7 @@ class TvSafeZone {
 
   static const double bottomReach = 220;
   static const double homeGridBottomReach = 96;
+  static const double homeGridEntryOffset = 255;
   static const double accountTop = 24;
   static const double accountSide = 48;
   static const double settingsTop = 24;

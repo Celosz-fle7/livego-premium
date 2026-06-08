@@ -239,8 +239,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _anchorGridRow({required int targetIndex, required int previousIndex}) {
     // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 205 and mainAxisSpacing: 14, so
-    // the vertical row stride is stable: 219px. Unlike the v1 test, this uses
+    // TvPosterGrid uses mainAxisExtent: 228 and default mainAxisSpacing: 16,
+    // so the vertical row stride is stable: 244px. Unlike the v1 test, this uses
     // actual row delta from index math and clamps aggressive repeat movement
     // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
     // post-frame ensureVisible.
@@ -376,6 +376,57 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   void _requestExit() {
     widget.onRequestExit?.call();
+  }
+
+  void _scrollHomeToTop() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final target = position.minScrollExtent;
+    if ((position.pixels - target).abs() < 1) return;
+    unawaited(_scroll.animateTo(
+      target,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  void _scrollHomeToGridEntry() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final target = TvSafeZone.homeGridEntryOffset
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((position.pixels - target).abs() < 1) return;
+    unawaited(_scroll.animateTo(
+      target,
+      duration: const Duration(milliseconds: 130),
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
+  bool _focusGridEntryFromBanner() {
+    if (_gridNodes.isEmpty) return false;
+    final target = _safe(_gridIndex, _gridNodes.length);
+    final node = _gridNodes[target];
+    final ok = _requestGridNode(node);
+    if (!ok) return false;
+
+    _gridIndex = target;
+    _rememberFocus(TvZone.grid, target);
+    _scrollHomeToGridEntry();
+    return true;
+  }
+
+  void _returnFromGridToBanner() {
+    _cancelHomeSelectionCommit();
+    if (_zone != TvZone.banner) {
+      setState(() => _zone = TvZone.banner);
+    }
+    _scrollHomeToTop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusBanner(throttle: false);
+    });
   }
 
   ContentItem _playerItem(ContentItem item) {
@@ -514,9 +565,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
-    // Home BACK is an exit intent. Do not climb grid -> category -> platform
-    // -> banner anymore; that fights the Shell exit popup and makes BACK feel
-    // unpredictable.
+    // Grid mode BACK returns to the first Home look: Banner + Platform + Category.
+    // BACK from Banner then asks Shell for the exit popup.
+    if (_zone == TvZone.grid ||
+        _gridNodes.any((node) => node.hasFocus) ||
+        (_rowsKey.currentState?.hasFocus ?? false)) {
+      _returnFromGridToBanner();
+      return;
+    }
+
     _requestExit();
   }
 
@@ -532,9 +589,17 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _moveToNav();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.arrowDown) {
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (!_focusGridEntryFromBanner()) {
+        if (!_focusCategory(_categoryIndex)) {
+          if (!_focusPlatform(_platformIndex)) _focusEmpty(throttle: false);
+        }
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
       if (!_focusPlatform(_platformIndex)) {
-        if (!_focusCategory(_categoryIndex)) _focusGrid(_gridIndex);
+        if (!_focusCategory(_categoryIndex)) _focusGridEntryFromBanner();
       }
       return KeyEventResult.handled;
     }
@@ -661,8 +726,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        if (!_focusRows(preferMyList: true)) {
-          if (!_focusCategory(_categoryIndex)) _focusPlatform(_platformIndex);
+        if (!_focusCategory(_categoryIndex)) {
+          if (!_focusPlatform(_platformIndex)) _focusBanner();
         }
       } else {
         _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);

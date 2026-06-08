@@ -209,3 +209,15 @@ Rules:
 - TV image decode widths stay small to protect RAM/FPS.
 - TV Home grid remains 6 columns; do not switch to 7 just to reduce blank space.
 - Heavy high-quality image upgrade must not fight first Home render or remote focus.
+
+## Home Sticky Header Grid Entry Rule
+
+Final Home remote UX:
+- Cold start focus stays on Banner.
+- DOWN once from Banner enters Grid directly.
+- The viewport slides to grid mode so Platform and Category stay visible above posters.
+- RIGHT from Banner still enters Platform for manual source/category control.
+- UP from first Grid row goes to Category, then Platform, then Banner.
+- BACK from Grid returns to the first Home look/Banner.
+- BACK from Banner opens the Shell exit popup.
+- Do not make Platform/Category disappear during normal grid browsing.
