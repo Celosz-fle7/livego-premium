@@ -219,6 +219,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       if (anchorRow) {
         _anchorGridRow(targetIndex: target, previousIndex: previous);
       }
+      if (_gridColumns > 0 && target ~/ _gridColumns == 0) {
+        _lockStickySourceHeaderAfterFocus();
+      }
     }
     return ok;
   }
@@ -261,9 +264,16 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final requestedStep = rowStride * deltaRows;
     final safeStep = requestedStep.clamp(-maxStep, maxStep).toDouble();
 
-    final target = (position.pixels + safeStep)
+    var target = (position.pixels + safeStep)
         .clamp(position.minScrollExtent, position.maxScrollExtent)
         .toDouble();
+
+    if (targetRow <= 0) {
+      final stickyTarget = TvSafeZone.homeGridEntryOffset
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if (target < stickyTarget) target = stickyTarget;
+    }
 
     if ((target - position.pixels).abs() < 1) return;
     position.jumpTo(target);
@@ -473,6 +483,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (ok) {
       _gridIndex = target;
       _rememberFocus(TvZone.grid, target);
+      _lockStickySourceHeaderAfterFocus();
       return true;
     }
 
@@ -483,6 +494,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       if (_requestGridNode(retryNode)) {
         _gridIndex = target;
         _rememberFocus(TvZone.grid, target);
+        _lockStickySourceHeaderAfterFocus();
       }
     });
 
