@@ -211,6 +211,60 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return ok;
   }
 
+  bool _focusPlatformHeaderAtControlAnchor() {
+    if (_platformHeaderNode.context == null) return false;
+    _scrollHomeToGridEntry();
+    final ok = _requestControlNode(_platformHeaderNode);
+    if (ok) _rememberFocus(TvZone.platform, _platformIndex);
+    return ok;
+  }
+
+  bool _focusCategoryHeaderAtControlAnchor() {
+    if (_categoryHeaderNode.context == null) return false;
+    _scrollHomeToGridEntry();
+    final ok = _requestControlNode(_categoryHeaderNode);
+    if (ok) _rememberFocus(TvZone.category, _categoryIndex);
+    return ok;
+  }
+
+  bool _focusPlatformAtControlAnchor(int index) {
+    if (_platformNodes.isEmpty) return false;
+    final target = _safe(index, _platformNodes.length);
+    _scrollHomeToGridEntry();
+    final ok = _requestControlNode(_platformNodes[target]);
+    if (ok) {
+      _platformIndex = target;
+      _rememberFocus(TvZone.platform, target);
+      _scheduleHomeSelectionCommit(TvZone.platform);
+    }
+    return ok;
+  }
+
+  bool _focusCategoryAtControlAnchor(int index) {
+    if (_categoryNodes.isEmpty) return false;
+    final target = _safe(index, _categoryNodes.length);
+    _scrollHomeToGridEntry();
+    final ok = _requestControlNode(_categoryNodes[target]);
+    if (ok) {
+      _categoryIndex = target;
+      _rememberFocus(TvZone.category, target);
+      _scheduleHomeSelectionCommit(TvZone.category);
+    }
+    return ok;
+  }
+
+  bool _requestControlNode(FocusNode node) {
+    // Full-grid ladder focuses pinned Platform/Kategori controls without
+    // ensureVisible, otherwise the Banner can reveal too early.
+    if (!node.canRequestFocus || node.context == null) return false;
+    try {
+      node.requestFocus();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _focusGrid(
     int index, {
     bool throttle = true,
@@ -367,12 +421,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.grid:
         if (_focusGrid(_gridIndex, throttle: throttle)) return;
         if (_focusRows(preferMyList: true)) return;
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return;
         if (_focusCategory(_categoryIndex, throttle: throttle)) return;
         break;
       case TvZone.category:
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return;
         if (_focusCategory(_categoryIndex, throttle: throttle)) return;
         break;
       case TvZone.platform:
+        if (_fullGridMode && _focusPlatformAtControlAnchor(_platformIndex)) return;
         if (_focusPlatform(_platformIndex, throttle: throttle)) return;
         break;
       case TvZone.banner:
@@ -484,7 +541,41 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return true;
   }
 
-  void _returnFromGridToBanner() {
+  void _returnToCategoryAnchor() {
+    _cancelHomeSelectionCommit();
+    if (!_fullGridMode || _zone != TvZone.category) {
+      setState(() {
+        _fullGridMode = true;
+        _zone = TvZone.category;
+      });
+    }
+    _scrollHomeToGridEntry();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+        _focusCategoryHeaderAtControlAnchor();
+      }
+    });
+  }
+
+  void _returnToPlatformAnchor() {
+    _cancelHomeSelectionCommit();
+    if (!_fullGridMode || _zone != TvZone.platform) {
+      setState(() {
+        _fullGridMode = true;
+        _zone = TvZone.platform;
+      });
+    }
+    _scrollHomeToGridEntry();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_focusPlatformAtControlAnchor(_platformIndex)) {
+        _focusPlatformHeaderAtControlAnchor();
+      }
+    });
+  }
+
+  void _returnToBanner() {
     _cancelHomeSelectionCommit();
     if (_zone != TvZone.banner || _fullGridMode) {
       setState(() {
@@ -637,13 +728,32 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
-    // Grid mode BACK returns to the first Home look: Banner + Platform + Category.
-    // BACK from Banner then asks Shell for the exit popup.
-    if (_fullGridMode ||
-        _zone == TvZone.grid ||
+    // One-step TV ladder:
+    // Grid -> Kategori -> Platform -> Banner -> Shell exit.
+    // Banner stays hidden while returning Grid -> Kategori -> Platform.
+    if (_zone == TvZone.grid ||
         _gridNodes.any((node) => node.hasFocus) ||
         (_rowsKey.currentState?.hasFocus ?? false)) {
-      _returnFromGridToBanner();
+      _returnToCategoryAnchor();
+      return;
+    }
+
+    if (_zone == TvZone.category ||
+        _categoryHeaderNode.hasFocus ||
+        _categoryNodes.any((node) => node.hasFocus)) {
+      _returnToPlatformAnchor();
+      return;
+    }
+
+    if (_zone == TvZone.platform ||
+        _platformHeaderNode.hasFocus ||
+        _platformNodes.any((node) => node.hasFocus)) {
+      _returnToBanner();
+      return;
+    }
+
+    if (_fullGridMode) {
+      _returnToCategoryAnchor();
       return;
     }
 
@@ -696,15 +806,17 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _focusPlatform(_platformIndex);
+      _focusPlatformAtControlAnchor(_platformIndex);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusBanner();
+      _returnToBanner();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusCategoryHeader()) _focusCategory(_categoryIndex);
+      if (!_focusCategoryHeaderAtControlAnchor()) {
+        _focusCategoryAtControlAnchor(_categoryIndex);
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key) || tvIsMenuKey(key)) {
@@ -727,11 +839,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      _focusCategory(_categoryIndex);
+      _focusCategoryAtControlAnchor(_categoryIndex);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusPlatformHeader()) _focusPlatform(_platformIndex);
+      _returnToPlatformAnchor();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -757,22 +869,24 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (current == 0) {
-        if (!_focusPlatformHeader()) _moveToNav();
+        if (!_focusPlatformHeaderAtControlAnchor()) _moveToNav();
       } else {
-        _focusPlatform(current - 1);
+        _focusPlatformAtControlAnchor(current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _platformNodes.length - 1) _focusPlatform(current + 1);
+      if (current < _platformNodes.length - 1) {
+        _focusPlatformAtControlAnchor(current + 1);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusBanner();
+      _returnToBanner();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusCategory(_categoryIndex)) _enterFullGrid();
+      if (!_focusCategoryAtControlAnchor(_categoryIndex)) _enterFullGrid();
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
@@ -794,18 +908,20 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (current == 0) {
-        if (!_focusCategoryHeader()) _moveToNav();
+        if (!_focusCategoryHeaderAtControlAnchor()) _moveToNav();
       } else {
-        _focusCategory(current - 1);
+        _focusCategoryAtControlAnchor(current - 1);
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _categoryNodes.length - 1) _focusCategory(current + 1);
+      if (current < _categoryNodes.length - 1) {
+        _focusCategoryAtControlAnchor(current + 1);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusPlatform(_platformIndex)) _focusBanner();
+      _returnToPlatformAnchor();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -859,8 +975,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        if (!_focusCategory(_categoryIndex)) {
-          if (!_focusPlatform(_platformIndex)) _focusBanner();
+        if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+          if (!_focusCategoryHeaderAtControlAnchor()) _returnToPlatformAnchor();
         }
       } else {
         _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
@@ -900,7 +1016,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusCategory(_categoryIndex, throttle: false)) _focusPlatform(_platformIndex, throttle: false);
+      if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+        _focusPlatformAtControlAnchor(_platformIndex);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
