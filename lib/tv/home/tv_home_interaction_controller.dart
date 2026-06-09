@@ -113,12 +113,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
       setState(() {
         _gridIndex = 0;
-        _gridItems = const <ContentItem>[];
         _zone = zone;
       });
 
       _rememberSelection();
-      _loadHome(clearPrevious: true);
+      _loadHome(clearPrevious: false);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -989,12 +988,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _platformIndex = target;
       _categoryIndex = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
       _gridIndex = 0;
-      _gridItems = const <ContentItem>[];
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.platform;
     });
     _rememberSelection();
-    _loadHome(clearPrevious: true);
+    _loadHome(clearPrevious: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _setManualZone(TvZone.platform, target);
@@ -1010,12 +1008,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     setState(() {
       _categoryIndex = target;
       _gridIndex = 0;
-      _gridItems = const <ContentItem>[];
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.category;
     });
     _rememberSelection();
-    _loadHome(clearPrevious: true);
+    _loadHome(clearPrevious: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _setManualZone(TvZone.category, target);

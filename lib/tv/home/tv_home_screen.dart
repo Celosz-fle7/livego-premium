@@ -250,12 +250,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
                       onKey: (node, event) => this._homeRootKey(home.hero, event),
                     ),
-                    if (home.refreshing || home.hasError || home.fromCache)
-                      TvHomeStatusLine(
-                        refreshing: home.refreshing,
-                        hasError: home.hasError,
-                        fromCache: home.fromCache,
-                      ),
+                    // V6c2: keep Home visually stable while content refreshes in background.
+                    // No top refresh/status line here because it changes vertical layout
+                    // and makes remote movement feel shaky.
                     TvOfflineBanner(
                       visible: home.offline || (home.hasError && home.fromCache),
                       fromCache: home.fromCache,
