@@ -87,13 +87,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
         ? _fallback()
         : widget.progressive
             ? _progressiveImage(context, cleanUrl)
-            : _networkImage(
-                context,
-                cleanUrl,
-                decodeWidth: _decodeWidth(context),
-                cacheSuffix: 'full',
-                showPlaceholder: true,
-              );
+            : _fullNetworkImage(context, cleanUrl, showPlaceholder: true);
 
     final body = widget.borderRadius == null
         ? image
@@ -107,12 +101,9 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return;
     }
 
-    // TV grid thumbnails stay low-only. They are many, small, and usually
-    // non-focused; upgrading all of them to high quality wastes RAM/GPU budget.
-    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
-      _loadHighQuality = false;
-      return;
-    }
+    // TV thumbnails are allowed to step up to a moderate width after the
+    // lightweight first pass. Poster role remains the high-quality path for
+    // focused tiles, so visible non-focused grids avoid full poster decodes.
 
     final baseDelayMs = ImageQualityConfig.progressiveDelayMsFor(widget.role);
     // TV remote focus must stay responsive. Let low-res posters settle first,
@@ -135,17 +126,6 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       ),
     );
 
-    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
-      return _networkImage(
-        context,
-        cleanUrl,
-        decodeWidth: lowWidth,
-        cacheSuffix: 'tv-low-$lowWidth',
-        showPlaceholder: true,
-        fadeInDuration: Duration.zero,
-      );
-    }
-
     final highWidth = _decodeWidth(context);
 
     if (lowWidth == highWidth) {
@@ -153,7 +133,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
         context,
         cleanUrl,
         decodeWidth: highWidth,
-        cacheSuffix: 'full',
+        cacheSuffix: _fullCacheSuffix(highWidth),
         showPlaceholder: true,
         fadeInDuration: const Duration(milliseconds: 90),
       );
@@ -175,12 +155,45 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
             context,
             cleanUrl,
             decodeWidth: highWidth,
-            cacheSuffix: 'full',
+            cacheSuffix: _fullCacheSuffix(highWidth),
             showPlaceholder: false,
             fadeInDuration: const Duration(milliseconds: 180),
           ),
       ],
     );
+  }
+
+  Widget _fullNetworkImage(
+    BuildContext context,
+    String cleanUrl, {
+    required bool showPlaceholder,
+  }) {
+    final decodeWidth = _decodeWidth(context);
+    return _networkImage(
+      context,
+      cleanUrl,
+      decodeWidth: decodeWidth,
+      cacheSuffix: _fullCacheSuffix(decodeWidth),
+      showPlaceholder: showPlaceholder,
+    );
+  }
+
+  String _fullCacheSuffix(int? decodeWidth) {
+    if (!widget.tv || decodeWidth == null) return 'full';
+    return 'tv-${_roleCacheName(widget.role)}-full-$decodeWidth';
+  }
+
+  String _roleCacheName(LiveGoImageRole role) {
+    switch (role) {
+      case LiveGoImageRole.poster:
+        return 'poster';
+      case LiveGoImageRole.banner:
+        return 'banner';
+      case LiveGoImageRole.detail:
+        return 'detail';
+      case LiveGoImageRole.thumbnail:
+        return 'thumbnail';
+    }
   }
 
   Widget _networkImage(
@@ -245,9 +258,9 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
 
     switch (widget.role) {
       case LiveGoImageRole.thumbnail:
-        return decodeWidth.clamp(96, 180).toInt();
+        return decodeWidth.clamp(150, 280).toInt();
       case LiveGoImageRole.poster:
-        return decodeWidth.clamp(120, 240).toInt();
+        return decodeWidth.clamp(180, 420).toInt();
       case LiveGoImageRole.detail:
         return decodeWidth.clamp(220, 560).toInt();
       case LiveGoImageRole.banner:
