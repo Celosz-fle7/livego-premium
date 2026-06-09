@@ -11,6 +11,7 @@ class TvHeroBannerFocus extends StatelessWidget {
   final VoidCallback onFocus;
   final VoidCallback? onTap;
   final FocusOnKeyEventCallback onKey;
+  final bool? focusedOverride;
 
   const TvHeroBannerFocus({
     super.key,
@@ -19,6 +20,7 @@ class TvHeroBannerFocus extends StatelessWidget {
     required this.onFocus,
     required this.onTap,
     required this.onKey,
+    this.focusedOverride,
   });
 
   @override
@@ -27,7 +29,7 @@ class TvHeroBannerFocus extends StatelessWidget {
       child: ListenableBuilder(
         listenable: focusNode,
         builder: (context, _) {
-          final focused = focusNode.hasFocus;
+          final focused = focusedOverride ?? focusNode.hasFocus;
           return Focus(
             focusNode: focusNode,
             skipTraversal: true,

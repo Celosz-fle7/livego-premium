@@ -67,6 +67,7 @@ class TvHomeScreen extends ConsumerStatefulWidget {
 
 class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final ScrollController _scroll = ScrollController();
+  final FocusNode _rootNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-root');
 
   // FOCUSNODE OWNERSHIP RULE:
   // FocusNodes stay in the screen because their lifecycle is tied to widgets
@@ -132,6 +133,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       this._loadHome(clearPrevious: false);
+      this._requestHomeRootFocus();
     });
     this._scheduleFocusEntry(preferBanner: true);
   }
@@ -163,6 +165,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _homeSelectionCommitTimer?.cancel();
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
+    _rootNode.dispose();
     _bannerNode.dispose();
     _platformHeaderNode.dispose();
     _categoryHeaderNode.dispose();
@@ -222,7 +225,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             return null;
           }),
         },
-        child: CustomScrollView(
+        child: Focus(
+          focusNode: _rootNode,
+          autofocus: true,
+          skipTraversal: true,
+          onKeyEvent: (node, event) => this._homeRootKey(home.hero, event),
+          child: CustomScrollView(
             // TV Home is remote-first. Disable direct drag/overscroll so an
             // accidental touchpad/mouse wheel cannot pull the viewport away
             // from the focused poster while DPAD logic owns scrolling.
@@ -237,9 +245,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     TvHeroBannerFocus(
                       item: home.hero,
                       focusNode: _bannerNode,
+                      focusedOverride: _zone == TvZone.banner,
                       onFocus: () => this._rememberFocus(TvZone.banner, 0),
                       onTap: home.hero == null ? null : () => this._openDetail(home.hero!),
-                      onKey: (node, event) => this._bannerKey(home.hero, event),
+                      onKey: (node, event) => this._homeRootKey(home.hero, event),
                     ),
                     if (home.refreshing || home.hasError || home.fromCache)
                       TvHomeStatusLine(
@@ -276,13 +285,14 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           child: TvChipRow(
                             labels: platforms,
                             selected: _platformIndex,
+                            focusedIndex: _zone == TvZone.platform ? _platformIndex : null,
                             nodes: _platformNodes,
                             onTap: this._selectPlatform,
                             onFocus: (i) {
                               _platformIndex = i;
                               this._rememberFocus(TvZone.platform, i);
                             },
-                            onKey: this._platformKey,
+                            onKey: (i, event) => this._homeRootKey(home.hero, event),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -298,13 +308,14 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           child: TvChipRow(
                             labels: categories,
                             selected: _categoryIndex,
+                            focusedIndex: _zone == TvZone.category ? _categoryIndex : null,
                             nodes: _categoryNodes,
                             onTap: this._selectCategory,
                             onFocus: (i) {
                               _categoryIndex = i;
                               this._rememberFocus(TvZone.category, i);
                             },
-                            onKey: this._categoryKey,
+                            onKey: (i, event) => this._homeRootKey(home.hero, event),
                           ),
                         ),
                       ],
@@ -341,13 +352,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           return Focus(
                             focusNode: _emptyNode,
                             skipTraversal: true,
-                            onKeyEvent: (node, event) => this._emptyKey(event),
+                            onKeyEvent: (node, event) => this._homeRootKey(home.hero, event),
                             onFocusChange: (focused) {
                               if (focused) this._rememberFocus(TvZone.placeholder, 0);
                             },
                             child: TvHomeEmptyState(
                               hasError: home.hasError,
-                              focused: _emptyNode.hasFocus,
+                              focused: _zone == TvZone.placeholder,
                             ),
                           );
                         },
@@ -362,6 +373,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   items: gridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
+                  focusedIndex: _zone == TvZone.grid ? _gridIndex : null,
                   padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 14,
@@ -373,11 +385,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   onTap: (i, item) {
                     this._openGridItem(i, item);
                   },
-                  onKey: (i, item, node, event) => this._gridKey(i, item, event),
+                  onKey: (i, item, node, event) => this._homeRootKey(home.hero, event),
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
             ],
           ),
+        ),
       ),
     );
       },

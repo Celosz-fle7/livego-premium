@@ -16,6 +16,7 @@ import '../../shared/widgets/livego_cached_image.dart';
 class TvPosterTile extends StatelessWidget {
   final ContentItem item;
   final FocusNode focusNode;
+  final bool? focusedOverride;
   final VoidCallback onFocus;
   final VoidCallback onTap;
   final FocusOnKeyEventCallback onKey;
@@ -24,6 +25,7 @@ class TvPosterTile extends StatelessWidget {
     super.key,
     required this.item,
     required this.focusNode,
+    this.focusedOverride,
     required this.onFocus,
     required this.onTap,
     required this.onKey,
@@ -34,7 +36,7 @@ class TvPosterTile extends StatelessWidget {
     return ListenableBuilder(
       listenable: focusNode,
       builder: (context, _) {
-        final focused = focusNode.hasFocus;
+        final focused = focusedOverride ?? focusNode.hasFocus;
         return Focus(
           focusNode: focusNode,
           skipTraversal: true,

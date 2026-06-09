@@ -8,6 +8,7 @@ class TvPosterGrid extends StatelessWidget {
   final List<ContentItem> items;
   final List<FocusNode> nodes;
   final int columns;
+  final int? focusedIndex;
   final EdgeInsets padding;
   final double crossAxisSpacing;
   final double mainAxisSpacing;
@@ -22,6 +23,7 @@ class TvPosterGrid extends StatelessWidget {
     required this.items,
     required this.nodes,
     required this.columns,
+    this.focusedIndex,
     required this.padding,
     required this.onFocus,
     required this.onTap,
@@ -65,6 +67,7 @@ class TvPosterGrid extends StatelessWidget {
               key: ValueKey<String>('${item.platformSlug}:${item.id}:${item.chapterId}:$i'),
               item: item,
               focusNode: node,
+              focusedOverride: focusedIndex == i,
               onFocus: () => onFocus(i),
               onTap: () => onTap(i, item),
               onKey: (focusNode, event) => onKey(i, item, focusNode, event),

@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 class TvChipRow extends StatelessWidget {
   final List<String> labels;
   final int selected;
+  final int? focusedIndex;
   final List<FocusNode> nodes;
   final ValueChanged<int> onTap;
   final ValueChanged<int> onFocus;
@@ -15,6 +16,7 @@ class TvChipRow extends StatelessWidget {
     super.key,
     required this.labels,
     required this.selected,
+    this.focusedIndex,
     required this.nodes,
     required this.onTap,
     required this.onFocus,
@@ -29,6 +31,7 @@ class TvChipRow extends StatelessWidget {
           text: labels[i],
           active: i == selected,
           focusNode: nodes[i],
+          focusedOverride: focusedIndex == i,
           onTap: () => onTap(i),
           onFocus: () => onFocus(i),
           onKey: (node, event) => onKey(i, event),
@@ -65,6 +68,7 @@ class _TvChip extends StatelessWidget {
   final String text;
   final bool active;
   final FocusNode focusNode;
+  final bool? focusedOverride;
   final VoidCallback onTap;
   final VoidCallback onFocus;
   final FocusOnKeyEventCallback onKey;
@@ -73,6 +77,7 @@ class _TvChip extends StatelessWidget {
     required this.text,
     required this.active,
     required this.focusNode,
+    this.focusedOverride,
     required this.onTap,
     required this.onFocus,
     required this.onKey,
@@ -84,7 +89,7 @@ class _TvChip extends StatelessWidget {
       child: ListenableBuilder(
         listenable: focusNode,
         builder: (context, _) {
-          final focused = focusNode.hasFocus;
+          final focused = focusedOverride ?? focusNode.hasFocus;
           final selected = active || focused;
           return Focus(
             focusNode: focusNode,
