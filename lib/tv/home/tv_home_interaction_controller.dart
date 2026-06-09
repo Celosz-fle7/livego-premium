@@ -137,6 +137,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       setState(() {
         _gridIndex = 0;
         _gridItems = const <ContentItem>[];
+        _fullGridMode = false;
         _zone = zone;
       });
 
@@ -465,10 +466,175 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return true;
   }
 
+
+  void _enterFullGridFromPreview(int previewIndex, int previewCount) {
+    final count = previewCount <= 0
+        ? (_gridNodes.length < _gridColumns ? _gridNodes.length : _gridColumns)
+        : previewCount;
+    if (count <= 0 || _gridNodes.length <= count) {
+      _rememberFocus(TvZone.grid, _safe(previewIndex, _gridNodes.length));
+      return;
+    }
+
+    final col = previewIndex % _gridColumns;
+    final target = (count + col).clamp(count, _gridNodes.length - 1).toInt();
+    setState(() {
+      _fullGridMode = true;
+      _gridIndex = target;
+      _zone = TvZone.grid;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_scroll.hasClients) {
+        _scroll.position.jumpTo(_scroll.position.minScrollExtent);
+      }
+      if (!_focusGrid(target, throttle: false, anchorRow: false)) {
+        _scheduleFocusEntry(preferBanner: false);
+      }
+    });
+  }
+
+  void _returnFromFullGridToPreviewGrid(int currentIndex, {int? previewCount}) {
+    final count = previewCount ?? (_gridNodes.length < _gridColumns ? _gridNodes.length : _gridColumns);
+    if (count <= 0) {
+      setState(() => _fullGridMode = false);
+      _focusBanner(throttle: false);
+      return;
+    }
+
+    final col = currentIndex % _gridColumns;
+    final target = col.clamp(0, count - 1).toInt();
+    setState(() {
+      _fullGridMode = false;
+      _gridIndex = target;
+      _zone = TvZone.grid;
+    });
+
+    _scrollHomeToGridEntry();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_focusGrid(target, throttle: false, anchorRow: false)) {
+        if (!_focusCategory(_categoryIndex, throttle: false)) _focusBanner(throttle: false);
+      }
+    });
+  }
+
+  KeyEventResult _previewGridKey(int index, ContentItem item, KeyEvent event, int previewCount) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    final count = previewCount <= 0
+        ? (_gridNodes.length < _gridColumns ? _gridNodes.length : _gridColumns)
+        : previewCount;
+    final current = _safe(index, count);
+    _gridIndex = current;
+    final col = current % _gridColumns;
+
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (col == 0) {
+        _moveToNav();
+      } else {
+        _focusGrid(current - 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      final next = current + 1;
+      if (col >= _gridColumns - 1 || next >= count) {
+        _rememberFocus(TvZone.grid, current);
+      } else {
+        _focusGrid(next);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (!_focusCategory(_categoryIndex)) {
+        if (!_focusPlatform(_platformIndex)) _focusBanner();
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _enterFullGridFromPreview(current, count);
+      return KeyEventResult.handled;
+    }
+    if (tvIsSelectKey(key)) {
+      _openGridItem(current, item);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _fullGridKey(int actualIndex, ContentItem item, KeyEvent event, int previewCount) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    final start = previewCount <= 0 ? _gridColumns : previewCount;
+    final current = _safe(actualIndex, _gridNodes.length);
+    _gridIndex = current;
+    final col = current % _gridColumns;
+    final fullRow = ((current - start) ~/ _gridColumns).clamp(0, 9999).toInt();
+
+    if (tvIsBackKey(key)) {
+      _returnFromFullGridToPreviewGrid(current, previewCount: start);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (col == 0 || current <= start) {
+        _moveToNav();
+      } else {
+        _focusGrid(current - 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      final next = current + 1;
+      if (col >= _gridColumns - 1 || next >= _gridNodes.length || ((next - start) ~/ _gridColumns) != fullRow) {
+        _rememberFocus(TvZone.grid, current);
+      } else {
+        _focusGrid(next);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (fullRow <= 0) {
+        _returnFromFullGridToPreviewGrid(current, previewCount: start);
+      } else {
+        _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      final next = current + _gridColumns;
+      if (next < _gridNodes.length) {
+        _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
+        return KeyEventResult.handled;
+      }
+      final lastIndex = _gridNodes.length - 1;
+      final lastFullRow = ((lastIndex - start) ~/ _gridColumns).clamp(0, 9999).toInt();
+      if (lastFullRow > fullRow) {
+        _focusGrid(lastIndex, anchorRow: true, anchorAlignment: 0.58);
+      }
+      return KeyEventResult.handled;
+    }
+    if (tvIsSelectKey(key)) {
+      _openGridItem(current, item);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   void _returnFromGridToBanner() {
     _cancelHomeSelectionCommit();
-    if (_zone != TvZone.banner) {
-      setState(() => _zone = TvZone.banner);
+    if (_zone != TvZone.banner || _fullGridMode) {
+      setState(() {
+        _fullGridMode = false;
+        _zone = TvZone.banner;
+      });
     }
     _scrollHomeToTop();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -523,6 +689,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _openingDetail = true;
 
     final returnZone = forceReturnZone ?? _zone;
+    final returnFullGridMode = _fullGridMode;
     final returnPlatform = _platformIndex;
     final returnCategory = _categoryIndex;
     final returnGrid = forceReturnGrid ?? _gridIndex;
@@ -543,6 +710,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         widget.onPlayerRouteClosed?.call();
         _openingDetail = false;
         if (!mounted) return;
+        _fullGridMode = returnFullGridMode;
         _zone = returnZone;
         _platformIndex = returnPlatform;
         _categoryIndex = returnCategory;
@@ -560,6 +728,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         // skip the restore. Force the saved zone/index once after the route pop.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
+          _fullGridMode = returnFullGridMode;
           _zone = returnZone;
           _platformIndex = returnPlatform;
           _categoryIndex = returnCategory;
@@ -589,6 +758,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _categoryIndex = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
       _gridIndex = 0;
       _gridItems = const <ContentItem>[];
+      _fullGridMode = false;
       _zone = TvZone.platform;
     });
     _rememberSelection();
@@ -605,6 +775,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _categoryIndex = target;
       _gridIndex = 0;
       _gridItems = const <ContentItem>[];
+      _fullGridMode = false;
       _zone = TvZone.category;
     });
     _rememberSelection();
@@ -613,6 +784,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
+    if (_fullGridMode && (_zone == TvZone.grid || _gridNodes.any((node) => node.hasFocus))) {
+      _returnFromFullGridToPreviewGrid(_gridIndex);
+      return;
+    }
+
     // Grid mode BACK returns to the first Home look: Banner + Platform + Category.
     // BACK from Banner then asks Shell for the exit popup.
     if (_zone == TvZone.grid ||

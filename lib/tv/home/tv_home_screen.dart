@@ -84,6 +84,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _categoryIndex = 0;
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
+  bool _fullGridMode = false;
   bool _openingDetail = false;
   int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
@@ -194,6 +195,20 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
     this._scheduleEmptyFocusIfNeeded(home, gridItems);
 
+    final previewGridCount = gridItems.length < _gridColumns ? gridItems.length : _gridColumns;
+    final previewGridItems = previewGridCount <= 0
+        ? const <ContentItem>[]
+        : gridItems.take(previewGridCount).toList(growable: false);
+    final fullGridItems = gridItems.length > previewGridCount
+        ? gridItems.skip(previewGridCount).toList(growable: false)
+        : const <ContentItem>[];
+    final previewGridNodes = previewGridCount <= 0
+        ? const <FocusNode>[]
+        : _gridNodes.take(previewGridCount).toList(growable: false);
+    final fullGridNodes = _gridNodes.length > previewGridCount
+        ? _gridNodes.skip(previewGridCount).toList(growable: false)
+        : const <FocusNode>[];
+
     final padding = TvSafeZone.home;
     return ListenableBuilder(
       listenable: _homeNavTick,
@@ -215,8 +230,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             controller: _scroll,
             cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
+              if (!_fullGridMode) ...[
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate.fixed([
                     TvHeroBannerFocus(
@@ -333,24 +349,48 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   ]),
                 ),
               ),
+              ],
               if (!home.loading && gridItems.isNotEmpty)
-                TvPosterGrid(
-                  items: gridItems,
-                  nodes: _gridNodes,
-                  columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 14,
-                  mainAxisExtent: 205,
-                  onFocus: (i) {
-                    _gridIndex = i;
-                    this._rememberFocus(TvZone.grid, i);
-                  },
-                  onTap: (i, item) {
-                    this._openGridItem(i, item);
-                  },
-                  onKey: (i, item, node, event) => this._gridKey(i, item, event),
-                ),
+                _fullGridMode
+                    ? TvPosterGrid(
+                        items: fullGridItems.isNotEmpty ? fullGridItems : previewGridItems,
+                        nodes: fullGridNodes.isNotEmpty ? fullGridNodes : previewGridNodes,
+                        columns: _gridColumns,
+                        padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, TvSafeZone.homeGridBottomReach),
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 14,
+                        mainAxisExtent: 205,
+                        onFocus: (i) {
+                          final actual = fullGridItems.isNotEmpty ? i + previewGridCount : i;
+                          _gridIndex = actual;
+                          this._rememberFocus(TvZone.grid, actual);
+                        },
+                        onTap: (i, item) {
+                          final actual = fullGridItems.isNotEmpty ? i + previewGridCount : i;
+                          this._openGridItem(actual, item);
+                        },
+                        onKey: (i, item, node, event) {
+                          final actual = fullGridItems.isNotEmpty ? i + previewGridCount : i;
+                          return this._fullGridKey(actual, item, event, previewGridCount);
+                        },
+                      )
+                    : TvPosterGrid(
+                        items: previewGridItems,
+                        nodes: previewGridNodes,
+                        columns: _gridColumns,
+                        padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 14,
+                        mainAxisExtent: 205,
+                        onFocus: (i) {
+                          _gridIndex = i;
+                          this._rememberFocus(TvZone.grid, i);
+                        },
+                        onTap: (i, item) {
+                          this._openGridItem(i, item);
+                        },
+                        onKey: (i, item, node, event) => this._previewGridKey(i, item, event, previewGridCount),
+                      ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
             ],
           ),
