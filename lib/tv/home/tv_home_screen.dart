@@ -30,7 +30,8 @@ import '../widgets/tv_offline_banner.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_professional_loading.dart';
-import 'zones/tv_home_top_zone.dart';
+import 'zones/tv_home_preview_zone.dart';
+import 'zones/tv_home_full_grid_zone.dart';
 
 
 part 'tv_home_interaction_controller.dart';
@@ -166,10 +167,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   }
 
   double _homeGridTopPadding() {
-    // HOME_TOP renders Banner + source header, so grid remains compact.
-    // HOME_BROWSE removes Banner from the sliver tree and gives the first
-    // grid row a small safe zone below Platform/Kategori.
-    return _homeBrowseMode ? TvSafeZone.homeGridUnderStickyTopPadding : 0;
+    return 0;
   }
 
   @override
@@ -186,6 +184,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
         ? rawItems.take(_homeGridLimit).toList(growable: false)
         : rawItems;
     _gridItems = gridItems;
+    final previewGridItems = gridItems.length > _gridColumns
+        ? gridItems.take(_gridColumns).toList(growable: false)
+        : gridItems;
 
     if (_platformNodes.length != platforms.length) {
       this._syncNodes(_platformNodes, platforms.length, 'tv-home-platform');
@@ -225,7 +226,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
             cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
               if (!_homeBrowseMode)
-                TvHomeTopZone(
+                TvHomePreviewZone(
                   padding: padding,
                   banner: TvHeroBannerFocus(
                     item: home.hero,
@@ -247,110 +248,86 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       refreshing: home.refreshing,
                     ),
                   ],
-                ),
-              if (_homeBrowseMode)
-                SliverPersistentHeader(
-                pinned: true,
-                delegate: _HomeStickySourceHeaderDelegate(
-                  height: 114,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 6),
-                    child: Column(
-                      children: [
-                        TvSectionBox(
-                          icon: Icons.apps_rounded,
-                          label: 'Platform',
-                          hint: LiveGoCatalog.label(_platformSlug),
-                          height: 52,
-                          onHeaderTap: this._openPlatformManager,
-                          child: TvChipRow(
-                            labels: platforms,
-                            selected: _platformIndex,
-                            nodes: _platformNodes,
-                            onTap: this._selectPlatform,
-                            onFocus: (i) {
-                              _platformIndex = i;
-                              this._rememberFocus(TvZone.platform, i);
-                            },
-                            onKey: this._platformKey,
-                          ),
+                  sourceHeader: Column(
+                    children: [
+                      TvSectionBox(
+                        icon: Icons.apps_rounded,
+                        label: 'Platform',
+                        hint: LiveGoCatalog.label(_platformSlug),
+                        height: 52,
+                        onHeaderTap: this._openPlatformManager,
+                        child: TvChipRow(
+                          labels: platforms,
+                          selected: _platformIndex,
+                          nodes: _platformNodes,
+                          onTap: this._selectPlatform,
+                          onFocus: (i) {
+                            _platformIndex = i;
+                            this._rememberFocus(TvZone.platform, i);
+                          },
+                          onKey: this._platformKey,
                         ),
-                        const SizedBox(height: 4),
-                        TvSectionBox(
-                          icon: Icons.tune_rounded,
-                          label: 'Kategori',
-                          hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
-                          height: 52,
-                          onHeaderTap: this._openCategoryManager,
-                          child: TvChipRow(
-                            labels: categories,
-                            selected: _categoryIndex,
-                            nodes: _categoryNodes,
-                            onTap: this._selectCategory,
-                            onFocus: (i) {
-                              _categoryIndex = i;
-                              this._rememberFocus(TvZone.category, i);
-                            },
-                            onKey: this._categoryKey,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      TvSectionBox(
+                        icon: Icons.tune_rounded,
+                        label: 'Kategori',
+                        hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
+                        height: 52,
+                        onHeaderTap: this._openCategoryManager,
+                        child: TvChipRow(
+                          labels: categories,
+                          selected: _categoryIndex,
+                          nodes: _categoryNodes,
+                          onTap: this._selectCategory,
+                          onFocus: (i) {
+                            _categoryIndex = i;
+                            this._rememberFocus(TvZone.category, i);
+                          },
+                          onKey: this._categoryKey,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              if (_homeBrowseMode)
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
-                  sliver: SliverList(
-                  delegate: SliverChildListDelegate.fixed([
-                    TvHomeProfessionalRows(
-                      key: _rowsKey,
-                      onOpen: this._openDetail,
-                      onMoveToNav: this._moveToNav,
-                      onBackToCategory: () {
-                        if (!this._focusCategory(_categoryIndex, throttle: false)) this._focusPlatform(_platformIndex, throttle: false);
-                      },
-                      onMoveToGrid: () => this._focusGrid(_gridIndex, throttle: false),
-                    ),
-                    // Grid title/count removed so poster grid can sit closer
-                    // to Kategori. This saves vertical TV space without touching
-                    // data loading or focus movement.
-                    const SizedBox(height: 6),
-                    if (home.loading && gridItems.isEmpty)
-                      const TvProfessionalGridSkeleton(columns: 7, rows: 2)
-                    else if (gridItems.isEmpty)
-                      ListenableBuilder(
-                        listenable: _emptyNode,
-                        builder: (context, _) {
-                          return Focus(
-                            focusNode: _emptyNode,
-                            skipTraversal: true,
-                            onKeyEvent: (node, event) => this._emptyKey(event),
-                            onFocusChange: (focused) {
-                              if (focused) this._rememberFocus(TvZone.placeholder, 0);
-                            },
-                            child: TvHomeEmptyState(
-                              hasError: home.hasError,
-                              focused: _emptyNode.hasFocus,
-                            ),
-                          );
-                        },
-                      )
-                    else
-                      const SizedBox.shrink(),
-                  ]),
-                ),
-              ),
-              if (_homeBrowseMode && !home.loading && gridItems.isNotEmpty)
+              if (!_homeBrowseMode && home.loading && gridItems.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: TvProfessionalGridSkeleton(columns: 7, rows: 1),
+                  ),
+                )
+              else if (!_homeBrowseMode && previewGridItems.isNotEmpty)
                 TvPosterGrid(
-                  items: gridItems,
+                  items: previewGridItems,
                   nodes: _gridNodes,
                   columns: _gridColumns,
-                  padding: EdgeInsets.fromLTRB(padding.left, _homeGridTopPadding(), padding.right, TvSafeZone.homeGridBottomReach),
+                  padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 24),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 14,
                   mainAxisExtent: 205,
+                  onFocus: (i) {
+                    _gridIndex = i;
+                    this._rememberFocus(TvZone.grid, i);
+                  },
+                  onTap: (i, item) {
+                    this._openGridItem(i, item);
+                  },
+                  onKey: (i, item, node, event) => this._gridKey(i, item, event),
+                ),
+              if (_homeBrowseMode && home.loading && gridItems.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 24),
+                    child: TvProfessionalGridSkeleton(columns: 7, rows: 2),
+                  ),
+                )
+              else if (_homeBrowseMode && gridItems.isNotEmpty)
+                TvHomeFullGridZone(
+                  items: gridItems,
+                  nodes: _gridNodes,
+                  columns: _gridColumns,
+                  padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, TvSafeZone.homeGridBottomReach),
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);
