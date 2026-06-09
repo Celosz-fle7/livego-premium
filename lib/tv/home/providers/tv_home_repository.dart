@@ -66,7 +66,10 @@ class TvHomeRepository {
 
   void markOffline() => LiveGoNetworkStatus.markOffline();
 
-  Future<TvHomeContentState?> loadCached(String platform, String selectedCategory) async {
+  Future<TvHomeContentState?> loadCached({
+    required String platform,
+    required String selectedCategory,
+  }) async {
     final cached = await LiveGoCatalog.cachedHomeByCategory(
       platform: platform,
       category: selectedCategory,
@@ -88,7 +91,10 @@ class TvHomeRepository {
     );
   }
 
-  Future<TvHomeContentState?> loadNetwork(String platform, String selectedCategory) async {
+  Future<TvHomeContentState?> loadNetwork({
+    required String platform,
+    required String selectedCategory,
+  }) async {
     final items = await LiveGoCatalog.homeByCategory(
       platform: platform,
       category: selectedCategory,
@@ -107,7 +113,10 @@ class TvHomeRepository {
     );
   }
 
-  Future<TvHomeContentState?> loadFallbackCache(String platform, String selectedCategory) async {
+  Future<TvHomeContentState?> loadFallbackCache({
+    required String platform,
+    required String selectedCategory,
+  }) async {
     final fallback = await LiveGoCatalog.cachedHomeByCategory(
       platform: platform,
       category: selectedCategory,
