@@ -11,6 +11,7 @@ class TvPlayerExplorer3Timing {
 
   static const int cursorMoveGuardMs = 90;
   static const int playerUiTickMs = 500;
+  static const int progressSaveThrottleMs = 12000;
 
   static const Duration episodeWarmupDelay = Duration(seconds: 1);
   static const Duration lightPrefetchDelay = Duration(seconds: 10);
