@@ -126,7 +126,7 @@ class LiveGoSettings {
     manualRotateButton = true;
     tvSourceSetupCompleted = false;
     mobileHomeGrid = 3;
-    tvHomeGrid = 6;
+    tvHomeGrid = 7;
     tvLastHomeCategories.clear();
     activePlatforms
       ..clear()

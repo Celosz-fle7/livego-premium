@@ -325,7 +325,7 @@ class LiveGoLocalStore {
       LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
       LiveGoSettings.tvSourceSetupCompleted = _bool(json['tvSourceSetupCompleted'], LiveGoSettings.tvSourceSetupCompleted);
       LiveGoSettings.mobileHomeGrid = parseInt(json['mobileHomeGrid'], fallback: LiveGoSettings.mobileHomeGrid).clamp(2, 5).toInt();
-      LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(6, 10).toInt();
+      LiveGoSettings.tvHomeGrid = parseInt(json['tvHomeGrid'], fallback: LiveGoSettings.tvHomeGrid).clamp(7, 10).toInt();
 
       final savedActivePlatforms = _stringList(json['activePlatforms']);
       final savedHomePlatforms = _stringList(json['homePlatforms']);
@@ -343,6 +343,22 @@ class LiveGoLocalStore {
       if (hasLegacyApiSource && home.length < 2) {
         home = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
+
+      // Dobda migration guard:
+      // Old saved source settings can leave Home with only one Dobda platform
+      // (or a legacy alias normalized to dobda_freereels). Always merge the
+      // current Dobda starter pack back into active/home so Source Manager and
+      // Home expose all clean Dobda platforms after update.
+      final defaultDobdaPlatforms = LiveGoSettings.defaultPlatforms
+          .where(supported.contains)
+          .toList(growable: false);
+      if (defaultDobdaPlatforms.isNotEmpty) {
+        for (final slug in defaultDobdaPlatforms) {
+          if (!active.contains(slug)) active.add(slug);
+          if (!home.contains(slug)) home.add(slug);
+        }
+      }
+
       if (active.isNotEmpty) {
         LiveGoSettings.activePlatforms
           ..clear()
