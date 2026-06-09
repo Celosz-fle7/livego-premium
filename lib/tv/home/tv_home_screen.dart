@@ -92,6 +92,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
   int _lastEmptyFocusMs = 0;
+  int _lastHomeBackMs = 0;
   int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
   String _loadedPlatformSlug = '';

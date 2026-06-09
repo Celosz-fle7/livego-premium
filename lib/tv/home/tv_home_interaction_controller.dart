@@ -327,6 +327,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     final position = _scroll.position;
     final viewport = position.viewportDimension;
+    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns).clamp(1, 999).toInt();
+    final visibleRows = _visibleGridRows(viewport, totalRows, rowStride);
+    final maxTopRow = (totalRows - visibleRows).clamp(0, totalRows).toInt();
+    final maxComfortScroll = _homeGridScrollForTopRow(maxTopRow, position);
     final comfortWindow = (viewport - TvSafeZone.gridTop - TvSafeZone.gridBottom)
         .clamp(rowStride, rowStride * 2.0)
         .toDouble();
@@ -335,7 +339,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final safeStep = requestedStep.clamp(-maxStep, maxStep).toDouble();
 
     final target = (position.pixels + safeStep)
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .clamp(position.minScrollExtent, maxComfortScroll)
         .toDouble();
 
     if ((target - position.pixels).abs() < 1) return;
@@ -439,10 +443,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
 
     _requestHomeRootFocus();
-    final key = event.logicalKey;
+    return _reduceHomeKey(hero, event.logicalKey);
+  }
 
+  KeyEventResult _reduceHomeKey(ContentItem? hero, LogicalKeyboardKey key) {
     if (tvIsBackKey(key)) {
-      _homeManualBack();
+      _handleBack();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
@@ -463,6 +469,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (tvIsSelectKey(key)) {
       _homeManualSelect(hero);
+      return KeyEventResult.handled;
+    }
+    if (tvIsMenuKey(key)) {
+      _homeManualMenu();
       return KeyEventResult.handled;
     }
     return KeyEventResult.handled;
@@ -538,22 +548,21 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final row = safeIndex ~/ _gridColumns;
     final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns).clamp(1, 999).toInt();
 
-    // V6b: do not place the last grid row at the top of the viewport.
-    // The grid has bottom reach padding for TV safe area. If we scroll directly to
-    // row * stride near the end, the bottom padding becomes a large empty area.
-    // Cap the top row by the number of rows that can comfortably fit on screen.
-    final visibleRows = ((position.viewportDimension - TvSafeZone.gridTop - TvSafeZone.gridBottom) / rowStride)
-        .floor()
-        .clamp(1, totalRows)
-        .toInt();
-    final maxTopRow = (totalRows - visibleRows).clamp(0, totalRows).toInt();
-    final anchoredRow = row.clamp(0, maxTopRow).toInt();
-
-    final target = (TvSafeZone.homeGridEntryOffset + (anchoredRow * rowStride))
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
+    final visibleRows = _visibleGridRows(position.viewportDimension, totalRows, rowStride);
+    final anchoredRow = row.clamp(0, totalRows - visibleRows).toInt();
+    final target = _homeGridScrollForTopRow(anchoredRow, position);
     if ((target - position.pixels).abs() < 1) return;
     position.jumpTo(target);
+  }
+
+  int _visibleGridRows(double viewport, int totalRows, double rowStride) {
+    final usableHeight = viewport - TvSafeZone.gridTop - TvSafeZone.gridBottom;
+    return (usableHeight / rowStride).floor().clamp(1, totalRows).toInt();
+  }
+
+  double _homeGridScrollForTopRow(int topRow, ScrollPosition position) {
+    final target = TvSafeZone.homeGridEntryOffset + (topRow * 219.0);
+    return target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
   }
 
   void _homeManualUp() {
@@ -674,19 +683,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _homeManualBack() {
-    // V6e: BACK is now simple and safe for the one-root Home model.
-    //
-    // Any Home content position returns to Banner first:
-    // Grid -> Banner
-    // Kategori -> Banner
-    // Platform -> Banner
-    //
-    // Only when Home is already at Banner/top may BACK request the exit popup.
+    // One Home owner decides BACK. Every non-top Home position returns directly
+    // to Banner/top; only Banner/top can delegate to Shell for the exit popup.
     final isScrolledAwayFromTop = _scroll.hasClients && _scroll.position.pixels > 8;
     final shouldReturnToBanner = _zone != TvZone.banner || _fullGridMode || isScrolledAwayFromTop;
 
     if (shouldReturnToBanner) {
-      _setManualZone(TvZone.banner, 0);
+      _returnToBanner();
       return;
     }
 
@@ -716,6 +719,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.placeholder:
         ref.read(tvHomeContentProvider.notifier).retry();
         _scheduleFocusEntry(preferBanner: false);
+        return;
+      default:
+        return;
+    }
+  }
+
+  void _homeManualMenu() {
+    switch (_zone) {
+      case TvZone.platform:
+        unawaited(_openPlatformManager());
+        return;
+      case TvZone.category:
+        unawaited(_openCategoryManager());
         return;
       default:
         return;
@@ -1025,282 +1041,55 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastHomeBackMs < 260) return;
+    _lastHomeBackMs = now;
     _homeManualBack();
-    return;
-
-    // One-step TV ladder:
-    // Grid -> Kategori -> Platform -> Banner -> Shell exit.
-    // Banner stays hidden while returning Grid -> Kategori -> Platform.
-    if (_zone == TvZone.grid ||
-        _gridNodes.any((node) => node.hasFocus) ||
-        (_rowsKey.currentState?.hasFocus ?? false)) {
-      _returnToCategoryAnchor();
-      return;
-    }
-
-    if (_zone == TvZone.category ||
-        _categoryHeaderNode.hasFocus ||
-        _categoryNodes.any((node) => node.hasFocus)) {
-      _returnToPlatformAnchor();
-      return;
-    }
-
-    if (_zone == TvZone.platform ||
-        _platformHeaderNode.hasFocus ||
-        _platformNodes.any((node) => node.hasFocus)) {
-      _returnToBanner();
-      return;
-    }
-
-    if (_fullGridMode) {
-      _returnToCategoryAnchor();
-      return;
-    }
-
-    _requestExit();
   }
 
   KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusPlatform(_platformIndex)) {
-        if (!_focusPlatformHeader()) {
-          if (!_focusCategory(_categoryIndex)) _focusEmpty(throttle: false);
-        }
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (!_focusPlatform(_platformIndex)) {
-        if (!_focusCategory(_categoryIndex)) _focusCategoryHeader();
-      }
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key) && hero != null) {
-      _openDetail(hero);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
+    _rememberFocus(TvZone.banner, 0);
+    return _reduceHomeKey(hero, event.logicalKey);
   }
 
   KeyEventResult _platformHeaderKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _focusPlatformAtControlAnchor(_platformIndex);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _returnToBanner();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusCategoryHeaderAtControlAnchor()) {
-        _focusCategoryAtControlAnchor(_categoryIndex);
-      }
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key) || tvIsMenuKey(key)) {
-      _openPlatformManager();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
+    _rememberFocus(TvZone.platform, _platformIndex);
+    return _reduceHomeKey(null, event.logicalKey);
   }
 
   KeyEventResult _categoryHeaderKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveToNav();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _focusCategoryAtControlAnchor(_categoryIndex);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _returnToPlatformAnchor();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_enterFullGrid()) _focusEmpty();
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key) || tvIsMenuKey(key)) {
-      _openCategoryManager();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.handled;
+    _rememberFocus(TvZone.category, _categoryIndex);
+    return _reduceHomeKey(null, event.logicalKey);
   }
 
   KeyEventResult _platformKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    final current = _safe(index, _platformNodes.length);
-    _platformIndex = current;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (current == 0) {
-        if (!_focusPlatformHeaderAtControlAnchor()) _moveToNav();
-      } else {
-        _focusPlatformAtControlAnchor(current - 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _platformNodes.length - 1) {
-        _focusPlatformAtControlAnchor(current + 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _returnToBanner();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusCategoryAtControlAnchor(_categoryIndex)) _enterFullGrid();
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key)) {
-      _selectPlatform(current);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+    _platformIndex = _safe(index, _platformNodes.length);
+    _rememberFocus(TvZone.platform, _platformIndex);
+    return _reduceHomeKey(null, event.logicalKey);
   }
 
   KeyEventResult _categoryKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    final current = _safe(index, _categoryNodes.length);
-    _categoryIndex = current;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (current == 0) {
-        if (!_focusCategoryHeaderAtControlAnchor()) _moveToNav();
-      } else {
-        _focusCategoryAtControlAnchor(current - 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (current < _categoryNodes.length - 1) {
-        _focusCategoryAtControlAnchor(current + 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      _returnToPlatformAnchor();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_enterFullGrid()) _focusEmpty();
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key)) {
-      _selectCategory(current);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+    _categoryIndex = _safe(index, _categoryNodes.length);
+    _rememberFocus(TvZone.category, _categoryIndex);
+    return _reduceHomeKey(null, event.logicalKey);
   }
 
   KeyEventResult _gridKey(int index, ContentItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    final current = _safe(index, _gridNodes.length);
-    _gridIndex = current;
-    final col = current % _gridColumns;
-    final row = current ~/ _gridColumns;
-    if (tvIsBackKey(key)) {
-      _handleBack();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (col == 0) {
-        _moveToNav();
-      } else {
-        _focusGrid(current - 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      // Do not wrap from the right edge into the next row. On TV this feels like
-      // the cursor disappeared, especially when the next row is partly outside
-      // the visible safe zone. RIGHT at row edge must hold position.
-      if (col >= _gridColumns - 1) {
-        _rememberFocus(TvZone.grid, current);
-        return KeyEventResult.handled;
-      }
-
-      final next = current + 1;
-      if (next >= _gridNodes.length || next ~/ _gridColumns != row) {
-        _rememberFocus(TvZone.grid, current);
-        return KeyEventResult.handled;
-      }
-
-      _focusGrid(next);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      if (row == 0) {
-        if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
-          if (!_focusCategoryHeaderAtControlAnchor()) _returnToPlatformAnchor();
-        }
-      } else {
-        _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      final next = current + _gridColumns;
-      if (next < _gridNodes.length) {
-        _focusGrid(next, anchorRow: true, anchorAlignment: 0.58);
-        return KeyEventResult.handled;
-      }
-      final lastIndex = _gridNodes.length - 1;
-      final lastRow = lastIndex ~/ _gridColumns;
-      if (lastRow > row) {
-        _focusGrid(lastIndex, anchorRow: true, anchorAlignment: 0.58);
-      }
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key)) {
-      _openGridItem(current, item);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+    _gridIndex = _safe(index, _gridNodes.length);
+    _rememberFocus(TvZone.grid, _gridIndex);
+    return _reduceHomeKey(null, event.logicalKey);
   }
 
   KeyEventResult _emptyKey(KeyEvent event) {
