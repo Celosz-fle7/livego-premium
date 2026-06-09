@@ -85,6 +85,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   int _platformIndex = 0;
   int _categoryIndex = 0;
+  int _selectedPlatformIndex = 0;
+  int _selectedCategoryIndex = 0;
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
   bool _openingDetail = false;
@@ -93,6 +95,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _lastFocusEntryMs = 0;
   int _lastEmptyFocusMs = 0;
   int _lastHomeBackMs = 0;
+  int _lastHomeSelectMs = 0;
   int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;
   String _loadedPlatformSlug = '';
@@ -111,8 +114,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return 'shortmax';
-    _platformIndex = _platformIndex.clamp(0, platforms.length - 1).toInt();
-    return platforms[_platformIndex];
+    _selectedPlatformIndex = _selectedPlatformIndex.clamp(0, platforms.length - 1).toInt();
+    return platforms[_selectedPlatformIndex];
   }
 
   List<String> get _categories => LiveGoCatalog.categoriesFor(_platformSlug);
@@ -120,8 +123,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   String get _categoryLabel {
     final categories = _categories;
     if (categories.isEmpty) return 'Populer';
-    _categoryIndex = _categoryIndex.clamp(0, categories.length - 1).toInt();
-    return categories[_categoryIndex];
+    _selectedCategoryIndex = _selectedCategoryIndex.clamp(0, categories.length - 1).toInt();
+    return categories[_selectedCategoryIndex];
   }
 
   @override
@@ -202,8 +205,14 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
       this._syncNodes(_gridNodes, gridItems.length, 'tv-home-grid');
     }
 
-    if (_platformNodes.isNotEmpty) _platformIndex = this._safe(_platformIndex, _platformNodes.length);
-    if (_categoryNodes.isNotEmpty) _categoryIndex = this._safe(_categoryIndex, _categoryNodes.length);
+    if (_platformNodes.isNotEmpty) {
+      _platformIndex = this._safe(_platformIndex, _platformNodes.length);
+      _selectedPlatformIndex = this._safe(_selectedPlatformIndex, _platformNodes.length);
+    }
+    if (_categoryNodes.isNotEmpty) {
+      _categoryIndex = this._safe(_categoryIndex, _categoryNodes.length);
+      _selectedCategoryIndex = this._safe(_selectedCategoryIndex, _categoryNodes.length);
+    }
     if (_gridNodes.isNotEmpty) _gridIndex = this._safe(_gridIndex, _gridNodes.length);
 
     this._scheduleEmptyFocusIfNeeded(home, gridItems);
@@ -262,7 +271,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _HomeStickySourceHeaderDelegate(
-                  height: 114,
+                  height: 110,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 6),
                     child: Column(
@@ -271,14 +280,14 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           icon: Icons.apps_rounded,
                           label: 'Platform',
                           hint: LiveGoCatalog.label(_platformSlug),
-                          height: 52,
+                          height: 50,
                           onHeaderTap: this._openPlatformManager,
                           headerFocusNode: _platformHeaderNode,
                           onHeaderFocus: () => this._rememberFocus(TvZone.platform, _platformIndex),
                           onHeaderKey: this._platformHeaderKey,
                           child: TvChipRow(
                             labels: platforms,
-                            selected: _platformIndex,
+                            selected: _selectedPlatformIndex,
                             focusedIndex: _zone == TvZone.platform ? _platformIndex : null,
                             nodes: _platformNodes,
                             onTap: this._selectPlatform,
@@ -293,15 +302,15 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                         TvSectionBox(
                           icon: Icons.tune_rounded,
                           label: 'Kategori',
-                          hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
-                          height: 52,
+                          hint: categories.isEmpty ? 'Default' : categories[_selectedCategoryIndex],
+                          height: 50,
                           onHeaderTap: this._openCategoryManager,
                           headerFocusNode: _categoryHeaderNode,
                           onHeaderFocus: () => this._rememberFocus(TvZone.category, _categoryIndex),
                           onHeaderKey: this._categoryHeaderKey,
                           child: TvChipRow(
                             labels: categories,
-                            selected: _categoryIndex,
+                            selected: _selectedCategoryIndex,
                             focusedIndex: _zone == TvZone.category ? _categoryIndex : null,
                             nodes: _categoryNodes,
                             onTap: this._selectCategory,
@@ -318,7 +327,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                 ),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
+                padding: EdgeInsets.fromLTRB(padding.left, 14, padding.right, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate.fixed([
                     if (!_fullGridMode)
