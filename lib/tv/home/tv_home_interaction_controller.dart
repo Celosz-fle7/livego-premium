@@ -1,5 +1,7 @@
 part of 'tv_home_screen.dart';
 
+bool _fullGridMode = false;
+
 /// Interaction layer for TV Home.
 ///
 /// Owns:
@@ -22,14 +24,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.grid:
         if (_focusGrid(_gridIndex, throttle: false)) return true;
         if (_focusRows(preferMyList: true)) return true;
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return true;
+        if (_fullGridMode && _focusPlatformAtControlAnchor(_platformIndex)) return true;
         if (_focusCategory(_categoryIndex, throttle: false)) return true;
         if (_focusPlatform(_platformIndex, throttle: false)) return true;
         break;
       case TvZone.category:
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return true;
         if (_focusCategory(_categoryIndex, throttle: false)) return true;
+        if (_fullGridMode && _focusPlatformAtControlAnchor(_platformIndex)) return true;
         if (_focusPlatform(_platformIndex, throttle: false)) return true;
         break;
       case TvZone.platform:
+        if (_fullGridMode && _focusPlatformAtControlAnchor(_platformIndex)) return true;
         if (_focusPlatform(_platformIndex, throttle: false)) return true;
         break;
       case TvZone.banner:
@@ -197,6 +204,45 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return ok;
   }
 
+  bool _focusPlatformAtControlAnchor(int index) {
+    if (_platformNodes.isEmpty) return false;
+    final target = _safe(index, _platformNodes.length);
+    _scrollHomeToControlAnchor();
+    final ok = _requestControlNode(_platformNodes[target]);
+    if (ok) {
+      _platformIndex = target;
+      _rememberFocus(TvZone.platform, target);
+      _scheduleHomeSelectionCommit(TvZone.platform);
+    }
+    return ok;
+  }
+
+  bool _focusCategoryAtControlAnchor(int index) {
+    if (_categoryNodes.isEmpty) return false;
+    final target = _safe(index, _categoryNodes.length);
+    _scrollHomeToControlAnchor();
+    final ok = _requestControlNode(_categoryNodes[target]);
+    if (ok) {
+      _categoryIndex = target;
+      _rememberFocus(TvZone.category, target);
+      _scheduleHomeSelectionCommit(TvZone.category);
+    }
+    return ok;
+  }
+
+  bool _requestControlNode(FocusNode node) {
+    // For the full-grid ladder, do not call tvFocus/ensureVisible on pinned
+    // Platform/Kategori chips. ensureVisible can reveal the Banner because the
+    // chip's original sliver position is above the current grid anchor.
+    if (!node.canRequestFocus || node.context == null) return false;
+    try {
+      node.requestFocus();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _focusGrid(
     int index, {
     bool throttle = true,
@@ -351,12 +397,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.grid:
         if (_focusGrid(_gridIndex, throttle: throttle)) return;
         if (_focusRows(preferMyList: true)) return;
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return;
         if (_focusCategory(_categoryIndex, throttle: throttle)) return;
         break;
       case TvZone.category:
+        if (_fullGridMode && _focusCategoryAtControlAnchor(_categoryIndex)) return;
         if (_focusCategory(_categoryIndex, throttle: throttle)) return;
         break;
       case TvZone.platform:
+        if (_fullGridMode && _focusPlatformAtControlAnchor(_platformIndex)) return;
         if (_focusPlatform(_platformIndex, throttle: throttle)) return;
         break;
       case TvZone.banner:
@@ -425,25 +474,34 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _scrollHomeToGridEntry() {
+    _scrollHomeToControlAnchor();
+  }
+
+  void _scrollHomeToControlAnchor() {
     if (!_scroll.hasClients) return;
     final position = _scroll.position;
     final target = TvSafeZone.homeGridEntryOffset
         .clamp(position.minScrollExtent, position.maxScrollExtent)
         .toDouble();
     if ((position.pixels - target).abs() < 1) return;
-    unawaited(_scroll.animateTo(
-      target,
-      duration: const Duration(milliseconds: 130),
-      curve: Curves.easeOutCubic,
-    ));
+
+    // Full-grid mode keeps Banner hidden. Platform + Kategori are the visual
+    // top anchor until the user explicitly steps up from Platform.
+    position.jumpTo(target);
   }
 
   bool _focusGridEntryFromBanner() {
+    return _enterFullGrid();
+  }
+
+  bool _enterFullGrid({int? index}) {
     if (_gridNodes.isEmpty) return false;
-    final target = _safe(_gridIndex, _gridNodes.length);
+    _fullGridMode = true;
+
+    final target = _safe(index ?? _gridIndex, _gridNodes.length);
     final node = _gridNodes[target];
 
-    _scrollHomeToGridEntry();
+    _scrollHomeToControlAnchor();
 
     final ok = _requestGridNode(node);
     if (ok) {
@@ -465,8 +523,33 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return true;
   }
 
-  void _returnFromGridToBanner() {
+  void _returnToCategoryAnchor() {
     _cancelHomeSelectionCommit();
+    _fullGridMode = true;
+    _scrollHomeToControlAnchor();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+        _focusPlatformAtControlAnchor(_platformIndex);
+      }
+    });
+  }
+
+  void _returnToPlatformAnchor() {
+    _cancelHomeSelectionCommit();
+    _fullGridMode = true;
+    _scrollHomeToControlAnchor();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_focusPlatformAtControlAnchor(_platformIndex)) {
+        _focusBanner(throttle: false);
+      }
+    });
+  }
+
+  void _returnToBanner() {
+    _cancelHomeSelectionCommit();
+    _fullGridMode = false;
     if (_zone != TvZone.banner) {
       setState(() => _zone = TvZone.banner);
     }
@@ -613,12 +696,24 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
-    // Grid mode BACK returns to the first Home look: Banner + Platform + Category.
-    // BACK from Banner then asks Shell for the exit popup.
+    // One-step full-grid ladder:
+    // Grid -> Kategori -> Platform -> Banner -> Shell exit.
+    // Banner is intentionally hidden while moving from Grid back to Kategori
+    // or Platform.
     if (_zone == TvZone.grid ||
         _gridNodes.any((node) => node.hasFocus) ||
         (_rowsKey.currentState?.hasFocus ?? false)) {
-      _returnFromGridToBanner();
+      _returnToCategoryAnchor();
+      return;
+    }
+
+    if (_zone == TvZone.category || _categoryNodes.any((node) => node.hasFocus)) {
+      _returnToPlatformAnchor();
+      return;
+    }
+
+    if (_zone == TvZone.platform || _platformNodes.any((node) => node.hasFocus)) {
+      _returnToBanner();
       return;
     }
 
@@ -638,7 +733,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusGridEntryFromBanner()) {
+      if (!_enterFullGrid()) {
         if (!_focusCategory(_categoryIndex)) {
           if (!_focusPlatform(_platformIndex)) _focusEmpty(throttle: false);
         }
@@ -681,11 +776,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusBanner();
+      _returnToBanner();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusCategory(_categoryIndex)) _focusGrid(_gridIndex);
+      _scrollHomeToControlAnchor();
+      if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+        _enterFullGrid();
+      }
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
@@ -718,13 +816,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusPlatform(_platformIndex)) _focusBanner();
+      _scrollHomeToControlAnchor();
+      if (!_focusPlatformAtControlAnchor(_platformIndex)) {
+        _focusBanner(throttle: false);
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusRows()) {
-        if (!_focusGrid(_gridIndex)) _focusEmpty();
-      }
+      if (!_enterFullGrid()) _focusEmpty(throttle: false);
       return KeyEventResult.handled;
     }
     if (tvIsSelectKey(key)) {
@@ -774,8 +873,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        if (!_focusCategory(_categoryIndex)) {
-          if (!_focusPlatform(_platformIndex)) _focusBanner();
+        _fullGridMode = true;
+        _scrollHomeToControlAnchor();
+        if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+          if (!_focusPlatformAtControlAnchor(_platformIndex)) _focusBanner(throttle: false);
         }
       } else {
         _focusGrid(current - _gridColumns, anchorRow: true, anchorAlignment: 0.42);
