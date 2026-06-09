@@ -251,7 +251,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       case LiveGoImageRole.detail:
         return decodeWidth.clamp(220, 560).toInt();
       case LiveGoImageRole.banner:
-        return decodeWidth.clamp(240, 640).toInt();
+        return decodeWidth.clamp(360, 960).toInt();
     }
   }
 

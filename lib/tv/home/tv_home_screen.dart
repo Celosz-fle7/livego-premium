@@ -19,6 +19,7 @@ import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
 import 'providers/tv_home_provider.dart';
 import 'providers/tv_home_content_state.dart';
+import 'tv_home_performance_config.dart';
 import 'focus/tv_home_focus_state.dart';
 import '../providers/tv_remote_owner.dart';
 import '../source_manager/tv_source_manager_screen.dart';
@@ -71,6 +72,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   // FocusNodes stay in the screen because their lifecycle is tied to widgets
   // and dispose(). Interaction decisions live in the part-extension controller.
   final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
+  final FocusNode _platformHeaderNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-platform-header');
+  final FocusNode _categoryHeaderNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-category-header');
   final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-empty-retry');
   final List<FocusNode> _platformNodes = <FocusNode>[];
   final List<FocusNode> _categoryNodes = <FocusNode>[];
@@ -85,6 +88,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
   bool _openingDetail = false;
+  bool _fullGridMode = false;
   int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
   int _lastEmptyFocusMs = 0;
@@ -96,7 +100,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   List<ContentItem> _gridItems = const <ContentItem>[];
 
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
-  int get _homeGridLimit => (_gridColumns * 5).clamp(35, 50).toInt();
+  int get _homeGridLimit {
+    final visibleGridLimit = _gridColumns * TvHomePerformanceConfig.maxVisibleGridRows;
+    return visibleGridLimit < TvHomePerformanceConfig.maxManifestItems
+        ? visibleGridLimit
+        : TvHomePerformanceConfig.maxManifestItems;
+  }
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -155,6 +164,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _navService.removeListener(_navListener);
     _homeNavTick.dispose();
     _bannerNode.dispose();
+    _platformHeaderNode.dispose();
+    _categoryHeaderNode.dispose();
     _emptyNode.dispose();
     this._disposeNodes(_platformNodes);
     this._disposeNodes(_categoryNodes);
@@ -212,6 +223,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
           }),
         },
         child: CustomScrollView(
+            // TV Home is remote-first. Disable direct drag/overscroll so an
+            // accidental touchpad/mouse wheel cannot pull the viewport away
+            // from the focused poster while DPAD logic owns scrolling.
+            physics: const NeverScrollableScrollPhysics(),
             controller: _scroll,
             cacheExtent: TvSafeZone.cacheExtent,
             slivers: [
@@ -255,6 +270,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           hint: LiveGoCatalog.label(_platformSlug),
                           height: 52,
                           onHeaderTap: this._openPlatformManager,
+                          headerFocusNode: _platformHeaderNode,
+                          onHeaderFocus: () => this._rememberFocus(TvZone.platform, _platformIndex),
+                          onHeaderKey: this._platformHeaderKey,
                           child: TvChipRow(
                             labels: platforms,
                             selected: _platformIndex,
@@ -274,6 +292,9 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           hint: categories.isEmpty ? 'Default' : categories[_categoryIndex],
                           height: 52,
                           onHeaderTap: this._openCategoryManager,
+                          headerFocusNode: _categoryHeaderNode,
+                          onHeaderFocus: () => this._rememberFocus(TvZone.category, _categoryIndex),
+                          onHeaderKey: this._categoryHeaderKey,
                           child: TvChipRow(
                             labels: categories,
                             selected: _categoryIndex,
@@ -295,15 +316,18 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                 padding: EdgeInsets.fromLTRB(padding.left, 6, padding.right, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate.fixed([
-                    TvHomeProfessionalRows(
-                      key: _rowsKey,
-                      onOpen: this._openDetail,
-                      onMoveToNav: this._moveToNav,
-                      onBackToCategory: () {
-                        if (!this._focusCategory(_categoryIndex, throttle: false)) this._focusPlatform(_platformIndex, throttle: false);
-                      },
-                      onMoveToGrid: () => this._focusGrid(_gridIndex, throttle: false),
-                    ),
+                    if (!_fullGridMode)
+                      TvHomeProfessionalRows(
+                        key: _rowsKey,
+                        onOpen: this._openDetail,
+                        onMoveToNav: this._moveToNav,
+                        onBackToCategory: () {
+                          if (!this._focusCategory(_categoryIndex, throttle: false)) {
+                            this._focusPlatform(_platformIndex, throttle: false);
+                          }
+                        },
+                        onMoveToGrid: () => this._enterFullGrid(throttle: false),
+                      ),
                     // Grid title/count removed so poster grid can sit closer
                     // to Kategori. This saves vertical TV space without touching
                     // data loading or focus movement.

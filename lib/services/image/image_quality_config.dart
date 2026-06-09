@@ -10,7 +10,7 @@ class ImageQualityConfig {
   static const int posterWidth = 360;
   static const int tvPosterWidth = 220;
   static const int bannerWidth = 960;
-  static const int tvBannerWidth = 640;
+  static const int tvBannerWidth = 960;
   static const int detailWidth = 640;
   static const int thumbnailWidth = 320;
   static const int tvThumbnailWidth = 160;
@@ -19,7 +19,7 @@ class ImageQualityConfig {
   static const int posterLowWidth = 180;
   static const int tvPosterLowWidth = 120;
   static const int bannerLowWidth = 480;
-  static const int tvBannerLowWidth = 320;
+  static const int tvBannerLowWidth = 480;
   static const int detailLowWidth = 320;
   static const int thumbnailLowWidth = 180;
   static const int tvThumbnailLowWidth = 110;
@@ -65,7 +65,7 @@ class ImageQualityConfig {
       case LiveGoImageRole.poster:
         return 1100;
       case LiveGoImageRole.banner:
-        return 950;
+        return 520;
       case LiveGoImageRole.detail:
         return 480;
       case LiveGoImageRole.thumbnail:
@@ -78,7 +78,7 @@ class ImageQualityConfig {
       case LiveGoImageRole.poster:
         return 720;
       case LiveGoImageRole.banner:
-        return 240;
+        return 140;
       case LiveGoImageRole.detail:
         return 180;
       case LiveGoImageRole.thumbnail:
