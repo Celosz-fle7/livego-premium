@@ -23,6 +23,13 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   TvHomeContentState? _lastGoodState;
   String _lastPlatform = 'dobda_freereels';
   String _lastCategory = 'Home';
+  String? _requestedKey;
+  String? _displayedKey;
+  String _loadingMode = 'firstLoad';
+
+  String? get requestedKey => _requestedKey;
+  String? get displayedKey => _displayedKey;
+  String get loadingMode => _loadingMode;
 
   Future<void> load({
     required String platform,
@@ -31,31 +38,53 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   }) async {
     _lastPlatform = platform;
     _lastCategory = selectedCategory;
+    final requestKey = _repository.homeContentKey(
+      platform: platform,
+      category: selectedCategory,
+      page: 1,
+    );
+    _requestedKey = requestKey;
     final token = ++_loadToken;
 
     // Even when the UI asks to clear previous content, show matching RAM cache
-    // immediately if the same platform/category was already loaded before.
+    // immediately if the same platform/category/page/params key was loaded before.
     // This prevents category/platform switching from feeling like first launch.
-    final ramState = _repository.readRam(platform, selectedCategory);
+    final ramState = _repository.readRam(requestKey);
     if (ramState != null && ramState.items.isNotEmpty) {
+      _loadingMode = 'cachedHit';
       final next = _repository.asRefreshingCache(ramState);
-      _lastGoodState = next;
+      _remember(requestKey, next);
       state = next;
+    } else if (clearPrevious && state.items.isNotEmpty) {
+      _loadingMode = 'refreshingOldData';
+      state = state.copyWith(
+        loading: false,
+        refreshing: true,
+        hasError: false,
+        offline: false,
+      );
     } else if (clearPrevious) {
+      _loadingMode = 'firstLoad';
       state = const TvHomeContentState(loading: true);
     } else if (state.items.isEmpty) {
+      _loadingMode = 'firstLoad';
       state = state.copyWith(loading: true, refreshing: false, hasError: false, offline: false);
     } else {
+      _loadingMode = 'refreshingOldData';
       state = state.copyWith(refreshing: true, hasError: false, offline: false);
     }
 
     try {
-      final cached = await _repository.loadCached(platform, selectedCategory);
-      if (!_active(token)) return;
+      final cached = await _repository.loadCached(
+        platform: platform,
+        selectedCategory: selectedCategory,
+      );
+      if (!_active(token, requestKey)) return;
       if (cached != null && cached.items.isNotEmpty) {
-        _remember(platform, selectedCategory, cached);
+        _loadingMode = 'cachedHit';
+        _remember(requestKey, cached);
         state = cached;
-        unawaited(_refreshInBackground(platform, selectedCategory, token));
+        unawaited(_refreshInBackground(platform, selectedCategory, requestKey, token));
         return;
       }
     } catch (error) {
@@ -63,18 +92,22 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     }
 
     final online = await _repository.isOnline();
-    if (!_active(token)) return;
+    if (!_active(token, requestKey)) return;
     if (!online) {
-      _showOffline();
+      _showOffline(requestKey);
       return;
     }
 
     try {
-      final network = await _repository.loadNetwork(platform, selectedCategory);
-      if (!_active(token)) return;
+      final network = await _repository.loadNetwork(
+        platform: platform,
+        selectedCategory: selectedCategory,
+      );
+      if (!_active(token, requestKey)) return;
       if (network != null && network.items.isNotEmpty) {
+        _loadingMode = 'loaded';
         _repository.markOnline();
-        _remember(platform, selectedCategory, network);
+        _remember(requestKey, network);
         state = network;
         return;
       }
@@ -83,10 +116,14 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     }
 
     try {
-      final fallback = await _repository.loadFallbackCache(platform, selectedCategory);
-      if (!_active(token)) return;
+      final fallback = await _repository.loadFallbackCache(
+        platform: platform,
+        selectedCategory: selectedCategory,
+      );
+      if (!_active(token, requestKey)) return;
       if (fallback != null && fallback.items.isNotEmpty) {
-        _remember(platform, selectedCategory, fallback);
+        _loadingMode = 'errorWithOldData';
+        _remember(requestKey, fallback);
         state = fallback;
         return;
       }
@@ -94,8 +131,8 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       debugPrint('TV HOME FALLBACK CACHE ERROR: $error');
     }
 
-    if (!_active(token)) return;
-    _showOffline();
+    if (!_active(token, requestKey)) return;
+    _showOffline(requestKey);
   }
 
   Future<void> retry() {
@@ -106,16 +143,31 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     );
   }
 
-  bool _active(int token) => token == _loadToken;
-
-  void _remember(String platform, String selectedCategory, TvHomeContentState next) {
-    _lastGoodState = next;
-    _repository.saveRam(platform, selectedCategory, next);
+  bool _active(int token, String requestKey) {
+    return token == _loadToken && requestKey == _requestedKey;
   }
 
-  void _showOffline() {
-    final last = _lastGoodState;
+  void _remember(String displayedKey, TvHomeContentState next) {
+    _displayedKey = displayedKey;
+    _lastGoodState = next;
+    _repository.saveRam(displayedKey, next);
+  }
+
+  void _showOffline(String requestKey) {
+    _loadingMode = 'errorWithOldData';
     _repository.markOffline();
+
+    if (state.items.isNotEmpty) {
+      state = state.copyWith(
+        loading: false,
+        refreshing: false,
+        hasError: true,
+        offline: true,
+      );
+      return;
+    }
+
+    final last = _lastGoodState;
     if (last != null) {
       state = last.copyWith(
         loading: false,
@@ -127,6 +179,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       return;
     }
 
+    _displayedKey = requestKey;
     state = const TvHomeContentState(
       loading: false,
       hasError: true,
@@ -135,31 +188,39 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     );
   }
 
-  Future<void> _refreshInBackground(String platform, String selectedCategory, int token) async {
+  Future<void> _refreshInBackground(
+    String platform,
+    String selectedCategory,
+    String requestKey,
+    int token,
+  ) async {
     try {
       final fresh = await _repository.refresh(platform, selectedCategory);
-      if (!_active(token)) return;
+      if (!_active(token, requestKey)) return;
 
       if (fresh == null || fresh.items.isEmpty) {
-        final last = _lastGoodState;
-        if (last != null) {
-          final next = last.copyWith(refreshing: false, hasError: true);
-          _lastGoodState = next;
+        _loadingMode = 'errorWithOldData';
+        final next = state.items.isNotEmpty
+            ? state.copyWith(refreshing: false, hasError: true)
+            : _lastGoodState?.copyWith(refreshing: false, hasError: true);
+        if (next != null) {
           state = next;
         }
         return;
       }
 
+      _loadingMode = 'loaded';
       _repository.markOnline();
-      _remember(platform, selectedCategory, fresh);
+      _remember(requestKey, fresh);
       state = fresh;
     } catch (error) {
       debugPrint('TV HOME BACKGROUND REFRESH ERROR: $error');
-      if (!_active(token)) return;
-      final last = _lastGoodState;
-      if (last == null) return;
-      final next = last.copyWith(refreshing: false, hasError: true);
-      _lastGoodState = next;
+      if (!_active(token, requestKey)) return;
+      _loadingMode = 'errorWithOldData';
+      final next = state.items.isNotEmpty
+          ? state.copyWith(refreshing: false, hasError: true)
+          : _lastGoodState?.copyWith(refreshing: false, hasError: true);
+      if (next == null) return;
       state = next;
     }
   }

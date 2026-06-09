@@ -17,8 +17,18 @@ class TvHomeRepository {
 
   static const int maxTvHomeItems = TvHomePerformanceConfig.maxManifestItems;
 
-  String _ramKey(String platform, String selectedCategory) {
-    return TvRamCache.key('home', [platform, selectedCategory]);
+  String homeContentKey({
+    required String platform,
+    required String category,
+    int page = 1,
+    Object? paramsHash,
+  }) {
+    return TvRamCache.key('home', [
+      platform,
+      category,
+      page,
+      paramsHash ?? 'default',
+    ]);
   }
 
   List<ContentItem> _prepareItems(List<ContentItem> rows) {
@@ -27,14 +37,14 @@ class TvHomeRepository {
         .toList(growable: false);
   }
 
-  TvHomeContentState? readRam(String platform, String selectedCategory) {
-    return TvRamCache.instance.read<TvHomeContentState>(_ramKey(platform, selectedCategory));
+  TvHomeContentState? readRam(String cacheKey) {
+    return TvRamCache.instance.read<TvHomeContentState>(cacheKey);
   }
 
-  void saveRam(String platform, String selectedCategory, TvHomeContentState state) {
+  void saveRam(String cacheKey, TvHomeContentState state) {
     if (state.items.isEmpty) return;
     TvRamCache.instance.write(
-      _ramKey(platform, selectedCategory),
+      cacheKey,
       state,
       ttl: TvRamCache.homeTtl,
     );
