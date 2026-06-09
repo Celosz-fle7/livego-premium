@@ -51,6 +51,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   static const MethodChannel _nativeSurfacePlayer = MethodChannel('livego/native_surface_player');
 
   VideoPlayerController? _controller;
+  int? _controllerEpisode;
+  String _controllerChapterId = '';
   StreamInfo _streamInfo = StreamInfo.empty;
 
   int _loadToken = 0;
@@ -83,6 +85,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   int _optionCursor = 0;
   int _lastCursorMoveMs = 0;
   int _lastPlayerUiTickMs = 0;
+  int _lastProgressSaveMs = 0;
 
   double _speed = 1.0;
   _Explorer3Mode _mode = _Explorer3Mode.controls;
@@ -653,6 +656,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   void _exitFlutterPlayerRoute({required String source}) {
     if (!mounted) return;
 
+    unawaited(_saveProgressNow(force: true));
     _cancelEpisodeListWarmup();
     _cancelLightPrefetch();
     _cancelAutoHide();
@@ -818,16 +822,47 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       }
 
       await controller.setPlaybackSpeed(_speed);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.setVolume(_muted ? 0 : 1);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
       await controller.play();
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      await _saveProgressNow(force: true);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
 
       final old = _controller;
       old?.removeListener(_onControllerTick);
       _controller = controller;
+      _controllerEpisode = _episode;
+      _controllerChapterId = _chapterId;
       controller.addListener(_onControllerTick);
       await old?.dispose();
 
-      if (!_active(token)) return;
+      if (!_active(token)) {
+        controller.removeListener(_onControllerTick);
+        if (_controller == controller) {
+          _controller = null;
+          _controllerEpisode = null;
+          _controllerChapterId = '';
+        }
+        await controller.dispose();
+        return;
+      }
       setState(() {
         _loading = false;
         _status = 'PLAY';
@@ -845,6 +880,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _scheduleLightPrefetch();
       _scheduleAutoHide();
     } catch (_) {
+      controller.removeListener(_onControllerTick);
+      if (_controller == controller) {
+        _controller = null;
+        _controllerEpisode = null;
+        _controllerChapterId = '';
+      }
       await controller.dispose();
       rethrow;
     }
@@ -927,6 +968,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return;
     }
 
+    unawaited(_saveProgressNow());
+
     // Keep the visible progress text fresh without adding a recorder/timer.
     final now = DateTime.now().millisecondsSinceEpoch;
     if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= TvPlayerExplorer3Timing.playerUiTickMs) {
@@ -935,11 +978,42 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
   }
 
+  Future<void> _saveProgressNow({bool force = false}) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.hasError) return;
+
+    final value = c.value;
+    final duration = value.duration;
+    final position = value.position;
+    if (duration <= Duration.zero || position <= Duration.zero) return;
+    if (position > duration) return;
+
+    final itemId = widget.item.id.trim();
+    final platformSlug = widget.item.platformSlug.trim();
+    if (itemId.isEmpty || platformSlug.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!force && now - _lastProgressSaveMs < TvPlayerExplorer3Timing.progressSaveThrottleMs) return;
+    _lastProgressSaveMs = now;
+
+    final episode = (_controllerEpisode ?? _episode).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final chapterId = _controllerChapterId.trim().isNotEmpty ? _controllerChapterId.trim() : '$episode';
+    await LiveGoLocalStore.saveProgress(
+      _playableItemFor(episode: episode, chapterId: chapterId),
+      episode,
+      position,
+      duration,
+    );
+  }
+
   Future<void> _disposeController() async {
     _surfaceTimer?.cancel();
     _surfaceTimer = null;
+    await _saveProgressNow(force: true);
     final c = _controller;
     _controller = null;
+    _controllerEpisode = null;
+    _controllerChapterId = '';
     if (c != null) {
       c.removeListener(_onControllerTick);
       await c.dispose();
@@ -1097,6 +1171,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return;
     }
 
+    await _saveProgressNow(force: true);
+    if (!mounted || _loading) return;
+
     setState(() {
       _status = 'Mencari EP $requested...';
       _mode = _Explorer3Mode.controls;
@@ -1159,6 +1236,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     final safe = _qualityCursor.clamp(0, choices.length - 1).toInt();
     final label = choices[safe];
+
+    await _saveProgressNow(force: true);
+    if (!mounted) return;
 
     setState(() {
       _activeQuality = label;
@@ -1644,6 +1724,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _hideControlsTimer?.cancel();
     _statusTimer?.cancel();
     _rootFocus.dispose();
+    unawaited(_saveProgressNow(force: true));
     _controller?.removeListener(_onControllerTick);
     _controller?.dispose();
     _nativeSurfacePlayer.setMethodCallHandler(null);
