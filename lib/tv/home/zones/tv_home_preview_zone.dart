@@ -1,37 +1,18 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
-/// HOME_PREVIEW zone.
+/// HOME_PREVIEW physical zone.
 ///
-/// Banner, Platform, Kategori, and only the first grid row are shown here.
-/// The full content grid is not rendered in this zone. Pressing DOWN from the
-/// preview row switches the parent screen into FULL_GRID mode.
+/// Banner + source header + first grid row may be visible here, but the zone is
+/// static: no scroll movement is used to transform it into the full grid.
+/// DOWN from the preview row performs a hard switch into HOME_FULL_GRID.
 class TvHomePreviewZone extends StatelessWidget {
-  final EdgeInsets padding;
-  final Widget banner;
-  final List<Widget> below;
-  final Widget sourceHeader;
+  final Widget child;
 
   const TvHomePreviewZone({
     super.key,
-    required this.padding,
-    required this.banner,
-    required this.sourceHeader,
-    this.below = const <Widget>[],
+    required this.child,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
-      sliver: SliverList(
-        delegate: SliverChildListDelegate.fixed([
-          banner,
-          ...below,
-          const SizedBox(height: 8),
-          sourceHeader,
-          const SizedBox(height: 6),
-        ]),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => child;
 }
