@@ -230,27 +230,30 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusPlatformAtControlAnchor(int index) {
     if (_platformNodes.isEmpty) return false;
     final target = _safe(index, _platformNodes.length);
+
+    // State-first reducer rule: update the Home focus state before attaching
+    // Flutter focus. Remote movement must not depend on widget context deciding
+    // which zone/index is active.
+    _platformIndex = target;
+    _rememberFocus(TvZone.platform, target);
+    _scheduleHomeSelectionCommit(TvZone.platform);
+
     _scrollHomeToGridEntry();
-    final ok = _requestControlNode(_platformNodes[target]);
-    if (ok) {
-      _platformIndex = target;
-      _rememberFocus(TvZone.platform, target);
-      _scheduleHomeSelectionCommit(TvZone.platform);
-    }
-    return ok;
+    return _requestControlNode(_platformNodes[target]);
   }
 
   bool _focusCategoryAtControlAnchor(int index) {
     if (_categoryNodes.isEmpty) return false;
     final target = _safe(index, _categoryNodes.length);
+
+    // State-first reducer rule: update zone/index first, scroll second, then
+    // requestFocus only after the target state is valid.
+    _categoryIndex = target;
+    _rememberFocus(TvZone.category, target);
+    _scheduleHomeSelectionCommit(TvZone.category);
+
     _scrollHomeToGridEntry();
-    final ok = _requestControlNode(_categoryNodes[target]);
-    if (ok) {
-      _categoryIndex = target;
-      _rememberFocus(TvZone.category, target);
-      _scheduleHomeSelectionCommit(TvZone.category);
-    }
-    return ok;
+    return _requestControlNode(_categoryNodes[target]);
   }
 
   bool _requestControlNode(FocusNode node) {
@@ -276,25 +279,35 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final previous = _gridIndex;
     final node = _gridNodes[target];
 
-    // Home grid vertical movement uses the same principle as Source Manager:
-    // target cursor and target scroll are calculated from index math in the
-    // same key event. Horizontal movement can still use tvFocusGrid because it
-    // should not pull the vertical viewport.
-    final ok = anchorRow ? _requestGridNode(node) : tvFocusGrid(node, throttle: throttle);
-    if (ok) {
-      _gridIndex = target;
-      _rememberFocus(TvZone.grid, target);
-      if (anchorRow) {
-        _anchorGridRow(targetIndex: target, previousIndex: previous);
-      }
+    // State-first reducer rule:
+    // 1) compute cursor from index,
+    // 2) save zone/index,
+    // 3) scroll from index/height math,
+    // 4) requestFocus only after state and scroll target are valid.
+    _gridIndex = target;
+    _rememberFocus(TvZone.grid, target);
+
+    if (anchorRow) {
+      _anchorGridRow(targetIndex: target, previousIndex: previous);
+    }
+
+    final ok = _requestGridNode(node);
+    if (!ok && anchorRow) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_zone != TvZone.grid || _gridIndex != target) return;
+        if (target >= _gridNodes.length) return;
+        _requestGridNode(_gridNodes[target]);
+      });
+      return true;
     }
     return ok;
   }
 
   bool _requestGridNode(FocusNode node) {
-    // Never focus a SliverGrid node that is not currently attached. Focusing an
-    // offstage/unbuilt poster is the fastest way to make the cursor disappear
-    // under aggressive remote input.
+    // Reducer owns zone/index. This only attaches Flutter focus to the already
+    // selected visible node for key delivery/visual compatibility. Never focus
+    // an offstage or unbuilt poster.
     if (!node.canRequestFocus || node.context == null) return false;
     try {
       node.requestFocus();
