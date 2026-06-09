@@ -102,13 +102,13 @@ class LiveGoSettings {
 
 
   static void setMobileHomeGrid(int value) {
-    // HP/mobile grid range is separate from TV.
-    mobileHomeGrid = value.clamp(2, 5);
+    // Grid HP dikunci agar tidak bentrok dengan layout TV.
+    mobileHomeGrid = 3;
   }
 
   static void setTvHomeGrid(int value) {
-    // Android TV grid range is separate from HP/mobile.
-    tvHomeGrid = value.clamp(7, 10);
+    // Grid TV dikunci untuk stabilitas remote dan layout Home.
+    tvHomeGrid = 7;
   }
 
   static void reset() {

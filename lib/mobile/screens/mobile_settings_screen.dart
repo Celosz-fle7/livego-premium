@@ -167,42 +167,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
             ],
           ),
         ),
-        _section('Tampilan Beranda'),
-        GlowContainer(
-          padding: const EdgeInsets.all(18),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final isTvLike = MediaQuery.sizeOf(context).shortestSide >= 540 && MediaQuery.sizeOf(context).width >= 960;
-              final value = isTvLike ? LiveGoSettings.tvHomeGrid : LiveGoSettings.mobileHomeGrid;
-              final max = isTvLike ? 10 : 6;
-              final min = isTvLike ? 4 : 2;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Jumlah Grid Beranda', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 6),
-                  Text('Geser titik untuk mengatur jumlah poster. Perangkat ini dibatasi sampai $max grid.', style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-                  const SizedBox(height: 18),
-                  _GridSlider(
-                    label: 'Grid',
-                    value: value,
-                    min: min,
-                    max: max,
-                    onChanged: (v) => setState(() {
-                      if (isTvLike) {
-                        LiveGoSettings.setTvHomeGrid(v);
-                      } else {
-                        LiveGoSettings.setMobileHomeGrid(v);
-                      }
-                    }),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        _section('Sumber & Izin'),
+_section('Sumber & Izin'),
         GlowContainer(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(

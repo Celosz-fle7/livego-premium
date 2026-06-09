@@ -31,7 +31,7 @@ class TvSettingsConfig {
   static const double sectionTitleGap = 8;
   static const double pillGap = 8;
 
-  static const int resetTvGrid = 6;
+  static const int resetTvGrid = 7;
 
   static const List<String> drmValues = <String>[
     'Auto',

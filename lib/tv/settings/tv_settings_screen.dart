@@ -60,20 +60,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: true),
           ],
         ),
-        _SettingsSection(
-          title: 'Tampilan Home',
-          items: [
-            _SettingItem.tile(
-              kind: _SettingKind.tvGrid,
-              icon: Icons.grid_view_rounded,
-              title: 'Jumlah Grid Home TV',
-              subtitle: 'LEFT kurang, RIGHT/OK tambah. TV memakai 6–10 kolom, terpisah dari grid HP.',
-              value: '${LiveGoSettings.tvHomeGrid}',
-              showGridBar: true,
-            ),
-          ],
-        ),
-        _SettingsSection(
+_SettingsSection(
           title: 'Sumber & Izin',
           items: [
             _SettingItem.tile(
