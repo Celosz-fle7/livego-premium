@@ -674,21 +674,23 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _homeManualBack() {
-    switch (_zone) {
-      case TvZone.grid:
-        _setManualZone(TvZone.category, _categoryIndex);
-        return;
-      case TvZone.category:
-        _setManualZone(TvZone.platform, _platformIndex);
-        return;
-      case TvZone.platform:
-        _setManualZone(TvZone.banner, 0);
-        return;
-      case TvZone.banner:
-      default:
-        _requestExit();
-        return;
+    // V6e: BACK is now simple and safe for the one-root Home model.
+    //
+    // Any Home content position returns to Banner first:
+    // Grid -> Banner
+    // Kategori -> Banner
+    // Platform -> Banner
+    //
+    // Only when Home is already at Banner/top may BACK request the exit popup.
+    final isScrolledAwayFromTop = _scroll.hasClients && _scroll.position.pixels > 8;
+    final shouldReturnToBanner = _zone != TvZone.banner || _fullGridMode || isScrolledAwayFromTop;
+
+    if (shouldReturnToBanner) {
+      _setManualZone(TvZone.banner, 0);
+      return;
     }
+
+    _requestExit();
   }
 
   void _homeManualSelect(ContentItem? hero) {
