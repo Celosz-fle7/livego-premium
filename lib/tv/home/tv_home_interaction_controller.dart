@@ -53,10 +53,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (platforms.isEmpty) return;
     final savedPlatform = LiveGoSettings.defaultPlatform.trim();
     final savedPlatformIndex = platforms.indexOf(savedPlatform);
-    _platformIndex = savedPlatformIndex >= 0 ? savedPlatformIndex : 0;
-    final categories = LiveGoCatalog.categoriesFor(platforms[_platformIndex]);
-    final savedCategory = LiveGoSettings.tvLastHomeCategories[platforms[_platformIndex]] ?? 0;
-    _categoryIndex = categories.isEmpty ? 0 : savedCategory.clamp(0, categories.length - 1).toInt();
+    _selectedPlatformIndex = savedPlatformIndex >= 0 ? savedPlatformIndex : 0;
+    _platformIndex = _selectedPlatformIndex;
+    final categories = LiveGoCatalog.categoriesFor(platforms[_selectedPlatformIndex]);
+    final savedCategory = LiveGoSettings.tvLastHomeCategories[platforms[_selectedPlatformIndex]] ?? 0;
+    _selectedCategoryIndex = categories.isEmpty ? 0 : savedCategory.clamp(0, categories.length - 1).toInt();
+    _categoryIndex = _selectedCategoryIndex;
   }
 
   void _rememberSelection() {
@@ -64,7 +66,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     LiveGoSettings.defaultPlatform = platform;
     final categories = _categories;
     if (categories.isNotEmpty) {
-      LiveGoSettings.tvLastHomeCategories[platform] = _categoryIndex.clamp(0, categories.length - 1).toInt();
+      LiveGoSettings.tvLastHomeCategories[platform] = _selectedCategoryIndex.clamp(0, categories.length - 1).toInt();
     }
     unawaited(LiveGoLocalStore.saveSettings().then((_) {
       if (mounted) _settingsVersion = LiveGoLocalStore.version.value;
@@ -178,7 +180,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (ok) {
       _platformIndex = target;
       _rememberFocus(TvZone.platform, target);
-      _scheduleHomeSelectionCommit(TvZone.platform);
     }
     return ok;
   }
@@ -190,7 +191,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (ok) {
       _categoryIndex = target;
       _rememberFocus(TvZone.category, target);
-      _scheduleHomeSelectionCommit(TvZone.category);
     }
     return ok;
   }
@@ -224,8 +224,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // which zone/index is active.
     _platformIndex = target;
     _rememberFocus(TvZone.platform, target);
-    _scheduleHomeSelectionCommit(TvZone.platform);
-
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
     }
@@ -240,8 +238,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // requestFocus only after the target state is valid.
     _categoryIndex = target;
     _rememberFocus(TvZone.category, target);
-    _scheduleHomeSelectionCommit(TvZone.category);
-
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
     }
@@ -634,7 +630,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           _moveToNav();
         } else {
           _setManualZone(TvZone.platform, _platformIndex - 1, scroll: false);
-          _scheduleHomeSelectionCommit(TvZone.platform);
         }
         return;
       case TvZone.category:
@@ -642,7 +637,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           _moveToNav();
         } else {
           _setManualZone(TvZone.category, _categoryIndex - 1, scroll: false);
-          _scheduleHomeSelectionCommit(TvZone.category);
         }
         return;
       case TvZone.banner:
@@ -665,13 +659,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.platform:
         if (_platformIndex < _platformNodes.length - 1) {
           _setManualZone(TvZone.platform, _platformIndex + 1, scroll: false);
-          _scheduleHomeSelectionCommit(TvZone.platform);
         }
         return;
       case TvZone.category:
         if (_categoryIndex < _categoryNodes.length - 1) {
           _setManualZone(TvZone.category, _categoryIndex + 1, scroll: false);
-          _scheduleHomeSelectionCommit(TvZone.category);
         }
         return;
       case TvZone.banner:
@@ -683,17 +675,22 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _homeManualBack() {
-    // One Home owner decides BACK. Every non-top Home position returns directly
-    // to Banner/top; only Banner/top can delegate to Shell for the exit popup.
-    final isScrolledAwayFromTop = _scroll.hasClients && _scroll.position.pixels > 8;
-    final shouldReturnToBanner = _zone != TvZone.banner || _fullGridMode || isScrolledAwayFromTop;
-
-    if (shouldReturnToBanner) {
-      _returnToBanner();
-      return;
+    switch (_zone) {
+      case TvZone.grid:
+      case TvZone.placeholder:
+        _returnToCategoryAnchor();
+        return;
+      case TvZone.category:
+        _returnToPlatformAnchor();
+        return;
+      case TvZone.platform:
+        _returnToBanner();
+        return;
+      case TvZone.banner:
+      default:
+        _requestExit();
+        return;
     }
-
-    _requestExit();
   }
 
   void _homeManualSelect(ContentItem? hero) {
@@ -702,13 +699,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         if (hero != null) _openDetail(hero);
         return;
       case TvZone.platform:
-        // V6d: LEFT header button is not separately focusable under root-focus Home.
-        // Use OK on the Platform row to open the full platform manager.
-        unawaited(_openPlatformManager());
+        if (!_selectActivationAllowed()) return;
+        _selectPlatform(_platformIndex);
         return;
       case TvZone.category:
-        // V6d: Use OK on the Category row to open the category manager.
-        unawaited(_openCategoryManager());
+        if (!_selectActivationAllowed()) return;
+        _selectCategory(_categoryIndex);
         return;
       case TvZone.grid:
         if (_gridItems.isNotEmpty) {
@@ -996,18 +992,31 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     });
   }
 
+  bool _selectActivationAllowed() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastHomeSelectMs < 320) return false;
+    _lastHomeSelectMs = now;
+    return true;
+  }
+
   void _selectPlatform(int index) {
     _cancelHomeSelectionCommit();
     final keepControlGridZone = _fullGridMode;
     final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return;
     final target = _safe(index, platforms.length);
+    _platformIndex = target;
+    _rememberFocus(TvZone.platform, target);
+    if (target == _selectedPlatformIndex) return;
+
     final selectedPlatform = platforms[target];
     final categories = LiveGoCatalog.categoriesFor(selectedPlatform);
     final rememberedCategory = LiveGoSettings.tvLastHomeCategories[selectedPlatform] ?? 0;
+    final selectedCategory = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
     setState(() {
-      _platformIndex = target;
-      _categoryIndex = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
+      _selectedPlatformIndex = target;
+      _selectedCategoryIndex = selectedCategory;
+      _categoryIndex = selectedCategory;
       _gridIndex = 0;
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.platform;
@@ -1026,8 +1035,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final categories = _categories;
     if (categories.isEmpty) return;
     final target = _safe(index, categories.length);
+    _categoryIndex = target;
+    _rememberFocus(TvZone.category, target);
+    if (target == _selectedCategoryIndex) return;
+
     setState(() {
-      _categoryIndex = target;
+      _selectedCategoryIndex = target;
       _gridIndex = 0;
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.category;
