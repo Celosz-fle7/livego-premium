@@ -28,6 +28,11 @@ This folder is intentionally split so Home does not become a dumping ground agai
    - Should receive data/callbacks from parent.
    - Should not directly call provider/network unless the widget is explicitly a provider-bound widget.
 
+5. `tv_home_performance_config.dart`
+   - Owns low-end TV Home performance budgets: manifest item cap, visible grid rows,
+     cache/network timeouts, and selection debounce.
+   - It must not call providers, widgets, network clients, or app storage.
+
 ## Back and focus rule
 
 One remote key must produce one action.
@@ -54,9 +59,12 @@ Potential future adjustment after real device testing:
 `tv_home_screen.dart` should stay thin.
 
 Current rule:
-- `tv_home_screen.dart` owns widget layout, FocusNode fields, ScrollController, init/dispose, and build wiring.
-- `tv_home_interaction_controller.dart` owns focus movement, BACK ladder, key handlers, retry focus, restore-zone logic, and platform/category/grid interaction.
-- This file is a `part` of `tv_home_screen.dart` so it can safely access private focus nodes and context without turning Home into a fragile dependency graph.
+- `tv_home_screen.dart` owns widget layout, FocusNode fields, ScrollController,
+  init/dispose, and build wiring.
+- `tv_home_interaction_controller.dart` owns focus movement, BACK ladder,
+  key handlers, retry focus, restore-zone logic, and platform/category/grid interaction.
+- This file is a `part` of `tv_home_screen.dart` so it can safely access
+  private focus nodes and context without turning Home into a fragile dependency graph.
 
 Do not move FocusNode ownership out of the screen until real-device tests prove the split is stable.
 
