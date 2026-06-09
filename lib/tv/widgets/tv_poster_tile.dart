@@ -78,6 +78,7 @@ class TvPosterTile extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   role: focused ? LiveGoImageRole.poster : LiveGoImageRole.thumbnail,
                                   tv: true,
+                                  progressive: !focused,
                                 ),
                           if (focused) ...[
                             Positioned(top: 7, left: 7, child: _TvPosterBadge(text: '${item.episodes} Ep')),
