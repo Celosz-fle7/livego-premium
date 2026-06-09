@@ -12,8 +12,7 @@ class TvSafeZone {
 
   static const double bottomReach = 220;
   static const double homeGridBottomReach = 96;
-  static const double homeGridEntryOffset = 0; // legacy; HOME_BROWSE no longer scrolls past Banner.
-  static const double homeGridUnderStickyTopPadding = 0;
+  static const double homeGridEntryOffset = 245;
   static const double accountTop = 24;
   static const double accountSide = 48;
   static const double settingsTop = 24;
