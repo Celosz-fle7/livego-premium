@@ -108,6 +108,9 @@ class _TvAccountBadge extends StatelessWidget {
         return '${LiveGoLocalStore.downloads.length}';
       case TvAccountAction.sourceManager:
       case TvAccountAction.displaySettings:
+      case TvAccountAction.cacheMaintenance:
+      case TvAccountAction.help:
+      case TvAccountAction.feedback:
       case TvAccountAction.about:
       case TvAccountAction.update:
         return fallback;
