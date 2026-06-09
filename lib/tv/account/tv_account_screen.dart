@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../screens/tv_settings_screen.dart';
-import '../layout/tv_safe_zone.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../update/tv_update_screen.dart';
 import 'tv_account_config.dart';
 import 'tv_account_menu_data.dart';
 import 'widgets/tv_account_header.dart';
+import 'widgets/tv_account_menu_card.dart';
 
 enum _AccountZone {
   header,
@@ -44,8 +44,9 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   static const double _bottomPadding = TvAccountConfig.bottomPadding;
   static const double _headerHeight = TvAccountConfig.headerHeight;
   static const double _afterHeader = TvAccountConfig.afterHeader;
-  static const double _rowHeight = TvAccountConfig.rowHeight;
-  static const double _rowGap = TvAccountConfig.rowGap;
+  static const int _gridColumnCount = TvAccountConfig.gridColumnCount;
+  static const double _cardHeight = TvAccountConfig.cardHeight;
+  static const double _cardGap = TvAccountConfig.cardGap;
   static const double _footerGap = TvAccountConfig.footerGap;
   static const double _footerHeight = TvAccountConfig.footerHeight;
   static const double _comfortTop = TvAccountConfig.comfortTop;
@@ -89,7 +90,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _rootNode.requestFocus();
       if (header) {
         setState(() => _zone = _AccountZone.header);
-        if (_items.length > TvAccountConfig.visibleMenuWithoutScroll) _jumpToTop();
+        final rowCount = (_items.length / _gridColumnCount).ceil();
+        if (rowCount > TvAccountConfig.visibleMenuRowsWithoutScroll) {
+          _jumpToTop();
+        }
       } else {
         _jumpToCursor(_cursor);
       }
@@ -141,21 +145,28 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _scrollController.jumpTo(0);
   }
 
+  int _rowForIndex(int index) => index ~/ _gridColumnCount;
+
+  int _columnForIndex(int index) => index % _gridColumnCount;
+
   double _rowOffset(int index) {
-    return _topPadding + _headerHeight + _afterHeader + (index * (_rowHeight + _rowGap));
+    final row = _rowForIndex(index);
+    return _topPadding +
+        _headerHeight +
+        _afterHeader +
+        (row * (_cardHeight + _cardGap));
   }
 
   void _jumpToCursor(int index) {
     if (!_scrollController.hasClients || _items.isEmpty) return;
 
-    // Account only has four visible menu items. Keep the viewport steady like a
-    // fixed TV menu; aggressive UP/DOWN should move the cursor, not pull scroll.
-    if (_items.length <= TvAccountConfig.visibleMenuWithoutScroll) return;
+    final rowCount = (_items.length / _gridColumnCount).ceil();
+    if (rowCount <= TvAccountConfig.visibleMenuRowsWithoutScroll) return;
 
     final safe = index.clamp(0, _items.length - 1).toInt();
     final position = _scrollController.position;
     final rowTop = _rowOffset(safe);
-    final rowBottom = rowTop + _rowHeight;
+    final rowBottom = rowTop + _cardHeight;
     final current = position.pixels;
     final visibleTop = current + _comfortTop;
     final visibleBottom = current + position.viewportDimension - _comfortBottom;
@@ -168,14 +179,17 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     }
 
     if (target == null) return;
-    final clamped = target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    final clamped = target
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
     if ((clamped - current).abs() < 1) return;
     position.jumpTo(clamped);
   }
 
   void _moveToHeader() {
     setState(() => _zone = _AccountZone.header);
-    if (_items.length > TvAccountConfig.visibleMenuWithoutScroll) _jumpToTop();
+    final rowCount = (_items.length / _gridColumnCount).ceil();
+    if (rowCount > TvAccountConfig.visibleMenuRowsWithoutScroll) _jumpToTop();
   }
 
   void _moveToMenu({int? index}) {
@@ -189,15 +203,48 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _jumpToCursor(next);
   }
 
-  void _moveMenu(int delta) {
+  void _moveCursorTo(int next) {
     final items = _items;
     if (items.isEmpty) return;
-    final next = (_cursor + delta).clamp(0, items.length - 1).toInt();
+    final safe = next.clamp(0, items.length - 1).toInt();
     setState(() {
       _zone = _AccountZone.menu;
-      _cursor = next;
+      _cursor = safe;
     });
-    _jumpToCursor(next);
+    _jumpToCursor(safe);
+  }
+
+  void _moveVertical(int direction) {
+    final items = _items;
+    if (items.isEmpty) return;
+
+    final next = _cursor + (direction * _gridColumnCount);
+    if (next < 0) {
+      _moveToHeader();
+      return;
+    }
+    if (next >= items.length) return;
+    _moveCursorTo(next);
+  }
+
+  void _moveRight() {
+    final items = _items;
+    if (items.isEmpty) return;
+    if (_columnForIndex(_cursor) != 0) return;
+
+    final next = _cursor + 1;
+    if (next >= items.length || _rowForIndex(next) != _rowForIndex(_cursor)) {
+      return;
+    }
+    _moveCursorTo(next);
+  }
+
+  void _moveLeft() {
+    if (_columnForIndex(_cursor) == 0) {
+      _backToNav();
+      return;
+    }
+    _moveCursorTo(_cursor - 1);
   }
 
   void _push(Widget screen) {
@@ -237,16 +284,21 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       case TvAccountAction.displaySettings:
         _push(const TvSettingsScreen());
         break;
+      case TvAccountAction.cacheMaintenance:
+        _message('Perawatan cache akan ditambahkan di patch berikutnya.');
+        break;
+      case TvAccountAction.help:
+        _message('Bantuan TV akan ditambahkan.');
+        break;
+      case TvAccountAction.feedback:
+        _message('Feedback akan ditambahkan.');
+        break;
       case TvAccountAction.about:
         _message(TvAccountConfig.aboutMessage);
         break;
       case TvAccountAction.update:
         _push(const TvUpdateScreen());
         break;
-
-      // These actions are intentionally navbar-owned. They are not shown in the
-      // Account menu, but remain here so old saved builds do not break if enum
-      // cases still exist.
       case TvAccountAction.history:
         widget.onOpenNavIndex?.call(2);
         break;
@@ -293,27 +345,27 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     }
 
     if (_zone == _AccountZone.menu) {
-      if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
-        // Exact Account ladder:
-        // Account item BACK/LEFT -> navbar Akun.
-        // Settings/Source subscreen BACK still pops back to the item first,
-        // then this rule returns to navbar Akun.
+      if (_isBack(key)) {
         _backToNav();
         return KeyEventResult.handled;
       }
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        _moveLeft();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowRight) {
+        _moveRight();
+        return KeyEventResult.handled;
+      }
       if (key == LogicalKeyboardKey.arrowUp) {
-        if (_cursor == 0) {
-          _moveToHeader();
-        } else {
-          _moveMenu(-1);
-        }
+        _moveVertical(-1);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowDown) {
-        _moveMenu(1);
+        _moveVertical(1);
         return KeyEventResult.handled;
       }
-      if (key == LogicalKeyboardKey.arrowRight || _isSelect(key)) {
+      if (_isSelect(key)) {
         _activateCurrent();
         return KeyEventResult.handled;
       }
@@ -345,7 +397,12 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         child: ListView(
           controller: _scrollController,
           cacheExtent: TvAccountConfig.cacheExtent,
-          padding: const EdgeInsets.fromLTRB(_horizontalPadding, _topPadding, _horizontalPadding, _bottomPadding),
+          padding: const EdgeInsets.fromLTRB(
+            _horizontalPadding,
+            _topPadding,
+            _horizontalPadding,
+            _bottomPadding,
+          ),
           children: [
             TvAccountHeader(
               height: _headerHeight,
@@ -353,17 +410,39 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               onTap: () => _moveToMenu(),
             ),
             const SizedBox(height: _afterHeader),
-            for (var i = 0; i < items.length; i++) ...[
-              _AccountDeterministicRow(
-                height: _rowHeight,
-                item: items[i],
-                focused: _zone == _AccountZone.menu && _cursor == i,
-                onTap: () {
-                  _moveToMenu(index: i);
-                  _activateAction(items[i].action);
-                },
+            for (var rowStart = 0;
+                rowStart < items.length;
+                rowStart += _gridColumnCount) ...[
+              Row(
+                children: [
+                  for (var column = 0; column < _gridColumnCount; column++) ...[
+                    if (column > 0) const SizedBox(width: _cardGap),
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          final index = rowStart + column;
+                          if (index >= items.length) {
+                            return const SizedBox(height: _cardHeight);
+                          }
+
+                          return TvAccountMenuCard(
+                            height: _cardHeight,
+                            item: items[index],
+                            focused:
+                                _zone == _AccountZone.menu && _cursor == index,
+                            onTap: () {
+                              _moveToMenu(index: index);
+                              _activateAction(items[index].action);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              if (i < items.length - 1) const SizedBox(height: _rowGap),
+              if (rowStart + _gridColumnCount < items.length)
+                const SizedBox(height: _cardGap),
             ],
             const SizedBox(height: _footerGap),
             SizedBox(
@@ -374,7 +453,9 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.surface2.withOpacity(0.42),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppTheme.borderSoft.withOpacity(0.42)),
+                  border: Border.all(
+                    color: AppTheme.borderSoft.withOpacity(0.42),
+                  ),
                 ),
                 child: Text(
                   TvAccountConfig.footerHelp,
@@ -390,119 +471,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AccountDeterministicRow extends StatelessWidget {
-  final double height;
-  final TvAccountMenuItem item;
-  final bool focused;
-  final VoidCallback onTap;
-
-  const _AccountDeterministicRow({
-    required this.height,
-    required this.item,
-    required this.focused,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: InkWell(
-        canRequestFocus: false,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        focusColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: focused
-                ? LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      AppTheme.surface3.withOpacity(0.98),
-                      AppTheme.surface2.withOpacity(0.88),
-                    ],
-                  )
-                : null,
-            color: focused ? null : AppTheme.surface.withOpacity(0.86),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: focused ? AppTheme.whiteGlow : AppTheme.borderSoft.withOpacity(0.70), width: focused ? 2.1 : 1),
-            boxShadow: focused ? [BoxShadow(color: AppTheme.cyan.withOpacity(0.09), blurRadius: 16)] : null,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: focused ? AppTheme.cyan.withOpacity(0.18) : AppTheme.surface2.withOpacity(0.78),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.42) : Colors.white10),
-                ),
-                child: Icon(item.icon, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: focused ? Colors.white : AppTheme.text,
-                        fontSize: 15.8,
-                        fontWeight: FontWeight.w900,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppTheme.textSoft.withOpacity(focused ? 0.92 : 0.74),
-                        fontSize: 10.8,
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: focused ? AppTheme.cyan.withOpacity(0.13) : Colors.white.withOpacity(0.045),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: focused ? AppTheme.whiteGlow.withOpacity(0.34) : Colors.white10),
-                ),
-                child: Text(
-                  item.badge,
-                  style: TextStyle(
-                    color: focused ? AppTheme.cyan : AppTheme.textSoft,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.keyboard_arrow_right_rounded, color: focused ? AppTheme.whiteGlow : Colors.white38, size: 26),
-            ],
-          ),
         ),
       ),
     );
