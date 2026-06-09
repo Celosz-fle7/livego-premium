@@ -531,11 +531,26 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _scrollHomeToGridIndex(int index) {
-    if (!_scroll.hasClients || _gridColumns <= 0) return;
+    if (!_scroll.hasClients || _gridColumns <= 0 || _gridNodes.isEmpty) return;
+
     const rowStride = 219.0;
-    final row = _safe(index, _gridNodes.length) ~/ _gridColumns;
     final position = _scroll.position;
-    final target = (TvSafeZone.homeGridEntryOffset + (row * rowStride))
+    final safeIndex = _safe(index, _gridNodes.length);
+    final row = safeIndex ~/ _gridColumns;
+    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns).clamp(1, 999).toInt();
+
+    // V6b: do not place the last grid row at the top of the viewport.
+    // The grid has bottom reach padding for TV safe area. If we scroll directly to
+    // row * stride near the end, the bottom padding becomes a large empty area.
+    // Cap the top row by the number of rows that can comfortably fit on screen.
+    final visibleRows = ((position.viewportDimension - TvSafeZone.gridTop - TvSafeZone.gridBottom) / rowStride)
+        .floor()
+        .clamp(1, totalRows)
+        .toInt();
+    final maxTopRow = (totalRows - visibleRows).clamp(0, totalRows).toInt();
+    final anchoredRow = row.clamp(0, maxTopRow).toInt();
+
+    final target = (TvSafeZone.homeGridEntryOffset + (anchoredRow * rowStride))
         .clamp(position.minScrollExtent, position.maxScrollExtent)
         .toDouble();
     if ((target - position.pixels).abs() < 1) return;

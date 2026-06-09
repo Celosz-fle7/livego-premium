@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 
-class TvChipRow extends StatelessWidget {
+class TvChipRow extends StatefulWidget {
   final List<String> labels;
   final int selected;
   final int? focusedIndex;
@@ -24,17 +24,59 @@ class TvChipRow extends StatelessWidget {
   });
 
   @override
+  State<TvChipRow> createState() => _TvChipRowState();
+}
+
+class _TvChipRowState extends State<TvChipRow> {
+  final ScrollController _scroll = ScrollController();
+
+  static const double _chipStep = 132.0; // 126 chip width + 6 right padding.
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncFocusedChip());
+  }
+
+  @override
+  void didUpdateWidget(covariant TvChipRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusedIndex != oldWidget.focusedIndex || widget.labels.length != oldWidget.labels.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncFocusedChip());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _syncFocusedChip() {
+    if (!mounted || !_scroll.hasClients) return;
+    final index = widget.focusedIndex;
+    if (index == null || widget.labels.length <= 6) return;
+
+    // V6b: root-focus Home no longer gives real focus to each chip, so Flutter
+    // cannot auto-reveal hidden horizontal chips. Scroll this row from index math.
+    final rawTarget = (index * _chipStep) - _chipStep;
+    final target = rawTarget.clamp(_scroll.position.minScrollExtent, _scroll.position.maxScrollExtent).toDouble();
+    if ((target - _scroll.position.pixels).abs() < 1) return;
+    _scroll.jumpTo(target);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (labels.isEmpty || nodes.isEmpty) return const SizedBox.shrink();
-    final count = labels.length;
+    if (widget.labels.isEmpty || widget.nodes.isEmpty) return const SizedBox.shrink();
+    final count = widget.labels.length;
     Widget chipAt(int i) => _TvChip(
-          text: labels[i],
-          active: i == selected,
-          focusNode: nodes[i],
-          focusedOverride: focusedIndex == i,
-          onTap: () => onTap(i),
-          onFocus: () => onFocus(i),
-          onKey: (node, event) => onKey(i, event),
+          text: widget.labels[i],
+          active: i == widget.selected,
+          focusNode: widget.nodes[i],
+          focusedOverride: widget.focusedIndex == i,
+          onTap: () => widget.onTap(i),
+          onFocus: () => widget.onFocus(i),
+          onKey: (node, event) => widget.onKey(i, event),
         );
 
     if (count <= 6) {
@@ -51,7 +93,9 @@ class TvChipRow extends StatelessWidget {
     }
 
     return SingleChildScrollView(
+      controller: _scroll,
       scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
       child: Row(
         children: List.generate(count, (i) {
           return Padding(
