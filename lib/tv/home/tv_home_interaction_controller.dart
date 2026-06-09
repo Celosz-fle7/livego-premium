@@ -697,10 +697,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         if (hero != null) _openDetail(hero);
         return;
       case TvZone.platform:
-        _selectPlatform(_platformIndex);
+        // V6d: LEFT header button is not separately focusable under root-focus Home.
+        // Use OK on the Platform row to open the full platform manager.
+        unawaited(_openPlatformManager());
         return;
       case TvZone.category:
-        _selectCategory(_categoryIndex);
+        // V6d: Use OK on the Category row to open the category manager.
+        unawaited(_openCategoryManager());
         return;
       case TvZone.grid:
         if (_gridItems.isNotEmpty) {

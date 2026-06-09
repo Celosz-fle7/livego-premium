@@ -27,7 +27,6 @@ import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_home_rail_section.dart';
-import '../widgets/tv_offline_banner.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_section_box.dart';
 import '../widgets/tv_professional_loading.dart';
@@ -253,11 +252,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // V6c2: keep Home visually stable while content refreshes in background.
                     // No top refresh/status line here because it changes vertical layout
                     // and makes remote movement feel shaky.
-                    TvOfflineBanner(
-                      visible: home.offline || (home.hasError && home.fromCache),
-                      fromCache: home.fromCache,
-                      refreshing: home.refreshing,
-                    ),
+                    // V6d: no cache/offline banner in the normal Home layout.
+                    // It was still taking vertical space and made the grid feel unchanged.
                     const SizedBox(height: 8),
                   ]),
                 ),
