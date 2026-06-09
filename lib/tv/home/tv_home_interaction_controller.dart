@@ -146,9 +146,17 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (zone == TvZone.platform) {
-          _focusPlatform(_platformIndex, throttle: false);
+          if (_fullGridMode) {
+            _focusPlatformAtControlAnchor(_platformIndex);
+          } else {
+            _focusPlatform(_platformIndex, throttle: false);
+          }
         } else if (zone == TvZone.category) {
-          _focusCategory(_categoryIndex, throttle: false);
+          if (_fullGridMode) {
+            _focusCategoryAtControlAnchor(_categoryIndex);
+          } else {
+            _focusCategory(_categoryIndex, throttle: false);
+          }
         }
       });
     });
@@ -213,7 +221,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   bool _focusPlatformHeaderAtControlAnchor() {
     if (_platformHeaderNode.context == null) return false;
-    _scrollHomeToGridEntry();
+    if (!_fullGridMode) {
+      _scrollHomeToGridEntry();
+    }
     final ok = _requestControlNode(_platformHeaderNode);
     if (ok) _rememberFocus(TvZone.platform, _platformIndex);
     return ok;
@@ -221,7 +231,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   bool _focusCategoryHeaderAtControlAnchor() {
     if (_categoryHeaderNode.context == null) return false;
-    _scrollHomeToGridEntry();
+    if (!_fullGridMode) {
+      _scrollHomeToGridEntry();
+    }
     final ok = _requestControlNode(_categoryHeaderNode);
     if (ok) _rememberFocus(TvZone.category, _categoryIndex);
     return ok;
@@ -238,7 +250,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _rememberFocus(TvZone.platform, target);
     _scheduleHomeSelectionCommit(TvZone.platform);
 
-    _scrollHomeToGridEntry();
+    if (!_fullGridMode) {
+      _scrollHomeToGridEntry();
+    }
     return _requestControlNode(_platformNodes[target]);
   }
 
@@ -252,7 +266,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _rememberFocus(TvZone.category, target);
     _scheduleHomeSelectionCommit(TvZone.category);
 
-    _scrollHomeToGridEntry();
+    if (!_fullGridMode) {
+      _scrollHomeToGridEntry();
+    }
     return _requestControlNode(_categoryNodes[target]);
   }
 
@@ -704,6 +720,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   void _selectPlatform(int index) {
     _cancelHomeSelectionCommit();
+    final keepControlGridZone = _fullGridMode;
     final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return;
     final target = _safe(index, platforms.length);
@@ -715,16 +732,25 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _categoryIndex = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
       _gridIndex = 0;
       _gridItems = const <ContentItem>[];
-      _fullGridMode = false;
+      _fullGridMode = keepControlGridZone;
       _zone = TvZone.platform;
     });
     _rememberSelection();
     _loadHome(clearPrevious: true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusPlatform(target, throttle: false));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (keepControlGridZone) {
+        _scrollHomeToGridEntry();
+        _focusPlatformAtControlAnchor(target);
+      } else {
+        _focusPlatform(target, throttle: false);
+      }
+    });
   }
 
   void _selectCategory(int index) {
     _cancelHomeSelectionCommit();
+    final keepControlGridZone = _fullGridMode;
     final categories = _categories;
     if (categories.isEmpty) return;
     final target = _safe(index, categories.length);
@@ -732,12 +758,20 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _categoryIndex = target;
       _gridIndex = 0;
       _gridItems = const <ContentItem>[];
-      _fullGridMode = false;
+      _fullGridMode = keepControlGridZone;
       _zone = TvZone.category;
     });
     _rememberSelection();
     _loadHome(clearPrevious: true);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusCategory(target, throttle: false));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (keepControlGridZone) {
+        _scrollHomeToGridEntry();
+        _focusCategoryAtControlAnchor(target);
+      } else {
+        _focusCategory(target, throttle: false);
+      }
+    });
   }
 
   void _handleBack() {
