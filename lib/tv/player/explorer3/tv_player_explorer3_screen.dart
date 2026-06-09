@@ -54,6 +54,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   StreamInfo _streamInfo = StreamInfo.empty;
 
   int _loadToken = 0;
+  int _nativeResolveToken = 0;
   late int _episode;
   String _chapterId = '';
   bool _loading = true;
@@ -151,6 +152,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   bool _active(int token) => mounted && !_closing && token == _loadToken;
+
+  bool _activeNativeResolve(int token) =>
+      mounted && !_closing && token == _nativeResolveToken;
 
   int _episodeTotal() {
     final fromStream = _streamInfo.totalEpisodes;
@@ -274,12 +278,26 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   Map<String, Object?> _nativePlayerPayload(StreamInfo stream, String url) {
-    return TvPlayerExplorer3NativePayload.build(
-      item: widget.item,
+    return _nativePlayerPayloadFor(
       stream: stream,
       url: url,
       episode: _episode,
       chapterId: _chapterId,
+    );
+  }
+
+  Map<String, Object?> _nativePlayerPayloadFor({
+    required StreamInfo stream,
+    required String url,
+    required int episode,
+    required String chapterId,
+  }) {
+    return TvPlayerExplorer3NativePayload.build(
+      item: widget.item,
+      stream: stream,
+      url: url,
+      episode: episode,
+      chapterId: chapterId,
       totalEpisodes: _nativePayloadTotal(stream),
     );
   }
@@ -548,6 +566,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   Future<Map<String, Object?>> _resolveEpisodeForNative(Object? args) async {
+    final token = ++_nativeResolveToken;
     final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
     final requestedEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
     final requestedQuality = '${raw['quality'] ?? _activeQuality}'.trim().isEmpty ? 'Auto' : '${raw['quality'] ?? _activeQuality}'.trim();
@@ -558,22 +577,42 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     try {
       final target = await _resolveOrderedEpisodeTarget(requestedEpisode);
-      _episode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
-      _chapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$_episode';
-      _episodeCursor = _episode;
+      if (!_activeNativeResolve(token)) {
+        return <String, Object?>{
+          'error': 'Stale native episode resolve',
+          'episode': previousEpisode,
+          'chapterId': previousChapterId,
+        };
+      }
 
-      final item = _playableItem();
+      final targetEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+      final targetChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$targetEpisode';
+      final item = _playableItemFor(
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
       final resolved = await _service.resolveStream(
         item,
         chapterId: item.chapterId,
-        episode: _episode,
+        episode: targetEpisode,
       );
+      if (!_activeNativeResolve(token)) {
+        return <String, Object?>{
+          'error': 'Stale native episode resolve',
+          'episode': previousEpisode,
+          'chapterId': previousChapterId,
+        };
+      }
 
       final stream = resolved.stream;
-      _streamInfo = stream;
-      _activeQuality = requestedQuality;
       final url = _safeUrlForQuality(stream, requestedQuality).trim();
       if (url.isEmpty) throw StateError('Stream kosong');
+
+      _episode = targetEpisode;
+      _chapterId = targetChapterId;
+      _episodeCursor = targetEpisode;
+      _streamInfo = stream;
+      _activeQuality = requestedQuality;
 
       if (mounted) {
         setState(() {
@@ -585,12 +624,19 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       }
 
       _scheduleLightPrefetch();
-      return _nativePlayerPayload(stream, url);
+      return _nativePlayerPayloadFor(
+        stream: stream,
+        url: url,
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
     } catch (error) {
-      _episode = previousEpisode;
-      _chapterId = previousChapterId;
-      _episodeCursor = previousEpisode;
-      _streamInfo = previousStream;
+      if (_activeNativeResolve(token)) {
+        _episode = previousEpisode;
+        _chapterId = previousChapterId;
+        _episodeCursor = previousEpisode;
+        _streamInfo = previousStream;
+      }
       return <String, Object?>{
         'error': '$error',
         'episode': previousEpisode,
@@ -650,6 +696,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   Future<void> _load() async {
     final token = ++_loadToken;
+    _nativeResolveToken++;
     final item = _playableItem();
 
     _cancelEpisodeListWarmup();
@@ -726,7 +773,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!_active(token)) return true;
 
     try {
-      await _nativeSurfacePlayer.invokeMethod<bool>('open', _nativePlayerPayload(stream, url));
+      await _nativeSurfacePlayer
+          .invokeMethod<bool>('open', _nativePlayerPayload(stream, url))
+          .timeout(
+            TvPlayerExplorer3Timing.nativeOpenTimeout,
+            onTimeout: () => throw TimeoutException('Native open timeout'),
+          );
 
       if (!mounted || !_active(token)) return true;
 
