@@ -107,12 +107,9 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       return;
     }
 
-    // TV grid thumbnails stay low-only. They are many, small, and usually
-    // non-focused; upgrading all of them to high quality wastes RAM/GPU budget.
-    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
-      _loadHighQuality = false;
-      return;
-    }
+    // TV thumbnails are no longer low-only because Home poster grids can use
+    // them for visible tiles. They still upgrade progressively with TV jitter
+    // so low-end STBs do not decode every visible image at once.
 
     final baseDelayMs = ImageQualityConfig.progressiveDelayMsFor(widget.role);
     // TV remote focus must stay responsive. Let low-res posters settle first,
@@ -134,17 +131,6 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
         tv: widget.tv,
       ),
     );
-
-    if (widget.tv && widget.role == LiveGoImageRole.thumbnail) {
-      return _networkImage(
-        context,
-        cleanUrl,
-        decodeWidth: lowWidth,
-        cacheSuffix: 'tv-low-$lowWidth',
-        showPlaceholder: true,
-        fadeInDuration: Duration.zero,
-      );
-    }
 
     final highWidth = _decodeWidth(context);
 
@@ -245,9 +231,9 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
 
     switch (widget.role) {
       case LiveGoImageRole.thumbnail:
-        return decodeWidth.clamp(96, 180).toInt();
+        return decodeWidth.clamp(150, 260).toInt();
       case LiveGoImageRole.poster:
-        return decodeWidth.clamp(120, 240).toInt();
+        return decodeWidth.clamp(180, 380).toInt();
       case LiveGoImageRole.detail:
         return decodeWidth.clamp(220, 560).toInt();
       case LiveGoImageRole.banner:
