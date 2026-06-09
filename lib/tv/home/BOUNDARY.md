@@ -62,6 +62,19 @@ Must not own:
 - TV key handling
 - widget layout
 
+### `tv_home_performance_config.dart`
+Owns:
+- low-end TV Home item budgets
+- visible grid row budget
+- cache/network timeout budgets
+- platform/category selection debounce
+
+Must not own:
+- FocusNode lifecycle
+- provider state
+- widget layout
+- raw endpoint clients
+
 ## Current implementation choice
 
 `tv_home_interaction_controller.dart` is currently a Dart `part` extension.

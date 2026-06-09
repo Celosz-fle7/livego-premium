@@ -5,6 +5,7 @@ import '../../../models/content_item.dart';
 import '../../../services/content/content_health_service.dart';
 import '../../../services/network/livego_network_status.dart';
 import '../../cache/tv_ram_cache.dart';
+import '../tv_home_performance_config.dart';
 import 'tv_home_content_state.dart';
 
 /// Home data repository.
@@ -14,7 +15,7 @@ import 'tv_home_content_state.dart';
 class TvHomeRepository {
   const TvHomeRepository();
 
-  static const int maxTvHomeItems = 30;
+  static const int maxTvHomeItems = TvHomePerformanceConfig.maxManifestItems;
 
   String _ramKey(String platform, String selectedCategory) {
     return TvRamCache.key('home', [platform, selectedCategory]);
@@ -60,7 +61,10 @@ class TvHomeRepository {
       platform: platform,
       category: selectedCategory,
       allowExpired: true,
-    ).timeout(const Duration(milliseconds: 650), onTimeout: () => const <ContentItem>[]);
+    ).timeout(
+      TvHomePerformanceConfig.cacheReadTimeout,
+      onTimeout: () => const <ContentItem>[],
+    );
 
     final prepared = _prepareItems(cached);
     if (prepared.isEmpty) return null;
@@ -78,7 +82,10 @@ class TvHomeRepository {
     final items = await LiveGoCatalog.homeByCategory(
       platform: platform,
       category: selectedCategory,
-    ).timeout(const Duration(seconds: 10), onTimeout: () => const <ContentItem>[]);
+    ).timeout(
+      TvHomePerformanceConfig.foregroundNetworkTimeout,
+      onTimeout: () => const <ContentItem>[],
+    );
 
     final prepared = _prepareItems(items);
     if (prepared.isEmpty) return null;
@@ -95,7 +102,10 @@ class TvHomeRepository {
       platform: platform,
       category: selectedCategory,
       allowExpired: true,
-    ).timeout(const Duration(milliseconds: 800), onTimeout: () => const <ContentItem>[]);
+    ).timeout(
+      TvHomePerformanceConfig.fallbackCacheTimeout,
+      onTimeout: () => const <ContentItem>[],
+    );
 
     final prepared = _prepareItems(fallback);
     if (prepared.isEmpty) return null;
@@ -113,7 +123,10 @@ class TvHomeRepository {
     final fresh = await LiveGoCatalog.homeByCategory(
       platform: platform,
       category: selectedCategory,
-    ).timeout(const Duration(seconds: 12), onTimeout: () => const <ContentItem>[]);
+    ).timeout(
+      TvHomePerformanceConfig.backgroundRefreshTimeout,
+      onTimeout: () => const <ContentItem>[],
+    );
 
     final prepared = _prepareItems(fresh);
     if (prepared.isEmpty) {
