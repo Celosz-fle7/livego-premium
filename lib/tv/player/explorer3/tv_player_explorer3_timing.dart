@@ -15,6 +15,7 @@ class TvPlayerExplorer3Timing {
   static const Duration episodeWarmupDelay = Duration(seconds: 1);
   static const Duration lightPrefetchDelay = Duration(seconds: 10);
   static const Duration episodeResolveTimeout = Duration(seconds: 4);
+  static const Duration nativeOpenTimeout = Duration(seconds: 4);
   static const Duration episodeWarmupTimeout = Duration(seconds: 5);
   static const Duration lightPrefetchTimeout = Duration(seconds: 7);
   static const Duration fallbackControllerInitTimeout = Duration(seconds: 22);
