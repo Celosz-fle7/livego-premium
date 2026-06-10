@@ -107,13 +107,13 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
   void _activateSetting(LiveGoSettingId id) {
     switch (id) {
       case LiveGoSettingId.layoutAuto:
-        _applySetting(() => LiveGoSettings.layoutMode = 'Auto');
+        _applySetting(() => LiveGoSettings.layoutMode = LiveGoSettings.layoutAuto);
         break;
       case LiveGoSettingId.layoutMobile:
-        _applySetting(() => LiveGoSettings.layoutMode = 'Mobile');
+        _applySetting(() => LiveGoSettings.layoutMode = LiveGoSettings.layoutMobile);
         break;
       case LiveGoSettingId.layoutTv:
-        _applySetting(() => LiveGoSettings.layoutMode = 'TV');
+        _applySetting(() => LiveGoSettings.layoutMode = LiveGoSettings.layoutTv);
         break;
       case LiveGoSettingId.backgroundPoster:
         _applySetting(() => LiveGoSettings.backgroundPoster = !LiveGoSettings.backgroundPoster);

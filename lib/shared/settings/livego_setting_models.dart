@@ -102,7 +102,7 @@ class LiveGoSettingsMenuData {
     required bool tvLocked,
     bool cacheBusy = false,
   }) {
-    final selectedLayout = tvLocked ? 'TV' : LiveGoSettings.layoutMode;
+    final selectedLayout = tvLocked ? LiveGoSettings.layoutTv : LiveGoSettings.layoutMode;
     return <LiveGoSettingSection>[
       LiveGoSettingSection(
         title: 'Tampilan & Navigasi',
@@ -113,17 +113,17 @@ class LiveGoSettingsMenuData {
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutAuto,
             title: 'Otomatis (Ikuti Hardware)',
-            active: selectedLayout == 'Auto',
+            active: selectedLayout == LiveGoSettings.layoutAuto,
           ),
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutMobile,
             title: 'Smartphone / Tablet (Android)',
-            active: selectedLayout == 'Mobile',
+            active: selectedLayout == LiveGoSettings.layoutMobile,
           ),
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutTv,
             title: 'Android TV (Leanback Style)',
-            active: selectedLayout == 'TV',
+            active: selectedLayout == LiveGoSettings.layoutTv,
           ),
           LiveGoSettingItem.tile(
             id: LiveGoSettingId.backgroundPoster,

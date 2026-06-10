@@ -3,7 +3,7 @@ import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../shared/widgets/poster_card.dart';
-import '../../tv/player/tv_player_entry.dart';
+import '../mobile_player_entry.dart';
 
 class MobileSearchScreen extends StatefulWidget {
   const MobileSearchScreen({super.key});
@@ -144,7 +144,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
               final item = results[i];
               return PosterCard(
                 item: item,
-                onTap: () => TvPlayerEntry.open(context, item: item),
+                onTap: () => MobilePlayerEntry.open(context, item: item),
               );
             },
           ),

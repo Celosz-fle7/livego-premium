@@ -232,8 +232,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   void _lockTvLayout({bool persist = false}) {
     var changed = false;
-    if (LiveGoSettings.layoutMode != 'TV') {
-      LiveGoSettings.layoutMode = 'TV';
+    if (LiveGoSettings.layoutMode != LiveGoSettings.layoutTv) {
+      LiveGoSettings.layoutMode = LiveGoSettings.layoutTv;
       changed = true;
     }
 
@@ -276,7 +276,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         case LiveGoSettingId.layoutAuto:
         case LiveGoSettingId.layoutMobile:
         case LiveGoSettingId.layoutTv:
-          LiveGoSettings.layoutMode = 'TV';
+          LiveGoSettings.layoutMode = LiveGoSettings.layoutTv;
           _showTvLayoutLockedMessage();
           break;
         case LiveGoSettingId.backgroundPoster:
