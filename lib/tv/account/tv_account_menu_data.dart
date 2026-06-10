@@ -72,7 +72,7 @@ class TvAccountMenuData {
       TvAccountMenuItem(
         icon: Icons.cleaning_services_rounded,
         title: 'Perawatan Cache',
-        subtitle: 'Ruang perawatan cache TV untuk patch berikutnya.',
+        subtitle: 'Bersihkan cache gambar, streaming, dan RAM TV.',
         badge: 'CACHE',
         action: TvAccountAction.cacheMaintenance,
       ),

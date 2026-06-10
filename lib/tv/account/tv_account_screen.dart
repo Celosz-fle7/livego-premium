@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
+import '../cache/tv_cache_maintenance_service.dart';
 import '../update/tv_update_screen.dart';
 import 'tv_account_config.dart';
 import 'tv_account_menu_data.dart';
@@ -60,6 +63,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   int _lastBackMs = 0;
   int _lastSelectMs = 0;
   bool _openingSubscreen = false;
+  bool _cacheMaintenanceBusy = false;
 
   List<TvAccountMenuItem> get _items => TvAccountMenuData.build();
 
@@ -276,6 +280,42 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _scheduleEntry(header: false);
   }
 
+
+  Future<void> _runCacheMaintenance() async {
+    if (_cacheMaintenanceBusy) return;
+    setState(() => _cacheMaintenanceBusy = true);
+    var progressOpen = true;
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) {
+        return const _AccountCacheMaintenanceDialog();
+      },
+    ).whenComplete(() => progressOpen = false));
+
+    final result = await TvCacheMaintenanceService.clearAll();
+    if (!mounted) return;
+    if (progressOpen) {
+      Navigator.of(context).pop();
+    }
+    setState(() => _cacheMaintenanceBusy = false);
+    final failed = result.failedItems.keys.join(', ');
+    final message = result.hasFailure
+        ? '${result.message} Gagal: $failed.'
+        : result.message;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: result.hasFailure ? Colors.deepOrange.shade700 : AppTheme.surface2,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    _scheduleEntry(header: false);
+  }
+
   void _activateAction(TvAccountAction action) {
     switch (action) {
       case TvAccountAction.sourceManager:
@@ -285,7 +325,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _push(const TvSettingsScreen());
         break;
       case TvAccountAction.cacheMaintenance:
-        _message('Perawatan cache akan ditambahkan di patch berikutnya.');
+        _runCacheMaintenance();
         break;
       case TvAccountAction.help:
         _message('Bantuan TV akan ditambahkan.');
@@ -468,6 +508,43 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
                     decoration: TextDecoration.none,
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountCacheMaintenanceDialog extends StatelessWidget {
+  const _AccountCacheMaintenanceDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox(
+              width: 34,
+              height: 34,
+              child: CircularProgressIndicator(strokeWidth: 3, color: AppTheme.cyan),
+            ),
+            SizedBox(width: 16),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Membersihkan Cache', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                  SizedBox(height: 6),
+                  Text('Mohon tunggu, cache TV sedang dibersihkan.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35, decoration: TextDecoration.none)),
+                ],
               ),
             ),
           ],

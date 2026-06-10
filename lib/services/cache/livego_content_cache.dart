@@ -106,6 +106,13 @@ class LiveGoContentCache {
     );
   }
 
+  static Future<void> clearAll() async {
+    final root = await _rootDir();
+    if (await root.exists()) {
+      await root.delete(recursive: true);
+    }
+  }
+
   static Future<void> cleanExpiredAndTrim() async {
     final root = await _rootDir();
     if (!await root.exists()) return;

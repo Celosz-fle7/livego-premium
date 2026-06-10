@@ -59,6 +59,8 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
   int _categoryIndex = 0;
   int _popupCursor = 0;
   int _lastBackMs = 0;
+  int _lastSelectMs = 0;
+  bool _saving = false;
 
   late Set<String> _draftActive;
   late List<String> _draftHome;
@@ -185,6 +187,17 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     return key == LogicalKeyboardKey.goBack ||
         key == LogicalKeyboardKey.escape ||
         key == LogicalKeyboardKey.browserBack;
+  }
+
+  bool _isMenu(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
+  }
+
+  bool _allowSelect() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastSelectMs < 320) return false;
+    _lastSelectMs = now;
+    return true;
   }
 
   bool _ignoreBackSpam() {
@@ -405,7 +418,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     if (_ignoreBackSpam()) return;
 
     if (_zone == _SourceZone.popup) {
-      _discardAndExit();
+      _closePopup();
       return;
     }
 
@@ -422,36 +435,46 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
     _requestExit();
   }
 
+  void _closePopup() {
+    setState(() => _zone = _categoryMode ? _SourceZone.category : _SourceZone.platform);
+  }
+
   void _discardAndExit() {
     Navigator.of(context).pop();
   }
 
   Future<void> _saveAndExit() async {
-    _repairDraft();
+    if (_saving) return;
+    _saving = true;
+    try {
+      _repairDraft();
 
-    LiveGoSettings.activePlatforms
-      ..clear()
-      ..addAll(_draftActive);
+      LiveGoSettings.activePlatforms
+        ..clear()
+        ..addAll(_draftActive);
 
-    LiveGoSettings.homePlatforms
-      ..clear()
-      ..addAll(_draftHome.where(_draftActive.contains));
+      LiveGoSettings.homePlatforms
+        ..clear()
+        ..addAll(_draftHome.where(_draftActive.contains));
 
-    if (LiveGoSettings.homePlatforms.isEmpty) {
-      LiveGoSettings.homePlatforms.add(_draftActive.first);
+      if (LiveGoSettings.homePlatforms.isEmpty) {
+        LiveGoSettings.homePlatforms.add(_draftActive.first);
+      }
+
+      LiveGoSettings.defaultPlatform = _draftDefault;
+
+      LiveGoSettings.homeCategories
+        ..clear()
+        ..addAll({
+          for (final entry in _draftCategories.entries)
+            entry.key: List<String>.from(entry.value),
+        });
+
+      await LiveGoLocalStore.saveSettings();
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      _saving = false;
     }
-
-    LiveGoSettings.defaultPlatform = _draftDefault;
-
-    LiveGoSettings.homeCategories
-      ..clear()
-      ..addAll({
-        for (final entry in _draftCategories.entries)
-          entry.key: List<String>.from(entry.value),
-      });
-
-    await LiveGoLocalStore.saveSettings();
-    if (mounted) Navigator.of(context).pop();
   }
 
   void _toast(String message) {
@@ -472,11 +495,13 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (event is KeyRepeatEvent && (_isSelect(event.logicalKey) || _isBack(event.logicalKey))) {
+    if (event is KeyRepeatEvent && (_isSelect(event.logicalKey) || _isBack(event.logicalKey) || _isMenu(event.logicalKey))) {
       return KeyEventResult.handled;
     }
 
     final key = event.logicalKey;
+
+    if (_isMenu(key)) return KeyEventResult.handled;
 
     if (_zone == _SourceZone.popup) {
       if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
@@ -484,6 +509,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
+        if (!_allowSelect()) return KeyEventResult.handled;
         if (_popupCursor == 0) {
           _discardAndExit();
         } else {
@@ -492,7 +518,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isBack(key)) {
-        _discardAndExit();
+        _closePopup();
         return KeyEventResult.handled;
       }
       return KeyEventResult.handled;
@@ -509,6 +535,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
+        if (!_allowSelect()) return KeyEventResult.handled;
         _requestExit();
         return KeyEventResult.handled;
       }
@@ -539,6 +566,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
+        if (!_allowSelect()) return KeyEventResult.handled;
         _togglePlatform();
         return KeyEventResult.handled;
       }
@@ -568,6 +596,7 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
         return KeyEventResult.handled;
       }
       if (_isSelect(key)) {
+        if (!_allowSelect()) return KeyEventResult.handled;
         _toggleCategory();
         return KeyEventResult.handled;
       }
