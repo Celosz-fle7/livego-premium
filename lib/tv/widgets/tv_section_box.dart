@@ -11,6 +11,7 @@ class TvSectionBox extends StatelessWidget {
   final Widget child;
   final VoidCallback? onHeaderTap;
   final FocusNode? headerFocusNode;
+  final bool? headerFocusedOverride;
   final FocusOnKeyEventCallback? onHeaderKey;
   final VoidCallback? onHeaderFocus;
 
@@ -23,6 +24,7 @@ class TvSectionBox extends StatelessWidget {
     required this.child,
     this.onHeaderTap,
     this.headerFocusNode,
+    this.headerFocusedOverride,
     this.onHeaderKey,
     this.onHeaderFocus,
   });
@@ -54,6 +56,7 @@ class TvSectionBox extends StatelessWidget {
               hint: hint,
               onTap: onHeaderTap,
               focusNode: headerFocusNode,
+              focusedOverride: headerFocusedOverride,
               onKey: onHeaderKey,
               onFocus: onHeaderFocus,
             ),
@@ -73,6 +76,7 @@ class _SectionHeaderButton extends StatelessWidget {
   final String hint;
   final VoidCallback? onTap;
   final FocusNode? focusNode;
+  final bool? focusedOverride;
   final FocusOnKeyEventCallback? onKey;
   final VoidCallback? onFocus;
 
@@ -82,6 +86,7 @@ class _SectionHeaderButton extends StatelessWidget {
     required this.hint,
     this.onTap,
     this.focusNode,
+    this.focusedOverride,
     this.onKey,
     this.onFocus,
   });
@@ -98,7 +103,7 @@ class _SectionHeaderButton extends StatelessWidget {
       },
       child: ListenableBuilder(
         listenable: focusNode!,
-        builder: (context, _) => _buildButton(focused: focusNode!.hasFocus),
+        builder: (context, _) => _buildButton(focused: focusedOverride ?? focusNode!.hasFocus),
       ),
     );
   }

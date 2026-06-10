@@ -34,6 +34,13 @@ import '../widgets/tv_professional_loading.dart';
 
 part 'tv_home_interaction_controller.dart';
 
+enum _HomeControlFocus {
+  platformHeader,
+  platformChip,
+  categoryHeader,
+  categoryChip,
+}
+
 /// ARCHITECTURE LOCK:
 /// Home screen owns layout, FocusNode lifecycle, ScrollController lifecycle,
 /// init/dispose, and widget callback wiring only.
@@ -89,6 +96,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _selectedCategoryIndex = 0;
   int _gridIndex = 0;
   TvZone _zone = TvZone.banner;
+  _HomeControlFocus _controlFocus = _HomeControlFocus.platformChip;
   bool _openingDetail = false;
   bool _fullGridMode = false;
   int _focusBootstrapTicket = 0;
@@ -283,19 +291,30 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           height: 50,
                           onHeaderTap: this._openPlatformManager,
                           headerFocusNode: _platformHeaderNode,
-                          onHeaderFocus: () => this._rememberFocus(TvZone.platform, _platformIndex),
+                          headerFocusedOverride: _zone == TvZone.platform &&
+                              _controlFocus == _HomeControlFocus.platformHeader,
+                          onHeaderFocus: () {
+                            setState(() => _controlFocus = _HomeControlFocus.platformHeader);
+                            this._rememberFocus(TvZone.platform, _platformIndex);
+                          },
                           onHeaderKey: this._platformHeaderKey,
                           child: TvChipRow(
                             labels: platforms,
                             selected: _selectedPlatformIndex,
-                            focusedIndex: _zone == TvZone.platform ? _platformIndex : null,
+                            focusedIndex: _zone == TvZone.platform &&
+                                    _controlFocus == _HomeControlFocus.platformChip
+                                ? _platformIndex
+                                : null,
                             nodes: _platformNodes,
                             onTap: this._selectPlatform,
                             onFocus: (i) {
-                              _platformIndex = i;
+                              setState(() {
+                                _platformIndex = i;
+                                _controlFocus = _HomeControlFocus.platformChip;
+                              });
                               this._rememberFocus(TvZone.platform, i);
                             },
-                            onKey: (i, event) => this._homeRootKey(home.hero, event),
+                            onKey: (i, event) => this._platformKey(i, event),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -306,19 +325,30 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           height: 50,
                           onHeaderTap: this._openCategoryManager,
                           headerFocusNode: _categoryHeaderNode,
-                          onHeaderFocus: () => this._rememberFocus(TvZone.category, _categoryIndex),
+                          headerFocusedOverride: _zone == TvZone.category &&
+                              _controlFocus == _HomeControlFocus.categoryHeader,
+                          onHeaderFocus: () {
+                            setState(() => _controlFocus = _HomeControlFocus.categoryHeader);
+                            this._rememberFocus(TvZone.category, _categoryIndex);
+                          },
                           onHeaderKey: this._categoryHeaderKey,
                           child: TvChipRow(
                             labels: categories,
                             selected: _selectedCategoryIndex,
-                            focusedIndex: _zone == TvZone.category ? _categoryIndex : null,
+                            focusedIndex: _zone == TvZone.category &&
+                                    _controlFocus == _HomeControlFocus.categoryChip
+                                ? _categoryIndex
+                                : null,
                             nodes: _categoryNodes,
                             onTap: this._selectCategory,
                             onFocus: (i) {
-                              _categoryIndex = i;
+                              setState(() {
+                                _categoryIndex = i;
+                                _controlFocus = _HomeControlFocus.categoryChip;
+                              });
                               this._rememberFocus(TvZone.category, i);
                             },
-                            onKey: (i, event) => this._homeRootKey(home.hero, event),
+                            onKey: (i, event) => this._categoryKey(i, event),
                           ),
                         ),
                       ],
