@@ -1,3 +1,5 @@
+import '../../services/cache/livego_cache_observer.dart';
+
 /// Small RAM-only cache for TV UI state.
 ///
 /// This is not API cache, not image cache, not video cache.
@@ -22,13 +24,33 @@ class TvRamCache {
 
   T? read<T>(String key) {
     final entry = _store[key];
-    if (entry == null) return null;
+    if (entry == null) {
+      LiveGoCacheObserver.log(
+        key.startsWith('home:') ? 'home_cache_miss' : 'cache_miss',
+        domain: key.startsWith('home:') ? 'home' : 'ram',
+        key: key,
+      );
+      return null;
+    }
     if (entry.expired) {
       _store.remove(key);
+      LiveGoCacheObserver.log(
+        key.startsWith('home:') ? 'home_cache_expired' : 'cache_expired',
+        domain: key.startsWith('home:') ? 'home' : 'ram',
+        key: key,
+        expired: true,
+      );
       return null;
     }
     final value = entry.value;
-    if (value is T) return value as T;
+    if (value is T) {
+      LiveGoCacheObserver.log(
+        key.startsWith('home:') ? 'home_cache_hit' : 'cache_hit',
+        domain: key.startsWith('home:') ? 'home' : 'ram',
+        key: key,
+      );
+      return value as T;
+    }
     return null;
   }
 
@@ -40,6 +62,12 @@ class TvRamCache {
       expiresAt: DateTime.now().add(ttl),
       touchedAt: DateTime.now(),
     );
+    LiveGoCacheObserver.log(
+      key.startsWith('home:') ? 'home_cache_saved' : 'cache_saved',
+      domain: key.startsWith('home:') ? 'home' : 'ram',
+      key: key,
+      ttl: ttl,
+    );
     _trim();
   }
 
@@ -49,11 +77,21 @@ class TvRamCache {
 
   void clearExpired() {
     final now = DateTime.now();
-    _store.removeWhere((_, entry) => entry.expiresAt.isBefore(now));
+    var removed = 0;
+    _store.removeWhere((_, entry) {
+      final expired = entry.expiresAt.isBefore(now);
+      if (expired) removed++;
+      return expired;
+    });
+    if (removed > 0) {
+      LiveGoCacheObserver.log('cache_cleanup_done', domain: 'ram', itemCount: removed, reason: 'expired_ram');
+    }
   }
 
   void clearAll() {
+    final count = _store.length;
     _store.clear();
+    LiveGoCacheObserver.log('cache_cleanup_done', domain: 'ram', itemCount: count, reason: 'clear_runtime_ram');
   }
 
   static String key(String scope, List<Object?> parts) {
@@ -76,6 +114,7 @@ class TvRamCache {
     final removeCount = _store.length - maxEntries;
     for (final entry in entries.take(removeCount)) {
       _store.remove(entry.key);
+      LiveGoCacheObserver.log('cache_cleanup_done', domain: 'ram', key: entry.key, reason: 'entry_limit');
     }
   }
 }

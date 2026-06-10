@@ -5,16 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../core/app_theme.dart';
+import '../../services/cache/livego_cache_observer.dart';
 import '../../services/image/image_quality_config.dart';
 
 class LiveGoImageCacheManager {
-  static const key = 'livegoPosterImageCacheV2';
+  static const key = 'livegoVisibleImageCacheV3';
 
   static final CacheManager instance = CacheManager(
     Config(
       key,
-      stalePeriod: const Duration(days: 7),
-      maxNrOfCacheObjects: 720,
+      stalePeriod: const Duration(days: 3),
+      maxNrOfCacheObjects: 240,
       repo: JsonCacheInfoRepository(databaseName: key),
       fileService: HttpFileService(),
     ),
@@ -52,12 +53,15 @@ class LiveGoCachedImage extends StatefulWidget {
 }
 
 class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
+  static bool _policyLogged = false;
+
   Timer? _highQualityTimer;
   bool _loadHighQuality = false;
 
   @override
   void initState() {
     super.initState();
+    _logPolicyOnce();
     _scheduleHighQualityLoad();
   }
 
@@ -93,6 +97,19 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
         ? image
         : ClipRRect(borderRadius: widget.borderRadius!, child: image);
     return body;
+  }
+
+  void _logPolicyOnce() {
+    if (_policyLogged) return;
+    _policyLogged = true;
+    LiveGoCacheObserver.log(
+      'image_cache_policy_used',
+      domain: 'image',
+      key: LiveGoImageCacheManager.key,
+      itemCount: 240,
+      ttl: const Duration(days: 3),
+      reason: 'single_visible_first_cached_network_image_manager',
+    );
   }
 
   void _scheduleHighQualityLoad() {
@@ -207,10 +224,16 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
     final effectiveFadeIn = widget.tv ? Duration.zero : fadeInDuration;
     final effectiveFadeOut = widget.tv ? Duration.zero : const Duration(milliseconds: 80);
     final diskWidth = _diskCacheWidth(decodeWidth);
+    LiveGoCacheObserver.log(
+      'image_visible_load',
+      domain: 'image',
+      key: cleanUrl,
+      reason: cacheSuffix,
+    );
     return CachedNetworkImage(
       imageUrl: cleanUrl,
       cacheManager: LiveGoImageCacheManager.instance,
-      cacheKey: '${_stableCacheKey(cleanUrl)}::$cacheSuffix',
+      cacheKey: _stableCacheKey(cleanUrl),
       width: widget.width,
       height: widget.height,
       fit: widget.fit,

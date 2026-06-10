@@ -183,7 +183,7 @@ class LiveGoSettingsMenuData {
             id: LiveGoSettingId.cacheMaintenance,
             icon: Icons.delete_rounded,
             title: 'Cache Maintenance / Hapus Cache',
-            subtitle: 'Bersihkan cache streaming, image, runtime, dan cache manager tanpa mengubah source.',
+            subtitle: 'Bersihkan cache sementara Home/Player/Image/RAM. Riwayat, favorit, progress, settings, dan unduhan manual tetap aman.',
             value: cacheBusy ? 'PROSES' : 'BERSIHKAN',
             danger: true,
           ),

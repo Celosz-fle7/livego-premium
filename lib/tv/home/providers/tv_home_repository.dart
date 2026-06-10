@@ -73,7 +73,7 @@ class TvHomeRepository {
     final cached = await LiveGoCatalog.cachedHomeByCategory(
       platform: platform,
       category: selectedCategory,
-      allowExpired: true,
+      allowExpired: false,
     ).timeout(
       TvHomePerformanceConfig.cacheReadTimeout,
       onTimeout: () => const <ContentItem>[],

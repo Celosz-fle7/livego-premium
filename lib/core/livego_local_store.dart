@@ -252,6 +252,7 @@ class LiveGoLocalStore {
     _bump();
   }
 
+  /// User-data destructive reset only. Cache maintenance must not call this.
   static Future<void> clearAll() async {
     _history.clear();
     _favorites.clear();

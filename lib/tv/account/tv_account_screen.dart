@@ -492,7 +492,7 @@ class _AccountCacheMaintenanceDialog extends StatelessWidget {
                 children: [
                   Text('Membersihkan Cache', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
                   SizedBox(height: 6),
-                  Text('Mohon tunggu, cache TV sedang dibersihkan.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35, decoration: TextDecoration.none)),
+                  Text('Mohon tunggu, hanya cache sementara Home/Player/Image/RAM yang dibersihkan.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35, decoration: TextDecoration.none)),
                 ],
               ),
             ),
