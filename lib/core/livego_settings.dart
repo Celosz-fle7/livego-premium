@@ -11,7 +11,7 @@ class LiveGoSettings {
   static String language = 'id';
   static String defaultPlatform = 'dobda_freereels';
   static String quality = 'Auto';
-  static String layoutMode = layoutTv;
+  static String layoutMode = layoutAuto;
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
   static bool autoNextEnabled = true;
@@ -33,7 +33,7 @@ class LiveGoSettings {
     if (value == layoutAuto || value == layoutMobile || value == layoutTv) {
       return value!;
     }
-    return layoutTv;
+    return layoutAuto;
   }
 
   static void lockRuntimeToTv() {
@@ -158,7 +158,7 @@ class LiveGoSettings {
     language = 'id';
     defaultPlatform = 'dobda_freereels';
     quality = 'Auto';
-    layoutMode = layoutTv;
+    layoutMode = layoutAuto;
     drmMode = 'Auto';
     subtitlesEnabled = true;
     autoNextEnabled = true;
