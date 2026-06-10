@@ -1,3 +1,4 @@
+import '../../../services/cache/livego_cache_observer.dart';
 import '../../../models/content_item.dart';
 import '../../../models/livego_episode.dart';
 import '../../../models/stream_info.dart';
@@ -5,17 +6,18 @@ import '../../../models/stream_info.dart';
 class TvPlayerCacheManager {
   const TvPlayerCacheManager._();
 
-  static const Duration episodeListTtl = Duration(hours: 24);
+  static const Duration episodeListTtl = Duration(minutes: 20);
 
   // Stream URLs can be short-lived and episode switching must not reuse stale
-  // video URLs for too long. Keep this small; episode list cache remains long.
-  static const Duration streamInfoTtl = Duration(seconds: 90);
+  // video URLs for too long. Keep all player cache short-lived and bounded.
+  static const Duration streamInfoTtl = Duration(seconds: 75);
   static const Duration failedStreamTtl = Duration(minutes: 3);
 
-  static const int _maxEpisodeLists = 80;
-  static const int _maxEpisodeInFlight = 24;
-  static const int _maxStreamEntries = 240;
-  static const int _maxFailedEntries = 160;
+  static const int _maxEpisodeLists = 24;
+  static const int _maxEpisodesPerList = 80;
+  static const int _maxEpisodeInFlight = 12;
+  static const int _maxStreamEntries = 64;
+  static const int _maxFailedEntries = 64;
 
   static final Map<String, _EpisodeListCacheEntry> _episodeLists =
       <String, _EpisodeListCacheEntry>{};
@@ -37,19 +39,28 @@ class TvPlayerCacheManager {
     final now = DateTime.now();
     final cached = _episodeLists[key];
     if (cached != null && cached.expiresAt.isAfter(now)) {
+      LiveGoCacheObserver.log('player_episode_cache_hit', domain: 'player', key: key, itemCount: cached.rows.length, ttl: cached.expiresAt.difference(now));
       return List<LiveGoEpisode>.unmodifiable(cached.rows);
+    }
+    if (cached != null) {
+      LiveGoCacheObserver.log('player_episode_cache_expired', domain: 'player', key: key, expired: true);
+      _episodeLists.remove(key);
     }
 
     final existing = _episodeInFlight[key];
-    if (existing != null) return existing;
+    if (existing != null) {
+      LiveGoCacheObserver.log('player_inflight_join', domain: 'player', key: key);
+      return existing;
+    }
 
     final request = () async {
       final rows = await loader();
       if (rows.isNotEmpty) {
         _episodeLists[key] = _EpisodeListCacheEntry(
-          rows: List<LiveGoEpisode>.unmodifiable(rows),
+          rows: List<LiveGoEpisode>.unmodifiable(rows.take(_maxEpisodesPerList)),
           expiresAt: DateTime.now().add(episodeListTtl),
         );
+        LiveGoCacheObserver.log('player_episode_cache_saved', domain: 'player', key: key, itemCount: rows.length, ttl: episodeListTtl);
         _limitEpisodeLists();
       }
       return rows;
@@ -69,7 +80,10 @@ class TvPlayerCacheManager {
   static List<LiveGoEpisode>? cachedEpisodes(ContentItem item) {
     _prune();
     final cached = _episodeLists[_contentKey(item)];
-    if (cached == null || cached.expiresAt.isBefore(DateTime.now())) {
+    if (cached == null) return null;
+    if (cached.expiresAt.isBefore(DateTime.now())) {
+      _episodeLists.remove(_contentKey(item));
+      LiveGoCacheObserver.log('player_episode_cache_expired', domain: 'player', key: _contentKey(item), expired: true);
       return null;
     }
     return List<LiveGoEpisode>.unmodifiable(cached.rows);
@@ -83,10 +97,13 @@ class TvPlayerCacheManager {
     _prune();
     final key = _streamKey(item, chapterId, episode);
     final cached = _streams[key];
-    if (cached == null || cached.expiresAt.isBefore(DateTime.now())) {
+    if (cached == null) return null;
+    if (cached.expiresAt.isBefore(DateTime.now())) {
       _streams.remove(key);
+      LiveGoCacheObserver.log('player_stream_cache_expired', domain: 'player', key: key, expired: true);
       return null;
     }
+    LiveGoCacheObserver.log('player_stream_cache_hit', domain: 'player', key: key, ttl: cached.expiresAt.difference(DateTime.now()));
     return cached.stream;
   }
 
@@ -105,6 +122,7 @@ class TvPlayerCacheManager {
       expiresAt: DateTime.now().add(streamInfoTtl),
     );
     _failedStreams.remove(key);
+    LiveGoCacheObserver.log('player_stream_cache_saved', domain: 'player', key: key, ttl: streamInfoTtl);
     _limitStreams();
   }
 
@@ -115,7 +133,11 @@ class TvPlayerCacheManager {
   }) {
     _prune();
     final until = _failedStreams[_streamKey(item, chapterId, episode)];
-    return until != null && until.isAfter(DateTime.now());
+    final active = until != null && until.isAfter(DateTime.now());
+    if (active) {
+      LiveGoCacheObserver.log('player_failed_cooldown_hit', domain: 'player', key: _streamKey(item, chapterId, episode), ttl: until.difference(DateTime.now()));
+    }
+    return active;
   }
 
   static void markStreamFailed(
@@ -123,8 +145,9 @@ class TvPlayerCacheManager {
     required String chapterId,
     required int episode,
   }) {
-    _failedStreams[_streamKey(item, chapterId, episode)] =
-        DateTime.now().add(failedStreamTtl);
+    final key = _streamKey(item, chapterId, episode);
+    _failedStreams[key] = DateTime.now().add(failedStreamTtl);
+    LiveGoCacheObserver.log('player_failed_cooldown_saved', domain: 'player', key: key, ttl: failedStreamTtl);
     _limitFailed();
   }
 
@@ -134,20 +157,39 @@ class TvPlayerCacheManager {
     _episodeInFlight.remove(_contentKey(item));
     _streams.removeWhere((key, _) => key.startsWith(prefix));
     _failedStreams.removeWhere((key, _) => key.startsWith(prefix));
+    LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', key: _contentKey(item), reason: 'clear_item');
   }
 
   static void clearAll() {
+    final count = _episodeLists.length + _episodeInFlight.length + _streams.length + _failedStreams.length;
     _episodeLists.clear();
     _episodeInFlight.clear();
     _streams.clear();
     _failedStreams.clear();
+    LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', itemCount: count, reason: 'clear_all_runtime');
   }
 
   static void _prune() {
     final now = DateTime.now();
-    _episodeLists.removeWhere((_, entry) => !entry.expiresAt.isAfter(now));
-    _streams.removeWhere((_, entry) => !entry.expiresAt.isAfter(now));
-    _failedStreams.removeWhere((_, until) => !until.isAfter(now));
+    var removed = 0;
+    _episodeLists.removeWhere((_, entry) {
+      final expired = !entry.expiresAt.isAfter(now);
+      if (expired) removed++;
+      return expired;
+    });
+    _streams.removeWhere((_, entry) {
+      final expired = !entry.expiresAt.isAfter(now);
+      if (expired) removed++;
+      return expired;
+    });
+    _failedStreams.removeWhere((_, until) {
+      final expired = !until.isAfter(now);
+      if (expired) removed++;
+      return expired;
+    });
+    if (removed > 0) {
+      LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', itemCount: removed, reason: 'expired_runtime');
+    }
     _limitEpisodeLists();
     _limitEpisodeInFlight();
     _limitStreams();
@@ -159,6 +201,7 @@ class TvPlayerCacheManager {
     final removeCount = _episodeLists.length - _maxEpisodeLists;
     for (final key in _episodeLists.keys.take(removeCount).toList()) {
       _episodeLists.remove(key);
+      LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', key: key, reason: 'episode_list_limit');
     }
   }
 
@@ -167,6 +210,7 @@ class TvPlayerCacheManager {
     final removeCount = _episodeInFlight.length - _maxEpisodeInFlight;
     for (final key in _episodeInFlight.keys.take(removeCount).toList()) {
       _episodeInFlight.remove(key);
+      LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', key: key, reason: 'inflight_limit');
     }
   }
 
@@ -175,6 +219,7 @@ class TvPlayerCacheManager {
     final removeCount = _streams.length - _maxStreamEntries;
     for (final key in _streams.keys.take(removeCount).toList()) {
       _streams.remove(key);
+      LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', key: key, reason: 'stream_limit');
     }
   }
 
@@ -183,6 +228,7 @@ class TvPlayerCacheManager {
     final removeCount = _failedStreams.length - _maxFailedEntries;
     for (final key in _failedStreams.keys.take(removeCount).toList()) {
       _failedStreams.remove(key);
+      LiveGoCacheObserver.log('player_cache_cleanup', domain: 'player', key: key, reason: 'failed_limit');
     }
   }
 

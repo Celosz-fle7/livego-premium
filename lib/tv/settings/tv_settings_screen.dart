@@ -325,7 +325,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       builder: (_) {
         return const _CacheMaintenanceDialog(
           title: 'Membersihkan Cache',
-          message: 'Mohon tunggu, cache TV sedang dibersihkan.',
+          message: 'Mohon tunggu, hanya cache sementara Home/Player/Image/RAM yang dibersihkan.',
           loading: true,
         );
       },

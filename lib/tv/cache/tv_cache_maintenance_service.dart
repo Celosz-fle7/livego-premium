@@ -1,6 +1,6 @@
 import 'package:flutter/painting.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
+import '../../services/cache/livego_cache_observer.dart';
 import '../../services/cache/livego_content_cache.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../player/cache/tv_player_cache_manager.dart';
@@ -20,9 +20,9 @@ class TvCacheMaintenanceResult {
 
   String get message {
     if (hasFailure) {
-      return 'Cache berhasil dibersihkan sebagian: ${clearedItems.length} sukses, ${failedItems.length} gagal.';
+      return 'Cache sementara berhasil dibersihkan sebagian: ${clearedItems.length} sukses, ${failedItems.length} gagal. Data pengguna tetap aman.';
     }
-    return 'Semua cache berhasil dibersihkan (${clearedItems.length} item).';
+    return 'Cache sementara berhasil dibersihkan (${clearedItems.length} domain). Riwayat, favorit, progress, settings, dan unduhan manual tidak dihapus.';
   }
 }
 
@@ -33,43 +33,63 @@ class TvCacheMaintenanceService {
     final cleared = <String>[];
     final failed = <String, Object>{};
 
-    Future<void> run(String label, Future<void> Function() action) async {
+    LiveGoCacheObserver.log(
+      'cache_cleanup_start',
+      domain: 'maintenance',
+      reason: 'temporary_cache_only_user_data_preserved',
+    );
+
+    Future<void> run(
+      String label,
+      String domain,
+      Future<void> Function() action,
+    ) async {
       try {
         await action();
         cleared.add(label);
+        LiveGoCacheObserver.log('cache_cleanup_done', domain: domain, reason: label);
       } catch (error) {
         failed[label] = error;
+        LiveGoCacheObserver.log('cache_cleanup_failed', domain: domain, reason: '$label: $error');
       }
     }
 
-    await run('Flutter image cache', () async {
+    await run('Home cache expired/manifest', 'home', () async {
+      await LiveGoContentCache.clearHomeCache();
+    });
+
+    await run('Player cache expired/runtime', 'player', () async {
+      TvPlayerCacheManager.clearAll();
+      await LiveGoContentCache.clearPlayerCache();
+    });
+
+    await run('Image RAM cache', 'image', () async {
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
     });
 
-    await run('LiveGo TV RAM cache', () async {
-      TvRamCache.instance.clearAll();
-    });
-
-    await run('LiveGo TV runtime cache', () async {
-      TvRuntimeCache.clearAll();
-    });
-
-    await run('TV player cache manager', () async {
-      TvPlayerCacheManager.clearAll();
-    });
-
-    await run('LiveGo content cache', () async {
-      await LiveGoContentCache.clearAll();
-    });
-
-    await run('LiveGo image cache manager', () async {
+    await run('LiveGo bounded image disk cache', 'image', () async {
       await LiveGoImageCacheManager.instance.emptyCache();
     });
 
-    await run('Default network cache manager', () async {
-      await DefaultCacheManager().emptyCache();
+    await run('TV RAM cache sementara', 'ram', () async {
+      TvRamCache.instance.clearAll();
     });
+
+    await run('TV runtime cache sementara', 'runtime', () async {
+      TvRuntimeCache.clearAll();
+    });
+
+    await run('Search cache sementara', 'search', () async {
+      await LiveGoContentCache.clearSearchCache();
+    });
+
+    LiveGoCacheObserver.log(
+      'cache_cleanup_done',
+      domain: 'maintenance',
+      itemCount: cleared.length,
+      reason: failed.isEmpty ? 'success_user_data_preserved' : 'partial_user_data_preserved',
+    );
 
     return TvCacheMaintenanceResult(
       clearedItems: List<String>.unmodifiable(cleared),
