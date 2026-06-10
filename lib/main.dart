@@ -83,20 +83,22 @@ class AdaptiveRoot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveLayout = LiveGoSettings.effectiveLayoutModeForRuntime(
-      isTvRuntime: LiveGoSettings.runtimeLockedToTv,
+    if (LiveGoSettings.runtimeLockedToTv) {
+      return const TvApp();
+    }
+
+    final layout = LiveGoSettings.normalizeLayoutMode(
+      LiveGoSettings.layoutMode,
     );
 
-    if (effectiveLayout == LiveGoSettings.layoutTv) return const TvApp();
-    if (effectiveLayout == LiveGoSettings.layoutMobile) return const MobileApp();
-
-    return _prefersTvLayout(context) ? const TvApp() : const MobileApp();
-  }
-
-  bool _prefersTvLayout(BuildContext context) {
-    final media = MediaQuery.maybeOf(context);
-    if (media == null) return false;
-    final size = media.size;
-    return size.width >= 900 && size.width > size.height;
+    switch (layout) {
+      case LiveGoSettings.layoutTv:
+        return const TvApp(); // HP manual Lanskap-TV.
+      case LiveGoSettings.layoutMobile:
+        return const MobileApp(); // HP Handphone.
+      case LiveGoSettings.layoutAuto:
+      default:
+        return const MobileApp(); // HP default.
+    }
   }
 }

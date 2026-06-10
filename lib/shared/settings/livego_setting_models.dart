@@ -102,27 +102,31 @@ class LiveGoSettingsMenuData {
     required bool tvLocked,
     bool cacheBusy = false,
   }) {
-    final selectedLayout = tvLocked ? LiveGoSettings.layoutTv : LiveGoSettings.layoutMode;
+    final selectedLayout = tvLocked
+        ? LiveGoSettings.layoutTv
+        : LiveGoSettings.normalizeLayoutMode(LiveGoSettings.layoutMode);
     return <LiveGoSettingSection>[
       LiveGoSettingSection(
         title: 'Tampilan & Navigasi',
         description: tvLocked
-            ? 'Pilihan dibuat sejajar dengan HP, tetapi runtime DTV tetap dikunci ke mode TV.'
-            : 'Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.',
+            ? 'Auto/Handphone/Lanskap-TV tetap berjalan di TvApp karena runtime DTV dikunci ke mode TV.'
+            : 'Auto: HP memakai tampilan handphone, Android TV memakai tampilan TV. '
+                'Handphone: tampilan sentuh untuk HP. '
+                'Lanskap-TV: tampilan lebar / TV-style; di HP hanya aktif jika dipilih manual.',
         items: <LiveGoSettingItem>[
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutAuto,
-            title: 'Otomatis (Ikuti Hardware)',
+            title: 'Auto',
             active: selectedLayout == LiveGoSettings.layoutAuto,
           ),
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutMobile,
-            title: 'Smartphone / Tablet (Android)',
+            title: 'Handphone',
             active: selectedLayout == LiveGoSettings.layoutMobile,
           ),
           LiveGoSettingItem.radio(
             id: LiveGoSettingId.layoutTv,
-            title: 'Android TV (Leanback Style)',
+            title: 'Lanskap-TV',
             active: selectedLayout == LiveGoSettings.layoutTv,
           ),
           LiveGoSettingItem.tile(
