@@ -1,4 +1,5 @@
 import '../../../core/livego_settings.dart';
+import '../../../services/player/player_preferences.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 
@@ -22,7 +23,12 @@ class TvPlayerExplorer3NativePayload {
       'category': item.category,
       'episode': episode,
       'chapterId': chapterId,
+      'playbackKey': _playbackKey(item: item, episode: episode, chapterId: chapterId),
       'totalEpisodes': totalEpisodes,
+      'selectedQuality': PlayerPreferences.quality.trim().isNotEmpty ? PlayerPreferences.quality : LiveGoSettings.quality,
+      'selectedSubtitle': PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
+      'selectedAudio': PlayerPreferences.audioTrack,
+      'selectedSpeed': PlayerPreferences.speed,
       'headers': stream.headers,
       'qualityLabels': stream.qualities.map((e) => e.label).toList(),
       'qualityUrls': stream.qualities.map((e) => e.url).toList(),
@@ -31,5 +37,17 @@ class TvPlayerExplorer3NativePayload {
       'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
       'autoNextEnabled': LiveGoSettings.autoNextEnabled,
     };
+  }
+
+  static String _playbackKey({
+    required ContentItem item,
+    required int episode,
+    required String chapterId,
+  }) {
+    final platform = item.platformSlug.trim();
+    final id = item.id.trim();
+    final source = item.source.trim();
+    final chapter = chapterId.trim().isNotEmpty ? chapterId.trim() : '$episode';
+    return '$platform|$id|$source|$episode|$chapter';
   }
 }

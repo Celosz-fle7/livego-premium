@@ -9,6 +9,7 @@ import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
 import '../layout/tv_safe_zone.dart';
 import '../cache/tv_cache_maintenance_service.dart';
+import '../source_manager/tv_source_manager_screen.dart';
 import 'tv_settings_config.dart';
 
 part 'tv_settings_models.dart';
@@ -62,17 +63,69 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           description: 'Mode TV dikunci. Grid HP dan TV dipisah agar tidak bertabrakan.',
           items: [
             _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: true),
+            _SettingItem.tile(
+              kind: _SettingKind.backgroundPoster,
+              icon: Icons.wallpaper_rounded,
+              title: 'Background Poster',
+              subtitle: 'Tampilkan poster/backdrop sebagai latar detail dan Home jika tersedia.',
+              value: LiveGoSettings.backgroundPoster ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.backgroundPoster,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.tvGrid,
+              icon: Icons.grid_view_rounded,
+              title: 'TV Home Grid',
+              subtitle: 'Jumlah kolom Home TV dikunci untuk stabilitas fokus remote.',
+              value: '${LiveGoSettings.tvHomeGrid} KOLOM • LOCKED',
+              showGridBar: true,
+            ),
+          ],
+        ),
+        _SettingsSection(
+          title: 'Playback TV',
+          items: [
+            _SettingItem.tile(
+              kind: _SettingKind.cachePlayback,
+              icon: Icons.play_circle_fill_rounded,
+              title: 'Cache Playback',
+              subtitle: 'Gunakan cache playback jika didukung player/source.',
+              value: LiveGoSettings.cachePlayback ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.cachePlayback,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.manualRotate,
+              icon: Icons.screen_rotation_alt_rounded,
+              title: 'Manual Rotate Button',
+              subtitle: 'Tetap tersedia untuk parity HP; TV tetap landscape.',
+              value: LiveGoSettings.manualRotateButton ? 'ON' : 'OFF',
+              switchValue: LiveGoSettings.manualRotateButton,
+            ),
+            _SettingItem.tile(
+              kind: _SettingKind.drmMode,
+              icon: Icons.enhanced_encryption_rounded,
+              title: 'DRM Mode',
+              subtitle: 'LEFT/RIGHT untuk memilih mode kompatibilitas DRM.',
+              value: LiveGoSettings.drmMode,
+            ),
           ],
         ),
         _SettingsSection(
           title: 'Sumber & Izin',
           items: [
             _SettingItem.tile(
+              kind: _SettingKind.sourceManager,
+              icon: Icons.source_rounded,
+              title: 'Source Manager',
+              subtitle: 'Kelola platform, default source, dan kategori Home TV.',
+              value: 'BUKA',
+            ),
+            _SettingItem.tile(
               kind: _SettingKind.downloadNotice,
-              icon: Icons.info_rounded,
-              title: 'Notifikasi Unduhan',
-              subtitle: 'Toggle preferensi unduhan melalui remote.',
+              icon: Icons.wifi_rounded,
+              title: 'Download Wi-Fi Only',
+              subtitle: 'Batasi download hanya saat memakai Wi-Fi.',
               value: LiveGoSettings.downloadWifiOnly ? 'Wi-Fi' : 'Bebas',
+              switchValue: LiveGoSettings.downloadWifiOnly,
             ),
           ],
         ),
@@ -82,8 +135,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             _SettingItem.tile(
               kind: _SettingKind.reset,
               icon: Icons.delete_rounded,
-              title: 'Hapus Semua Cache',
-              subtitle: 'Bersihkan cache streaming, gambar, dan cache RAM TV.',
+              title: 'Cache Maintenance',
+              subtitle: 'Bersihkan image, RAM, runtime, player, content, LiveGo image, dan DefaultCacheManager tanpa reset setting.',
               value: _cacheMaintenanceBusy ? 'PROSES' : 'BERSIHKAN',
               danger: true,
             ),
@@ -311,6 +364,12 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       _runCacheMaintenance();
       return;
     }
+    if (kind == _SettingKind.sourceManager) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const TvSourceManagerScreen()),
+      );
+      return;
+    }
 
     setState(() {
       switch (kind) {
@@ -336,6 +395,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + 1);
           break;
         case _SettingKind.sourceManager:
+          break;
         case _SettingKind.reset:
           break;
         case _SettingKind.downloadNotice:

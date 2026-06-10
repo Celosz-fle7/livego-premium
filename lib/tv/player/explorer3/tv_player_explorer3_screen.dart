@@ -9,6 +9,7 @@ import '../../../core/livego_local_store.dart';
 import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
+import '../../../services/player/player_preferences.dart';
 import '../tv_player_service.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
@@ -106,6 +107,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     _episodeCursor = _episode;
     _chapterId = widget.item.chapterId.trim().isNotEmpty ? widget.item.chapterId.trim() : '$_episode';
     LiveGoLocalStore.addHistory(widget.item);
+    unawaited(PlayerPreferences.load());
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -305,9 +307,35 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     );
   }
 
+  String _nativePlaybackKeyFor({required int episode, required String chapterId}) {
+    final platform = widget.item.platformSlug.trim();
+    final id = widget.item.id.trim();
+    final source = widget.item.source.trim();
+    final chapter = chapterId.trim().isNotEmpty ? chapterId.trim() : '$episode';
+    return '$platform|$id|$source|$episode|$chapter';
+  }
+
+  bool _isCurrentNativePlayback(Map<dynamic, dynamic> raw) {
+    final eventKey = '${raw['playbackKey'] ?? ''}'.trim();
+    final eventEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
+    final eventChapter = '${raw['chapterId'] ?? ''}'.trim();
+    final expectedKey = _nativePlaybackKeyFor(episode: _episode, chapterId: _chapterId);
+    if (eventKey.isNotEmpty) return eventKey == expectedKey;
+    if (eventEpisode != _episode) return false;
+    return eventChapter.isEmpty || eventChapter == _chapterId.trim();
+  }
+
   Future<dynamic> _handleNativeSurfaceMethod(MethodCall call) async {
     if (call.method == 'resolveEpisode') {
       return _resolveEpisodeForNative(call.arguments);
+    }
+    if (call.method == 'nativeProgress') {
+      await _saveNativeProgress(call.arguments);
+      return true;
+    }
+    if (call.method == 'nativePreference') {
+      await _syncNativePreference(call.arguments);
+      return true;
     }
     if (call.method == 'nativeClosed') {
       _closeFromNative();
@@ -648,6 +676,73 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
   }
 
+  Future<void> _saveNativeProgress(Object? args) async {
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    if (!_isCurrentNativePlayback(raw)) return;
+
+    final positionMs = int.tryParse('${raw['positionMs'] ?? 0}') ?? 0;
+    final durationMs = int.tryParse('${raw['durationMs'] ?? 0}') ?? 0;
+    if (durationMs <= 0 || positionMs <= 0 || positionMs > durationMs) return;
+
+    final itemId = widget.item.id.trim();
+    final platformSlug = widget.item.platformSlug.trim();
+    if (itemId.isEmpty || platformSlug.isEmpty) return;
+
+    final episode = (int.tryParse('${raw['episode'] ?? _episode}') ?? _episode)
+        .clamp(1, TvPlayerExplorer3Timing.maxEpisode)
+        .toInt();
+    final chapterId = '${raw['chapterId'] ?? _chapterId}'.trim().isNotEmpty
+        ? '${raw['chapterId'] ?? _chapterId}'.trim()
+        : '$episode';
+
+    await LiveGoLocalStore.saveProgress(
+      _playableItemFor(episode: episode, chapterId: chapterId),
+      episode,
+      Duration(milliseconds: positionMs),
+      Duration(milliseconds: durationMs),
+    );
+  }
+
+  Future<void> _syncNativePreference(Object? args) async {
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    if (!_isCurrentNativePlayback(raw)) return;
+
+    final name = '${raw['name'] ?? ''}'.trim().toLowerCase();
+    final value = raw['value'];
+    final text = '$value'.trim();
+    if (name.isEmpty || text.isEmpty) return;
+
+    switch (name) {
+      case 'quality':
+        LiveGoSettings.quality = text;
+        _activeQuality = text;
+        _qualityCursor = _qualityIndexFor(text);
+        await PlayerPreferences.setQuality(text);
+        break;
+      case 'subtitle':
+        final off = text.toLowerCase() == 'off' || text.toLowerCase() == 'matikan';
+        LiveGoSettings.subtitlesEnabled = !off;
+        _subtitleStatus = off ? 'OFF' : text;
+        await PlayerPreferences.setSubtitle(enabled: !off, language: off ? 'OFF' : text);
+        break;
+      case 'audio':
+        await PlayerPreferences.setAudioTrack(text);
+        break;
+      case 'speed':
+        final speed = value is num ? value.toDouble() : double.tryParse(text);
+        if (speed == null) return;
+        _speed = speed.clamp(0.5, 2.0).toDouble();
+        await PlayerPreferences.setSpeed(_speed);
+        break;
+      default:
+        return;
+    }
+
+    await LiveGoLocalStore.saveSettings();
+    if (mounted && !_closing) setState(() {});
+  }
+
+
   void _closeFromNative() {
     if (!mounted) return;
     _exitFlutterPlayerRoute(source: 'nativeClosed');
@@ -777,6 +872,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!_active(token)) return true;
 
     try {
+      await PlayerPreferences.load();
       await _nativeSurfacePlayer
           .invokeMethod<bool>('open', _nativePlayerPayload(stream, url))
           .timeout(

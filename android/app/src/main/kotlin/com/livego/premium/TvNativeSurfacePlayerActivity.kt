@@ -68,6 +68,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var source = ""
     private var category = ""
     private var currentUrl = ""
+    private var chapterId = ""
+    private var playbackKey = ""
     private var episode = 1
     private var totalEpisodes = 0
     private var selectedControl = 1
@@ -80,6 +82,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var fitCover = false
     private var muted = false
     private var autoNext = true
+    private var selectedAudioLabel = ""
     private var mode = Mode.DOCK
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
@@ -124,13 +127,19 @@ class TvNativeSurfacePlayerActivity : Activity() {
         source = intent.getStringExtra("source").orEmpty()
         category = intent.getStringExtra("category").orEmpty()
         episode = intent.getIntExtra("episode", 1)
+        chapterId = intent.getStringExtra("chapterId").orEmpty().ifBlank { episode.toString() }
+        playbackKey = intent.getStringExtra("playbackKey").orEmpty()
         totalEpisodes = intent.getIntExtra("totalEpisodes", 0)
         episodeCursor = episode
         autoNext = intent.getBooleanExtra("autoNextEnabled", true)
+        selectedAudioLabel = intent.getStringExtra("selectedAudio").orEmpty()
+
+        applyInitialPreferences()
 
         readHeadersFromIntent()
         readQualitiesFromIntent()
         readSubtitlesFromIntent()
+        applyInitialTrackCursors()
 
         setContentView(buildRoot())
         createPlayer(currentUrl, keepPositionMs = 0L, playWhenReady = true)
@@ -186,6 +195,29 @@ class TvNativeSurfacePlayerActivity : Activity() {
             if (url.isNotBlank()) subtitles.add(SubtitleRow(label, url, format))
         }
         subtitleCursor = subtitleCursor.coerceIn(0, max(0, subtitles.size - 1))
+    }
+
+    private fun applyInitialPreferences() {
+        val selectedSpeed = intent.getDoubleExtra("selectedSpeed", 1.0).toFloat()
+        val speedMatch = speeds.indexOfFirst { kotlin.math.abs(it - selectedSpeed) < 0.01f }
+        speedIndex = if (speedMatch >= 0) speedMatch else 1
+    }
+
+    private fun applyInitialTrackCursors() {
+        val selectedQuality = intent.getStringExtra("selectedQuality").orEmpty()
+        if (selectedQuality.isNotBlank()) {
+            val qualityIndex = qualities.indexOfFirst { it.label.equals(selectedQuality, ignoreCase = true) }
+            if (qualityIndex >= 0) qualityCursor = qualityIndex
+        }
+
+        val selectedSubtitle = intent.getStringExtra("selectedSubtitle").orEmpty()
+        if (selectedSubtitle.isNotBlank()) {
+            subtitleCursor = if (selectedSubtitle.equals("OFF", ignoreCase = true)) {
+                0
+            } else {
+                subtitles.indexOfFirst { it.label.equals(selectedSubtitle, ignoreCase = true) }.takeIf { it >= 0 } ?: subtitleCursor
+            }
+        }
     }
 
     private fun blackWindow() {
@@ -439,7 +471,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     private fun refreshAudioRows() {
-        val previous = audioRows.getOrNull(audioCursor)?.label
+        val previous = audioRows.getOrNull(audioCursor)?.label ?: selectedAudioLabel
         audioRows.clear()
         audioRows.add(AudioRow("Auto", null))
         val p = player ?: return
@@ -459,7 +491,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 if (seen.add(label)) audioRows.add(AudioRow(label, language.ifBlank { null }))
             }
         }
-        audioCursor = audioRows.indexOfFirst { it.label == previous }.takeIf { it >= 0 } ?: 0
+        audioCursor = audioRows.indexOfFirst { it.label.equals(previous, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
     }
 
     private fun cancelEpisodeResolveTimeout() {
@@ -502,6 +534,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             return
         }
 
+        notifyProgress("beforeEpisodeSwitch")
         episodeResolveInFlight = true
         showToast("Memuat Episode $targetEpisode...")
         armEpisodeResolveTimeout(targetEpisode)
@@ -568,6 +601,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
         source = data["source"]?.toString().orEmpty()
         category = data["category"]?.toString().orEmpty()
         episode = (data["episode"] as? Number)?.toInt() ?: data["episode"]?.toString()?.toIntOrNull() ?: episode
+        chapterId = data["chapterId"]?.toString().orEmpty().ifBlank { episode.toString() }
+        playbackKey = data["playbackKey"]?.toString().orEmpty().ifBlank { playbackKey }
         totalEpisodes = ((data["totalEpisodes"] as? Number)?.toInt()
             ?: data["totalEpisodes"]?.toString()?.toIntOrNull()
             ?: totalEpisodes).coerceIn(0, 999)
@@ -966,6 +1001,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun changeSpeed() {
         speedIndex = (speedIndex + 1) % speeds.size
         player?.setPlaybackSpeed(speeds[speedIndex])
+        notifyPreference("speed", speeds[speedIndex])
         showToast("Speed ${speeds[speedIndex]}x")
         setMode(Mode.DOCK)
     }
@@ -993,19 +1029,23 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun applyQuality() {
         val row = qualities.getOrNull(qualityCursor) ?: return
+        notifyProgress("beforeQualitySwitch")
         val p = player
         val pos = p?.currentPosition ?: 0L
         val playing = p?.isPlaying ?: true
         createPlayer(row.url, pos, playing)
+        notifyPreference("quality", row.label)
         showToast("Quality: ${row.label}")
         setMode(Mode.DOCK)
     }
 
     private fun applySubtitle() {
+        notifyProgress("beforeSubtitleSwitch")
         val p = player
         val pos = p?.currentPosition ?: 0L
         val playing = p?.isPlaying ?: true
         createPlayer(currentUrl, pos, playing)
+        notifyPreference("subtitle", subtitles.getOrNull(subtitleCursor)?.label ?: "OFF")
         showToast("Subtitle: ${subtitles.getOrNull(subtitleCursor)?.label ?: "OFF"}")
         setMode(Mode.DOCK)
     }
@@ -1015,6 +1055,8 @@ class TvNativeSurfacePlayerActivity : Activity() {
         val builder = player?.trackSelectionParameters?.buildUpon() ?: return
         builder.setPreferredAudioLanguage(row.language)
         player?.trackSelectionParameters = builder.build()
+        selectedAudioLabel = row.label
+        notifyPreference("audio", row.label)
         showToast("Audio: ${row.label}")
         setMode(Mode.DOCK)
     }
@@ -1070,7 +1112,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
-                back()
+                if (event.repeatCount == 0) back()
                 return true
             }
 
@@ -1147,7 +1189,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
             }
 
             KeyEvent.KEYCODE_MENU -> {
-                setMode(Mode.OPTIONS)
+                if (event.repeatCount == 0) setMode(Mode.OPTIONS)
                 return true
             }
 
@@ -1166,17 +1208,62 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        notifyProgress("pause")
         player?.pause()
     }
 
     override fun onDestroy() {
         cancelEpisodeResolveTimeout()
         handler.removeCallbacksAndMessages(null)
+        notifyProgress("destroy")
         playerView.player = null
         player?.release()
         player = null
         notifyClosed()
         super.onDestroy()
+    }
+
+    private fun currentDurationMs(): Long {
+        val d = player?.duration ?: 0L
+        return if (d > 0) d else 0L
+    }
+
+    private fun currentPositionMs(): Long {
+        val pos = player?.currentPosition ?: 0L
+        val duration = currentDurationMs()
+        if (pos <= 0L) return 0L
+        return if (duration > 0L) pos.coerceAtMost(duration) else pos
+    }
+
+    private fun notifyProgress(phase: String) {
+        val duration = currentDurationMs()
+        val position = currentPositionMs()
+        if (duration <= 0L || position <= 0L || position > duration) return
+        MainActivity.nativePlayerChannel?.invokeMethod(
+            "nativeProgress",
+            mapOf(
+                "phase" to phase,
+                "playbackKey" to playbackKey,
+                "episode" to episode,
+                "chapterId" to chapterId,
+                "positionMs" to position,
+                "durationMs" to duration,
+                "url" to currentUrl
+            )
+        )
+    }
+
+    private fun notifyPreference(name: String, value: Any?) {
+        MainActivity.nativePlayerChannel?.invokeMethod(
+            "nativePreference",
+            mapOf(
+                "name" to name,
+                "value" to (value ?: ""),
+                "playbackKey" to playbackKey,
+                "episode" to episode,
+                "chapterId" to chapterId
+            )
+        )
     }
 
     private fun notifyClosed() {
