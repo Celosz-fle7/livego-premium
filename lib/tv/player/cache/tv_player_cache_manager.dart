@@ -2,6 +2,7 @@ import '../../../services/cache/livego_cache_observer.dart';
 import '../../../models/content_item.dart';
 import '../../../models/livego_episode.dart';
 import '../../../models/stream_info.dart';
+import '../tv_player_engine.dart';
 
 class TvPlayerCacheManager {
   const TvPlayerCacheManager._();
@@ -43,6 +44,7 @@ class TvPlayerCacheManager {
       return List<LiveGoEpisode>.unmodifiable(cached.rows);
     }
     if (cached != null) {
+      TvPlayerDebugLog.event('player_cache_expired', item: item, reason: 'episode_list');
       LiveGoCacheObserver.log('player_episode_cache_expired', domain: 'player', key: key, expired: true);
       _episodeLists.remove(key);
     }
@@ -100,9 +102,11 @@ class TvPlayerCacheManager {
     if (cached == null) return null;
     if (cached.expiresAt.isBefore(DateTime.now())) {
       _streams.remove(key);
+      TvPlayerDebugLog.event('player_cache_expired', item: item, episode: episode, reason: 'stream');
       LiveGoCacheObserver.log('player_stream_cache_expired', domain: 'player', key: key, expired: true);
       return null;
     }
+    TvPlayerDebugLog.event('player_cache_hit', item: item, episode: episode, reason: 'stream');
     LiveGoCacheObserver.log('player_stream_cache_hit', domain: 'player', key: key, ttl: cached.expiresAt.difference(DateTime.now()));
     return cached.stream;
   }

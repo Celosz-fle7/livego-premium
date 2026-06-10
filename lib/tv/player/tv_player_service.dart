@@ -8,6 +8,7 @@ import '../../services/player/playback_contract.dart';
 import '../../services/player/playback_resolver.dart';
 import '../../services/player/playback_timeout_config.dart';
 import 'cache/tv_player_cache_manager.dart';
+import 'tv_player_engine.dart';
 
 class TvPlayerStreamResolveResult {
   final StreamInfo stream;
@@ -55,6 +56,7 @@ class TvPlayerService implements PlaybackContract {
       episode: episode,
     );
     if (cachedStream != null && cachedStream.url.trim().isNotEmpty) {
+      TvPlayerDebugLog.event('player_stream_resolve_hit', item: item, episode: episode, reason: 'stream_cache', tail: chapterId);
       debugPrint('LIVEGO TV STREAM CACHE HIT ep=$episode chapter=$chapterId');
       return TvPlayerStreamResolveResult(
         stream: cachedStream,
@@ -68,6 +70,7 @@ class TvPlayerService implements PlaybackContract {
       chapterId: chapterId,
       episode: episode,
     )) {
+      TvPlayerDebugLog.event('player_stream_resolve_hit', item: item, episode: episode, reason: 'failed_cooldown', tail: chapterId);
       debugPrint('LIVEGO TV STREAM CACHE FAILED_COOLDOWN ep=$episode chapter=$chapterId');
       return const TvPlayerStreamResolveResult(
         stream: StreamInfo.empty,
@@ -78,6 +81,7 @@ class TvPlayerService implements PlaybackContract {
 
     final blockedUntil = _recentMiss[budgetKey];
     if (blockedUntil != null && DateTime.now().isBefore(blockedUntil)) {
+      TvPlayerDebugLog.event('player_stream_resolve_hit', item: item, episode: episode, reason: 'recent_miss', tail: chapterId);
       debugPrint('LIVEGO TV STREAM BUDGET RECENT_MISS SKIP ep=$episode chapter=$chapterId');
       return const TvPlayerStreamResolveResult(
         stream: StreamInfo.empty,
@@ -88,6 +92,7 @@ class TvPlayerService implements PlaybackContract {
 
     final existing = _inFlight[budgetKey];
     if (existing != null) {
+      TvPlayerDebugLog.event('player_stream_resolve_hit', item: item, episode: episode, reason: 'inflight_join', tail: chapterId);
       debugPrint('LIVEGO TV STREAM BUDGET JOIN inFlight ep=$episode chapter=$chapterId');
       return existing;
     }
@@ -101,6 +106,7 @@ class TvPlayerService implements PlaybackContract {
       );
     }
 
+    TvPlayerDebugLog.event('player_stream_resolve_miss', item: item, episode: episode, reason: 'network_resolve', tail: chapterId);
     final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode)
         .timeout(
           _streamResolveTimeout,
@@ -223,6 +229,7 @@ class TvPlayerService implements PlaybackContract {
       );
     }
 
+    TvPlayerDebugLog.event('player_stream_resolve_miss', item: item, episode: episode, reason: 'network_resolve', tail: chapterId);
     final request = _resolveStreamUncached(item, chapterId: chapterId, episode: episode)
         .timeout(
           _prefetchResolveTimeout,
