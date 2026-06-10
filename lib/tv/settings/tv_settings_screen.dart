@@ -9,10 +9,9 @@ import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
 import '../layout/tv_safe_zone.dart';
 import '../cache/tv_cache_maintenance_service.dart';
-import '../source_manager/tv_source_manager_screen.dart';
+import '../../shared/settings/livego_setting_models.dart';
 import 'tv_settings_config.dart';
 
-part 'tv_settings_models.dart';
 part 'tv_settings_widgets.dart';
 
 class TvSettingsScreen extends StatefulWidget {
@@ -43,7 +42,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   static const double _descriptionHeight = TvSettingsConfig.descriptionHeight;
   static const double _radioRowHeight = TvSettingsConfig.radioRowHeight;
   static const double _tileRowHeight = TvSettingsConfig.tileRowHeight;
-  static const double _gridRowHeight = TvSettingsConfig.gridRowHeight;
   static const double _footerHeight = TvSettingsConfig.footerHeight;
   static const double _comfortTop = TvSettingsConfig.comfortTop;
   static const double _comfortBottom = TvSettingsConfig.comfortBottom;
@@ -57,95 +55,13 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   bool _entryPending = false;
   bool _cacheMaintenanceBusy = false;
 
-  List<_SettingsSection> get _sections => [
-        _SettingsSection(
-          title: 'Tampilan & Navigasi',
-          description: 'Mode TV dikunci. Grid HP dan TV dipisah agar tidak bertabrakan.',
-          items: [
-            _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: true),
-            _SettingItem.tile(
-              kind: _SettingKind.backgroundPoster,
-              icon: Icons.wallpaper_rounded,
-              title: 'Background Poster',
-              subtitle: 'Tampilkan poster/backdrop sebagai latar detail dan Home jika tersedia.',
-              value: LiveGoSettings.backgroundPoster ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.backgroundPoster,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.tvGrid,
-              icon: Icons.grid_view_rounded,
-              title: 'TV Home Grid',
-              subtitle: 'Jumlah kolom Home TV dikunci untuk stabilitas fokus remote.',
-              value: '${LiveGoSettings.tvHomeGrid} KOLOM • LOCKED',
-              showGridBar: true,
-            ),
-          ],
-        ),
-        _SettingsSection(
-          title: 'Playback TV',
-          items: [
-            _SettingItem.tile(
-              kind: _SettingKind.cachePlayback,
-              icon: Icons.play_circle_fill_rounded,
-              title: 'Cache Playback',
-              subtitle: 'Gunakan cache playback jika didukung player/source.',
-              value: LiveGoSettings.cachePlayback ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.cachePlayback,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.manualRotate,
-              icon: Icons.screen_rotation_alt_rounded,
-              title: 'Manual Rotate Button',
-              subtitle: 'Tetap tersedia untuk parity HP; TV tetap landscape.',
-              value: LiveGoSettings.manualRotateButton ? 'ON' : 'OFF',
-              switchValue: LiveGoSettings.manualRotateButton,
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.drmMode,
-              icon: Icons.enhanced_encryption_rounded,
-              title: 'DRM Mode',
-              subtitle: 'LEFT/RIGHT untuk memilih mode kompatibilitas DRM.',
-              value: LiveGoSettings.drmMode,
-            ),
-          ],
-        ),
-        _SettingsSection(
-          title: 'Sumber & Izin',
-          items: [
-            _SettingItem.tile(
-              kind: _SettingKind.sourceManager,
-              icon: Icons.source_rounded,
-              title: 'Source Manager',
-              subtitle: 'Kelola platform, default source, dan kategori Home TV.',
-              value: 'BUKA',
-            ),
-            _SettingItem.tile(
-              kind: _SettingKind.downloadNotice,
-              icon: Icons.wifi_rounded,
-              title: 'Download Wi-Fi Only',
-              subtitle: 'Batasi download hanya saat memakai Wi-Fi.',
-              value: LiveGoSettings.downloadWifiOnly ? 'Wi-Fi' : 'Bebas',
-              switchValue: LiveGoSettings.downloadWifiOnly,
-            ),
-          ],
-        ),
-        _SettingsSection(
-          title: 'Perawatan',
-          items: [
-            _SettingItem.tile(
-              kind: _SettingKind.reset,
-              icon: Icons.delete_rounded,
-              title: 'Cache Maintenance',
-              subtitle: 'Bersihkan image, RAM, runtime, player, content, LiveGo image, dan DefaultCacheManager tanpa reset setting.',
-              value: _cacheMaintenanceBusy ? 'PROSES' : 'BERSIHKAN',
-              danger: true,
-            ),
-          ],
-        ),
-      ];
+  List<LiveGoSettingSection> get _sections => LiveGoSettingsMenuData.build(
+        tvLocked: true,
+        cacheBusy: _cacheMaintenanceBusy,
+      );
 
-  List<_SettingItem> get _flatItems {
-    final result = <_SettingItem>[];
+  List<LiveGoSettingItem> get _flatItems {
+    final result = <LiveGoSettingItem>[];
     for (final section in _sections) {
       result.addAll(section.items);
     }
@@ -252,9 +168,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
         key == LogicalKeyboardKey.f10;
   }
 
-  double _rowHeight(_SettingItem item) {
-    if (item.showGridBar) return _gridRowHeight;
-    if (item.style == _SettingItemStyle.radio) return _radioRowHeight;
+  double _rowHeight(LiveGoSettingItem item) {
+    if (item.style == LiveGoSettingStyle.radio) return _radioRowHeight;
     return _tileRowHeight;
   }
 
@@ -336,17 +251,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     LiveGoLocalStore.saveSettings();
   }
 
-  void _adjustTvGrid(int delta) {
-    setState(() {
-      LiveGoSettings.layoutMode = 'TV';
-      LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + delta);
-    });
-    _persistSettings();
-    _jumpToCursor(_cursor);
-  }
-
   String _nextDrm(int delta) {
-    const values = TvSettingsConfig.drmValues;
+    const values = LiveGoSettingsMenuData.drmValues;
     final current = values.indexOf(LiveGoSettings.drmMode);
     final base = current < 0 ? 0 : current;
     final next = (base + delta) % values.length;
@@ -359,52 +265,54 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     _jumpToCursor(_cursor);
   }
 
-  void _activate(_SettingKind kind) {
-    if (kind == _SettingKind.reset) {
+  void _activate(LiveGoSettingId id) {
+    if (id == LiveGoSettingId.cacheMaintenance) {
       _runCacheMaintenance();
-      return;
-    }
-    if (kind == _SettingKind.sourceManager) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const TvSourceManagerScreen()),
-      );
       return;
     }
 
     setState(() {
-      switch (kind) {
-        case _SettingKind.layoutAuto:
-        case _SettingKind.layoutMobile:
-        case _SettingKind.layoutTv:
-          // TV Settings cannot switch into HP/Mobile layout.
+      switch (id) {
+        case LiveGoSettingId.layoutAuto:
+        case LiveGoSettingId.layoutMobile:
+        case LiveGoSettingId.layoutTv:
           LiveGoSettings.layoutMode = 'TV';
+          _showTvLayoutLockedMessage();
           break;
-        case _SettingKind.backgroundPoster:
+        case LiveGoSettingId.backgroundPoster:
           LiveGoSettings.backgroundPoster = !LiveGoSettings.backgroundPoster;
           break;
-        case _SettingKind.cachePlayback:
+        case LiveGoSettingId.cachePlayback:
           LiveGoSettings.cachePlayback = !LiveGoSettings.cachePlayback;
           break;
-        case _SettingKind.manualRotate:
+        case LiveGoSettingId.manualRotate:
           LiveGoSettings.manualRotateButton = !LiveGoSettings.manualRotateButton;
           break;
-        case _SettingKind.drmMode:
+        case LiveGoSettingId.drmMode:
           LiveGoSettings.drmMode = _nextDrm(1);
           break;
-        case _SettingKind.tvGrid:
-          LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + 1);
-          break;
-        case _SettingKind.sourceManager:
-          break;
-        case _SettingKind.reset:
-          break;
-        case _SettingKind.downloadNotice:
+        case LiveGoSettingId.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
+          break;
+        case LiveGoSettingId.cacheMaintenance:
           break;
       }
     });
     _persistSettings();
     _jumpToCursor(_cursor);
+  }
+
+  void _showTvLayoutLockedMessage() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Mode TV dikunci untuk perangkat DTV.'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppTheme.surface2,
+          duration: Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _runCacheMaintenance() async {
@@ -502,9 +410,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowLeft) {
-      if (item.kind == _SettingKind.tvGrid) {
-        _adjustTvGrid(-1);
-      } else if (item.kind == _SettingKind.drmMode) {
+      if (item.id == LiveGoSettingId.drmMode) {
         _cycleDrm(-1);
       } else if (widget.onMoveToNav != null) {
         _moveToNav();
@@ -516,18 +422,16 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowRight) {
-      if (item.kind == _SettingKind.tvGrid) {
-        _adjustTvGrid(1);
-      } else if (item.kind == _SettingKind.drmMode) {
+      if (item.id == LiveGoSettingId.drmMode) {
         _cycleDrm(1);
       } else {
-        _activate(item.kind);
+        _activate(item.id);
       }
       return KeyEventResult.handled;
     }
 
     if (_isSelect(key)) {
-      _activate(item.kind);
+      _activate(item.id);
       return KeyEventResult.handled;
     }
 
@@ -551,7 +455,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
               _zone = TvZone.settings;
               _cursor = rowIndex;
             });
-            _activate(item.kind);
+            _activate(item.id);
           },
         ));
       }

@@ -43,6 +43,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   int _index = TvNavIndex.home;
   int _navCursorIndex = TvNavIndex.home;
   TvSideNavMode _navMode = TvSideNavMode.hidden;
+  bool _navCloseFocused = false;
   int _homeTicket = 0;
   int _homeBannerTicket = 0;
   int _contentTicket = 0;
@@ -180,6 +181,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = TvNavIndex.home;
       _navCursorIndex = TvNavIndex.home;
       _navMode = TvSideNavMode.hidden;
+      _navCloseFocused = false;
     });
     _syncOwner();
     _restoreActiveContentAfterBack(banner: false);
@@ -188,6 +190,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   void _focusNav(int index) {
     final safe = _safeNav(index);
     _navCursorIndex = safe;
+    _navCloseFocused = false;
 
     // Deterministic navbar: Shell root owns remote input while navbar is active.
     // SideNav is visual only, so no item FocusNode/requestFocus is used here.
@@ -200,6 +203,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   void _showNav() {
     setState(() {
       _navMode = TvSideNavMode.focused;
+      _navCloseFocused = false;
       _navCursorIndex = _index;
     });
 
@@ -231,6 +235,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = TvNavIndex.home;
       _navCursorIndex = TvNavIndex.home;
       _navMode = TvSideNavMode.hidden;
+      _navCloseFocused = false;
     });
     _syncOwner();
     _restoreActiveContentAfterBack(banner: false);
@@ -241,6 +246,7 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (_navMode != TvSideNavMode.focused || _navCursorIndex != safe) {
       setState(() {
         _navMode = TvSideNavMode.focused;
+        _navCloseFocused = false;
         _navCursorIndex = safe;
       });
     }
@@ -248,7 +254,12 @@ class _TvShellState extends ConsumerState<TvShell> {
   }
 
   void _hideNav() {
-    if (_navMode != TvSideNavMode.hidden) setState(() => _navMode = TvSideNavMode.hidden);
+    if (_navMode != TvSideNavMode.hidden || _navCloseFocused) {
+      setState(() {
+        _navMode = TvSideNavMode.hidden;
+        _navCloseFocused = false;
+      });
+    }
     _syncOwner();
   }
 
@@ -262,6 +273,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
+      _navCloseFocused = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _bumpFocusForCurrent();
@@ -278,6 +290,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.focused;
+      _navCloseFocused = false;
     });
     _focusNav(safe);
   }
@@ -293,6 +306,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       _index = safe;
       _navCursorIndex = safe;
       _navMode = TvSideNavMode.hidden;
+      _navCloseFocused = false;
     });
     _bumpFocusForCurrent();
   }
@@ -361,11 +375,50 @@ class _TvShellState extends ConsumerState<TvShell> {
         tvIsMenuKey(key);
   }
 
+  void _focusNavClose() {
+    setState(() {
+      _navMode = TvSideNavMode.focused;
+      _navCloseFocused = true;
+    });
+    _holdRootFocusDuringBackHandoff();
+    _syncOwner(navFocused: true);
+  }
+
+  void _closeNavRestoreContent() {
+    _suppressBack(180);
+    _holdRootFocusDuringBackHandoff();
+    setState(() {
+      _navMode = TvSideNavMode.hidden;
+      _navCloseFocused = false;
+    });
+    _syncOwner();
+    _restoreActiveContentAfterBack(banner: false);
+  }
+
   bool _handleDeterministicNavKey(LogicalKeyboardKey key) {
     if (_navMode != TvSideNavMode.focused) return false;
 
+    if (_navCloseFocused) {
+      if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
+        _focusNav(_navCursorIndex);
+        return true;
+      }
+      if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowLeft) {
+        return true;
+      }
+      if (tvIsSelectKey(key)) {
+        _closeNavRestoreContent();
+        return true;
+      }
+      return false;
+    }
+
     if (key == LogicalKeyboardKey.arrowUp) {
-      _moveNavCursor(_navCursorIndex - 1);
+      if (_navCursorIndex == TvNavIndex.home) {
+        _focusNavClose();
+      } else {
+        _moveNavCursor(_navCursorIndex - 1);
+      }
       return true;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -377,6 +430,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       return true;
     }
     if (key == LogicalKeyboardKey.arrowLeft || tvIsMenuKey(key)) {
+      _focusNavClose();
       return true;
     }
 
@@ -503,7 +557,11 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      _returnToHomeFromNavbar();
+      if (_navCloseFocused) {
+        _closeNavRestoreContent();
+      } else {
+        _focusNavClose();
+      }
       return;
     }
     if (_index == TvNavIndex.home) {
@@ -674,8 +732,10 @@ class _TvShellState extends ConsumerState<TvShell> {
                           index: _navMode == TvSideNavMode.focused ? _navCursorIndex : _index,
                           mode: _navMode,
                           focusNodes: _navNodes,
+                          closeFocused: _navCloseFocused,
                           onChanged: _moveNavCursor,
                           onOpenContent: _enterContent,
+                          onClose: _closeNavRestoreContent,
                         ),
                         AnimatedContainer(duration: TvFocusStyle.normal, width: _navMode == TvSideNavMode.hidden ? 0 : 1, margin: const EdgeInsets.symmetric(vertical: 30), color: Colors.white.withOpacity(0.035)),
                         Expanded(

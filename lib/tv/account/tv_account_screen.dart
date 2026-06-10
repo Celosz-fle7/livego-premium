@@ -47,9 +47,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   static const double _bottomPadding = TvAccountConfig.bottomPadding;
   static const double _headerHeight = TvAccountConfig.headerHeight;
   static const double _afterHeader = TvAccountConfig.afterHeader;
-  static const int _gridColumnCount = TvAccountConfig.gridColumnCount;
-  static const double _cardHeight = TvAccountConfig.cardHeight;
-  static const double _cardGap = TvAccountConfig.cardGap;
+  static const double _rowHeight = TvAccountConfig.rowHeight;
+  static const double _rowGap = TvAccountConfig.rowGap;
   static const double _footerGap = TvAccountConfig.footerGap;
   static const double _footerHeight = TvAccountConfig.footerHeight;
   static const double _comfortTop = TvAccountConfig.comfortTop;
@@ -94,10 +93,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       _rootNode.requestFocus();
       if (header) {
         setState(() => _zone = _AccountZone.header);
-        final rowCount = (_items.length / _gridColumnCount).ceil();
-        if (rowCount > TvAccountConfig.visibleMenuRowsWithoutScroll) {
-          _jumpToTop();
-        }
+        _jumpToTop();
       } else {
         _jumpToCursor(_cursor);
       }
@@ -149,28 +145,20 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _scrollController.jumpTo(0);
   }
 
-  int _rowForIndex(int index) => index ~/ _gridColumnCount;
-
-  int _columnForIndex(int index) => index % _gridColumnCount;
-
   double _rowOffset(int index) {
-    final row = _rowForIndex(index);
     return _topPadding +
         _headerHeight +
         _afterHeader +
-        (row * (_cardHeight + _cardGap));
+        (index * (_rowHeight + _rowGap));
   }
 
   void _jumpToCursor(int index) {
     if (!_scrollController.hasClients || _items.isEmpty) return;
 
-    final rowCount = (_items.length / _gridColumnCount).ceil();
-    if (rowCount <= TvAccountConfig.visibleMenuRowsWithoutScroll) return;
-
     final safe = index.clamp(0, _items.length - 1).toInt();
     final position = _scrollController.position;
     final rowTop = _rowOffset(safe);
-    final rowBottom = rowTop + _cardHeight;
+    final rowBottom = rowTop + _rowHeight;
     final current = position.pixels;
     final visibleTop = current + _comfortTop;
     final visibleBottom = current + position.viewportDimension - _comfortBottom;
@@ -192,8 +180,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   void _moveToHeader() {
     setState(() => _zone = _AccountZone.header);
-    final rowCount = (_items.length / _gridColumnCount).ceil();
-    if (rowCount > TvAccountConfig.visibleMenuRowsWithoutScroll) _jumpToTop();
+    _jumpToTop();
   }
 
   void _moveToMenu({int? index}) {
@@ -222,7 +209,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     final items = _items;
     if (items.isEmpty) return;
 
-    final next = _cursor + (direction * _gridColumnCount);
+    final next = _cursor + direction;
     if (next < 0) {
       _moveToHeader();
       return;
@@ -231,24 +218,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _moveCursorTo(next);
   }
 
-  void _moveRight() {
-    final items = _items;
-    if (items.isEmpty) return;
-    if (_columnForIndex(_cursor) != 0) return;
-
-    final next = _cursor + 1;
-    if (next >= items.length || _rowForIndex(next) != _rowForIndex(_cursor)) {
-      return;
-    }
-    _moveCursorTo(next);
-  }
-
   void _moveLeft() {
-    if (_columnForIndex(_cursor) == 0) {
-      _backToNav();
-      return;
-    }
-    _moveCursorTo(_cursor - 1);
+    _backToNav();
   }
 
   void _push(Widget screen) {
@@ -394,7 +365,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowRight) {
-        _moveRight();
+        _activateCurrent();
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
@@ -450,39 +421,17 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
               onTap: () => _moveToMenu(),
             ),
             const SizedBox(height: _afterHeader),
-            for (var rowStart = 0;
-                rowStart < items.length;
-                rowStart += _gridColumnCount) ...[
-              Row(
-                children: [
-                  for (var column = 0; column < _gridColumnCount; column++) ...[
-                    if (column > 0) const SizedBox(width: _cardGap),
-                    Expanded(
-                      child: Builder(
-                        builder: (context) {
-                          final index = rowStart + column;
-                          if (index >= items.length) {
-                            return const SizedBox(height: _cardHeight);
-                          }
-
-                          return TvAccountMenuCard(
-                            height: _cardHeight,
-                            item: items[index],
-                            focused:
-                                _zone == _AccountZone.menu && _cursor == index,
-                            onTap: () {
-                              _moveToMenu(index: index);
-                              _activateAction(items[index].action);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ],
+            for (var index = 0; index < items.length; index++) ...[
+              TvAccountMenuCard(
+                height: _rowHeight,
+                item: items[index],
+                focused: _zone == _AccountZone.menu && _cursor == index,
+                onTap: () {
+                  _moveToMenu(index: index);
+                  _activateAction(items[index].action);
+                },
               ),
-              if (rowStart + _gridColumnCount < items.length)
-                const SizedBox(height: _cardGap),
+              if (index < items.length - 1) const SizedBox(height: _rowGap),
             ],
             const SizedBox(height: _footerGap),
             SizedBox(
