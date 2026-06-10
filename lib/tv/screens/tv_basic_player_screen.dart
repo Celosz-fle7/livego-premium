@@ -315,35 +315,34 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
           child: Material(
             color: Colors.black,
             child: Scaffold(
-            backgroundColor: Colors.black,
-            body: Stack(
-              fit: StackFit.expand,
-              children: [
-                const ColoredBox(color: Colors.black),
-                _videoSurface(controller),
-                if (!_surfaceReady)
+              backgroundColor: Colors.black,
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
                   const ColoredBox(color: Colors.black),
-                if (_loading || _error.isNotEmpty)
-                  _StatusCenter(
-                    title: _status,
-                    subtitle: _error.isEmpty ? 'Legacy hybrid player • black guard aktif' : _error,
-                    loading: _loading && _error.isEmpty,
-                  ),
-                if (_controls || !_ready || _error.isNotEmpty)
-                  Positioned(
-                    left: 40,
-                    right: 40,
-                    bottom: 32,
-                    child: _BasicControls(
-                      title: widget.item.title,
-                      episode: _episode,
-                      ready: _ready,
-                      status: _error.isEmpty ? _status : 'ERROR',
-                      playing: controller?.value.isPlaying ?? false,
+                  _videoSurface(controller),
+                  if (!_surfaceReady) const ColoredBox(color: Colors.black),
+                  if (_loading || _error.isNotEmpty)
+                    _StatusCenter(
+                      title: _status,
+                      subtitle: _error.isEmpty ? 'Legacy hybrid player • black guard aktif' : _error,
+                      loading: _loading && _error.isEmpty,
                     ),
-                  ),
-              ],
-            ),
+                  if (_controls || !_ready || _error.isNotEmpty)
+                    Positioned(
+                      left: 40,
+                      right: 40,
+                      bottom: 32,
+                      child: _BasicControls(
+                        title: widget.item.title,
+                        episode: _episode,
+                        ready: _ready,
+                        status: _error.isEmpty ? _status : 'ERROR',
+                        playing: controller?.value.isPlaying ?? false,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -423,23 +422,6 @@ class _BasicControls extends StatelessWidget {
     required this.status,
     required this.playing,
   });
-
-  Widget _videoSurface(VideoPlayerController? controller) {
-    if (!_surfaceReady || controller == null || !controller.value.isInitialized || controller.value.hasError) {
-      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
-      return const ColoredBox(color: Colors.black);
-    }
-    final aspect = controller.value.aspectRatio;
-    return ColoredBox(
-      color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: aspect <= 0 ? 16 / 9 : aspect,
-          child: VideoPlayer(controller),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
