@@ -20,6 +20,8 @@ class LiveGoSettings {
   static bool backgroundPoster = true;
   static bool cachePlayback = true;
   static bool manualRotateButton = true;
+  // Internal/debug-only TV player engine override. Empty means nativeExo default.
+  static String tvPlayerEngineOverride = '';
   static bool tvSourceSetupCompleted = false;
   static int mobileHomeGrid = 3;
   static int tvHomeGrid = 7;
@@ -165,6 +167,7 @@ class LiveGoSettings {
     backgroundPoster = true;
     cachePlayback = true;
     manualRotateButton = true;
+    tvPlayerEngineOverride = '';
     tvSourceSetupCompleted = false;
     mobileHomeGrid = 3;
     tvHomeGrid = 7;

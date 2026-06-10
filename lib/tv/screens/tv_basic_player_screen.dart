@@ -8,16 +8,19 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../models/content_item.dart';
+import '../player/tv_player_engine.dart';
 import '../player/tv_player_service.dart';
 
 class TvBasicPlayerScreen extends StatefulWidget {
   final ContentItem item;
   final int? episode;
+  final Future<void> Function(BuildContext context, String reason)? onFallbackToNative;
 
   const TvBasicPlayerScreen({
     super.key,
     required this.item,
     this.episode,
+    this.onFallbackToNative,
   });
 
   @override
@@ -32,6 +35,8 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
   bool _loading = true;
   bool _controls = true;
   bool _closing = false;
+  bool _surfaceReady = false;
+  int _loadToken = 0;
   String _status = 'Membuka player...';
   String _error = '';
   late int _episode;
@@ -51,17 +56,22 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
   @override
   void dispose() {
     _rootFocus.dispose();
+    TvPlayerDebugLog.event('player_dispose', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
     final controller = _controller;
     _controller = null;
+    controller?.removeListener(_onControllerTick);
     controller?.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final token = ++_loadToken;
+    TvPlayerDebugLog.event('player_legacy_open', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
     setState(() {
       _loading = true;
       _error = '';
       _status = 'Mencari stream episode $_episode...';
+      _surfaceReady = false;
     });
 
     try {
@@ -82,6 +92,7 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
       if (!mounted || _closing) return;
       setState(() => _status = 'Menyiapkan video...');
 
+      TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(url),
         httpHeaders: stream.headers,
@@ -94,35 +105,86 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
       );
 
       await controller.play();
+      TvPlayerDebugLog.event('player_legacy_controller_init_done', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
       LiveGoLocalStore.addHistory(widget.item);
 
-      if (!mounted || _closing) {
+      if (!mounted || _closing || token != _loadToken) {
         await controller.dispose();
         return;
       }
 
       final old = _controller;
+      old?.removeListener(_onControllerTick);
       _controller = controller;
+      controller.addListener(_onControllerTick);
       await old?.dispose();
 
       setState(() {
-        _loading = false;
+        _loading = true;
         _controls = true;
         _status = 'PLAY';
       });
+      _onControllerTick();
+      Future<void>.delayed(const Duration(milliseconds: 650), () {
+        if (!mounted || _closing || token != _loadToken) return;
+        _onControllerTick(forceReady: true);
+      });
     } catch (e) {
-      if (!mounted || _closing) return;
+      TvPlayerDebugLog.event('player_legacy_controller_init_failed', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName, error: e);
+      TvPlayerDebugLog.event('player_error', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName, error: e);
+      if (!mounted || _closing || token != _loadToken) return;
+      setState(() {
+        _loading = true;
+        _surfaceReady = false;
+        _error = '';
+        _status = 'Fallback ke native...';
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+      if (!mounted || _closing || token != _loadToken) return;
+      final fallback = widget.onFallbackToNative;
+      if (fallback != null) {
+        await fallback(context, 'legacy_init_failed');
+        return;
+      }
       setState(() {
         _loading = false;
-        _error = '$e';
-        _status = 'Gagal membuka video';
+        _error = 'Legacy gagal dan native fallback tidak tersedia';
+        _status = 'ERROR';
       });
+    }
+  }
+
+  void _onControllerTick({bool forceReady = false}) {
+    if (!mounted || _closing) return;
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.hasError) {
+      setState(() {
+        _surfaceReady = false;
+        _loading = false;
+        _error = controller.value.errorDescription ?? 'Video error';
+      });
+      return;
+    }
+    final size = controller.value.size;
+    final hasFrameSignal = size.width > 0 && size.height > 0;
+    final hasPlaybackSignal = controller.value.isPlaying ||
+        controller.value.position > Duration.zero ||
+        !controller.value.isBuffering;
+    if (!_surfaceReady && (forceReady || (hasFrameSignal && hasPlaybackSignal))) {
+      TvPlayerDebugLog.event('player_legacy_ready', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
+      setState(() {
+        _surfaceReady = true;
+        _loading = false;
+        _status = controller.value.isPlaying ? 'PLAY' : 'PAUSE';
+      });
+      return;
     }
   }
 
   bool get _ready {
     final controller = _controller;
-    return controller != null && controller.value.isInitialized;
+    return controller != null && controller.value.isInitialized && _surfaceReady && _error.isEmpty;
   }
 
   Future<void> _togglePlay() async {
@@ -217,6 +279,23 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
     return KeyEventResult.handled;
   }
 
+  Widget _videoSurface(VideoPlayerController? controller) {
+    if (!_surfaceReady || controller == null || !controller.value.isInitialized || controller.value.hasError) {
+      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
+      return const ColoredBox(color: Colors.black);
+    }
+    final aspect = controller.value.aspectRatio;
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: aspect <= 0 ? 16 / 9 : aspect,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
@@ -231,25 +310,23 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
         autofocus: true,
         skipTraversal: true,
         onKeyEvent: _onKey,
-        child: Material(
+        child: ColoredBox(
           color: Colors.black,
-          child: Scaffold(
+          child: Material(
+            color: Colors.black,
+            child: Scaffold(
             backgroundColor: Colors.black,
             body: Stack(
               fit: StackFit.expand,
               children: [
                 const ColoredBox(color: Colors.black),
-                if (controller != null && controller.value.isInitialized)
-                  Center(
-                    child: AspectRatio(
-                      aspectRatio: controller.value.aspectRatio <= 0 ? 16 / 9 : controller.value.aspectRatio,
-                      child: VideoPlayer(controller),
-                    ),
-                  )
-                else
+                _videoSurface(controller),
+                if (!_surfaceReady)
+                  const ColoredBox(color: Colors.black),
+                if (_loading || _error.isNotEmpty)
                   _StatusCenter(
                     title: _status,
-                    subtitle: _error.isEmpty ? 'Player TV basic single-route' : _error,
+                    subtitle: _error.isEmpty ? 'Legacy hybrid player • black guard aktif' : _error,
                     loading: _loading && _error.isEmpty,
                   ),
                 if (_controls || !_ready || _error.isNotEmpty)
@@ -266,6 +343,7 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
                     ),
                   ),
               ],
+            ),
             ),
           ),
         ),
@@ -345,6 +423,23 @@ class _BasicControls extends StatelessWidget {
     required this.status,
     required this.playing,
   });
+
+  Widget _videoSurface(VideoPlayerController? controller) {
+    if (!_surfaceReady || controller == null || !controller.value.isInitialized || controller.value.hasError) {
+      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
+      return const ColoredBox(color: Colors.black);
+    }
+    final aspect = controller.value.aspectRatio;
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: aspect <= 0 ? 16 / 9 : aspect,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

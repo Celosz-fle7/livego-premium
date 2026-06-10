@@ -10,6 +10,7 @@ import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
+import '../tv_player_engine.dart';
 import '../tv_player_service.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
@@ -26,11 +27,13 @@ import 'widgets/tv_player_explorer3_controls.dart';
 class TvPlayerExplorer3Screen extends StatefulWidget {
   final ContentItem item;
   final int? episode;
+  final bool preferNativeSurface;
 
   const TvPlayerExplorer3Screen({
     super.key,
     required this.item,
     this.episode,
+    this.preferNativeSurface = true,
   });
 
   @override
@@ -847,10 +850,20 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       });
 
       _scheduleEpisodeListWarmup();
-      final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
-      if (nativeOpened) {
-        _scheduleLightPrefetch();
-        return;
+      if (widget.preferNativeSurface) {
+        final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
+        if (nativeOpened) {
+          _scheduleLightPrefetch();
+          return;
+        }
+      } else {
+        TvPlayerDebugLog.event(
+          'player_engine_selected',
+          item: widget.item,
+          episode: _episode,
+          engine: PlayerEngineType.flutterFallback.wireName,
+          reason: 'native_surface_disabled',
+        );
       }
 
       await _startController(token, stream, url);
@@ -870,6 +883,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   Future<bool> _openNativeSurfacePlayer(int token, StreamInfo stream, String url) async {
     if (!_active(token)) return true;
+    TvPlayerDebugLog.event('player_engine_selected', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, host: _lastStreamHost, tail: _lastStreamTail);
 
     try {
       await PlayerPreferences.load();
@@ -893,6 +907,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return true;
     } catch (error) {
       if (!mounted || !_active(token)) return true;
+      TvPlayerDebugLog.event('player_engine_fallback', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'native_open_failed', error: error);
       setState(() {
         _status = 'Flutter fallback: $error';
       });
@@ -901,6 +916,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   Future<void> _startController(int token, StreamInfo stream, String url) async {
+    TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, host: _lastStreamHost, tail: _lastStreamTail);
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
       httpHeaders: stream.headers,
@@ -930,6 +946,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       }
 
       await controller.play();
+      TvPlayerDebugLog.event('player_legacy_controller_init_done', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
       if (!_active(token)) {
         await controller.dispose();
         return;
@@ -1027,6 +1044,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _surfaceTimer?.cancel();
         _surfaceTimer = null;
         if (!_active(token)) return;
+        TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'surface_timeout_or_size_ready');
         setState(() => _surfaceReady = true);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && !_closing) _rootFocus.requestFocus();
@@ -1053,6 +1071,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         !value.isBuffering;
 
     if (!_surfaceReady && hasSize && hasPlaybackSignal) {
+      TvPlayerDebugLog.event('player_legacy_ready', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
       setState(() {
         _surfaceReady = true;
         _loading = false;
@@ -1333,6 +1352,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final safe = _qualityCursor.clamp(0, choices.length - 1).toInt();
     final label = choices[safe];
 
+    TvPlayerDebugLog.event('player_quality_switch_start', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
     await _saveProgressNow(force: true);
     if (!mounted) return;
 
@@ -1343,7 +1363,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _mode = _Explorer3Mode.controls;
     });
     unawaited(LiveGoLocalStore.saveSettings());
-    await _load();
+    try {
+      await _load();
+      TvPlayerDebugLog.event('player_quality_switch_success', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
+    } catch (error) {
+      TvPlayerDebugLog.event('player_quality_switch_failed', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label, error: error);
+      rethrow;
+    }
   }
 
   Future<void> _applySubtitleChoice() async {
@@ -1687,6 +1713,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   Widget _videoSurface() {
     final c = _controller;
     if (!_surfaceReady || c == null || !c.value.isInitialized || c.value.hasError) {
+      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
       return const ColoredBox(color: Colors.black);
     }
 
@@ -1823,6 +1850,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     unawaited(_saveProgressNow(force: true));
     _controller?.removeListener(_onControllerTick);
     _controller?.dispose();
+    TvPlayerDebugLog.event('player_dispose', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName);
     _nativeSurfacePlayer.setMethodCallHandler(null);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
