@@ -16,6 +16,13 @@ part of 'tv_home_screen.dart';
 ///
 /// Do not put raw API endpoint logic, image/cache policy, or heavy UI layout here.
 extension TvHomeInteractionController on _TvHomeScreenState {
+  void _homeDebugLog(String event) {
+    assert(() {
+      debugPrint('TV_HOME event=$event');
+      return true;
+    }());
+  }
+
   bool _focusPreferredEntry({bool preferBanner = false}) {
     if (preferBanner) {
       _setManualZone(TvZone.banner, 0);
@@ -161,21 +168,30 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   bool _focusPlatformHeader({bool throttle = true}) {
     if (_platformHeaderNode.context == null) return false;
+    _controlFocus = _HomeControlFocus.platformHeader;
     final ok = tvFocus(_platformHeaderNode, alignment: 0.08, throttle: throttle);
-    if (ok) _rememberFocus(TvZone.platform, _platformIndex);
+    if (ok) {
+      _homeDebugLog('home_focus_platform_header');
+      _rememberFocus(TvZone.platform, _platformIndex);
+    }
     return ok;
   }
 
   bool _focusCategoryHeader({bool throttle = true}) {
     if (_categoryHeaderNode.context == null) return false;
+    _controlFocus = _HomeControlFocus.categoryHeader;
     final ok = tvFocus(_categoryHeaderNode, alignment: 0.12, throttle: throttle);
-    if (ok) _rememberFocus(TvZone.category, _categoryIndex);
+    if (ok) {
+      _homeDebugLog('home_focus_category_header');
+      _rememberFocus(TvZone.category, _categoryIndex);
+    }
     return ok;
   }
 
   bool _focusPlatform(int index, {bool throttle = true}) {
     if (_platformNodes.isEmpty) return false;
     final target = _safe(index, _platformNodes.length);
+    _controlFocus = _HomeControlFocus.platformChip;
     final ok = tvFocus(_platformNodes[target], alignment: 0.08, throttle: throttle);
     if (ok) {
       _platformIndex = target;
@@ -187,6 +203,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusCategory(int index, {bool throttle = true}) {
     if (_categoryNodes.isEmpty) return false;
     final target = _safe(index, _categoryNodes.length);
+    _controlFocus = _HomeControlFocus.categoryChip;
     final ok = tvFocus(_categoryNodes[target], alignment: 0.12, throttle: throttle);
     if (ok) {
       _categoryIndex = target;
@@ -200,8 +217,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
     }
+    _controlFocus = _HomeControlFocus.platformHeader;
     final ok = _requestControlNode(_platformHeaderNode);
-    if (ok) _rememberFocus(TvZone.platform, _platformIndex);
+    if (ok) {
+      _homeDebugLog('home_focus_platform_header');
+      _rememberFocus(TvZone.platform, _platformIndex);
+    }
     return ok;
   }
 
@@ -210,8 +231,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
     }
+    _controlFocus = _HomeControlFocus.categoryHeader;
     final ok = _requestControlNode(_categoryHeaderNode);
-    if (ok) _rememberFocus(TvZone.category, _categoryIndex);
+    if (ok) {
+      _homeDebugLog('home_focus_category_header');
+      _rememberFocus(TvZone.category, _categoryIndex);
+    }
     return ok;
   }
 
@@ -223,6 +248,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // Flutter focus. Remote movement must not depend on widget context deciding
     // which zone/index is active.
     _platformIndex = target;
+    _controlFocus = _HomeControlFocus.platformChip;
     _rememberFocus(TvZone.platform, target);
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
@@ -237,6 +263,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // State-first reducer rule: update zone/index first, scroll second, then
     // requestFocus only after the target state is valid.
     _categoryIndex = target;
+    _controlFocus = _HomeControlFocus.categoryChip;
     _rememberFocus(TvZone.category, target);
     if (!_fullGridMode) {
       _scrollHomeToGridEntry();
@@ -483,12 +510,24 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     }
   }
 
-  void _setManualZone(TvZone zone, int index, {bool scroll = true}) {
+  void _setManualZone(
+    TvZone zone,
+    int index, {
+    bool scroll = true,
+    _HomeControlFocus? controlFocus,
+  }) {
     if (!mounted) return;
 
     final target = _safeManualIndex(zone, index);
+    final targetControlFocus = controlFocus ??
+        switch (zone) {
+          TvZone.platform => _HomeControlFocus.platformChip,
+          TvZone.category => _HomeControlFocus.categoryChip,
+          _ => _controlFocus,
+        };
     setState(() {
       _zone = zone;
+      _controlFocus = targetControlFocus;
       if (zone == TvZone.platform) _platformIndex = target;
       if (zone == TvZone.category) _categoryIndex = target;
       if (zone == TvZone.grid) _gridIndex = target;
@@ -497,8 +536,22 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     });
 
     _rememberFocus(zone, target);
-    _requestHomeRootFocus();
     if (scroll) _scrollManualZone(zone, target);
+
+    final headerFocused = targetControlFocus == _HomeControlFocus.platformHeader ||
+        targetControlFocus == _HomeControlFocus.categoryHeader;
+    if (headerFocused) {
+      final node = targetControlFocus == _HomeControlFocus.platformHeader
+          ? _platformHeaderNode
+          : _categoryHeaderNode;
+      if (_requestControlNode(node)) {
+        _homeDebugLog(targetControlFocus == _HomeControlFocus.platformHeader
+            ? 'home_focus_platform_header'
+            : 'home_focus_category_header');
+        return;
+      }
+    }
+    _requestHomeRootFocus();
   }
 
   int _safeManualIndex(TvZone zone, int index) {
@@ -573,7 +626,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.category:
-        _setManualZone(TvZone.platform, _platformIndex);
+        _setManualZone(
+          TvZone.platform,
+          _platformIndex,
+          controlFocus: _controlFocus == _HomeControlFocus.categoryHeader
+              ? _HomeControlFocus.platformHeader
+              : _HomeControlFocus.platformChip,
+        );
         return;
       case TvZone.platform:
         _setManualZone(TvZone.banner, 0);
@@ -591,10 +650,22 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _homeManualDown() {
     switch (_zone) {
       case TvZone.banner:
-        _setManualZone(TvZone.platform, _platformIndex, scroll: false);
+        _setManualZone(
+          TvZone.platform,
+          _platformIndex,
+          scroll: false,
+          controlFocus: _HomeControlFocus.platformHeader,
+        );
         return;
       case TvZone.platform:
-        _setManualZone(TvZone.category, _categoryIndex, scroll: false);
+        _setManualZone(
+          TvZone.category,
+          _categoryIndex,
+          scroll: false,
+          controlFocus: _controlFocus == _HomeControlFocus.platformHeader
+              ? _HomeControlFocus.categoryHeader
+              : _HomeControlFocus.categoryChip,
+        );
         return;
       case TvZone.category:
         if (_gridNodes.isNotEmpty) {
@@ -626,15 +697,29 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.platform:
-        if (_platformIndex == 0) {
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
           _moveToNav();
+        } else if (_platformIndex == 0) {
+          _setManualZone(
+            TvZone.platform,
+            _platformIndex,
+            scroll: false,
+            controlFocus: _HomeControlFocus.platformHeader,
+          );
         } else {
           _setManualZone(TvZone.platform, _platformIndex - 1, scroll: false);
         }
         return;
       case TvZone.category:
-        if (_categoryIndex == 0) {
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
           _moveToNav();
+        } else if (_categoryIndex == 0) {
+          _setManualZone(
+            TvZone.category,
+            _categoryIndex,
+            scroll: false,
+            controlFocus: _HomeControlFocus.categoryHeader,
+          );
         } else {
           _setManualZone(TvZone.category, _categoryIndex - 1, scroll: false);
         }
@@ -657,17 +742,36 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.platform:
-        if (_platformIndex < _platformNodes.length - 1) {
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
+          _setManualZone(
+            TvZone.platform,
+            _platformIndex,
+            scroll: false,
+            controlFocus: _HomeControlFocus.platformChip,
+          );
+        } else if (_platformIndex < _platformNodes.length - 1) {
           _setManualZone(TvZone.platform, _platformIndex + 1, scroll: false);
         }
         return;
       case TvZone.category:
-        if (_categoryIndex < _categoryNodes.length - 1) {
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
+          _setManualZone(
+            TvZone.category,
+            _categoryIndex,
+            scroll: false,
+            controlFocus: _HomeControlFocus.categoryChip,
+          );
+        } else if (_categoryIndex < _categoryNodes.length - 1) {
           _setManualZone(TvZone.category, _categoryIndex + 1, scroll: false);
         }
         return;
       case TvZone.banner:
-        _setManualZone(TvZone.platform, _platformIndex, scroll: false);
+        _setManualZone(
+          TvZone.platform,
+          _platformIndex,
+          scroll: false,
+          controlFocus: _HomeControlFocus.platformHeader,
+        );
         return;
       default:
         return;
@@ -681,10 +785,18 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         _returnToCategoryAnchor();
         return;
       case TvZone.category:
-        _returnToPlatformAnchor();
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
+          _requestExit();
+        } else {
+          _returnToPlatformAnchor();
+        }
         return;
       case TvZone.platform:
-        _returnToBanner();
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
+          _requestExit();
+        } else {
+          _returnToBanner();
+        }
         return;
       case TvZone.banner:
       default:
@@ -700,11 +812,21 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         return;
       case TvZone.platform:
         if (!_selectActivationAllowed()) return;
-        _selectPlatform(_platformIndex);
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
+          _homeDebugLog('home_select_platform_header_open_manager');
+          unawaited(_openPlatformManager());
+        } else {
+          _selectPlatform(_platformIndex);
+        }
         return;
       case TvZone.category:
         if (!_selectActivationAllowed()) return;
-        _selectCategory(_categoryIndex);
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
+          _homeDebugLog('home_select_category_header_open_manager');
+          unawaited(_openCategoryManager());
+        } else {
+          _selectCategory(_categoryIndex);
+        }
         return;
       case TvZone.grid:
         if (_gridItems.isNotEmpty) {
@@ -735,27 +857,40 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _restoreManualCursor() {
-    _requestHomeRootFocus();
     switch (_zone) {
       case TvZone.banner:
+        _requestHomeRootFocus();
         _scrollManualZone(TvZone.banner, 0);
         break;
       case TvZone.platform:
         _scrollManualZone(TvZone.platform, _platformIndex);
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
+          _requestControlNode(_platformHeaderNode);
+        } else {
+          _requestHomeRootFocus();
+        }
         break;
       case TvZone.category:
         _scrollManualZone(TvZone.category, _categoryIndex);
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
+          _requestControlNode(_categoryHeaderNode);
+        } else {
+          _requestHomeRootFocus();
+        }
         break;
       case TvZone.grid:
+        _requestHomeRootFocus();
         _scrollManualZone(TvZone.grid, _gridIndex);
         break;
       default:
+        _requestHomeRootFocus();
         break;
     }
   }
 
   Future<void> _openPlatformManager() async {
     _cancelHomeSelectionCommit();
+    final openedFromHeader = _controlFocus == _HomeControlFocus.platformHeader;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => const TvSourceManagerScreen(
@@ -766,12 +901,18 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (!mounted) return;
     _refreshIfSettingsChanged();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusPlatform(_platformIndex, throttle: false);
+      if (!mounted) return;
+      if (openedFromHeader) {
+        _focusPlatformHeader(throttle: false);
+      } else {
+        _focusPlatform(_platformIndex, throttle: false);
+      }
     });
   }
 
   Future<void> _openCategoryManager() async {
     _cancelHomeSelectionCommit();
+    final openedFromHeader = _controlFocus == _HomeControlFocus.categoryHeader;
     final platform = _platformSlug;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -784,7 +925,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (!mounted) return;
     _refreshIfSettingsChanged();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusCategory(_categoryIndex, throttle: false);
+      if (!mounted) return;
+      if (openedFromHeader) {
+        _focusCategoryHeader(throttle: false);
+      } else {
+        _focusCategory(_categoryIndex, throttle: false);
+      }
     });
   }
 
@@ -1006,7 +1152,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (platforms.isEmpty) return;
     final target = _safe(index, platforms.length);
     _platformIndex = target;
+    _controlFocus = _HomeControlFocus.platformChip;
     _rememberFocus(TvZone.platform, target);
+    _homeDebugLog('home_platform_chip_select');
     if (target == _selectedPlatformIndex) return;
 
     final selectedPlatform = platforms[target];
@@ -1020,8 +1168,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _gridIndex = 0;
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.platform;
+      _controlFocus = _HomeControlFocus.platformChip;
     });
     _rememberSelection();
+    _homeDebugLog('home_platform_category_reload');
     _loadHome(clearPrevious: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1036,7 +1186,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (categories.isEmpty) return;
     final target = _safe(index, categories.length);
     _categoryIndex = target;
+    _controlFocus = _HomeControlFocus.categoryChip;
     _rememberFocus(TvZone.category, target);
+    _homeDebugLog('home_category_chip_select');
     if (target == _selectedCategoryIndex) return;
 
     setState(() {
@@ -1044,8 +1196,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _gridIndex = 0;
       _fullGridMode = keepControlGridZone;
       _zone = TvZone.category;
+      _controlFocus = _HomeControlFocus.categoryChip;
     });
     _rememberSelection();
+    _homeDebugLog('home_platform_category_reload');
     _loadHome(clearPrevious: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1070,6 +1224,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   KeyEventResult _platformHeaderKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    _controlFocus = _HomeControlFocus.platformHeader;
     _rememberFocus(TvZone.platform, _platformIndex);
     return _reduceHomeKey(null, event.logicalKey);
   }
@@ -1077,6 +1232,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   KeyEventResult _categoryHeaderKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    _controlFocus = _HomeControlFocus.categoryHeader;
     _rememberFocus(TvZone.category, _categoryIndex);
     return _reduceHomeKey(null, event.logicalKey);
   }
@@ -1085,6 +1241,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _platformIndex = _safe(index, _platformNodes.length);
+    _controlFocus = _HomeControlFocus.platformChip;
     _rememberFocus(TvZone.platform, _platformIndex);
     return _reduceHomeKey(null, event.logicalKey);
   }
@@ -1093,6 +1250,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _categoryIndex = _safe(index, _categoryNodes.length);
+    _controlFocus = _HomeControlFocus.categoryChip;
     _rememberFocus(TvZone.category, _categoryIndex);
     return _reduceHomeKey(null, event.logicalKey);
   }
