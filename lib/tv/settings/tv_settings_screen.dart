@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +8,7 @@ import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
 import '../layout/tv_safe_zone.dart';
+import '../cache/tv_cache_maintenance_service.dart';
 import 'tv_settings_config.dart';
 
 part 'tv_settings_models.dart';
@@ -51,6 +54,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   int _cursor = 0;
   int _lastBackHandledMs = 0;
   bool _entryPending = false;
+  bool _cacheMaintenanceBusy = false;
 
   List<_SettingsSection> get _sections => [
         _SettingsSection(
@@ -60,7 +64,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
             _SettingItem.radio(kind: _SettingKind.layoutTv, title: 'Android TV (Leanback Style)', active: true),
           ],
         ),
-_SettingsSection(
+        _SettingsSection(
           title: 'Sumber & Izin',
           items: [
             _SettingItem.tile(
@@ -79,8 +83,8 @@ _SettingsSection(
               kind: _SettingKind.reset,
               icon: Icons.delete_rounded,
               title: 'Hapus Semua Cache',
-              subtitle: 'Bersihkan cache streaming dan gambar agar ruang penyimpanan lega.',
-              value: 'RESET',
+              subtitle: 'Bersihkan cache streaming, gambar, dan cache RAM TV.',
+              value: _cacheMaintenanceBusy ? 'PROSES' : 'BERSIHKAN',
               danger: true,
             ),
           ],
@@ -303,6 +307,11 @@ _SettingsSection(
   }
 
   void _activate(_SettingKind kind) {
+    if (kind == _SettingKind.reset) {
+      _runCacheMaintenance();
+      return;
+    }
+
     setState(() {
       switch (kind) {
         case _SettingKind.layoutAuto:
@@ -327,19 +336,58 @@ _SettingsSection(
           LiveGoSettings.setTvHomeGrid(LiveGoSettings.tvHomeGrid + 1);
           break;
         case _SettingKind.sourceManager:
+        case _SettingKind.reset:
           break;
         case _SettingKind.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
-          break;
-        case _SettingKind.reset:
-          LiveGoSettings.reset();
-          LiveGoSettings.layoutMode = 'TV';
-          LiveGoSettings.setTvHomeGrid(TvSettingsConfig.resetTvGrid);
           break;
       }
     });
     _persistSettings();
     _jumpToCursor(_cursor);
+  }
+
+  Future<void> _runCacheMaintenance() async {
+    if (_cacheMaintenanceBusy) return;
+    setState(() => _cacheMaintenanceBusy = true);
+    var progressOpen = true;
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) {
+        return const _CacheMaintenanceDialog(
+          title: 'Membersihkan Cache',
+          message: 'Mohon tunggu, cache TV sedang dibersihkan.',
+          loading: true,
+        );
+      },
+    ).whenComplete(() => progressOpen = false));
+
+    final result = await TvCacheMaintenanceService.clearAll();
+    if (!mounted) return;
+    if (progressOpen) {
+      Navigator.of(context).pop();
+    }
+    setState(() => _cacheMaintenanceBusy = false);
+    _showCacheResult(result);
+    _jumpToCursor(_cursor);
+  }
+
+  void _showCacheResult(TvCacheMaintenanceResult result) {
+    final failed = result.failedItems.keys.join(', ');
+    final message = result.hasFailure
+        ? '${result.message} Gagal: $failed.'
+        : result.message;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: result.hasFailure ? Colors.deepOrange.shade700 : AppTheme.surface2,
+          duration: const Duration(seconds: 4),
+        ),
+      );
   }
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {

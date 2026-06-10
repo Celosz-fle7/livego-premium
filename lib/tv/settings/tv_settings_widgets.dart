@@ -353,3 +353,51 @@ class _GridPreview extends StatelessWidget {
     );
   }
 }
+
+class _CacheMaintenanceDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final bool loading;
+
+  const _CacheMaintenanceDialog({
+    required this.title,
+    required this.message,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              const SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppTheme.cyan),
+              )
+            else
+              const Icon(Icons.check_circle_rounded, color: AppTheme.cyan, size: 34),
+            const SizedBox(width: 16),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
+                  const SizedBox(height: 6),
+                  Text(message, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, fontWeight: FontWeight.w700, height: 1.35, decoration: TextDecoration.none)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
