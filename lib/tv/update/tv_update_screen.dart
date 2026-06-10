@@ -147,11 +147,10 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
       setState(() {
         _apkPath = result.path;
         _status = _UpdateStatus.ready;
-        _message = 'APK siap di-install. Pilih Install Update.';
+        _message = 'APK siap di-install. Pilih Install Update untuk membuka layar konfirmasi Android.';
         _busy = false;
         _cursor = 0;
       });
-      await _openInstaller();
     } catch (error) {
       if (!mounted) return;
       setState(() {
