@@ -9,16 +9,13 @@ class TvAccountConfig {
 
   static const int backGuardMs = 420;
   static const int selectGuardMs = 300;
-  static const int visibleMenuRowsWithoutScroll = 3;
-
-  static const double topPadding = TvSafeZone.accountTop;
+    static const double topPadding = TvSafeZone.accountTop;
   static const double horizontalPadding = TvSafeZone.accountSide;
   static const double bottomPadding = TvSafeZone.bottomReach + 72;
   static const double headerHeight = 84;
   static const double afterHeader = 14;
-  static const int gridColumnCount = 2;
-  static const double cardHeight = 94;
-  static const double cardGap = 12;
+  static const double rowHeight = 86;
+  static const double rowGap = 8;
   static const double footerGap = 14;
   static const double footerHeight = 38;
   static const double comfortTop = TvSafeZone.listTop;
@@ -28,7 +25,7 @@ class TvAccountConfig {
   static const Duration snackDuration = Duration(seconds: 2);
 
   static const String footerHelp =
-      'D-pad pilih kartu • OK buka • ← dari kolom kiri / BACK ke Navbar Akun';
+      'D-pad atas/bawah pilih menu • OK/→ buka • ←/BACK kembali ke Navbar Akun';
   static const String aboutMessage =
       'LiveGo Premium TV • data sinkron dengan mode HP';
 }

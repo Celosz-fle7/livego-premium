@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
-import '../../core/livego_settings.dart';
 import '../../shared/widgets/glow_container.dart';
 import 'mobile_settings_screen.dart';
 import 'mobile_library_screen.dart';
 import 'mobile_downloads_screen.dart';
+import '../update/mobile_update_screen.dart';
 
 class MobileAccountScreen extends StatelessWidget {
   const MobileAccountScreen({super.key});
@@ -140,13 +140,18 @@ class MobileAccountScreen extends StatelessWidget {
               _menu(context, Icons.download_for_offline_rounded, 'Download', 'Lihat antrean dan episode yang tersimpan.', () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileDownloadsScreen()))));
               }),
-              _menu(context, Icons.settings_rounded, 'Pengaturan', 'Atur tampilan, player, subtitle, dan source aktif.', () {
+              _menu(context, Icons.settings_rounded, 'Pengaturan', 'Atur tampilan, player, DRM, unduhan, dan cache.', () {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: MobileSettingsScreen()))));
               }),
             ]),
             _section('Aplikasi & Dukungan'),
             _menuGroup(context, [
-              _menu(context, Icons.system_update_alt_rounded, 'Periksa Pembaruan', 'Cek versi terbaru LiveGo Premium.', () {}),
+              _menu(context, Icons.layers_rounded, 'Kelola Sumber Data', 'Pilih 6 platform Beranda, kategori, dan cek status server.', () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: SourceManagerScreen()))));
+              }),
+              _menu(context, Icons.system_update_alt_rounded, 'Periksa Pembaruan', 'Cek versi terbaru LiveGo Premium.', () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MobileUpdateScreen()));
+              }),
               _menu(context, Icons.share_rounded, 'Dukung LiveGo', 'Bantu maintenance dan eksperimen fitur baru.', () {}),
               _menu(context, Icons.send_rounded, 'Kirim Feedback', 'Laporkan bug, source, atau usulan fitur.', () {}),
               _menu(context, Icons.help_outline_rounded, 'Bantuan', 'Panduan singkat fitur utama LiveGo.', () {}),

@@ -160,6 +160,12 @@ class TvAccountMenuCard extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.keyboard_arrow_right_rounded,
+                color: focused ? AppTheme.whiteGlow : Colors.white38,
+                size: 28,
+              ),
             ],
           ),
         ),

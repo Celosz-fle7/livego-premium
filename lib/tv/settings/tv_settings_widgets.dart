@@ -153,7 +153,7 @@ class _SettingsCard extends StatelessWidget {
 }
 
 class _DeterministicSettingRow extends StatelessWidget {
-  final _SettingItem item;
+  final LiveGoSettingItem item;
   final bool focused;
   final double height;
   final VoidCallback onTap;
@@ -168,7 +168,7 @@ class _DeterministicSettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = item.danger ? AppTheme.danger : AppTheme.cyan;
-    final isRadio = item.style == _SettingItemStyle.radio;
+    final isRadio = item.style == LiveGoSettingStyle.radio;
     return SizedBox(
       height: height,
       child: InkWell(
@@ -200,7 +200,7 @@ class _DeterministicSettingRow extends StatelessWidget {
 }
 
 class _RadioContent extends StatelessWidget {
-  final _SettingItem item;
+  final LiveGoSettingItem item;
   final bool focused;
 
   const _RadioContent({required this.item, required this.focused});
@@ -221,7 +221,7 @@ class _RadioContent extends StatelessWidget {
 }
 
 class _TileContent extends StatelessWidget {
-  final _SettingItem item;
+  final LiveGoSettingItem item;
   final bool focused;
   final Color accent;
 
@@ -250,18 +250,12 @@ class _TileContent extends StatelessWidget {
               Text(item.title, style: TextStyle(color: item.danger ? accent : Colors.white, fontSize: 14.8, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
               const SizedBox(height: 4),
               Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10.8, height: 1.20, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
-              if (item.showGridBar) ...[
-                const SizedBox(height: 9),
-                _TvGridStepper(value: LiveGoSettings.tvHomeGrid, focused: focused),
-              ],
             ],
           ),
         ),
         const SizedBox(width: 10),
         if (item.switchValue != null)
           _SwitchPill(value: item.switchValue!, focused: focused)
-        else if (item.showGridBar)
-          Text('←  ${LiveGoSettings.tvHomeGrid}  →', style: TextStyle(color: focused ? accent : AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11.6, decoration: TextDecoration.none))
         else
           Text(item.value, style: TextStyle(color: focused ? accent : (item.danger ? accent : AppTheme.cyan), fontWeight: FontWeight.w900, fontSize: 11.6, decoration: TextDecoration.none)),
         const SizedBox(width: 10),
@@ -290,66 +284,6 @@ class _SwitchPill extends StatelessWidget {
       ),
       alignment: value ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(width: 22, height: 22, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
-    );
-  }
-}
-
-class _TvGridStepper extends StatelessWidget {
-  final int value;
-  final bool focused;
-
-  const _TvGridStepper({required this.value, required this.focused});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget box(String text, {bool active = false}) {
-      return Container(
-        width: active ? 52 : 34,
-        height: 26,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: active ? AppTheme.cyan.withOpacity(0.18) : Colors.white.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: active || focused ? AppTheme.whiteGlow.withOpacity(0.64) : Colors.white12),
-        ),
-        child: Text(text, style: TextStyle(color: active || focused ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 11.4, decoration: TextDecoration.none)),
-      );
-    }
-
-    return Row(
-      children: [
-        box('-'),
-        const SizedBox(width: 7),
-        box('$value', active: true),
-        const SizedBox(width: 7),
-        box('+'),
-        const SizedBox(width: 12),
-        Expanded(child: _GridPreview(value: value)),
-      ],
-    );
-  }
-}
-
-class _GridPreview extends StatelessWidget {
-  final int value;
-  const _GridPreview({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(10, (i) {
-        final active = i < value;
-        return Expanded(
-          child: Container(
-            height: 5,
-            margin: EdgeInsets.only(right: i == 9 ? 0 : 4),
-            decoration: BoxDecoration(
-              color: active ? AppTheme.cyan : AppTheme.borderSoft.withOpacity(0.72),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        );
-      }),
     );
   }
 }

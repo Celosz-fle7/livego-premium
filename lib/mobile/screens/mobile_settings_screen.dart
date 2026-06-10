@@ -5,6 +5,7 @@ import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
 import '../../shared/widgets/glow_container.dart';
+import '../../shared/settings/livego_setting_models.dart';
 
 class MobileSettingsScreen extends StatefulWidget {
   const MobileSettingsScreen({super.key});
@@ -80,7 +81,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
       builder: (context) => SimpleDialog(
         title: const Text('Mode Widevine DRM'),
         children: [
-          for (final item in ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'])
+          for (final item in LiveGoSettingsMenuData.drmValues)
             RadioListTile<String>(
               value: item,
               groupValue: LiveGoSettings.drmMode,
@@ -95,7 +96,99 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
         ],
       ),
     );
-    if (value != null) setState(() => LiveGoSettings.drmMode = value);
+    if (value != null) _applySetting(() => LiveGoSettings.drmMode = value);
+  }
+
+  void _applySetting(VoidCallback change) {
+    setState(change);
+    LiveGoLocalStore.saveSettings();
+  }
+
+  void _activateSetting(LiveGoSettingId id) {
+    switch (id) {
+      case LiveGoSettingId.layoutAuto:
+        _applySetting(() => LiveGoSettings.layoutMode = 'Auto');
+        break;
+      case LiveGoSettingId.layoutMobile:
+        _applySetting(() => LiveGoSettings.layoutMode = 'Mobile');
+        break;
+      case LiveGoSettingId.layoutTv:
+        _applySetting(() => LiveGoSettings.layoutMode = 'TV');
+        break;
+      case LiveGoSettingId.backgroundPoster:
+        _applySetting(() => LiveGoSettings.backgroundPoster = !LiveGoSettings.backgroundPoster);
+        break;
+      case LiveGoSettingId.cachePlayback:
+        _applySetting(() => LiveGoSettings.cachePlayback = !LiveGoSettings.cachePlayback);
+        break;
+      case LiveGoSettingId.manualRotate:
+        _applySetting(() => LiveGoSettings.manualRotateButton = !LiveGoSettings.manualRotateButton);
+        break;
+      case LiveGoSettingId.drmMode:
+        _showDrmDialog();
+        break;
+      case LiveGoSettingId.downloadNotice:
+        _applySetting(() => LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly);
+        break;
+      case LiveGoSettingId.cacheMaintenance:
+        _applySetting(LiveGoSettings.reset);
+        break;
+    }
+  }
+
+  Widget _settingItem(LiveGoSettingItem item) {
+    if (item.style == LiveGoSettingStyle.radio) {
+      return _mode(item.title, item.active, () => _activateSetting(item.id));
+    }
+    final trailing = item.switchValue != null
+        ? Switch(
+            value: item.switchValue!,
+            activeColor: AppTheme.cyan,
+            onChanged: (_) => _activateSetting(item.id),
+          )
+        : Text(
+            item.value,
+            style: TextStyle(
+              color: item.danger ? Colors.redAccent : AppTheme.cyan,
+              fontWeight: FontWeight.w900,
+            ),
+          );
+    return _tile(
+      item.icon,
+      item.title,
+      item.id == LiveGoSettingId.drmMode ? 'Mode saat ini: ${LiveGoSettings.drmMode}' : item.subtitle,
+      iconColor: item.danger ? Colors.redAccent : null,
+      trailing: trailing,
+      onTap: () => _activateSetting(item.id),
+    );
+  }
+
+  List<Widget> _settingSectionWidgets() {
+    final sections = LiveGoSettingsMenuData.build(tvLocked: false);
+    final widgets = <Widget>[];
+    for (final section in sections) {
+      widgets.add(_section(section.title));
+      widgets.add(
+        GlowContainer(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (section.description != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 8),
+                  child: Text(section.description!, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
+                ),
+              for (var i = 0; i < section.items.length; i++) ...[
+                _settingItem(section.items[i]),
+                if (i < section.items.length - 1) const Divider(color: Color(0xFF24344A), height: 1),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 
   @override
@@ -122,7 +215,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
               const SizedBox(height: 12),
               const Text('Pengaturan LiveGo', style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900)),
               const SizedBox(height: 8),
-              const Text('Rapikan mode tampilan, player, source, izin, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, height: 1.4)),
+              const Text('Rapikan mode tampilan, player, unduhan, dan cache dari satu tempat.', style: TextStyle(color: AppTheme.textSoft, height: 1.4)),
               const SizedBox(height: 14),
               Row(
                 children: const [
@@ -130,62 +223,13 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
                   SizedBox(width: 8),
                   _SmallPill('Player'),
                   SizedBox(width: 8),
-                  _SmallPill('Source'),
+                  _SmallPill('Cache'),
                 ],
               )
             ],
           ),
         ),
-        _section('Tampilan & Navigasi'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 8, bottom: 8),
-                child: Text('Pilih antarmuka yang paling cocok. Mode Auto mengikuti perangkat saat aplikasi dibuka.', style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35)),
-              ),
-              _mode('Otomatis (Ikuti Hardware)', LiveGoSettings.layoutMode == 'Auto', () => setState(() => LiveGoSettings.layoutMode = 'Auto')),
-              _mode('Smartphone / Tablet (Android)', LiveGoSettings.layoutMode == 'Mobile', () => setState(() => LiveGoSettings.layoutMode = 'Mobile')),
-              _mode('Android TV (Leanback Style)', LiveGoSettings.layoutMode == 'TV', () => setState(() => LiveGoSettings.layoutMode = 'TV')),
-            ],
-          ),
-        ),
-        _section('Player'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              _tile(Icons.image_rounded, 'Tampilkan Background Poster', 'Poster menjadi ambience di halaman detail dan player.', trailing: Switch(value: LiveGoSettings.backgroundPoster, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.backgroundPoster = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.sync_rounded, 'Gunakan Cache Playback', 'Simpan potongan stream sementara agar perpindahan lebih stabil.', trailing: Switch(value: LiveGoSettings.cachePlayback, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.cachePlayback = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.screen_rotation_rounded, 'Tampilkan Tombol Rotasi Manual', 'Tampilkan kontrol rotasi manual saat menonton.', trailing: Switch(value: LiveGoSettings.manualRotateButton, activeColor: AppTheme.cyan, onChanged: (v) => setState(() => LiveGoSettings.manualRotateButton = v))),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.lock_rounded, 'Kompatibilitas Widevine DRM', 'Mode saat ini: ${LiveGoSettings.drmMode}', trailing: const Text('ATUR', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900)), onTap: _showDrmDialog),
-            ],
-          ),
-        ),
-_section('Sumber & Izin'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            children: [
-              _tile(Icons.layers_rounded, 'Kelola Sumber Data', 'Pilih 6 platform Beranda, kategori, dan cek status server.', onTap: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const SourceManagerScreen()));
-                setState(() {});
-              }),
-              const Divider(color: Color(0xFF24344A), height: 1),
-              _tile(Icons.info_rounded, 'Kelola Notifikasi Unduhan', 'Belum aktif. Aktifkan lagi agar progress unduhan mudah dipantau.', trailing: const Text('AKTIFKAN', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900))),
-            ],
-          ),
-        ),
-        _section('Perawatan'),
-        GlowContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: _tile(Icons.delete_rounded, 'Hapus Semua Cache', 'Bersihkan cache streaming dan gambar agar ruang penyimpanan lega.', iconColor: Colors.redAccent, trailing: const Icon(Icons.arrow_forward_rounded, color: Colors.redAccent), onTap: () => setState(LiveGoSettings.reset)),
-        ),
+        ..._settingSectionWidgets(),
       ],
     );
   }

@@ -58,7 +58,7 @@ class TvAccountMenuData {
       TvAccountMenuItem(
         icon: Icons.tune_rounded,
         title: 'Pengaturan Tampilan',
-        subtitle: 'Mode tampilan, grid, poster, dan preferensi layar TV.',
+        subtitle: 'Mode layout, poster, player, DRM, unduhan, dan cache.',
         badge: 'DISPLAY',
         action: TvAccountAction.displaySettings,
       ),

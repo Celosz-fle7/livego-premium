@@ -21,7 +21,6 @@ class TvSettingsConfig {
   static const double descriptionHeight = 42;
   static const double radioRowHeight = 50;
   static const double tileRowHeight = 76;
-  static const double gridRowHeight = 112;
   static const double footerHeight = 38;
   static const double comfortTop = TvSafeZone.listTop;
   static const double comfortBottom = TvSafeZone.listBottom;
@@ -31,13 +30,6 @@ class TvSettingsConfig {
   static const double sectionTitleGap = 8;
   static const double pillGap = 8;
 
-  static const int resetTvGrid = 7;
-
-  static const List<String> drmValues = <String>[
-    'Auto',
-    'Paksa L3',
-    'Nonaktifkan Paksa L3',
-  ];
 
   static const String footerSettingsHelp =
       '↑↓ pilih • OK/→ ubah • ←/BACK kembali';

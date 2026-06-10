@@ -16,16 +16,20 @@ class TvSideNav extends StatelessWidget {
   final int index;
   final TvSideNavMode mode;
   final List<FocusNode> focusNodes;
+  final bool closeFocused;
   final ValueChanged<int> onChanged;
   final ValueChanged<int> onOpenContent;
+  final VoidCallback onClose;
 
   const TvSideNav({
     super.key,
     required this.index,
     required this.mode,
     required this.focusNodes,
+    required this.closeFocused,
     required this.onChanged,
     required this.onOpenContent,
+    required this.onClose,
   });
 
   static const items = [
@@ -66,6 +70,10 @@ class TvSideNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          _NavCloseButton(focused: closeFocused && _focused, onTap: onClose),
+          const SizedBox(height: 8),
+          Container(width: 31, height: 1, color: Colors.white10),
+          const SizedBox(height: 8),
           for (var i = 0; i < TvSideNav.items.length; i++) ...[
             _NavIconButton(
               icon: TvSideNav.items[i].icon,
@@ -104,6 +112,44 @@ class _HiddenGrip extends StatelessWidget {
         decoration: BoxDecoration(
           color: TvFocusStyle.focusBlue.withOpacity(0.16),
           borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _NavCloseButton extends StatelessWidget {
+  final bool focused;
+  final VoidCallback onTap;
+
+  const _NavCloseButton({required this.focused, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      canRequestFocus: false,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 50,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: focused ? AppTheme.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: focused ? TvFocusStyle.focusBlue : Colors.white12,
+            width: focused ? 2 : 1,
+          ),
+        ),
+        child: Container(
+          width: 26,
+          height: 4,
+          decoration: BoxDecoration(
+            color: focused ? AppTheme.whiteGlow : Colors.white54,
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
       ),
     );

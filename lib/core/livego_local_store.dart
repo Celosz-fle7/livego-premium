@@ -313,8 +313,10 @@ class LiveGoLocalStore {
 
       LiveGoSettings.language = _string(json['language'], LiveGoSettings.language);
       LiveGoSettings.quality = _string(json['quality'], LiveGoSettings.quality);
-      // TV build must not restore HP/Mobile layout from old saved settings.
-      LiveGoSettings.layoutMode = 'TV';
+      final savedLayout = _string(json['layoutMode'], LiveGoSettings.layoutMode);
+      LiveGoSettings.layoutMode = savedLayout == 'Auto' || savedLayout == 'Mobile' || savedLayout == 'TV'
+          ? savedLayout
+          : 'TV';
       LiveGoSettings.drmMode = _string(json['drmMode'], LiveGoSettings.drmMode);
       LiveGoSettings.subtitlesEnabled = _bool(json['subtitlesEnabled'], LiveGoSettings.subtitlesEnabled);
       LiveGoSettings.autoNextEnabled = _bool(json['autoNextEnabled'], LiveGoSettings.autoNextEnabled);
