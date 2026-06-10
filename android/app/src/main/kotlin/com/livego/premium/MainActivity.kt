@@ -1,5 +1,7 @@
 package com.livego.premium
 
+import android.app.UiModeManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -7,6 +9,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import androidx.core.content.FileProvider
@@ -16,6 +20,7 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private val nativePlayerChannelName = "livego/native_surface_player"
     private val updaterChannelName = "livego/app_updater"
+    private val runtimeChannelName = "livego/runtime"
 
     companion object {
         var nativePlayerChannel: MethodChannel? = null
@@ -35,6 +40,13 @@ class MainActivity : FlutterActivity() {
         return out
     }
 
+    private fun isTvRuntime(): Boolean {
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        val isTelevisionMode = uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+        val hasLeanback = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK_ONLY)
+        return isTelevisionMode || hasLeanback
+    }
 
     private fun appInfoMap(): Map<String, Any?> {
         val info = packageManager.getPackageInfo(packageName, 0)
@@ -125,6 +137,14 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
 
+                else -> result.notImplemented()
+            }
+        }
+
+        val runtimeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, runtimeChannelName)
+        runtimeChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isTvRuntime" -> result.success(isTvRuntime())
                 else -> result.notImplemented()
             }
         }

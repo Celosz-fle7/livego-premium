@@ -273,7 +273,7 @@ class LiveGoLocalStore {
       'language': LiveGoSettings.language,
       'defaultPlatform': LiveGoSettings.defaultPlatform,
       'quality': LiveGoSettings.quality,
-      'layoutMode': LiveGoSettings.layoutMode,
+      'layoutMode': LiveGoSettings.layoutModeForPersistence(),
       'drmMode': LiveGoSettings.drmMode,
       'subtitlesEnabled': LiveGoSettings.subtitlesEnabled,
       'autoNextEnabled': LiveGoSettings.autoNextEnabled,
@@ -300,6 +300,7 @@ class LiveGoLocalStore {
     _prefs = prefs;
     await prefs.remove(_settingsKey);
     LiveGoSettings.reset();
+    LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: LiveGoSettings.runtimeLockedToTv);
     _bump();
   }
 
@@ -315,9 +316,8 @@ class LiveGoLocalStore {
       LiveGoSettings.language = _string(json['language'], LiveGoSettings.language);
       LiveGoSettings.quality = _string(json['quality'], LiveGoSettings.quality);
       final savedLayout = _string(json['layoutMode'], LiveGoSettings.layoutMode);
-      LiveGoSettings.layoutMode = savedLayout == 'Auto' || savedLayout == 'Mobile' || savedLayout == 'TV'
-          ? savedLayout
-          : 'TV';
+      LiveGoSettings.layoutMode = LiveGoSettings.normalizeLayoutMode(savedLayout);
+      LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: LiveGoSettings.runtimeLockedToTv);
       LiveGoSettings.drmMode = _string(json['drmMode'], LiveGoSettings.drmMode);
       LiveGoSettings.subtitlesEnabled = _bool(json['subtitlesEnabled'], LiveGoSettings.subtitlesEnabled);
       LiveGoSettings.autoNextEnabled = _bool(json['autoNextEnabled'], LiveGoSettings.autoNextEnabled);

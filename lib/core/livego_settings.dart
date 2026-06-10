@@ -2,11 +2,16 @@ import '../services/api/api_platform.dart';
 
 class LiveGoSettings {
   static const appName = 'LiveGo';
+  static const layoutAuto = 'Auto';
+  static const layoutMobile = 'Mobile';
+  static const layoutTv = 'TV';
+
+  static bool _runtimeLockedToTv = false;
 
   static String language = 'id';
   static String defaultPlatform = 'dobda_freereels';
   static String quality = 'Auto';
-  static String layoutMode = 'TV';
+  static String layoutMode = layoutTv;
   static String drmMode = 'Auto';
   static bool subtitlesEnabled = true;
   static bool autoNextEnabled = true;
@@ -19,6 +24,42 @@ class LiveGoSettings {
   static int mobileHomeGrid = 3;
   static int tvHomeGrid = 7;
   static final Map<String, int> tvLastHomeCategories = <String, int>{};
+
+  static bool get runtimeLockedToTv => _runtimeLockedToTv;
+
+  static String normalizeLayoutMode(String? value) {
+    if (value == layoutAuto || value == layoutMobile || value == layoutTv) {
+      return value!;
+    }
+    return layoutTv;
+  }
+
+  static void lockRuntimeToTv() {
+    _runtimeLockedToTv = true;
+    layoutMode = layoutTv;
+  }
+
+  static void clearRuntimeTvLock() {
+    _runtimeLockedToTv = false;
+    layoutMode = normalizeLayoutMode(layoutMode);
+  }
+
+  static String effectiveLayoutModeForRuntime({required bool isTvRuntime}) {
+    if (isTvRuntime || _runtimeLockedToTv) return layoutTv;
+    return normalizeLayoutMode(layoutMode);
+  }
+
+  static String layoutModeForPersistence() {
+    return _runtimeLockedToTv ? layoutTv : normalizeLayoutMode(layoutMode);
+  }
+
+  static void applyRuntimeLayoutGuard({required bool isTvRuntime}) {
+    if (isTvRuntime) {
+      lockRuntimeToTv();
+      return;
+    }
+    clearRuntimeTvLock();
+  }
 
   static final List<String> defaultPlatforms = LiveGoApiPlatforms.defaultSlugs;
 
@@ -115,7 +156,7 @@ class LiveGoSettings {
     language = 'id';
     defaultPlatform = 'dobda_freereels';
     quality = 'Auto';
-    layoutMode = 'TV';
+    layoutMode = layoutTv;
     drmMode = 'Auto';
     subtitlesEnabled = true;
     autoNextEnabled = true;
