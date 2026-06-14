@@ -10,6 +10,7 @@ enum LiveGoSettingId {
   cachePlayback,
   manualRotate,
   drmMode,
+  tvPlayerEngine,
   cacheMaintenance,
   downloadNotice,
 }
@@ -164,6 +165,13 @@ class LiveGoSettingsMenuData {
             title: 'DRM Mode',
             subtitle: 'Mode kompatibilitas Widevine DRM.',
             value: LiveGoSettings.drmMode,
+          ),
+          LiveGoSettingItem.tile(
+            id: LiveGoSettingId.tvPlayerEngine,
+            icon: Icons.settings_input_component_rounded,
+            title: 'TV Player Engine',
+            subtitle: 'Pilih engine player default untuk TV (ExoPlayer atau Flutter Player).',
+            value: LiveGoSettings.tvPlayerEngineOverride.isEmpty ? 'Default' : LiveGoSettings.tvPlayerEngineOverride,
           ),
         ],
       ),

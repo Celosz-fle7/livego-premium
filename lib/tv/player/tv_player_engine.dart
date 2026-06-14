@@ -35,7 +35,7 @@ class TvPlayerEngineConfig {
     defaultValue: '',
   );
 
-  static PlayerEngineType get defaultEngine => PlayerEngineType.nativeExo;
+  static PlayerEngineType get defaultEngine => PlayerEngineType.flutterFallback;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override}) {
     return override ?? _fromName(LiveGoSettings.tvPlayerEngineOverride) ?? _fromName(_defineEngine) ?? defaultEngine;
