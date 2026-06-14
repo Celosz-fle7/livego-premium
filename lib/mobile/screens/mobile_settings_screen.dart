@@ -133,6 +133,15 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
       case LiveGoSettingId.cacheMaintenance:
         _applySetting(LiveGoSettings.reset);
         break;
+      case LiveGoSettingId.tvPlayerEngine:
+        if (LiveGoSettings.tvPlayerEngineOverride == 'nativeExo') {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'flutterFallback');
+        } else if (LiveGoSettings.tvPlayerEngineOverride == 'flutterFallback') {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = '');
+        } else {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'nativeExo');
+        }
+        break;
     }
   }
 
