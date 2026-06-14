@@ -8,6 +8,8 @@ import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../cache/tv_cache_maintenance_service.dart';
 import '../update/tv_update_screen.dart';
+import '../help/tv_help_screen.dart';
+import '../feedback/tv_feedback_screen.dart';
 import 'tv_account_config.dart';
 import 'tv_account_menu_data.dart';
 import 'widgets/tv_account_header.dart';
@@ -299,10 +301,10 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _runCacheMaintenance();
         break;
       case TvAccountAction.help:
-        _message('Bantuan TV akan ditambahkan.');
+        _push(const TvHelpScreen());
         break;
       case TvAccountAction.feedback:
-        _message('Feedback akan ditambahkan.');
+        _push(const TvFeedbackScreen());
         break;
       case TvAccountAction.about:
         _message(TvAccountConfig.aboutMessage);

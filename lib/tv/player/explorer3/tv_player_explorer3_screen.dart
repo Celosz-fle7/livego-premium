@@ -1441,11 +1441,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _toggleFit() {
-    // Disabled temporarily for Android TV texture safety.
-    // FittedBox/Cover layout caused audio-with-white-screen on some devices.
     setState(() {
-      _fitCover = false;
-      _status = 'Layar Fit aman';
+      _fitCover = !_fitCover;
+      _status = _fitCover ? 'Layar Cover' : 'Layar Fit';
     });
   }
 
@@ -1553,32 +1551,15 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _handleBackIntent() {
-    // If a previous nativeClosed pop failed and left a black screen, BACK must
-    // still be able to recover instead of being ignored forever.
-    if (_closing && !_allowRoutePop) return;
-    if (_closing && _allowRoutePop) {
-      _exitFlutterPlayerRoute(source: 'backWhileClosing');
-      return;
-    }
+    if (_closing) return;
 
+    // During loading or error, back should exit immediately.
     if (_loading || _error.isNotEmpty) {
       _close();
       return;
     }
 
-    if (_mode == _Explorer3Mode.quality ||
-        _mode == _Explorer3Mode.subtitle ||
-        _mode == _Explorer3Mode.options) {
-      _showControls();
-      return;
-    }
-
-    if (_mode == _Explorer3Mode.episode) {
-      _showControls();
-      return;
-    }
-
-    if (_mode == _Explorer3Mode.controls) {
+    if (_mode != _Explorer3Mode.watching) {
       _hideOverlays();
       return;
     }
@@ -1728,14 +1709,29 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     // Some TV boxes play audio but render a white native texture with that layout.
     // The earlier stable Explorer 3 surface used Center + AspectRatio; keep it.
     final aspect = value.aspectRatio;
+
+    Widget player = AspectRatio(
+      aspectRatio: aspect > 0 ? aspect : 16 / 9,
+      child: VideoPlayer(c),
+    );
+
+    if (_fitCover) {
+      player = SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
+            child: VideoPlayer(c),
+          ),
+        ),
+      );
+    }
+
     return ColoredBox(
       color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: aspect > 0 ? aspect : 16 / 9,
-          child: VideoPlayer(c),
-        ),
-      ),
+      child: Center(child: player),
     );
   }
 
