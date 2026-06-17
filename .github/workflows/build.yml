@@ -16,16 +16,6 @@ runs-on: ubuntu-latest
 env:
   DEFAULT_NOBUZERO_BASE_URL: https://nobuzero.my.id
 
-  LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
-  LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
-  LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
-  LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
-
-  LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
-  LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
-  LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
-  LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
-
 steps:
   - name: Checkout
     uses: actions/checkout@v4
@@ -34,12 +24,12 @@ steps:
     uses: actions/setup-java@v4
     with:
       distribution: temurin
-      java-version: 17
+      java-version: '17'
 
   - name: Setup Flutter
     uses: subosito/flutter-action@v2
     with:
-      flutter-version: 3.22.0
+      flutter-version: '3.22.0'
       channel: stable
       cache: true
 
@@ -48,10 +38,18 @@ steps:
 
   - name: Validate required secrets
     shell: bash
+    env:
+      LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
+      LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
+      LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+      LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
+      LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
+      LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+      LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+      LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
     run: |
       missing=0
 
-      # Base URL boleh kosong; otomatis fallback ke Nobuzero.
       if [ -z "$LIVEGO_BASE_URL" ]; then
         LIVEGO_BASE_URL="$DEFAULT_NOBUZERO_BASE_URL"
       fi
@@ -60,15 +58,7 @@ steps:
         LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_BASE_URL"
       fi
 
-      # Secret yang wajib ada.
-      for name in \
-        LIVEGO_USER_ID \
-        LIVEGO_SECRET \
-        LIVEGO_RELEASE_KEYSTORE_BASE64 \
-        LIVEGO_RELEASE_STORE_PASSWORD \
-        LIVEGO_RELEASE_KEY_ALIAS \
-        LIVEGO_RELEASE_KEY_PASSWORD
-      do
+      for name in LIVEGO_USER_ID LIVEGO_SECRET LIVEGO_RELEASE_KEYSTORE_BASE64 LIVEGO_RELEASE_STORE_PASSWORD LIVEGO_RELEASE_KEY_ALIAS LIVEGO_RELEASE_KEY_PASSWORD; do
         if [ -z "${!name}" ]; then
           echo "Missing required secret: $name"
           missing=1
@@ -79,11 +69,8 @@ steps:
         exit 1
       fi
 
-      # Simpan base URL hasil fallback untuk step berikutnya.
-      # Tidak menyimpan secret ke log.
       echo "LIVEGO_BASE_URL=$LIVEGO_BASE_URL" >> "$GITHUB_ENV"
       echo "LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL" >> "$GITHUB_ENV"
-
       echo "API secret validation passed."
       echo "Using LIVEGO_BASE_URL=$LIVEGO_BASE_URL"
       echo "Using LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL"
@@ -92,6 +79,8 @@ steps:
 
   - name: Decode fixed release keystore
     shell: bash
+    env:
+      LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
     run: |
       echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
       ls -lh android/app/livego-release-key.jks
@@ -102,7 +91,12 @@ steps:
   - name: Build universal release APK
     shell: bash
     env:
+      LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+      LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
       LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
+      LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+      LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+      LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
     run: |
       flutter build apk --release \
         --dart-define=LIVEGO_BASE_URL="$LIVEGO_BASE_URL" \
