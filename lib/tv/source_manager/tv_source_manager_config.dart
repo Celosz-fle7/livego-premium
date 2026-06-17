@@ -2,12 +2,12 @@ import '../layout/tv_safe_zone.dart';
 
 /// Source Manager constants and source-family rules.
 ///
-/// Keep these values outside the screen so Dobda/Anichin separation and TV
+/// Keep these values outside the screen so Nobuzero/Anichin separation and TV
 /// reachability tuning do not require editing UI/key-handling code.
 class TvSourceManagerConfig {
   const TvSourceManagerConfig._();
 
-  static const String fallbackPlatform = 'dobda_freereels';
+  static const String fallbackPlatform = 'nobuzero_freereels';
   static const int maxActivePlatforms = 999;
   static const int maxHomePlatforms = 999;
   static const int maxCategoriesPerPlatform = 6;
@@ -36,12 +36,12 @@ class TvSourceManagerConfig {
       'Source Beranda TV. Pilih platform aktif. Kategori diatur dari shortcut Kategori Home.';
 
   static const Map<String, int> sourceOrder = <String, int>{
-    'dobda_freereels': 0,
-    'dobda_goodshort': 1,
-    'dobda_dramawave': 2,
-    'dobda_reelshort': 3,
-    'dobda_reelife': 4,
-    'dobda_rapidtv': 5,
+    'nobuzero_freereels': 0,
+    'nobuzero_goodshort': 1,
+    'nobuzero_dramawave': 2,
+    'nobuzero_reelshort': 3,
+    'nobuzero_reelife': 4,
+    'nobuzero_rapidtv': 5,
   };
 
   static int sourcePriority(String slug) {

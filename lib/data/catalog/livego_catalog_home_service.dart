@@ -6,7 +6,7 @@ import '../../services/feed/feed_config.dart';
 import '../../services/feed/feed_limiter.dart';
 import '../../services/feed/feed_session_state.dart';
 import '../../services/livego_api_gateway.dart';
-import '../../services/dobda/dobda_http_client.dart';
+import '../../services/nobuzero/nobuzero_http_client.dart';
 import '../api_manager/api_platform_fallback_router.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/api_timeout_policy.dart';
@@ -81,7 +81,7 @@ class LiveGoCatalogHomeService {
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> home({String platform = 'nobuzero_shortmax'}) async {
     const endpoint = 'home_clean_v2';
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -141,7 +141,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String category = 'Home',
     bool allowExpired = true,
   }) async {
@@ -162,7 +162,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -270,7 +270,7 @@ class LiveGoCatalogHomeService {
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'nobuzero_shortmax'}) async {
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     try {
       final rows = await LiveGoApiGateway.banner(platform: platform, lang: lang)
@@ -286,7 +286,7 @@ class LiveGoCatalogHomeService {
     return const [];
   }
 
-  static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
+  static Future<ContentItem> hero({String platform = 'nobuzero_shortmax'}) async {
     try {
       final items = await banners(platform: platform);
       if (items.isNotEmpty) return items.first;

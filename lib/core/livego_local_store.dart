@@ -352,11 +352,11 @@ class LiveGoLocalStore {
         home = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
 
-      final defaultDobdaPlatforms = LiveGoSettings.defaultPlatforms
+      final defaultNobuzeroPlatforms = LiveGoSettings.defaultPlatforms
           .where(supported.contains)
           .toList(growable: false);
-      if (defaultDobdaPlatforms.isNotEmpty) {
-        for (final slug in defaultDobdaPlatforms) {
+      if (defaultNobuzeroPlatforms.isNotEmpty) {
+        for (final slug in defaultNobuzeroPlatforms) {
           if (!active.contains(slug)) active.add(slug);
           if (!home.contains(slug)) home.add(slug);
         }
@@ -437,44 +437,44 @@ class LiveGoLocalStore {
       'pinedrama',
       'flickreels',
       'meloshort',
-      'dobda_pinedrama',
-      'dobda_flickreels',
-      'dobda_meloshort',
+      'nobuzero_pinedrama',
+      'nobuzero_flickreels',
+      'nobuzero_meloshort',
     }.contains(slug);
   }
 
   static const Map<String, String> _rawPlatformAliases = {
-    'melolo': 'dobda_melolo',
-    'dramabox': 'dobda_dramabox',
-    'moviebox': 'dobda_moviebox',
-    'mydrama': 'dobda_mydrama',
-    'dramanova': 'dobda_dramanova',
-    'shorten': 'dobda_shorten',
-    'dramahub': 'dobda_dramahub',
-    'flickshort': 'dobda_flickshort',
-    'loklok': 'dobda_loklok',
-    'radreel': 'dobda_radreel',
-    'reelflix': 'dobda_reelflix',
-    'shortflix': 'dobda_shortflix',
-    'viu': 'dobda_viu',
-    'dotdrama': 'dobda_dotdrama',
-    'dramarush': 'dobda_dramarush',
-    'layarkaca': 'dobda_layarkaca',
-    'netshort': 'dobda_netshort',
-    'shortreels': 'dobda_shortreels',
-    'bittv': 'dobda_bittv',
-    'fizzo': 'dobda_fizzo',
-    'shortmax': 'dobda_shortmax',
-    'freereels': 'dobda_freereels',
-    'dramawave': 'dobda_dramawave',
+    'melolo': 'nobuzero_melolo',
+    'dramabox': 'nobuzero_dramabox',
+    'moviebox': 'nobuzero_moviebox',
+    'mydrama': 'nobuzero_mydrama',
+    'dramanova': 'nobuzero_dramanova',
+    'shorten': 'nobuzero_shorten',
+    'dramahub': 'nobuzero_dramahub',
+    'flickshort': 'nobuzero_flickshort',
+    'loklok': 'nobuzero_loklok',
+    'radreel': 'nobuzero_radreel',
+    'reelflix': 'nobuzero_reelflix',
+    'shortflix': 'nobuzero_shortflix',
+    'viu': 'nobuzero_viu',
+    'dotdrama': 'nobuzero_dotdrama',
+    'dramarush': 'nobuzero_dramarush',
+    'layarkaca': 'nobuzero_layarkaca',
+    'netshort': 'nobuzero_netshort',
+    'shortreels': 'nobuzero_shortreels',
+    'bittv': 'nobuzero_bittv',
+    'fizzo': 'nobuzero_fizzo',
+    'shortmax': 'nobuzero_shortmax',
+    'freereels': 'nobuzero_freereels',
+    'dramawave': 'nobuzero_dramawave',
   };
 
   static String _normalizeSavedPlatform(Object? value) {
     final slug = '${value ?? ''}'.trim().toLowerCase();
     if (slug.isEmpty) return '';
-    // Kalau sudah format dobda_xxx dan didukung, biarkan.
+    // Kalau sudah format nobuzero_xxx dan didukung, biarkan.
     if (LiveGoSettings.supportedPlatforms.contains(slug)) return slug;
-    // Kalau slug mentah (tanpa dobda_) ada di alias, ubah ke dobda_xxx.
+    // Kalau slug mentah (tanpa nobuzero_) ada di alias, ubah ke nobuzero_xxx.
     final alias = _rawPlatformAliases[slug];
     if (alias != null && LiveGoSettings.supportedPlatforms.contains(alias)) {
       return alias;
