@@ -1,92 +1,128 @@
 name: Build LiveGO Premium APK
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+push:
+branches:
+- main
+workflow_dispatch:
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+build:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+env:
+  DEFAULT_NOBUZERO_BASE_URL: https://nobuzero.my.id
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+  LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
+  LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
+  LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+  LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 3.22.0
-          channel: stable
+  LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
+  LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+  LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+  LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
 
-      - name: Pub get
-        run: flutter pub get
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-      - name: Decode fixed release keystore
-        env:
-          LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$LIVEGO_RELEASE_KEYSTORE_BASE64" ]; then
-            echo "Missing secret LIVEGO_RELEASE_KEYSTORE_BASE64"
-            exit 1
-          fi
-          echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
-          ls -lh android/app/livego-release-key.jks
+  - name: Setup Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: 17
 
-      - name: Validate API secrets
-        env:
-          LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
-          LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
-          LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
-          LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
-        run: |
-          missing=0
-          for name in LIVEGO_BASE_URL LIVEGO_NOBUZERO_BASE_URL LIVEGO_USER_ID LIVEGO_SECRET; do
-            if [ -z "${!name}" ]; then
-              echo "Missing required secret: $name"
-              missing=1
-            fi
-          done
-          exit "$missing"
+  - name: Setup Flutter
+    uses: subosito/flutter-action@v2
+    with:
+      flutter-version: 3.22.0
+      channel: stable
+      cache: true
 
-      - name: Analyze
-        run: flutter analyze
+  - name: Pub get
+    run: flutter pub get
 
-      - name: Build universal release APK
-        env:
-          LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
-          LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
-          LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
-          LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
-        run: |
-          flutter build apk --release \
-            --dart-define=LIVEGO_BASE_URL="${{ secrets.LIVEGO_BASE_URL }}" \
-            --dart-define=LIVEGO_NOBUZERO_BASE_URL="${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" \
-            --dart-define=LIVEGO_USER_ID="${{ secrets.LIVEGO_USER_ID }}" \
-            --dart-define=LIVEGO_SECRET="${{ secrets.LIVEGO_SECRET }}"
+  - name: Validate required secrets
+    shell: bash
+    run: |
+      missing=0
 
-      - name: Prepare files
-        run: |
-          cd build/app/outputs/flutter-apk
-          cp app-release.apk LiveGO-Premium.apk
-          zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
-          ls -lh LiveGO-Premium.apk livego-premium-artifact.zip
+      # Base URL boleh kosong; otomatis fallback ke Nobuzero.
+      if [ -z "$LIVEGO_BASE_URL" ]; then
+        LIVEGO_BASE_URL="$DEFAULT_NOBUZERO_BASE_URL"
+      fi
 
-      - name: Upload internal APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: livego-premium-internal-apk
-          path: |
-            build/app/outputs/flutter-apk/LiveGO-Premium.apk
-            build/app/outputs/flutter-apk/livego-premium-artifact.zip
-          if-no-files-found: error
+      if [ -z "$LIVEGO_NOBUZERO_BASE_URL" ]; then
+        LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_BASE_URL"
+      fi
+
+      # Secret yang wajib ada.
+      for name in \
+        LIVEGO_USER_ID \
+        LIVEGO_SECRET \
+        LIVEGO_RELEASE_KEYSTORE_BASE64 \
+        LIVEGO_RELEASE_STORE_PASSWORD \
+        LIVEGO_RELEASE_KEY_ALIAS \
+        LIVEGO_RELEASE_KEY_PASSWORD
+      do
+        if [ -z "${!name}" ]; then
+          echo "Missing required secret: $name"
+          missing=1
+        fi
+      done
+
+      if [ "$missing" -ne 0 ]; then
+        exit 1
+      fi
+
+      # Simpan base URL hasil fallback untuk step berikutnya.
+      # Tidak menyimpan secret ke log.
+      echo "LIVEGO_BASE_URL=$LIVEGO_BASE_URL" >> "$GITHUB_ENV"
+      echo "LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL" >> "$GITHUB_ENV"
+
+      echo "API secret validation passed."
+      echo "Using LIVEGO_BASE_URL=$LIVEGO_BASE_URL"
+      echo "Using LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL"
+      echo "LIVEGO_USER_ID is configured."
+      echo "LIVEGO_SECRET is configured."
+
+  - name: Decode fixed release keystore
+    shell: bash
+    run: |
+      echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
+      ls -lh android/app/livego-release-key.jks
+
+  - name: Analyze
+    run: flutter analyze
+
+  - name: Build universal release APK
+    shell: bash
+    env:
+      LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
+    run: |
+      flutter build apk --release \
+        --dart-define=LIVEGO_BASE_URL="$LIVEGO_BASE_URL" \
+        --dart-define=LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_NOBUZERO_BASE_URL" \
+        --dart-define=LIVEGO_USER_ID="$LIVEGO_USER_ID" \
+        --dart-define=LIVEGO_SECRET="$LIVEGO_SECRET"
+
+  - name: Prepare files
+    shell: bash
+    run: |
+      cd build/app/outputs/flutter-apk
+      cp app-release.apk LiveGO-Premium.apk
+      zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
+      ls -lh LiveGO-Premium.apk livego-premium-artifact.zip
+
+  - name: Upload internal APK artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: livego-premium-internal-apk
+      path: |
+        build/app/outputs/flutter-apk/LiveGO-Premium.apk
+        build/app/outputs/flutter-apk/livego-premium-artifact.zip
+      if-no-files-found: error
