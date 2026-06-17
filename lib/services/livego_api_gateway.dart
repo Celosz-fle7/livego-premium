@@ -12,7 +12,7 @@ class LiveGoApiGateway {
 
   static bool supports(String platform) => LiveGoApiPlatforms.supports(platform);
 
-  /// API aktif TV sekarang sengaja satu pintu: Dobda.
+  /// API aktif TV sekarang sengaja satu pintu: Nobuzero.
   ///
   /// Platform lama/Anichin sudah dibackup di branch backup/api-before-clean dan
   /// tidak dipakai lagi di jalur Home/Player supaya management API tidak ruwet.

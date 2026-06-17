@@ -39,6 +39,7 @@ class LiveGoApiPlatform {
   bool get isEncrypted => videoType == LiveGoVideoType.encrypted;
   bool get isHls => videoType == LiveGoVideoType.hls;
   bool get isDobda => backend == LiveGoApiBackend.dobda;
+  bool get isNobuzero => isDobda;
 }
 
 class LiveGoApiPlatforms {
@@ -347,8 +348,8 @@ class LiveGoApiPlatforms {
 
   /// TV starter pack yang diexpose ke Home/Source Manager.
   ///
-  /// Anichin-style source disimpan sebagai legacy/off. Yang ON hanya Dobda clean
-  /// starter supaya Home tidak campur antara engine Anichin dan engine Dobda.
+  /// Anichin-style source disimpan sebagai legacy/off. Yang ON hanya Nobuzero clean
+  /// starter supaya Home tidak campur antara engine Anichin dan engine Nobuzero.
   static const List<String> tvStarterSlugs = <String>[
     'melolo',
     'dramabox',
@@ -485,7 +486,7 @@ class LiveGoApiPlatforms {
   static String categoryLabel(String platform, String category) {
     final config = bySlug(platform);
     final key = categoryKey(config.slug, category);
-    if (config.isDobda) {
+    if (config.isNobuzero) {
       if (key == 'livego' || key == 'indonesia' || key == 'dubindo') return 'LiveGo';
       return 'Home';
     }
@@ -505,7 +506,7 @@ class LiveGoApiPlatforms {
       case 'discover':
         return 'Jelajah';
     }
-    return category.trim().isEmpty ? (config.isDobda ? 'Beranda' : 'Populer') : category.trim();
+    return category.trim().isEmpty ? (config.isNobuzero ? 'Beranda' : 'Populer') : category.trim();
   }
 
   static List<String> normalizeCategoriesFor(String platform, Iterable<String> values) {

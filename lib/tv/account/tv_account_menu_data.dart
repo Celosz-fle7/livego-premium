@@ -65,7 +65,7 @@ class TvAccountMenuData {
       TvAccountMenuItem(
         icon: Icons.layers_rounded,
         title: 'Kelola Sumber Data',
-        subtitle: 'Atur Anichin, bahasa, kategori, dan platform aktif.',
+        subtitle: 'Atur LiveGO Source, bahasa, kategori, dan platform aktif.',
         badge: 'SOURCE',
         action: TvAccountAction.sourceManager,
       ),

@@ -2,12 +2,12 @@ import '../layout/tv_safe_zone.dart';
 
 /// Source Manager constants and source-family rules.
 ///
-/// Keep these values outside the screen so Dobda/Anichin separation and TV
+/// Keep these values outside the screen so LiveGO Source separation and TV
 /// reachability tuning do not require editing UI/key-handling code.
 class TvSourceManagerConfig {
   const TvSourceManagerConfig._();
 
-  static const String fallbackPlatform = 'dobda_freereels';
+  static const String fallbackPlatform = 'melolo';
   static const int maxActivePlatforms = 999;
   static const int maxHomePlatforms = 999;
   static const int maxCategoriesPerPlatform = 6;
@@ -36,12 +36,29 @@ class TvSourceManagerConfig {
       'Source Beranda TV. Pilih platform aktif. Kategori diatur dari shortcut Kategori Home.';
 
   static const Map<String, int> sourceOrder = <String, int>{
-    'dobda_freereels': 0,
-    'dobda_goodshort': 1,
-    'dobda_dramawave': 2,
-    'dobda_reelshort': 3,
-    'dobda_reelife': 4,
-    'dobda_rapidtv': 5,
+    'melolo': 0,
+    'dramabox': 1,
+    'moviebox': 2,
+    'mydrama': 3,
+    'dramanova': 4,
+    'shorten': 5,
+    'dramahub': 6,
+    'flickshort': 7,
+    'loklok': 8,
+    'radreel': 9,
+    'reelflix': 10,
+    'shortflix': 11,
+    'viu': 12,
+    'dotdrama': 13,
+    'dramarush': 14,
+    'layarkaca': 15,
+    'netshort': 16,
+    'shortreels': 17,
+    'bittv': 18,
+    'fizzo': 19,
+    'shortmax': 20,
+    'freereels': 21,
+    'dramawave': 22,
   };
 
   static int sourcePriority(String slug) {

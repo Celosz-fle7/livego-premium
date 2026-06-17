@@ -502,7 +502,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'melolo': 'Anichin • Catalog jalan. Video CENC belum dipasang native.',
     };
     if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Dobda • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
+      return 'Nobuzero • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
     }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }

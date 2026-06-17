@@ -59,6 +59,6 @@ class ApiPlatformFallbackRouter {
 
   static String _normalize(String value) {
     final clean = value.trim().toLowerCase();
-    return clean.isEmpty ? 'dobda_freereels' : clean;
+    return clean.isEmpty ? 'melolo' : clean;
   }
 }

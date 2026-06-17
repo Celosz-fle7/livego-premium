@@ -9,7 +9,7 @@ class LiveGoSettings {
   static bool _runtimeLockedToTv = false;
 
   static String language = 'id';
-  static String defaultPlatform = 'dobda_freereels';
+  static String defaultPlatform = 'melolo';
   static String quality = 'Auto';
   static String layoutMode = layoutAuto;
   static String drmMode = 'Auto';
@@ -156,7 +156,7 @@ class LiveGoSettings {
 
   static void reset() {
     language = 'id';
-    defaultPlatform = 'dobda_freereels';
+    defaultPlatform = 'melolo';
     quality = 'Auto';
     layoutMode = layoutAuto;
     drmMode = 'Auto';
