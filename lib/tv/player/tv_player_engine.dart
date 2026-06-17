@@ -5,9 +5,8 @@ import '../../models/content_item.dart';
 
 /// TV player engine selection contract.
 ///
-/// The default must remain [PlayerEngineType.nativeExo]. Legacy/hybrid is a
-/// non-default internal fallback engine that can be enabled with:
-/// `--dart-define=LIVEGO_TV_PLAYER_ENGINE=legacyHybrid`.
+/// TV starts on the Flutter player by default.
+/// Native ExoPlayer is reserved for explicit overrides or playback fallback.
 enum PlayerEngineType {
   nativeExo,
   legacyHybrid,
@@ -38,7 +37,10 @@ class TvPlayerEngineConfig {
   static PlayerEngineType get defaultEngine => PlayerEngineType.flutterFallback;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override}) {
-    return override ?? _fromName(LiveGoSettings.tvPlayerEngineOverride) ?? _fromName(_defineEngine) ?? defaultEngine;
+    return override ??
+        _fromName(LiveGoSettings.tvPlayerEngineOverride) ??
+        _fromName(_defineEngine) ??
+        defaultEngine;
   }
 
   static bool get legacyEnabled => selectedEngine() == PlayerEngineType.legacyHybrid;

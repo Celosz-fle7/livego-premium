@@ -20,7 +20,9 @@ class TvPlayerEntry {
       item: item,
       episode: episode,
       engine: selected.wireName,
-      reason: engine == null ? 'default_or_internal_flag' : 'explicit_override',
+      reason: selected == PlayerEngineType.nativeExo
+          ? 'manual_native_override'
+          : (engine == null ? 'default_flutter' : 'explicit_override'),
     );
     return Navigator.of(context).push(_routeFor(item: item, episode: episode, engine: selected));
   }
@@ -29,7 +31,7 @@ class TvPlayerEntry {
     BuildContext context, {
     required ContentItem item,
     int? episode,
-    String reason = 'legacy_failed',
+    String reason = 'flutter_failed',
   }) {
     TvPlayerDebugLog.event(
       'player_engine_fallback',
@@ -79,7 +81,17 @@ class TvPlayerEntry {
           ),
         );
       case PlayerEngineType.flutterFallback:
-        return TvPlayerExplorer3Screen(item: item, episode: episode, preferNativeSurface: false);
+        return TvPlayerExplorer3Screen(
+          item: item,
+          episode: episode,
+          preferNativeSurface: false,
+          onFallbackToNative: (context, reason) => replaceWithNativeExo(
+            context,
+            item: item,
+            episode: episode,
+            reason: reason,
+          ),
+        );
       case PlayerEngineType.nativeExo:
         return TvPlayerExplorer3Screen(item: item, episode: episode, preferNativeSurface: true);
     }
