@@ -13,35 +13,32 @@ class ApiEnv {
   );
 
   // Nobuzero API v2. Auth-nya HMAC + UserID.
-  static const String _legacyBaseUrl = String.fromEnvironment(
-    'LIVEGO_' 'DO' 'BDA_BASE_URL',
-    defaultValue: '',
-  );
-
+  // TODO TEMP TEST MODE: remove source fallback credential after runtime/stress test passes.
   static const String _primaryBaseUrl = String.fromEnvironment(
     'LIVEGO_NOBUZERO_BASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://nobuzero.my.id/api/v2',
   );
 
-  static String get nobuzeroBaseUrl => _primaryBaseUrl.trim().isNotEmpty
-      ? _primaryBaseUrl
-      : (_legacyBaseUrl.trim().isNotEmpty
-          ? _legacyBaseUrl
-          : 'https://nobuzero.my.id/api/v2');
+  static String get nobuzeroBaseUrl {
+    final value = _primaryBaseUrl.trim();
+    if (value.isNotEmpty) return value;
+    return 'https://nobuzero.my.id/api/v2';
+  }
 
   static const String nobuzeroUserId = String.fromEnvironment(
     'LIVEGO_USER_ID',
-    defaultValue: '',
+    defaultValue: 'lg_2a741cdaf982a247',
   );
 
   static const String nobuzeroSecret = String.fromEnvironment(
     'LIVEGO_SECRET',
-    defaultValue: '',
+    defaultValue:
+        '<8eddddb070709a2a47cc3477dd761abd4879caf3c1154dac147d9ff7f5d7a1ee>',
   );
 
   static const Duration timeout = Duration(seconds: 18);
 
-  /// True jika USER_ID dan SECRET sudah dikonfigurasi via --dart-define.
+  /// True jika USER_ID dan SECRET tersedia dari --dart-define atau fallback source.
   static bool get hasLiveGoCredentials =>
       nobuzeroUserId.trim().isNotEmpty && nobuzeroSecret.trim().isNotEmpty;
 

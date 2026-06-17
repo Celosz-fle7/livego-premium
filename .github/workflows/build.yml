@@ -46,20 +46,16 @@ jobs:
           echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
           ls -lh android/app/livego-release-key.jks
 
-      - name: Validate required secrets
+      - name: Validate signing secrets
         shell: bash
         env:
-          LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
-          LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
-          LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
-          LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
           LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
           LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
           LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
         run: |
           missing=0
 
-          for name in LIVEGO_BASE_URL LIVEGO_NOBUZERO_BASE_URL LIVEGO_USER_ID LIVEGO_SECRET LIVEGO_RELEASE_STORE_PASSWORD LIVEGO_RELEASE_KEY_ALIAS LIVEGO_RELEASE_KEY_PASSWORD; do
+          for name in LIVEGO_RELEASE_STORE_PASSWORD LIVEGO_RELEASE_KEY_ALIAS LIVEGO_RELEASE_KEY_PASSWORD; do
             if [ -z "${!name}" ]; then
               echo "Missing required secret: $name"
               missing=1
@@ -70,11 +66,7 @@ jobs:
             exit 1
           fi
 
-          echo "API secret validation passed."
-          echo "LIVEGO_BASE_URL is configured."
-          echo "LIVEGO_NOBUZERO_BASE_URL is configured."
-          echo "LIVEGO_USER_ID is configured."
-          echo "LIVEGO_SECRET is configured."
+          echo "Signing secret validation passed. API secrets are optional in TEMP TEST MODE."
 
       - name: Analyze
         run: flutter analyze
@@ -82,16 +74,34 @@ jobs:
       - name: Build universal release APK
         shell: bash
         env:
+          LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
+          LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
+          LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+          LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
           LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
           LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
           LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
           LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
         run: |
-          flutter build apk --release \
-            --dart-define=LIVEGO_BASE_URL="${{ secrets.LIVEGO_BASE_URL }}" \
-            --dart-define=LIVEGO_NOBUZERO_BASE_URL="${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" \
-            --dart-define=LIVEGO_USER_ID="${{ secrets.LIVEGO_USER_ID }}" \
-            --dart-define=LIVEGO_SECRET="${{ secrets.LIVEGO_SECRET }}"
+          DART_DEFINES=()
+
+          if [ -n "${LIVEGO_BASE_URL:-}" ]; then
+            DART_DEFINES+=(--dart-define=LIVEGO_BASE_URL="$LIVEGO_BASE_URL")
+          fi
+
+          if [ -n "${LIVEGO_NOBUZERO_BASE_URL:-}" ]; then
+            DART_DEFINES+=(--dart-define=LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_NOBUZERO_BASE_URL")
+          fi
+
+          if [ -n "${LIVEGO_USER_ID:-}" ]; then
+            DART_DEFINES+=(--dart-define=LIVEGO_USER_ID="$LIVEGO_USER_ID")
+          fi
+
+          if [ -n "${LIVEGO_SECRET:-}" ]; then
+            DART_DEFINES+=(--dart-define=LIVEGO_SECRET="$LIVEGO_SECRET")
+          fi
+
+          flutter build apk --release "${DART_DEFINES[@]}"
 
       - name: Prepare files
         shell: bash
