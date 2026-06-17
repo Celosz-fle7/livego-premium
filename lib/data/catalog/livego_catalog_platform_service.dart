@@ -8,6 +8,8 @@ import '../api_manager/livego_api_manager.dart';
 class LiveGoCatalogPlatformService {
   const LiveGoCatalogPlatformService._();
 
+  static final Map<String, List<String>> _categoryCache = <String, List<String>>{};
+
   static List<String> get platforms {
     final chosen = LiveGoSettings.homePlatforms.where(LiveGoSettings.isPlatformActive).toList(growable: false);
     if (chosen.isNotEmpty) return chosen;
@@ -23,7 +25,12 @@ class LiveGoCatalogPlatformService {
 
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'melolo' : platforms.first);
 
-  static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform);
+  static List<String> categoriesFor(String platform) {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final cached = _categoryCache[config.slug];
+    if (cached != null && cached.isNotEmpty) return cached.take(6).toList(growable: false);
+    return LiveGoSettings.categoriesFor(config.slug).take(6).toList(growable: false);
+  }
 
   static List<String> availableCategoriesFor(String platform) =>
       LiveGoApiPlatforms.categoriesFor(platform);
@@ -41,7 +48,41 @@ class LiveGoCatalogPlatformService {
       LiveGoApiPlatforms.bySlug(platform).isDobda;
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
-    return availableCategoriesFor(platform);
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final cached = _categoryCache[config.slug];
+    if (cached != null && cached.isNotEmpty) return cached.take(6).toList(growable: false);
+
+    try {
+      final remote = await LiveGoApiGateway.categories(
+        platform: config.slug,
+        lang: languageFor(config.slug),
+      );
+      for (final entry in remote.entries) {
+        final remoteConfig = LiveGoApiPlatforms.bySlugOrNull(entry.key);
+        if (remoteConfig == null) continue;
+        final normalized = LiveGoApiPlatforms.normalizeCategoriesFor(remoteConfig.slug, entry.value);
+        if (normalized.isNotEmpty) {
+          _categoryCache[remoteConfig.slug] = normalized.take(6).toList(growable: false);
+          LiveGoSettings.setCategoriesFor(remoteConfig.slug, normalized);
+        }
+      }
+      final selected = remote[config.slug] ?? remote[config.apiSlug] ?? remote['global'];
+      if (selected != null && selected.isNotEmpty) {
+        final normalized = LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, selected);
+        if (normalized.isNotEmpty) {
+          _categoryCache[config.slug] = normalized.take(6).toList(growable: false);
+          LiveGoSettings.setCategoriesFor(config.slug, normalized);
+          return _categoryCache[config.slug]!;
+        }
+      }
+    } catch (e) {
+      print('LIVEGO CATEGORY FETCH FALLBACK ${config.slug}: $e');
+    }
+
+    final fallback = LiveGoApiPlatforms.categoriesFor(config.slug).take(6).toList(growable: false);
+    _categoryCache[config.slug] = fallback;
+    LiveGoSettings.setCategoriesFor(config.slug, fallback);
+    return fallback;
   }
 
   static Future<String> pingPlatform(String platform) async {

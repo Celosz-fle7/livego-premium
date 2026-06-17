@@ -41,7 +41,8 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
 
     try {
       // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
-      final baseCategories = LiveGoCatalog.categoriesFor(platform).take(6).toList();
+      final baseCategories = await LiveGoCatalog.fetchCategoriesFor(platform)
+          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform).take(6).toList());
       if (category >= baseCategories.length) category = 0;
       final selectedCategory = baseCategories.isEmpty ? 'Populer' : baseCategories[category];
       final items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)

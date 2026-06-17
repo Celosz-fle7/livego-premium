@@ -99,6 +99,20 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           selectedCategory: category,
           clearPrevious: clearPrevious,
         );
+    unawaited(_refreshCategoriesFor(platform));
+  }
+
+  Future<void> _refreshCategoriesFor(String platform) async {
+    final before = LiveGoCatalog.categoriesFor(platform).join('|');
+    final refreshed = await LiveGoCatalog.fetchCategoriesFor(platform)
+        .timeout(const Duration(seconds: 7), onTimeout: () => LiveGoCatalog.categoriesFor(platform));
+    if (!mounted || platform != _platformSlug) return;
+    if (refreshed.join('|') == before) return;
+    setState(() {
+      if (_selectedCategoryIndex >= refreshed.length) _selectedCategoryIndex = 0;
+      if (_categoryIndex >= refreshed.length) _categoryIndex = _selectedCategoryIndex;
+    });
+    _rememberSelection();
   }
 
   bool _isLoadedHomeSelection(String platform, String category) {
