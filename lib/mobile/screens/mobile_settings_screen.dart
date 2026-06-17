@@ -133,6 +133,15 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
       case LiveGoSettingId.cacheMaintenance:
         _applySetting(LiveGoSettings.reset);
         break;
+      case LiveGoSettingId.tvPlayerEngine:
+        if (LiveGoSettings.tvPlayerEngineOverride == 'nativeExo') {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'flutterFallback');
+        } else if (LiveGoSettings.tvPlayerEngineOverride == 'flutterFallback') {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = '');
+        } else {
+          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'nativeExo');
+        }
+        break;
     }
   }
 
@@ -626,55 +635,6 @@ class _SourcePlatformEditor extends StatelessWidget {
             for (final c in availableCategories)
               _ChoiceButton(text: c, active: selectedCategories.contains(c), onTap: () => onCategory(c)),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-class _GridSlider extends StatelessWidget {
-  final String label;
-  final int value;
-  final int min;
-  final int max;
-  final ValueChanged<int> onChanged;
-
-  const _GridSlider({
-    required this.label,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            const Spacer(),
-            Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
-          ],
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: AppTheme.cyan,
-            inactiveTrackColor: const Color(0xFF24344A),
-            thumbColor: Colors.white,
-            overlayColor: AppTheme.cyan.withOpacity(.15),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-          ),
-          child: Slider(
-            value: value.toDouble(),
-            min: min.toDouble(),
-            max: max.toDouble(),
-            divisions: max - min,
-            onChanged: (v) => onChanged(v.round()),
-          ),
         ),
       ],
     );
