@@ -501,8 +501,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'flickreels': 'Anichin • HLS signed. Banyak bahasa termasuk ID.',
       'melolo': 'Anichin • Catalog jalan. Video CENC belum dipasang native.',
     };
-    if (LiveGoCatalog.isNobuzeroPlatform(slug)) {
-      return 'Nobuzero • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
+    if (LiveGoCatalog.isDobdaPlatform(slug)) {
+      return 'Dobda • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
     }
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
   }

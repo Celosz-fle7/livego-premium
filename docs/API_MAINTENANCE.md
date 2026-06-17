@@ -99,7 +99,7 @@ Provider aktif default:
 Catatan:
 - Melolo jangan default jika masih kompleks DRM/decrypt/audio.
 - Jangan aktifkan provider baru sebelum Player/Home stabil.
-- Nobuzero lama jangan aktif di main route jika sudah diganti Anichin.
+- Dobda lama jangan aktif di main route jika sudah diganti Anichin.
 
 ## Player API Rules
 
@@ -146,13 +146,13 @@ Checklist:
 
 Satu patch API harus satu root problem.
 
-## Nobuzero Home / LiveGo / Platform Rules
+## Dobda Home / LiveGo / Platform Rules
 
 Current TV API rule:
 - Home uses `/api/v2/home` as the fast path.
 - Home must not wait for `/api/v2/discover` before showing content.
 - `/api/v2/discover` is fallback/background material only.
-- LiveGo remains an app-level category built from `/api/v2/search` because Nobuzero has no real `/livego` endpoint.
+- LiveGo remains an app-level category built from `/api/v2/search` because Dobda has no real `/livego` endpoint.
 - Platform list must show all user-selected Home platforms.
-- The current 6 Nobuzero platforms are starter defaults only, not a permanent user lock.
+- The current 6 Dobda platforms are starter defaults only, not a permanent user lock.
 - Default platform list means initial/reset choice. User choice from Source Manager must remain respected.

@@ -2,7 +2,7 @@ import '../models/content_item.dart';
 import '../models/livego_episode.dart';
 import '../models/stream_info.dart';
 import 'api/api_platform.dart';
-import 'nobuzero_api_client.dart';
+import 'dobda_api_client.dart';
 
 class LiveGoApiGateway {
   const LiveGoApiGateway._();
@@ -12,35 +12,35 @@ class LiveGoApiGateway {
 
   static bool supports(String platform) => LiveGoApiPlatforms.supports(platform);
 
-  /// API aktif TV sekarang sengaja satu pintu: Nobuzero.
-  static bool isNobuzero(String platform) => true;
+  /// API aktif TV sekarang sengaja satu pintu: Dobda.
+  static bool isDobda(String platform) => true;
 
-  static Future<List<String>> languages() => NobuzeroApiClient.languages();
-  static Future<List<String>> categories() => NobuzeroApiClient.categories();
-  static Future<Map<String, dynamic>> keyStatus() => NobuzeroApiClient.keyStatus();
+  static Future<List<String>> languages() => DobdaApiClient.languages();
+  static Future<List<String>> categories() => DobdaApiClient.categories();
+  static Future<Map<String, dynamic>> keyStatus() => DobdaApiClient.keyStatus();
 
   static Future<List<ContentItem>> home({
-    String platform = 'nobuzero_shortmax',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) {
-    return NobuzeroApiClient.home(platform: platform, lang: lang);
+    return DobdaApiClient.home(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'nobuzero_shortmax',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) {
-    return NobuzeroApiClient.discover(platform: platform, lang: lang, page: page);
+    return DobdaApiClient.discover(platform: platform, lang: lang, page: page);
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'nobuzero_shortmax',
+    String platform = 'dobda_shortmax',
     required String collection,
     String lang = 'id',
     int page = 1,
   }) {
-    return NobuzeroApiClient.collection(
+    return DobdaApiClient.collection(
       platform: platform,
       collection: collection,
       lang: lang,
@@ -49,30 +49,30 @@ class LiveGoApiGateway {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'nobuzero_shortmax',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) {
-    return NobuzeroApiClient.banner(platform: platform, lang: lang);
+    return DobdaApiClient.banner(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'nobuzero_shortmax',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) {
-    return NobuzeroApiClient.search(query: query, platform: platform, lang: lang);
+    return DobdaApiClient.search(query: query, platform: platform, lang: lang);
   }
 
   static Future<ContentItem?> detail(ContentItem item) {
-    return NobuzeroApiClient.detail(item);
+    return DobdaApiClient.detail(item);
   }
 
   static Future<List<LiveGoEpisode>> episodes(ContentItem item) {
-    return NobuzeroApiClient.episodes(item);
+    return DobdaApiClient.episodes(item);
   }
 
   static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) {
-    return NobuzeroApiClient.videoInfo(item, chapterId: chapterId);
+    return DobdaApiClient.videoInfo(item, chapterId: chapterId);
   }
 
   static Future<StreamInfo> fastEpisodeStream(
@@ -80,10 +80,10 @@ class LiveGoApiGateway {
     String? chapterId,
     Duration timeout = const Duration(seconds: 7),
   }) {
-    return NobuzeroApiClient.fastEpisodeStream(item, chapterId: chapterId, timeout: timeout);
+    return DobdaApiClient.fastEpisodeStream(item, chapterId: chapterId, timeout: timeout);
   }
 
   static Future<String> ping(String platform, String lang) {
-    return NobuzeroApiClient.ping(platform, lang);
+    return DobdaApiClient.ping(platform, lang);
   }
 }

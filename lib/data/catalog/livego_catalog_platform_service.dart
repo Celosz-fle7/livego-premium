@@ -21,7 +21,7 @@ class LiveGoCatalogPlatformService {
 
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
 
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'nobuzero_shortmax' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_shortmax' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform);
 
@@ -37,8 +37,8 @@ class LiveGoCatalogPlatformService {
   static String backendLabel(String platform) =>
       LiveGoApiPlatforms.backendLabel(platform);
 
-  static bool isNobuzeroPlatform(String platform) =>
-      LiveGoApiPlatforms.bySlug(platform).isNobuzero;
+  static bool isDobdaPlatform(String platform) =>
+      LiveGoApiPlatforms.bySlug(platform).isDobda;
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
     try {

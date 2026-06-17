@@ -39,8 +39,8 @@ class ApiCapabilityLock {
     if (config.isEncrypted) {
       return 'DRM/CENC: jangan dipaksa ke native player sampai decrypt/audio siap.';
     }
-    if (config.isNobuzero) {
-      return 'Nobuzero beta: aktifkan seperlunya, cocok sebagai fallback.';
+    if (config.isDobda) {
+      return 'Dobda beta: aktifkan seperlunya, cocok sebagai fallback.';
     }
     if (config.streamFromAllEpisodes) {
       return 'Video bisa lebih stabil dari /allepisode, bukan cuma /episode.';
@@ -57,8 +57,8 @@ class ApiCapabilityLock {
     switch (backend) {
       case LiveGoApiBackend.anichin:
         return 'ANICHIN';
-      case LiveGoApiBackend.nobuzero:
-        return 'NOBUZERO';
+      case LiveGoApiBackend.dobda:
+        return 'DOBDA';
     }
   }
 
@@ -85,6 +85,6 @@ class ApiCapabilityLock {
   }
 
   static bool _isBeta(LiveGoApiPlatform config) {
-    return config.isNobuzero || config.isEncrypted;
+    return config.isDobda || config.isEncrypted;
   }
 }

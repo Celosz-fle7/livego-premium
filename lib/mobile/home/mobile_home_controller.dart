@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
-import '../../services/nobuzero/nobuzero_http_client.dart';
+import '../../services/dobda/dobda_http_client.dart';
 import 'mobile_home_state.dart';
 
 class MobileHomeController {
@@ -11,7 +11,7 @@ class MobileHomeController {
   List<String> _platforms = [];
 
   String get selectedPlatformSlug {
-    if (_platforms.isEmpty) return 'nobuzero_shortmax';
+    if (_platforms.isEmpty) return 'dobda_shortmax';
     final index = state.value.selectedPlatformIndex;
     return (index >= 0 && index < _platforms.length) ? _platforms[index] : _platforms.first;
   }
