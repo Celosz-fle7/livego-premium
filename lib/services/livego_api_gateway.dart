@@ -13,21 +13,20 @@ class LiveGoApiGateway {
   static bool supports(String platform) => LiveGoApiPlatforms.supports(platform);
 
   /// API aktif TV sekarang sengaja satu pintu: Dobda.
+  ///
+  /// Platform lama/Anichin sudah dibackup di branch backup/api-before-clean dan
+  /// tidak dipakai lagi di jalur Home/Player supaya management API tidak ruwet.
   static bool isDobda(String platform) => true;
 
-  static Future<List<String>> languages() => DobdaApiClient.languages();
-  static Future<List<String>> categories() => DobdaApiClient.categories();
-  static Future<Map<String, dynamic>> keyStatus() => DobdaApiClient.keyStatus();
-
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_shortmax',
+    String platform = 'melolo',
     String lang = 'id',
   }) {
     return DobdaApiClient.home(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_shortmax',
+    String platform = 'melolo',
     String lang = 'id',
     int page = 1,
   }) {
@@ -35,7 +34,7 @@ class LiveGoApiGateway {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_shortmax',
+    String platform = 'melolo',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -49,7 +48,7 @@ class LiveGoApiGateway {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_shortmax',
+    String platform = 'melolo',
     String lang = 'id',
   }) {
     return DobdaApiClient.banner(platform: platform, lang: lang);
@@ -57,7 +56,7 @@ class LiveGoApiGateway {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_shortmax',
+    String platform = 'melolo',
     String lang = 'id',
   }) {
     return DobdaApiClient.search(query: query, platform: platform, lang: lang);

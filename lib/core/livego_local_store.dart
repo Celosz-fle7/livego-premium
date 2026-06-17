@@ -330,7 +330,8 @@ class LiveGoLocalStore {
       LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
       LiveGoSettings.tvPlayerEngineOverride = _string(json['tvPlayerEngineOverride'], LiveGoSettings.tvPlayerEngineOverride);
       LiveGoSettings.tvSourceSetupCompleted = _bool(json['tvSourceSetupCompleted'], LiveGoSettings.tvSourceSetupCompleted);
-
+      // Grid settings are now fixed: HP=3, TV=7.
+      // Ignore stale saved values so old settings cannot break layout.
       LiveGoSettings.mobileHomeGrid = 3;
       LiveGoSettings.tvHomeGrid = 7;
 
@@ -338,20 +339,24 @@ class LiveGoLocalStore {
       final savedHomePlatforms = _stringList(json['homePlatforms']);
       var active = _dedupeSupported(savedActivePlatforms, supported);
       var home = _dedupeSupported(savedHomePlatforms, supported);
-
-      // Reset hanya jika ada source legacy yang BENAR-BENAR tidak terdaftar sebagai alias Nobuzero
-      // atau jika platform yang tersisa sangat sedikit.
-      final hasUntrustedLegacy = savedActivePlatforms.any(_isLegacyApiSource) ||
+      final hasLegacyApiSource = savedActivePlatforms.any(_isLegacyApiSource) ||
           savedHomePlatforms.any(_isLegacyApiSource) ||
           _isLegacyApiSource(json['defaultPlatform']);
 
-      if (hasUntrustedLegacy && active.length < 2) {
+      // Kalau setting lama masih berisi Anichin-style source, reset ke Dobda clean starter.
+      // Ini mencegah Home/Source Manager campur engine lama dengan Dobda aktif.
+      if (hasLegacyApiSource && active.length < 2) {
         active = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
-      if (hasUntrustedLegacy && home.length < 2) {
+      if (hasLegacyApiSource && home.length < 2) {
         home = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
 
+      // Dobda migration guard:
+      // Old saved source settings can leave Home with only one Dobda platform
+      // (or a legacy alias normalized to dobda_freereels). Always merge the
+      // current Dobda starter pack back into active/home so Source Manager and
+      // Home expose all clean Dobda platforms after update.
       final defaultDobdaPlatforms = LiveGoSettings.defaultPlatforms
           .where(supported.contains)
           .toList(growable: false);
@@ -379,7 +384,7 @@ class LiveGoLocalStore {
       }
 
       final savedDefault = _normalizeSavedPlatform(_string(json['defaultPlatform'], LiveGoSettings.homePlatforms.first));
-      LiveGoSettings.defaultPlatform = (savedDefault.isNotEmpty && LiveGoSettings.activePlatforms.contains(savedDefault))
+      LiveGoSettings.defaultPlatform = LiveGoSettings.activePlatforms.contains(savedDefault)
           ? savedDefault
           : LiveGoSettings.homePlatforms.first;
 
@@ -387,7 +392,7 @@ class LiveGoLocalStore {
       if (languages is Map) {
         for (final entry in languages.entries) {
           final slug = _normalizeSavedPlatform(entry.key);
-          if (slug.isNotEmpty && supported.contains(slug)) {
+          if (supported.contains(slug)) {
             LiveGoSettings.setLanguageForPlatform(slug, '${entry.value}');
           }
         }
@@ -397,7 +402,7 @@ class LiveGoLocalStore {
       if (categories is Map) {
         for (final entry in categories.entries) {
           final slug = _normalizeSavedPlatform(entry.key);
-          if (slug.isEmpty || !supported.contains(slug)) continue;
+          if (!supported.contains(slug)) continue;
           LiveGoSettings.setCategoriesFor(slug, _stringList(entry.value));
         }
       }
@@ -407,7 +412,7 @@ class LiveGoLocalStore {
         LiveGoSettings.tvLastHomeCategories.clear();
         for (final entry in tvLastCategories.entries) {
           final slug = _normalizeSavedPlatform(entry.key);
-          if (slug.isEmpty || !supported.contains(slug)) continue;
+          if (!supported.contains(slug)) continue;
           final max = LiveGoSettings.categoriesFor(slug).length - 1;
           if (max < 0) continue;
           LiveGoSettings.tvLastHomeCategories[slug] = parseInt(entry.value, fallback: 0).clamp(0, max).toInt();
@@ -423,7 +428,7 @@ class LiveGoLocalStore {
     final seen = <String>{};
     for (final value in values) {
       final slug = _normalizeSavedPlatform(value);
-      if (slug.isEmpty || !supported.contains(slug)) continue;
+      if (!supported.contains(slug)) continue;
       if (seen.add(slug)) out.add(slug);
     }
     return out;
@@ -431,56 +436,27 @@ class LiveGoLocalStore {
 
   static bool _isLegacyApiSource(Object? value) {
     final slug = '${value ?? ''}'.trim().toLowerCase();
-    // Platform resmi Nobuzero dan aliasnya TIDAK dianggap legacy.
-    // Hanya platform yang benar-benar mati/diganti arsitekturnya yang masuk sini.
     return const <String>{
+      'shortmax',
+      'netshort',
       'pinedrama',
       'flickreels',
       'meloshort',
+      'dramabox',
+      'melolo',
+      'dobda_shortmax',
+      'dobda_netshort',
       'dobda_pinedrama',
       'dobda_flickreels',
       'dobda_meloshort',
+      'dobda_melolo',
     }.contains(slug);
   }
 
-  static const Map<String, String> _rawPlatformAliases = {
-    'melolo': 'dobda_melolo',
-    'dramabox': 'dobda_dramabox',
-    'moviebox': 'dobda_moviebox',
-    'mydrama': 'dobda_mydrama',
-    'dramanova': 'dobda_dramanova',
-    'shorten': 'dobda_shorten',
-    'dramahub': 'dobda_dramahub',
-    'flickshort': 'dobda_flickshort',
-    'loklok': 'dobda_loklok',
-    'radreel': 'dobda_radreel',
-    'reelflix': 'dobda_reelflix',
-    'shortflix': 'dobda_shortflix',
-    'viu': 'dobda_viu',
-    'dotdrama': 'dobda_dotdrama',
-    'dramarush': 'dobda_dramarush',
-    'layarkaca': 'dobda_layarkaca',
-    'netshort': 'dobda_netshort',
-    'shortreels': 'dobda_shortreels',
-    'bittv': 'dobda_bittv',
-    'fizzo': 'dobda_fizzo',
-    'shortmax': 'dobda_shortmax',
-    'freereels': 'dobda_freereels',
-    'dramawave': 'dobda_dramawave',
-  };
-
   static String _normalizeSavedPlatform(Object? value) {
     final slug = '${value ?? ''}'.trim().toLowerCase();
-    if (slug.isEmpty) return '';
-    // Kalau sudah format dobda_xxx dan didukung, biarkan.
-    if (LiveGoSettings.supportedPlatforms.contains(slug)) return slug;
-    // Kalau slug mentah (tanpa dobda_) ada di alias, ubah ke dobda_xxx.
-    final alias = _rawPlatformAliases[slug];
-    if (alias != null && LiveGoSettings.supportedPlatforms.contains(alias)) {
-      return alias;
-    }
-    // Jika tidak dikenal, return kosong (akan difilter di _dedupeSupported).
-    return '';
+    if (_isLegacyApiSource(slug)) return 'dobda_freereels';
+    return slug;
   }
 
   static String _string(Object? value, String fallback) {

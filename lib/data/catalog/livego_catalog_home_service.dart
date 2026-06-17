@@ -6,7 +6,6 @@ import '../../services/feed/feed_config.dart';
 import '../../services/feed/feed_limiter.dart';
 import '../../services/feed/feed_session_state.dart';
 import '../../services/livego_api_gateway.dart';
-import '../../services/dobda/dobda_http_client.dart';
 import '../api_manager/api_platform_fallback_router.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/api_timeout_policy.dart';
@@ -55,33 +54,28 @@ class LiveGoCatalogHomeService {
         return cached;
       }
 
-      try {
-        final rows = await LiveGoApiManager.fetchItems(
+      final rows = await LiveGoApiManager.fetchItems(
+        platform: candidate,
+        operation: '$operation:fallback:$candidate',
+        timeout: ApiTimeoutPolicy.home,
+        request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
+      );
+      if (rows.isNotEmpty) {
+        print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
+        await LiveGoContentCache.writeItems(
           platform: candidate,
-          operation: '$operation:fallback:$candidate',
-          timeout: ApiTimeoutPolicy.home,
-          request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
+          endpoint: endpoint,
+          params: {'lang': lang},
+          items: rows,
+          ttl: _homeCategoryTtl(endpoint),
         );
-        if (rows.isNotEmpty) {
-          print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
-          await LiveGoContentCache.writeItems(
-            platform: candidate,
-            endpoint: endpoint,
-            params: {'lang': lang},
-            items: rows,
-            ttl: _homeCategoryTtl(endpoint),
-          );
-          return rows;
-        }
-      } catch (e) {
-        // Stop fallback loop if auth error detected
-        if (e is LiveGoAuthConfigException || e is LiveGoAuthException) break;
+        return rows;
       }
     }
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_shortmax'}) async {
+  static Future<List<ContentItem>> home({String platform = 'dobda_freereels'}) async {
     const endpoint = 'home_clean_v2';
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -99,6 +93,7 @@ class LiveGoCatalogHomeService {
       timeout: ApiTimeoutPolicy.home,
       request: () => LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang),
     );
+    print('CATALOG HOME $platform -> ${rows.length}');
     if (rows.isNotEmpty) {
       await LiveGoContentCache.writeItems(
         platform: platform,
@@ -141,7 +136,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String category = 'Home',
     bool allowExpired = true,
   }) async {
@@ -162,7 +157,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_shortmax',
+    String platform = 'dobda_freereels',
     String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -193,15 +188,6 @@ class LiveGoCatalogHomeService {
       request: () {
         if (key == 'trending' || key.isEmpty || key == 'home') {
           return LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang);
-        }
-        if (key == 'discover') {
-          return LiveGoApiProviderRegistry.providerFor(platform).discover(lang: lang);
-        }
-        if (key == 'livego') {
-          return LiveGoApiProviderRegistry.providerFor(platform).collection(
-            collection: 'livego',
-            lang: lang,
-          );
         }
         return LiveGoApiProviderRegistry.providerFor(platform).collection(
           collection: key,
@@ -254,44 +240,29 @@ class LiveGoCatalogHomeService {
     final entries = <MapEntry<String, List<ContentItem>>>[];
     final seenKeys = <String>{};
     for (final platform in LiveGoCatalogPlatformService.platforms.take(6)) {
-      try {
-        final rows = await home(platform: platform);
-        final clean = <ContentItem>[];
-        for (final item in rows) {
-          final key = ContentHealthService.contentKey(item);
-          if (seenKeys.add(key)) clean.add(item);
-        }
-        if (clean.isNotEmpty) entries.add(MapEntry(LiveGoCatalogPlatformService.label(platform), clean));
-      } catch (e) {
-        // Stop fan-out if auth fails
-        if (e is LiveGoAuthConfigException || e is LiveGoAuthException) break;
+      final rows = await home(platform: platform);
+      final clean = <ContentItem>[];
+      for (final item in rows) {
+        final key = ContentHealthService.contentKey(item);
+        if (seenKeys.add(key)) clean.add(item);
       }
+      if (clean.isNotEmpty) entries.add(MapEntry(LiveGoCatalogPlatformService.label(platform), clean));
     }
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
-    final lang = LiveGoCatalogPlatformService.languageFor(platform);
-    try {
-      final rows = await LiveGoApiGateway.banner(platform: platform, lang: lang)
-          .timeout(const Duration(seconds: 6));
-      if (rows.isNotEmpty) return rows.take(5).toList();
-    } catch (e) {
-      print('BANNER API ERROR $platform: $e');
-      if (e is LiveGoAuthConfigException || e is LiveGoAuthException) rethrow;
-    }
-
+  static Future<List<ContentItem>> banners({String platform = 'dobda_freereels'}) async {
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
-    return const [];
+    return [];
   }
 
-  static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
+  static Future<ContentItem> hero({String platform = 'dobda_freereels'}) async {
     try {
-      final items = await banners(platform: platform);
+      final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
     } catch (e) {
-      print('LIVEGO CATALOG HERO ERROR: $e');
+      print('LIVEGO CATALOG ERROR: $e');
     }
     return MockCatalog.hero;
   }
