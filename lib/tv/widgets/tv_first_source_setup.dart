@@ -216,21 +216,21 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
 
   String _statusText(String slug) {
     final config = LiveGoApiPlatforms.bySlug(slug);
-    if (config.isDobda) return 'BETA';
+    if (config.isNobuzero) return 'BETA';
     if (config.isEncrypted) return 'DRM';
     return 'OK';
   }
 
   Color _statusColor(String slug) {
     final config = LiveGoApiPlatforms.bySlug(slug);
-    if (config.isDobda) return Colors.orangeAccent;
+    if (config.isNobuzero) return Colors.orangeAccent;
     if (config.isEncrypted) return AppTheme.warning;
     return Colors.greenAccent;
   }
 
   String _description(String slug) {
     final config = LiveGoApiPlatforms.bySlug(slug);
-    if (config.isDobda) return 'Dobda beta. Bisa dipakai, tapi jangan aktifkan terlalu banyak.';
+    if (config.isNobuzero) return 'Nobuzero beta. Bisa dipakai, tapi jangan aktifkan terlalu banyak.';
     if (config.isEncrypted) return 'Eksperimental. DRM/audio belum final.';
     if (config.isHls) return 'HLS source. Cocok untuk TV player.';
     return 'Direct source. Ringan untuk TV.';

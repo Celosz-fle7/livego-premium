@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-class DobdaHmacSigner {
-  const DobdaHmacSigner._();
+class NobuzeroHmacSigner {
+  const NobuzeroHmacSigner._();
 
   static Map<String, String> headers({
     required String method,

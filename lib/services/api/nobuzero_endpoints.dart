@@ -1,5 +1,5 @@
-class DobdaEndpoints {
-  const DobdaEndpoints._();
+class NobuzeroEndpoints {
+  const NobuzeroEndpoints._();
 
   static const languages = '/api/v2/languages';
   static const categories = '/api/v2/categories';

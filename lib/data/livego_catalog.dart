@@ -21,16 +21,16 @@ class LiveGoCatalog {
   static List<String> languagesFor(String platform) => LiveGoCatalogPlatformService.languagesFor(platform);
   static String languageFor(String platform) => LiveGoCatalogPlatformService.languageFor(platform);
   static String backendLabel(String platform) => LiveGoCatalogPlatformService.backendLabel(platform);
-  static bool isDobdaPlatform(String platform) => LiveGoCatalogPlatformService.isDobdaPlatform(platform);
+  static bool isNobuzeroPlatform(String platform) => LiveGoCatalogPlatformService.isNobuzeroPlatform(platform);
   static Future<List<String>> fetchCategoriesFor(String platform) => LiveGoCatalogPlatformService.fetchCategoriesFor(platform);
   static Future<String> pingPlatform(String platform) => LiveGoCatalogPlatformService.pingPlatform(platform);
   static String label(String slug) => LiveGoCatalogPlatformService.label(slug);
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_freereels'}) =>
+  static Future<List<ContentItem>> home({String platform = 'nobuzero_freereels'}) =>
       LiveGoCatalogHomeService.home(platform: platform);
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'nobuzero_freereels',
     String category = 'Home',
     bool allowExpired = true,
   }) =>
@@ -41,7 +41,7 @@ class LiveGoCatalog {
       );
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'nobuzero_freereels',
     String category = 'Home',
   }) =>
       LiveGoCatalogHomeService.homeByCategory(platform: platform, category: category);
@@ -49,13 +49,13 @@ class LiveGoCatalog {
   static Future<Map<String, List<ContentItem>>> homeSections() =>
       LiveGoCatalogHomeService.homeSections();
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_freereels'}) =>
+  static Future<List<ContentItem>> banners({String platform = 'nobuzero_freereels'}) =>
       LiveGoCatalogHomeService.banners(platform: platform);
 
-  static Future<ContentItem> hero({String platform = 'dobda_freereels'}) =>
+  static Future<ContentItem> hero({String platform = 'nobuzero_freereels'}) =>
       LiveGoCatalogHomeService.hero(platform: platform);
 
-  static Future<List<ContentItem>> search(String query, {String platform = 'dobda_freereels'}) =>
+  static Future<List<ContentItem>> search(String query, {String platform = 'nobuzero_freereels'}) =>
       LiveGoCatalogSearchService.search(query, platform: platform);
 
   static Future<List<ContentItem>> searchAll(String query) =>
