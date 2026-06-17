@@ -264,17 +264,28 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
+    final lang = LiveGoCatalogPlatformService.languageFor(platform);
+    try {
+      // Banner API dengan timeout pendek (6 detik).
+      final rows = await LiveGoApiGateway.banner(platform: platform, lang: lang)
+          .timeout(const Duration(seconds: 6));
+      if (rows.isNotEmpty) return rows.take(5).toList();
+    } catch (e) {
+      print('BANNER API ERROR $platform: $e');
+    }
+
+    // Fallback: ambil dari item Home jika banner endpoint gagal.
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
-    return [];
+    return const [];
   }
 
   static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
     try {
-      final items = await home(platform: platform);
+      final items = await banners(platform: platform);
       if (items.isNotEmpty) return items.first;
     } catch (e) {
-      print('LIVEGO CATALOG ERROR: $e');
+      print('LIVEGO CATALOG HERO ERROR: $e');
     }
     return MockCatalog.hero;
   }
