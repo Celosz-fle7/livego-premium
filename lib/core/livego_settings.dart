@@ -20,7 +20,7 @@ class LiveGoSettings {
   static bool backgroundPoster = true;
   static bool cachePlayback = true;
   static bool manualRotateButton = true;
-  // Internal/debug-only TV player engine override. Empty means nativeExo default.
+  // Internal/debug-only TV route player override. Empty means Flutter default.
   static String tvPlayerEngineOverride = '';
   static bool tvSourceSetupCompleted = false;
   static int mobileHomeGrid = 3;

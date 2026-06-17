@@ -28,12 +28,14 @@ class TvPlayerExplorer3Screen extends StatefulWidget {
   final ContentItem item;
   final int? episode;
   final bool preferNativeSurface;
+  final Future<void> Function(BuildContext context, String reason)? onFallbackToNative;
 
   const TvPlayerExplorer3Screen({
     super.key,
     required this.item,
     this.episode,
     this.preferNativeSurface = true,
+    this.onFallbackToNative,
   });
 
   @override
@@ -869,6 +871,23 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       await _startController(token, stream, url);
     } catch (error) {
       if (!_active(token)) return;
+      if (!widget.preferNativeSurface && widget.onFallbackToNative != null) {
+        final reason = _lastStreamUrl.toLowerCase().contains('.m3u8')
+            ? 'hls_requires_native'
+            : 'flutter_failed';
+        TvPlayerDebugLog.event(
+          'player_engine_fallback',
+          item: widget.item,
+          episode: _episode,
+          engine: PlayerEngineType.nativeExo.wireName,
+          reason: reason,
+          host: _lastStreamHost,
+          tail: _lastStreamTail,
+          error: error,
+        );
+        await widget.onFallbackToNative!(context, reason);
+        return;
+      }
       await _disposeController();
       if (!mounted) return;
       setState(() {

@@ -143,7 +143,7 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
       if (!mounted || _closing || token != _loadToken) return;
       final fallback = widget.onFallbackToNative;
       if (fallback != null) {
-        await fallback(context, 'legacy_init_failed');
+        await fallback(context, 'flutter_failed');
         return;
       }
       setState(() {

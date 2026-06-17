@@ -134,13 +134,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
         _applySetting(LiveGoSettings.reset);
         break;
       case LiveGoSettingId.tvPlayerEngine:
-        if (LiveGoSettings.tvPlayerEngineOverride == 'nativeExo') {
-          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'flutterFallback');
-        } else if (LiveGoSettings.tvPlayerEngineOverride == 'flutterFallback') {
-          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = '');
-        } else {
-          _applySetting(() => LiveGoSettings.tvPlayerEngineOverride = 'nativeExo');
-        }
+        // TV-only setting; mobile routes must not read or mutate it.
         break;
     }
   }
@@ -173,7 +167,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
   }
 
   List<Widget> _settingSectionWidgets() {
-    final sections = LiveGoSettingsMenuData.build(tvLocked: false);
+    final sections = LiveGoSettingsMenuData.build(tvLocked: false, includeTvPlayerEngine: false);
     final widgets = <Widget>[];
     for (final section in sections) {
       widgets.add(_section(section.title));

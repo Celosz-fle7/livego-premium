@@ -184,17 +184,17 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     final total = _knownEpisodeCount > widget.item.episodes ? _knownEpisodeCount : widget.item.episodes;
 
     if (_brokenEpisodeSkips >= 3 || episode >= total) {
-      final hidden = await ContentHealthService.markBroken(
-        widget.item,
-        reason: _lastBrokenReason,
-        days: 7,
-        failCount: _brokenEpisodeSkips,
+      debugPrint(
+        'LIVEGO MOBILE PLAYER source_error_no_hide reason=$_lastBrokenReason '
+        'episode=$episode total=$total',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(hidden
-            ? 'Konten ini bermasalah. Disembunyikan sementara 7 hari.'
-            : 'Beberapa episode gagal, tapi tidak disembunyikan karena kemungkinan jaringan/server.')),
+        const SnackBar(
+          content: Text(
+            'Source gagal, konten tidak disembunyikan selama test mapping API.',
+          ),
+        ),
       );
       return;
     }
@@ -381,6 +381,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Future<void> _openResolvedUrl(String url, {required bool resume, required bool autoplay}) async {
     try {
       _activeUrl = url;
+      _logStreamUrl('open_stream', url);
       final old = _controller;
       old?.removeListener(_listen);
       await old?.dispose();
@@ -408,8 +409,25 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _error = '$e';
       _buffering = false;
       if (mounted) setState(() {});
+      _logStreamUrl('source_error', url, error: e);
       _scheduleSkipBrokenEpisode('$e');
     }
+  }
+
+  void _logStreamUrl(String event, String url, {Object? error}) {
+    Uri? uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      uri = null;
+    }
+    final host = uri?.host.isNotEmpty == true ? uri!.host : '-';
+    final path = uri?.path.isNotEmpty == true ? uri!.path : url;
+    final tail = path.length <= 48 ? path : path.substring(path.length - 48);
+    debugPrint(
+      'LIVEGO MOBILE PLAYER $event host=$host tail=$tail'
+      '${error == null ? '' : ' error=$error'}',
+    );
   }
 
   void _scheduleSkipBrokenEpisode(String reason) {
