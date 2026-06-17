@@ -4,6 +4,21 @@ import 'dart:io';
 import '../api/api_env.dart';
 import '../api/dobda_hmac_signer.dart';
 
+class LiveGoAuthConfigException implements Exception {
+  final String message;
+  const LiveGoAuthConfigException(this.message);
+  @override
+  String toString() => 'LiveGoAuthConfigException: $message';
+}
+
+class LiveGoAuthException implements Exception {
+  final int statusCode;
+  final String message;
+  const LiveGoAuthException(this.statusCode, this.message);
+  @override
+  String toString() => 'LiveGoAuthException($statusCode): $message';
+}
+
 /// Low-level Dobda/Nobuzero HTTP/HMAC client.
 class DobdaHttpClient {
   const DobdaHttpClient._();
@@ -12,7 +27,13 @@ class DobdaHttpClient {
     String path,
     Map<String, String> query,
   ) async {
-    // Build URI sekali supaya parameter query konsisten untuk request dan signing.
+    // Auth Guard: Jangan hit network jika credentials kosong.
+    if (!ApiEnv.hasLiveGoCredentials) {
+      throw const LiveGoAuthConfigException(
+        'LIVEGO_USER_ID / LIVEGO_SECRET belum dikonfigurasi. Build APK dengan --dart-define.',
+      );
+    }
+
     final baseUri = Uri.parse(ApiEnv.dobdaBaseUrl);
     final uri = baseUri.replace(
       path: path,
@@ -23,7 +44,6 @@ class DobdaHttpClient {
     try {
       final request = await client.getUrl(uri).timeout(ApiEnv.timeout);
 
-      // Kirim X-User-Id dan Secret dari ApiEnv ke signer.
       final headers = DobdaHmacSigner.headers(
         method: 'GET',
         uri: uri,
@@ -38,8 +58,23 @@ class DobdaHttpClient {
       final response = await request.close().timeout(ApiEnv.timeout);
       final body = await response.transform(utf8.decoder).join();
 
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        String errorMessage = response.statusCode == 401
+            ? 'Auth gagal / signature salah / user kosong'
+            : 'Platform tidak diizinkan untuk user ini';
+
+        try {
+          final json = jsonDecode(body);
+          if (json is Map && json['message'] != null) {
+            errorMessage = '${json['message']}';
+          }
+        } catch (_) {}
+
+        throw LiveGoAuthException(response.statusCode, errorMessage);
+      }
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('NOBUZERO API ${response.statusCode} ${uri.path}: $body');
+        throw Exception('NOBUZERO API ${response.statusCode} ${uri.path}');
       }
 
       if (body.trim().isEmpty) return <String, dynamic>{};

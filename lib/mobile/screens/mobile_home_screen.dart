@@ -62,6 +62,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
               MobileHomeGrid(
                 items: state.items,
                 loading: state.loading,
+                errorMessage: state.errorMessage,
                 onTap: _open,
               ),
             ],

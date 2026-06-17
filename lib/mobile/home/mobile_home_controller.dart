@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../services/dobda/dobda_http_client.dart';
 import 'mobile_home_state.dart';
 
 class MobileHomeController {
@@ -17,7 +18,7 @@ class MobileHomeController {
 
   Future<void> load({bool silent = false}) async {
     if (!silent) {
-      state.value = state.value.copyWith(loading: true);
+      state.value = state.value.copyWith(loading: true, errorMessage: '');
     }
 
     try {
@@ -29,7 +30,6 @@ class MobileHomeController {
       final selectedCatIndex = state.value.selectedCategoryIndex.clamp(0, categories.length - 1).toInt();
       final selectedCategory = categories.isEmpty ? 'Home' : categories[selectedCatIndex];
 
-      // Load banners and items in parallel for efficiency.
       final results = await Future.wait([
         LiveGoCatalog.banners(platform: slug),
         LiveGoCatalog.homeByCategory(platform: slug, category: selectedCategory),
@@ -44,10 +44,24 @@ class MobileHomeController {
         categories: categories,
         platformLabels: labels,
         loading: false,
+        errorMessage: '',
       );
     } catch (e) {
       debugPrint('MOBILE HOME LOAD ERROR: $e');
-      state.value = state.value.copyWith(loading: false);
+
+      String msg = 'Gagal memuat konten. Tarik layar untuk coba lagi.';
+      if (e is LiveGoAuthConfigException) {
+        msg = 'API belum dikonfigurasi. Build APK dengan USER_ID dan SECRET.';
+      } else if (e is LiveGoAuthException) {
+        msg = e.statusCode == 401
+            ? 'Auth gagal / signature salah. Cek SECRET Anda.'
+            : 'Akses platform ditolak oleh server (403).';
+      }
+
+      state.value = state.value.copyWith(
+        loading: false,
+        errorMessage: msg,
+      );
     }
   }
 
