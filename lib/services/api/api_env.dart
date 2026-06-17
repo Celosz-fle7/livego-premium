@@ -30,6 +30,18 @@ class ApiEnv {
 
   static const Duration timeout = Duration(seconds: 18);
 
+  /// True jika USER_ID dan SECRET sudah dikonfigurasi via --dart-define.
+  static bool get hasLiveGoCredentials =>
+      dobdaUserId.trim().isNotEmpty && dobdaSecret.trim().isNotEmpty;
+
+  /// User ID tersensor untuk keperluan log/debug tanpa mengekspos ID asli secara penuh.
+  static String get maskedUserId {
+    final id = dobdaUserId.trim();
+    if (id.isEmpty) return 'none';
+    if (id.length < 8) return '***';
+    return '${id.substring(0, 3)}...${id.substring(id.length - 4)}';
+  }
+
   static void applyHeaders(HttpHeaders headers) {
     if (apiKey.isNotEmpty) {
       headers.set('X-API-Key', apiKey);

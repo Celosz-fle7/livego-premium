@@ -7,12 +7,14 @@ import '../../../shared/widgets/poster_card.dart';
 class MobileHomeGrid extends StatelessWidget {
   final List<ContentItem> items;
   final bool loading;
+  final String errorMessage;
   final ValueChanged<ContentItem> onTap;
 
   const MobileHomeGrid({
     super.key,
     required this.items,
     required this.loading,
+    this.errorMessage = '',
     required this.onTap,
   });
 
@@ -36,6 +38,28 @@ class MobileHomeGrid extends StatelessWidget {
       );
     }
 
+    if (errorMessage.isNotEmpty && items.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: const Color(0xFF101826),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF243A54)),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              errorMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.textSoft, height: 1.4, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (items.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(22),
@@ -46,6 +70,7 @@ class MobileHomeGrid extends StatelessWidget {
         ),
         child: const Text(
           'Belum ada konten. Coba ganti platform/kategori atau ping source di Pengaturan.',
+          textAlign: TextAlign.center,
           style: TextStyle(color: AppTheme.textSoft, height: 1.4),
         ),
       );

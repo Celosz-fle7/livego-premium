@@ -6,6 +6,7 @@ import '../../services/feed/feed_config.dart';
 import '../../services/feed/feed_limiter.dart';
 import '../../services/feed/feed_session_state.dart';
 import '../../services/livego_api_gateway.dart';
+import '../../services/dobda/dobda_http_client.dart';
 import '../api_manager/api_platform_fallback_router.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/api_timeout_policy.dart';
@@ -54,22 +55,27 @@ class LiveGoCatalogHomeService {
         return cached;
       }
 
-      final rows = await LiveGoApiManager.fetchItems(
-        platform: candidate,
-        operation: '$operation:fallback:$candidate',
-        timeout: ApiTimeoutPolicy.home,
-        request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
-      );
-      if (rows.isNotEmpty) {
-        print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
-        await LiveGoContentCache.writeItems(
+      try {
+        final rows = await LiveGoApiManager.fetchItems(
           platform: candidate,
-          endpoint: endpoint,
-          params: {'lang': lang},
-          items: rows,
-          ttl: _homeCategoryTtl(endpoint),
+          operation: '$operation:fallback:$candidate',
+          timeout: ApiTimeoutPolicy.home,
+          request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
         );
-        return rows;
+        if (rows.isNotEmpty) {
+          print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
+          await LiveGoContentCache.writeItems(
+            platform: candidate,
+            endpoint: endpoint,
+            params: {'lang': lang},
+            items: rows,
+            ttl: _homeCategoryTtl(endpoint),
+          );
+          return rows;
+        }
+      } catch (e) {
+        // Stop fallback loop if auth error detected
+        if (e is LiveGoAuthConfigException || e is LiveGoAuthException) break;
       }
     }
     return const <ContentItem>[];
@@ -185,15 +191,12 @@ class LiveGoCatalogHomeService {
       operation: 'category:$endpoint',
       timeout: ApiTimeoutPolicy.collection,
       request: () {
-        // Mapping Home/Trending -> .home()
         if (key == 'trending' || key.isEmpty || key == 'home') {
           return LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang);
         }
-        // Mapping Terbaru/Discover -> .discover()
         if (key == 'discover') {
           return LiveGoApiProviderRegistry.providerFor(platform).discover(lang: lang);
         }
-        // Mapping LiveGo/DubIndo -> .collection(collection: 'livego')
         if (key == 'livego') {
           return LiveGoApiProviderRegistry.providerFor(platform).collection(
             collection: 'livego',
@@ -250,15 +253,19 @@ class LiveGoCatalogHomeService {
     await LiveGoContentCache.cleanExpiredAndTrim();
     final entries = <MapEntry<String, List<ContentItem>>>[];
     final seenKeys = <String>{};
-    // Tetap ambil maksimal 6 platform di Home TV agar device aman.
     for (final platform in LiveGoCatalogPlatformService.platforms.take(6)) {
-      final rows = await home(platform: platform);
-      final clean = <ContentItem>[];
-      for (final item in rows) {
-        final key = ContentHealthService.contentKey(item);
-        if (seenKeys.add(key)) clean.add(item);
+      try {
+        final rows = await home(platform: platform);
+        final clean = <ContentItem>[];
+        for (final item in rows) {
+          final key = ContentHealthService.contentKey(item);
+          if (seenKeys.add(key)) clean.add(item);
+        }
+        if (clean.isNotEmpty) entries.add(MapEntry(LiveGoCatalogPlatformService.label(platform), clean));
+      } catch (e) {
+        // Stop fan-out if auth fails
+        if (e is LiveGoAuthConfigException || e is LiveGoAuthException) break;
       }
-      if (clean.isNotEmpty) entries.add(MapEntry(LiveGoCatalogPlatformService.label(platform), clean));
     }
     return Map.fromEntries(entries);
   }
@@ -266,15 +273,14 @@ class LiveGoCatalogHomeService {
   static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     try {
-      // Banner API dengan timeout pendek (6 detik).
       final rows = await LiveGoApiGateway.banner(platform: platform, lang: lang)
           .timeout(const Duration(seconds: 6));
       if (rows.isNotEmpty) return rows.take(5).toList();
     } catch (e) {
       print('BANNER API ERROR $platform: $e');
+      if (e is LiveGoAuthConfigException || e is LiveGoAuthException) rethrow;
     }
 
-    // Fallback: ambil dari item Home jika banner endpoint gagal.
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
     return const [];

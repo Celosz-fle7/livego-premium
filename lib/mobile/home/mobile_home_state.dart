@@ -8,6 +8,7 @@ class MobileHomeState {
   final int selectedPlatformIndex;
   final int selectedCategoryIndex;
   final bool loading;
+  final String errorMessage;
 
   const MobileHomeState({
     required this.banners,
@@ -17,6 +18,7 @@ class MobileHomeState {
     required this.selectedPlatformIndex,
     required this.selectedCategoryIndex,
     this.loading = false,
+    this.errorMessage = '',
   });
 
   factory MobileHomeState.initial() => const MobileHomeState(
@@ -27,6 +29,7 @@ class MobileHomeState {
         selectedPlatformIndex: 0,
         selectedCategoryIndex: 0,
         loading: true,
+        errorMessage: '',
       );
 
   MobileHomeState copyWith({
@@ -37,6 +40,7 @@ class MobileHomeState {
     int? selectedPlatformIndex,
     int? selectedCategoryIndex,
     bool? loading,
+    String? errorMessage,
   }) {
     return MobileHomeState(
       banners: banners ?? this.banners,
@@ -46,6 +50,7 @@ class MobileHomeState {
       selectedPlatformIndex: selectedPlatformIndex ?? this.selectedPlatformIndex,
       selectedCategoryIndex: selectedCategoryIndex ?? this.selectedCategoryIndex,
       loading: loading ?? this.loading,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }
