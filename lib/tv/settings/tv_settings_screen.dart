@@ -7,7 +7,6 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
-import '../layout/tv_safe_zone.dart';
 import '../cache/tv_cache_maintenance_service.dart';
 import '../../shared/settings/livego_setting_models.dart';
 import 'tv_settings_config.dart';

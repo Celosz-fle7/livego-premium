@@ -641,55 +641,6 @@ class _SourcePlatformEditor extends StatelessWidget {
   }
 }
 
-class _GridSlider extends StatelessWidget {
-  final String label;
-  final int value;
-  final int min;
-  final int max;
-  final ValueChanged<int> onChanged;
-
-  const _GridSlider({
-    required this.label,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            const Spacer(),
-            Text('$value', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 18)),
-          ],
-        ),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: AppTheme.cyan,
-            inactiveTrackColor: const Color(0xFF24344A),
-            thumbColor: Colors.white,
-            overlayColor: AppTheme.cyan.withOpacity(.15),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-          ),
-          child: Slider(
-            value: value.toDouble(),
-            min: min.toDouble(),
-            max: max.toDouble(),
-            divisions: max - min,
-            onChanged: (v) => onChanged(v.round()),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _ChoiceButton extends StatelessWidget {
   final String text;
   final bool active;
