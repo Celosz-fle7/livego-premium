@@ -150,11 +150,11 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   List<SubtitleTrack> get _subtitleTracks => _streamInfo.subtitles;
 
-  bool get _isDobdaPlayer {
+  bool get _isNobuzeroPlayer {
     try {
-      return LiveGoApiPlatforms.bySlug(widget.item.platformSlug).isDobda;
+      return LiveGoApiPlatforms.bySlug(widget.item.platformSlug).isNobuzero;
     } catch (_) {
-      return widget.item.platformSlug.startsWith('dobda_');
+      return widget.item.platformSlug.startsWith('nobuzero_');
     }
   }
 
@@ -299,7 +299,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
     _armVideoSurfaceShield();
 
     try {
-      final requestChapter = _isDobdaPlayer ? playable.chapterId : '$ep';
+      final requestChapter = _isNobuzeroPlayer ? playable.chapterId : '$ep';
       debugPrint('LIVEGO TV STREAM RESOLVE START platform=${playable.platformSlug} id=${playable.id} ep=$ep chapter=$requestChapter ticket=$ticket');
       final resolved = await _playerService.resolveStream(
         playable,
@@ -1239,14 +1239,14 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
 
   Future<int> _resolveEpisodeByOffset(int from, int delta, {bool skipBroken = true}) async {
     var rows = _orderedEpisodes();
-    if (rows.length <= 1 && _isDobdaPlayer) {
+    if (rows.length <= 1 && _isNobuzeroPlayer) {
       try {
         rows = await _ensureEpisodeListReady(ep: from, stream: _streamInfo)
             .timeout(const Duration(seconds: 4));
       } catch (_) {
         rows = _orderedEpisodes();
       }
-      // Dobda wajib chapterId asli dari /detail. Kalau daftar belum siap,
+      // Nobuzero wajib chapterId asli dari /detail. Kalau daftar belum siap,
       // jangan pakai fallback +1 karena bisa tembak chapterId salah.
       if (rows.length <= 1) return from;
     }
@@ -1413,7 +1413,7 @@ class _TvPlayerScreenState extends State<TvPlayerScreen> {
       _jumpEpisodePanelToCursor();
       return;
     }
-    if (_isDobdaPlayer) {
+    if (_isNobuzeroPlayer) {
       unawaited(_ensureEpisodeListReady(ep: _episodeCursor, stream: _streamInfo));
     }
     final total = _episodeTotal(_detail ?? widget.item);

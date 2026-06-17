@@ -1,12 +1,12 @@
-# Dobda API Endpoint Mapping Audit
+# Nobuzero API Endpoint Mapping Audit
 
 Tanggal audit: 2026-06-10
 Project: LiveGo Premium TV
 Mode: API Endpoint Mapping Audit Only
 
-> Scope: dokumen ini hanya memetakan endpoint Dobda API baru ke model, service, provider, dan player existing LiveGo. Tidak ada perubahan kode runtime yang direkomendasikan untuk diterapkan di artifact ini.
+> Scope: dokumen ini hanya memetakan endpoint Nobuzero API baru ke model, service, provider, dan player existing LiveGo. Tidak ada perubahan kode runtime yang direkomendasikan untuk diterapkan di artifact ini.
 >
-> Catatan keamanan: secret asli Dobda **tidak boleh ditulis** di dokumen, commit, log, atau PR. Gunakan placeholder `<DOBDA_SECRET>` / secure config.
+> Catatan keamanan: secret asli Nobuzero **tidak boleh ditulis** di dokumen, commit, log, atau PR. Gunakan placeholder `<NOBUZERO_SECRET>` / secure config.
 
 ## 1. Repo scan yang dilakukan
 
@@ -17,7 +17,7 @@ rg -n "class ContentItem|class LiveGoEpisode|class StreamInfo|source|provider|pl
 ```
 
 ```bash
-rg -n "http|Uri\.parse|baseUrl|endpoint|api|dobda|aicin|stream|playlist|chapter|Hmac|sha256|X-Signature|X-Timestamp" lib android
+rg -n "http|Uri\.parse|baseUrl|endpoint|api|nobuzero|aicin|stream|playlist|chapter|Hmac|sha256|X-Signature|X-Timestamp" lib android
 ```
 
 File penting yang ditemukan:
@@ -29,11 +29,11 @@ File penting yang ditemukan:
 - `lib/models/livego_stream.dart`
 - `lib/services/api/api_env.dart`
 - `lib/services/api/api_platform.dart`
-- `lib/services/api/dobda_endpoints.dart`
-- `lib/services/api/dobda_hmac_signer.dart`
-- `lib/services/dobda/dobda_http_client.dart`
-- `lib/services/dobda/dobda_api_client_impl.dart`
-- `lib/services/dobda_api_client.dart`
+- `lib/services/api/nobuzero_endpoints.dart`
+- `lib/services/api/nobuzero_hmac_signer.dart`
+- `lib/services/nobuzero/nobuzero_http_client.dart`
+- `lib/services/nobuzero/nobuzero_api_client_impl.dart`
+- `lib/services/nobuzero_api_client.dart`
 - `lib/services/livego_api_gateway.dart`
 - `lib/data/api_manager/api_provider_contract.dart`
 - `lib/data/api_manager/api_provider_registry.dart`
@@ -46,15 +46,15 @@ File penting yang ditemukan:
 - `android/app/src/main/kotlin/com/livego/premium/MainActivity.kt`
 - `android/app/src/main/kotlin/com/livego/premium/TvNativeSurfacePlayerActivity.kt`
 
-## 2. Dobda API baru: kontrak endpoint
+## 2. Nobuzero API baru: kontrak endpoint
 
 Base URL:
 
 ```text
-https://api-drama.dobda.id
+https://api-drama.nobuzero.id
 ```
 
-Authentication headers untuk request API Dobda:
+Authentication headers untuk request API Nobuzero:
 
 ```text
 X-Timestamp: {unix milliseconds}
@@ -65,7 +65,7 @@ Formula signature:
 
 ```text
 payload = METHOD:FULL_PATH_WITH_QUERY:TIMESTAMP
-signature = HMAC-SHA256(<DOBDA_SECRET>, payload)
+signature = HMAC-SHA256(<NOBUZERO_SECRET>, payload)
 ```
 
 Endpoint yang diaudit:
@@ -102,7 +102,7 @@ Endpoint yang diaudit:
 - `chapterId`
 - `lang`
 
-Factory existing `ContentItem.fromApi` sudah cocok untuk sebagian besar response HOME/DISCOVER Dobda:
+Factory existing `ContentItem.fromApi` sudah cocok untuk sebagian besar response HOME/DISCOVER Nobuzero:
 
 - `id` dari `json['id']`
 - `title` dari `json['title']`
@@ -125,7 +125,7 @@ Gap model: `views` belum punya field eksplisit; saat ini `_parseRating` hanya me
 - `index`
 - `title`
 
-Factory existing mengambil `id` dari `id` / `chapterId` / `index`, `index` dari `index` / `id`, dan title fallback `Episode {index/id}`. Ini cocok untuk `/api/v2/detail` jika `chapters[]` berisi id chapter asli. Dobda `/video` wajib memakai `chapterId`; karena itu mapping episode index ke chapter id harus dijaga dari detail response.
+Factory existing mengambil `id` dari `id` / `chapterId` / `index`, `index` dari `index` / `id`, dan title fallback `Episode {index/id}`. Ini cocok untuk `/api/v2/detail` jika `chapters[]` berisi id chapter asli. Nobuzero `/video` wajib memakai `chapterId`; karena itu mapping episode index ke chapter id harus dijaga dari detail response.
 
 ### 3.3 Model stream/player
 
@@ -140,7 +140,7 @@ Factory existing mengambil `id` dari `id` / `chapterId` / `index`, `index` dari 
 - `subtitles`
 - `qualities`
 
-Factory existing `StreamInfo.fromApi` dan parser Dobda existing sudah mendukung:
+Factory existing `StreamInfo.fromApi` dan parser Nobuzero existing sudah mendukung:
 
 - `data.streams[]` menjadi `StreamQuality`
 - URL stream dari `url` / `src` / `videoUrl` / `hlsUrl` / `streamUrl`
@@ -162,29 +162,29 @@ UI / TV providers
   -> catalog services
   -> LiveGoApiManager + ApiProviderRegistry
   -> LiveGoApiGateway
-  -> DobdaApiClient
-  -> DobdaApiClientImpl
-  -> DobdaHttpClient
+  -> NobuzeroApiClient
+  -> NobuzeroApiClientImpl
+  -> NobuzeroHttpClient
 ```
 
 `LiveGoApiProviderContract` sudah mendefinisikan kemampuan provider: home, discover, collection, search, detail, episodes, video, fastVideo, subtitle, audio.
 
-`LiveGoApiProviderRegistry` memakai `_GatewayApiProvider` dan capability Dobda saat ini:
+`LiveGoApiProviderRegistry` memakai `_GatewayApiProvider` dan capability Nobuzero saat ini:
 
 - `subtitle` mengikuti `config.supportsSubtitle`
 - `audio` hardcoded `false`
 - video aktif selama bukan encrypted
 
-Ini sesuai sample Dobda: subtitle tersedia, audio track list tidak tersedia di API.
+Ini sesuai sample Nobuzero: subtitle tersedia, audio track list tidak tersedia di API.
 
 ## 4. Pemetaan endpoint ke fitur LiveGo
 
-| Fitur | Endpoint Dobda | Existing entry point | Catatan mapping |
+| Fitur | Endpoint Nobuzero | Existing entry point | Catatan mapping |
 |---|---|---|---|
-| Home | `GET /api/v2/home?category_p={platform}&lang={lang}` | `LiveGoCatalog.home` -> `LiveGoCatalogHomeService.home` -> gateway -> Dobda client | Untuk trending/populer. Existing Dobda client sudah punya `_homeRaw`. |
+| Home | `GET /api/v2/home?category_p={platform}&lang={lang}` | `LiveGoCatalog.home` -> `LiveGoCatalogHomeService.home` -> gateway -> Nobuzero client | Untuk trending/populer. Existing Nobuzero client sudah punya `_homeRaw`. |
 | Discover / Terbaru | `GET /api/v2/discover?category_p={platform}&lang={lang}&sort=desc&page={page}` | `LiveGoCatalog.discover` / `homeNextPage` / catalog home service | Existing `_discoverRaw` memakai `category_p`, `lang`, `page`, `limit=20`; belum memakai `sort=desc`. |
 | Platform/category source | `GET /api/v2/categories` | `LiveGoCatalogPlatformService`, `LiveGoApiPlatforms` | Existing source list masih hardcoded starter pack; endpoint categories cocok untuk dynamic source manager nanti. |
-| Banner | `GET /api/v2/banner?category_p={platform}&lang={lang}` | `LiveGoCatalog.banners` / `hero` / `LiveGoCatalogHomeService.banners` | Existing Dobda client punya `banner`. Perlu cek UI expectation apakah data shape sama dengan ContentItem. |
+| Banner | `GET /api/v2/banner?category_p={platform}&lang={lang}` | `LiveGoCatalog.banners` / `hero` / `LiveGoCatalogHomeService.banners` | Existing Nobuzero client punya `banner`. Perlu cek UI expectation apakah data shape sama dengan ContentItem. |
 | Search | `GET /api/v2/search?q={query}&category_p={platform}&lang={lang}&page={page}` | `LiveGoCatalog.search` -> `LiveGoCatalogSearchService.search` | Existing client mencoba param `q`, lalu fallback `query`. API baru mewajibkan `q`; `query` fallback bisa tetap legacy saja. |
 | Detail | `GET /api/v2/detail?id={id}&category_p={platform}&lang={lang}` | `LiveGoCatalog.detail` / `episodes` -> detail player service | Detail harus menyimpan chapter id asli dari `chapters[]` untuk `/video`. |
 | Episode/chapter | Dari `/api/v2/detail` `chapters[]` | `LiveGoEpisode` list + `_episodeMemory` | Mapping penting: UI boleh minta episode index, provider harus resolve ke chapter id asli. Existing code sudah punya `_chapterIdForEpisode`. |
@@ -200,7 +200,7 @@ Ini sesuai sample Dobda: subtitle tersedia, audio track list tidak tersedia di A
 
 ### 5.1 HOME/DISCOVER/BANNER/SEARCH item
 
-| Dobda field | Existing mapping | Status |
+| Nobuzero field | Existing mapping | Status |
 |---|---|---|
 | `id` | `ContentItem.id` | Jelas |
 | `title` | `ContentItem.title` | Jelas |
@@ -218,7 +218,7 @@ Ini sesuai sample Dobda: subtitle tersedia, audio track list tidak tersedia di A
 
 ### 5.2 DETAIL response
 
-| Dobda field | Existing mapping | Status |
+| Nobuzero field | Existing mapping | Status |
 |---|---|---|
 | `data.id` | `ContentItem.id` / `LiveGoDetail.id` | Jelas |
 | `data.title` | `ContentItem.title` / `LiveGoDetail.title` | Jelas |
@@ -234,7 +234,7 @@ Ini sesuai sample Dobda: subtitle tersedia, audio track list tidak tersedia di A
 
 ### 5.3 VIDEO response
 
-| Dobda field | Existing mapping | Status |
+| Nobuzero field | Existing mapping | Status |
 |---|---|---|
 | `data.streams[]` | `StreamInfo.qualities` | Jelas |
 | `data.streams[0].url` | `StreamInfo.url` default | Jelas |
@@ -259,20 +259,20 @@ Ini sesuai sample Dobda: subtitle tersedia, audio track list tidak tersedia di A
 
 ### 6.1 API auth header
 
-Dobda API request butuh:
+Nobuzero API request butuh:
 
 ```text
 X-Timestamp: {unix milliseconds}
-X-Signature: HMAC-SHA256(<DOBDA_SECRET>, METHOD:FULL_PATH_WITH_QUERY:TIMESTAMP)
+X-Signature: HMAC-SHA256(<NOBUZERO_SECRET>, METHOD:FULL_PATH_WITH_QUERY:TIMESTAMP)
 ```
 
-Existing repo sudah memiliki helper signing di `lib/services/api/dobda_hmac_signer.dart` dan low-level client di `lib/services/dobda/dobda_http_client.dart`.
+Existing repo sudah memiliki helper signing di `lib/services/api/nobuzero_hmac_signer.dart` dan low-level client di `lib/services/nobuzero/nobuzero_http_client.dart`.
 
 Mapping helper yang cocok:
 
-- Signing tetap di `lib/services/api/dobda_hmac_signer.dart`.
-- Transport tetap di `lib/services/dobda/dobda_http_client.dart`.
-- Provider/parser tetap di `lib/services/dobda/dobda_api_client_impl.dart`.
+- Signing tetap di `lib/services/api/nobuzero_hmac_signer.dart`.
+- Transport tetap di `lib/services/nobuzero/nobuzero_http_client.dart`.
+- Provider/parser tetap di `lib/services/nobuzero/nobuzero_api_client_impl.dart`.
 - Jangan letakkan signing di UI, catalog service, provider registry, atau native player.
 
 Risiko signature:
@@ -284,10 +284,10 @@ Risiko signature:
 
 ### 6.2 Stream/player headers
 
-`streamHeaders` dari response `/video` adalah header untuk player/video CDN, bukan auth header Dobda API. Mapping yang benar:
+`streamHeaders` dari response `/video` adalah header untuk player/video CDN, bukan auth header Nobuzero API. Mapping yang benar:
 
 ```text
-Dobda API auth headers -> hanya DobdaHttpClient request
+Nobuzero API auth headers -> hanya NobuzeroHttpClient request
 streamHeaders -> StreamInfo.headers -> native player data source
 ```
 
@@ -298,12 +298,12 @@ Jangan mencampur:
 
 ### 6.3 Secret/config
 
-Existing `ApiEnv` menyimpan `baseUrl`, `apiKey`, `dobdaBaseUrl`, dan `dobdaSecret` sebagai constant. Untuk implementasi produksi berikutnya:
+Existing `ApiEnv` menyimpan `baseUrl`, `apiKey`, `nobuzeroBaseUrl`, dan `nobuzeroSecret` sebagai constant. Untuk implementasi produksi berikutnya:
 
 - Jangan hardcode secret baru di kode.
-- Gunakan placeholder saat dokumentasi: `<DOBDA_SECRET>`.
-- Ideal patch: pindahkan Dobda secret ke build-time config / dart-define / secure CI secret, lalu fallback aman untuk local dev.
-- Audit ini tidak menulis secret asli Dobda ke artifact.
+- Gunakan placeholder saat dokumentasi: `<NOBUZERO_SECRET>`.
+- Ideal patch: pindahkan Nobuzero secret ke build-time config / dart-define / secure CI secret, lalu fallback aman untuk local dev.
+- Audit ini tidak menulis secret asli Nobuzero ke artifact.
 
 ## 7. Subtitle analysis
 
@@ -313,7 +313,7 @@ API menyediakan subtitle sebagai external SRT URL:
 {
   "language": "id",
   "format": "srt",
-  "url": "https://api-dracin.dobda.id/api/proxy/subtitle?url=...srt"
+  "url": "https://api-dracin.nobuzero.id/api/proxy/subtitle?url=...srt"
 }
 ```
 
@@ -326,7 +326,7 @@ Existing support:
 
 File yang perlu disentuh jika patch subtitle nanti:
 
-- `lib/services/dobda/dobda_api_client_impl.dart` untuk parsing subtitle Dobda.
+- `lib/services/nobuzero/nobuzero_api_client_impl.dart` untuk parsing subtitle Nobuzero.
 - `lib/models/stream_info.dart` jika ingin memperluas metadata subtitle.
 - `lib/tv/player/explorer3/tv_player_explorer3_native_payload.dart` jika payload perlu field baru.
 - `android/app/src/main/kotlin/com/livego/premium/TvNativeSurfacePlayerActivity.kt` jika SRT proxy butuh header khusus, conversion, atau selected subtitle behavior.
@@ -334,7 +334,7 @@ File yang perlu disentuh jika patch subtitle nanti:
 Risiko subtitle:
 
 - Subtitle SRT external mungkin tidak kompatibel di semua device jika server memberi MIME salah.
-- Proxy subtitle host `api-dracin.dobda.id` berbeda dari base API `api-drama.dobda.id`.
+- Proxy subtitle host `api-dracin.nobuzero.id` berbeda dari base API `api-drama.nobuzero.id`.
 - Jika subtitle URL expired, player perlu resolve stream ulang.
 - Jika CDN butuh header khusus untuk subtitle URL, schema saat ini belum punya per-subtitle headers.
 
@@ -359,7 +359,7 @@ Existing support:
 Patch yang mungkin dibutuhkan nanti:
 
 - Pastikan label tidak duplikat jika `quality=auto` dan `resolution=auto` untuk banyak stream.
-- Pertimbangkan label gabungan seperti `quality/resolution` jika Dobda mengirim `quality=auto`, `resolution=720p`.
+- Pertimbangkan label gabungan seperti `quality/resolution` jika Nobuzero mengirim `quality=auto`, `resolution=720p`.
 - Jika only one stream `auto`, UI quality tetap menampilkan Auto saja.
 - Jika HLS master playlist sudah punya variant quality, ExoPlayer bisa auto-adapt tanpa multiple URL; jangan paksa split quality jika API hanya memberi auto.
 
@@ -385,7 +385,7 @@ Kesimpulan:
 - Capability provider `audio` tetap `false` untuk API-level audio.
 - UI audio track tetap boleh aktif dari ExoPlayer native tracks.
 
-Existing Android native player sudah membaca current tracks ExoPlayer dan membangun daftar audio dari track language/label/channel count. Jadi Dobda API tidak perlu mapping audio list.
+Existing Android native player sudah membaca current tracks ExoPlayer dan membangun daftar audio dari track language/label/channel count. Jadi Nobuzero API tidak perlu mapping audio list.
 
 ## 10. Platform/category source analysis
 
@@ -409,12 +409,12 @@ Sample `/api/v2/categories` menunjukkan sebagian platform:
 
 Existing `LiveGoApiPlatforms` hanya mengekspos starter pack:
 
-- `dobda_freereels` -> `freereels`
-- `dobda_goodshort` -> `goodshort`
-- `dobda_dramawave` -> `dramawave`
-- `dobda_reelshort` -> `reelshort`
-- `dobda_reelife` -> `reelife`
-- `dobda_rapidtv` -> `rapidtv`
+- `nobuzero_freereels` -> `freereels`
+- `nobuzero_goodshort` -> `goodshort`
+- `nobuzero_dramawave` -> `dramawave`
+- `nobuzero_reelshort` -> `reelshort`
+- `nobuzero_reelife` -> `reelife`
+- `nobuzero_rapidtv` -> `rapidtv`
 
 Mismatch/risiko:
 
@@ -429,33 +429,33 @@ Mismatch/risiko:
 
 1. `lib/services/api/api_env.dart`
    - Pindahkan secret ke secure config / dart-define.
-   - Jangan hardcode `<DOBDA_SECRET>` di source.
+   - Jangan hardcode `<NOBUZERO_SECRET>` di source.
 
-2. `lib/services/api/dobda_hmac_signer.dart`
+2. `lib/services/api/nobuzero_hmac_signer.dart`
    - Pastikan payload memakai exact `uri.path?uri.query`.
    - Tambahkan test helper deterministic timestamp jika testing diperlukan.
 
-3. `lib/services/dobda/dobda_http_client.dart`
+3. `lib/services/nobuzero/nobuzero_http_client.dart`
    - Pastikan query order stabil dan sama dengan signed URI.
    - Tambahkan support `GET /api/v2/key/status`, `/languages`, `/categories` bila belum tersedia di facade.
 
-4. `lib/services/api/dobda_endpoints.dart`
+4. `lib/services/api/nobuzero_endpoints.dart`
    - Endpoint utama sudah ada, termasuk `keyStatus`; tinggal pastikan tidak menambah endpoint fiktif.
 
-5. `lib/services/dobda/dobda_api_client_impl.dart`
+5. `lib/services/nobuzero/nobuzero_api_client_impl.dart`
    - Tambahkan `sort=desc` untuk discover jika harus mengikuti contoh baru.
    - Pastikan search utama memakai `q`.
    - Pastikan detail chapters disimpan dan dipakai untuk mapping `episode index -> chapterId`.
    - Tambahkan API categories/languages/key status facade bila akan dipakai UI.
 
-6. `lib/services/dobda_api_client.dart`
+6. `lib/services/nobuzero_api_client.dart`
    - Expose categories/languages/key status jika dibutuhkan.
 
 7. `lib/services/livego_api_gateway.dart`
    - Expose categories/languages/key status jika catalog/source manager akan consume dynamic data.
 
 8. `lib/services/api/api_platform.dart`
-   - Tambah mapping platform Dobda yang belum ada jika source manager belum dibuat dynamic.
+   - Tambah mapping platform Nobuzero yang belum ada jika source manager belum dibuat dynamic.
    - Alternatif lebih aman: tetap starter pack, lalu dynamic categories sebagai opt-in.
 
 9. `lib/data/catalog/livego_catalog_platform_service.dart`
@@ -482,14 +482,14 @@ Mismatch/risiko:
   - `lib/tv/account/**`, `lib/tv/settings/**`, `lib/tv/update/**`.
 - Native Android player jika parsing Dart sudah cukup dan subtitle SRT berjalan.
 - Model legacy `LiveGoStream` kecuali masih dipakai jalur tertentu; prioritas tetap `StreamInfo`.
-- Mock catalog kecuali test/demo membutuhkan sample Dobda.
+- Mock catalog kecuali test/demo membutuhkan sample Nobuzero.
 
 ## 12. Rekomendasi implementasi patch berikutnya
 
 ### 12.1 Patch minimal aman
 
 1. Secure config:
-   - Ganti hardcoded Dobda secret menjadi `String.fromEnvironment('DOBDA_SECRET')` atau mekanisme secure config project.
+   - Ganti hardcoded Nobuzero secret menjadi `String.fromEnvironment('NOBUZERO_SECRET')` atau mekanisme secure config project.
    - Pastikan report/log tidak mencetak secret.
 
 2. Stabilkan HTTP signing:
@@ -502,7 +502,7 @@ Mismatch/risiko:
    - Jadikan `q` sebagai primary search param; fallback `query` boleh tetap untuk compatibility.
 
 4. Dynamic platform/language read-only:
-   - Tambah method `categories()`, `languages()`, `keyStatus()` di Dobda client/gateway.
+   - Tambah method `categories()`, `languages()`, `keyStatus()` di Nobuzero client/gateway.
    - Jangan langsung expose semua 33 platform ke Home default; gunakan source manager opt-in atau starter pack.
 
 5. Field gap opsional:
@@ -579,7 +579,7 @@ Mismatch/risiko:
 
 ## 15. Kesimpulan audit
 
-Mapping endpoint Dobda API baru ke arsitektur LiveGo sudah cukup jelas untuk patch minimal:
+Mapping endpoint Nobuzero API baru ke arsitektur LiveGo sudah cukup jelas untuk patch minimal:
 
 - HOME/DISCOVER/BANNER/SEARCH dapat dipetakan ke `ContentItem`.
 - DETAIL dapat dipetakan ke `ContentItem` + `LiveGoEpisode` dan menjadi sumber chapter id asli.

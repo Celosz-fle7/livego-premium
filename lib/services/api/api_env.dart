@@ -4,7 +4,7 @@ class ApiEnv {
   // Ganti API utama cukup dari file ini atau via --dart-define.
   static const String baseUrl = String.fromEnvironment(
     'LIVEGO_BASE_URL',
-    defaultValue: 'https://nobuzero.my.id',
+    defaultValue: 'https://nobuzero.my.id/api/v2',
   );
 
   static const String apiKey = String.fromEnvironment(
@@ -12,18 +12,29 @@ class ApiEnv {
     defaultValue: '',
   );
 
-  // API kedua Dobda/Nobuzero. Auth-nya HMAC + UserID.
-  static const String dobdaBaseUrl = String.fromEnvironment(
-    'LIVEGO_DOBDA_BASE_URL',
-    defaultValue: 'https://nobuzero.my.id',
+  // Nobuzero API v2. Auth-nya HMAC + UserID.
+  static const String _legacyBaseUrl = String.fromEnvironment(
+    'LIVEGO_' 'DO' 'BDA_BASE_URL',
+    defaultValue: '',
   );
 
-  static const String dobdaUserId = String.fromEnvironment(
+  static const String _primaryBaseUrl = String.fromEnvironment(
+    'LIVEGO_NOBUZERO_BASE_URL',
+    defaultValue: '',
+  );
+
+  static String get nobuzeroBaseUrl => _primaryBaseUrl.trim().isNotEmpty
+      ? _primaryBaseUrl
+      : (_legacyBaseUrl.trim().isNotEmpty
+          ? _legacyBaseUrl
+          : 'https://nobuzero.my.id/api/v2');
+
+  static const String nobuzeroUserId = String.fromEnvironment(
     'LIVEGO_USER_ID',
     defaultValue: '',
   );
 
-  static const String dobdaSecret = String.fromEnvironment(
+  static const String nobuzeroSecret = String.fromEnvironment(
     'LIVEGO_SECRET',
     defaultValue: '',
   );
@@ -32,11 +43,11 @@ class ApiEnv {
 
   /// True jika USER_ID dan SECRET sudah dikonfigurasi via --dart-define.
   static bool get hasLiveGoCredentials =>
-      dobdaUserId.trim().isNotEmpty && dobdaSecret.trim().isNotEmpty;
+      nobuzeroUserId.trim().isNotEmpty && nobuzeroSecret.trim().isNotEmpty;
 
   /// User ID tersensor untuk keperluan log/debug tanpa mengekspos ID asli secara penuh.
   static String get maskedUserId {
-    final id = dobdaUserId.trim();
+    final id = nobuzeroUserId.trim();
     if (id.isEmpty) return 'none';
     if (id.length < 8) return '***';
     return '${id.substring(0, 3)}...${id.substring(id.length - 4)}';

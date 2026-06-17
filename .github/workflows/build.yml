@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -43,8 +43,24 @@ jobs:
           echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
           ls -lh android/app/livego-release-key.jks
 
+      - name: Validate API secrets
+        env:
+          LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
+          LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
+          LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+          LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
+        run: |
+          missing=0
+          for name in LIVEGO_BASE_URL LIVEGO_NOBUZERO_BASE_URL LIVEGO_USER_ID LIVEGO_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Analyze
-        run: flutter analyze || true
+        run: flutter analyze
 
       - name: Build universal release APK
         env:
@@ -52,93 +68,25 @@ jobs:
           LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
           LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
           LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release \
+            --dart-define=LIVEGO_BASE_URL="${{ secrets.LIVEGO_BASE_URL }}" \
+            --dart-define=LIVEGO_NOBUZERO_BASE_URL="${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" \
+            --dart-define=LIVEGO_USER_ID="${{ secrets.LIVEGO_USER_ID }}" \
+            --dart-define=LIVEGO_SECRET="${{ secrets.LIVEGO_SECRET }}"
 
       - name: Prepare files
         run: |
           cd build/app/outputs/flutter-apk
           cp app-release.apk LiveGO-Premium.apk
           zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
-          ls -lh
+          ls -lh LiveGO-Premium.apk livego-premium-artifact.zip
 
-      - name: Read app version
-        id: app_version
-        shell: bash
-        run: |
-          RAW_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          VERSION_NAME="${RAW_VERSION%%+*}"
-          VERSION_CODE="${RAW_VERSION##*+}"
-
-          if [ -z "$VERSION_NAME" ] || [ -z "$VERSION_CODE" ] || [ "$VERSION_NAME" = "$VERSION_CODE" ]; then
-            echo "Invalid pubspec version: $RAW_VERSION"
-            exit 1
-          fi
-
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Create update manifest
-        shell: bash
-        run: |
-          APK="build/app/outputs/flutter-apk/LiveGO-Premium.apk"
-          SHA256=$(sha256sum "$APK" | awk '{print $1}')
-          VERSION_NAME="${{ steps.app_version.outputs.version_name }}"
-          VERSION_CODE="${{ steps.app_version.outputs.version_code }}"
-
-          cat > build/app/outputs/flutter-apk/livego-version.json <<EOF
-          {
-            "versionName": "$VERSION_NAME",
-            "versionCode": $VERSION_CODE,
-            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/LiveGO-Premium.apk",
-            "sha256": "$SHA256",
-            "required": false,
-            "changelog": [
-              "Build otomatis dari main",
-              "Commit ${{ github.sha }}"
-            ]
-          }
-          EOF
-
-          cat build/app/outputs/flutter-apk/livego-version.json
-
-      - name: Publish latest release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.app_version.outputs.tag }}
-          name: LiveGo TV ${{ steps.app_version.outputs.version_name }}
-          body: |
-            LiveGo TV automatic release.
-
-            Version: ${{ steps.app_version.outputs.version_name }}
-            Version code: ${{ steps.app_version.outputs.version_code }}
-            Commit: ${{ github.sha }}
-          make_latest: true
-          overwrite_files: true
-          files: |
-            build/app/outputs/flutter-apk/LiveGO-Premium.apk
-            build/app/outputs/flutter-apk/livego-version.json
-
-      - name: Upload compressed artifact
+      - name: Upload internal APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: livego-premium-artifact
-          path: build/app/outputs/flutter-apk/livego-premium-artifact.zip
-
-      - name: Send APK to Telegram
-        env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          FILE="build/app/outputs/flutter-apk/LiveGO-Premium.apk"
-          SIZE=$(stat -c%s "$FILE")
-          LIMIT=50000000
-
-          if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ] && [ "$SIZE" -le "$LIMIT" ]; then
-            curl -F chat_id="$CHAT_ID" \
-                 -F document=@"$FILE" \
-                 -F caption="LiveGO Premium APK" \
-                 "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
-          else
-            echo "Skip Telegram: missing token/chat id or APK > 50MB."
-          fi
+          name: livego-premium-internal-apk
+          path: |
+            build/app/outputs/flutter-apk/LiveGO-Premium.apk
+            build/app/outputs/flutter-apk/livego-premium-artifact.zip
+          if-no-files-found: error

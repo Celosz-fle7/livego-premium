@@ -3,43 +3,43 @@ import '../../models/livego_episode.dart';
 import '../../models/stream_info.dart';
 import '../api/api_env.dart';
 import '../api/api_platform.dart';
-import '../api/dobda_endpoints.dart';
-import 'dobda_http_client.dart';
+import '../api/nobuzero_endpoints.dart';
+import 'nobuzero_http_client.dart';
 
-class DobdaApiClientImpl {
-  const DobdaApiClientImpl._();
+class NobuzeroApiClientImpl {
+  const NobuzeroApiClientImpl._();
 
-  static String get baseUrl => ApiEnv.dobdaBaseUrl;
+  static String get baseUrl => ApiEnv.nobuzeroBaseUrl;
   static final Map<String, List<LiveGoEpisode>> _episodeMemory = <String, List<LiveGoEpisode>>{};
 
   static Future<List<String>> languages() async {
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.languages, {});
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.languages, {});
     final data = json['data'];
     if (data is List) return data.map((e) => '$e').toList();
     return const [];
   }
 
   static Future<List<String>> categories() async {
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {});
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.categories, {});
     final data = json['data'];
     if (data is List) return data.map((e) => '$e').toList();
     return const [];
   }
 
   static Future<Map<String, dynamic>> keyStatus() async {
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.keyStatus, {});
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.keyStatus, {});
     return _dataMap(json);
   }
 
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
   }) async {
     return homeFeed(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -47,7 +47,7 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -60,24 +60,24 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> homeFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
     final homeRows = await _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home');
-    final cleanHome = _cleanDobdaItems(homeRows, excludeDubbed: true);
+    final cleanHome = _cleanNobuzeroItems(homeRows, excludeDubbed: true);
     if (cleanHome.isNotEmpty) return cleanHome.take(60).toList(growable: false);
 
     final discoverRows = await _safeRows(
       _discoverRaw(platform: platform, lang: lang, page: page),
       '$platform/discover-fallback',
     );
-    final cleanDiscover = _cleanDobdaItems(discoverRows, excludeDubbed: true);
+    final cleanDiscover = _cleanNobuzeroItems(discoverRows, excludeDubbed: true);
     return cleanDiscover.take(60).toList(growable: false);
   }
 
   static Future<List<ContentItem>> liveGoFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -103,7 +103,7 @@ class DobdaApiClientImpl {
 
     for (final rows in results) {
       for (final item in rows) {
-        if (!_isCleanDobdaItem(item)) continue;
+        if (!_isCleanNobuzeroItem(item)) continue;
         if (!_isLiveGoRecommendation(item)) continue;
         final key = _contentKey(item);
         if (seen.add(key)) merged.add(item);
@@ -114,7 +114,7 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> indonesiaFeed({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -122,12 +122,12 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.banner, {
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.banner, {
       'category_p': config.apiSlug,
       'lang': apiLang,
     });
@@ -136,12 +136,12 @@ class DobdaApiClientImpl {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_shortmax',
+    String platform = 'nobuzero_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
     final rows = await _searchRaw(query: query, platform: platform, lang: lang, page: page);
-    return _cleanDobdaItems(rows, fromDubSearch: true);
+    return _cleanNobuzeroItems(rows, fromDubSearch: true);
   }
 
   static Future<List<ContentItem>> _safeRows(
@@ -151,7 +151,7 @@ class DobdaApiClientImpl {
     try {
       return await future.timeout(const Duration(seconds: 6));
     } catch (e) {
-      print('DOBDA CLEAN FEED ERROR $label: $e');
+      print('NOBUZERO CLEAN FEED ERROR $label: $e');
       return const <ContentItem>[];
     }
   }
@@ -162,7 +162,7 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.home, {
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.home, {
       'category_p': config.apiSlug,
       'lang': apiLang,
     });
@@ -176,7 +176,7 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.discover, {
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.discover, {
       'category_p': config.apiSlug,
       'lang': apiLang,
       'sort': 'desc',
@@ -197,7 +197,7 @@ class DobdaApiClientImpl {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
 
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.search, {
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.search, {
       'category_p': config.apiSlug,
       'q': clean,
       'lang': apiLang,
@@ -210,9 +210,9 @@ class DobdaApiClientImpl {
   static Future<ContentItem?> detail(ContentItem item) async {
     final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final apiLang = _providerLang(config.slug, item.lang);
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
-      'category_p': config.apiSlug,
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.detail, {
       'id': item.id,
+      'category_p': config.apiSlug,
       'lang': apiLang,
     });
     final data = _dataMap(json);
@@ -234,9 +234,9 @@ class DobdaApiClientImpl {
     final cached = _episodeMemory[key];
     if (cached != null && cached.length > 1) return cached;
 
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
-      'category_p': config.apiSlug,
+    final json = await NobuzeroHttpClient.getJson(NobuzeroEndpoints.detail, {
       'id': item.id,
+      'category_p': config.apiSlug,
       'lang': apiLang,
     });
     final rows = _episodesFromJson(json);
@@ -336,7 +336,7 @@ class DobdaApiClientImpl {
           if (mapped.url.isNotEmpty) return mapped;
         }
       } catch (e) {
-        print('DOBDA FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
+        print('NOBUZERO FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
       }
 
       final direct = await _tryVideoByChapter(
@@ -378,7 +378,7 @@ class DobdaApiClientImpl {
         timeout: timeout,
       );
     } catch (e) {
-      print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
+      print('NOBUZERO FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
       return StreamInfo.empty;
     }
   }
@@ -392,9 +392,9 @@ class DobdaApiClientImpl {
     Duration? timeout,
   }) async {
     try {
-      var future = DobdaHttpClient.getJson(DobdaEndpoints.video, {
-        'category_p': config.apiSlug,
+      var future = NobuzeroHttpClient.getJson(NobuzeroEndpoints.video, {
         'id': item.id,
+        'category_p': config.apiSlug,
         'chapterId': chapterId,
         'lang': apiLang,
       });
@@ -404,7 +404,7 @@ class DobdaApiClientImpl {
       if (stream.url.isEmpty) return StreamInfo.empty;
       return stream;
     } catch (e) {
-      print('DOBDA VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
+      print('NOBUZERO VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
       return StreamInfo.empty;
     }
   }
@@ -448,7 +448,7 @@ class DobdaApiClientImpl {
     }
   }
 
-  static List<ContentItem> _cleanDobdaItems(
+  static List<ContentItem> _cleanNobuzeroItems(
     List<ContentItem> rows, {
     bool fromDubSearch = false,
     bool requireDubbed = false,
@@ -457,7 +457,7 @@ class DobdaApiClientImpl {
     final out = <ContentItem>[];
     final seen = <String>{};
     for (final item in rows) {
-      if (!_isCleanDobdaItem(
+      if (!_isCleanNobuzeroItem(
         item,
         fromDubSearch: fromDubSearch,
         requireDubbed: requireDubbed,
@@ -471,7 +471,7 @@ class DobdaApiClientImpl {
     return out;
   }
 
-  static bool _isCleanDobdaItem(
+  static bool _isCleanNobuzeroItem(
     ContentItem item, {
     bool fromDubSearch = false,
     bool requireDubbed = false,

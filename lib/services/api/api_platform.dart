@@ -29,7 +29,7 @@ class LiveGoApiPlatform {
     required this.supportedLangs,
     required this.categories,
     this.endpointSlug = '',
-    this.backend = LiveGoApiBackend.dobda,
+    this.backend = LiveGoApiBackend.nobuzero,
     this.enabledByDefault = false,
     this.supportsSubtitle = false,
     this.streamFromAllEpisodes = false,
@@ -38,13 +38,13 @@ class LiveGoApiPlatform {
   String get apiSlug => endpointSlug.isEmpty ? slug : endpointSlug;
   bool get isEncrypted => videoType == LiveGoVideoType.encrypted;
   bool get isHls => videoType == LiveGoVideoType.hls;
-  bool get isDobda => backend == LiveGoApiBackend.dobda;
+  bool get isNobuzero => backend == LiveGoApiBackend.nobuzero;
 }
 
 class LiveGoApiPlatforms {
   static const List<LiveGoApiPlatform> all = [
     LiveGoApiPlatform(
-      slug: 'dobda_melolo',
+      slug: 'nobuzero_melolo',
       endpointSlug: 'melolo',
       name: 'Melolo',
       defaultLang: 'id',
@@ -55,7 +55,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dramabox',
+      slug: 'nobuzero_dramabox',
       endpointSlug: 'dramabox',
       name: 'DramaBox',
       defaultLang: 'id',
@@ -66,7 +66,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_moviebox',
+      slug: 'nobuzero_moviebox',
       endpointSlug: 'moviebox',
       name: 'MovieBox',
       defaultLang: 'id',
@@ -77,7 +77,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_mydrama',
+      slug: 'nobuzero_mydrama',
       endpointSlug: 'mydrama',
       name: 'MyDrama',
       defaultLang: 'id',
@@ -88,7 +88,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dramanova',
+      slug: 'nobuzero_dramanova',
       endpointSlug: 'dramanova',
       name: 'DramaNova',
       defaultLang: 'id',
@@ -99,7 +99,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_shorten',
+      slug: 'nobuzero_shorten',
       endpointSlug: 'shorten',
       name: 'Shorten',
       defaultLang: 'id',
@@ -110,7 +110,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dramahub',
+      slug: 'nobuzero_dramahub',
       endpointSlug: 'dramahub',
       name: 'DramaHub',
       defaultLang: 'id',
@@ -121,7 +121,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_flickshort',
+      slug: 'nobuzero_flickshort',
       endpointSlug: 'flickshort',
       name: 'FlickShort',
       defaultLang: 'id',
@@ -132,7 +132,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_loklok',
+      slug: 'nobuzero_loklok',
       endpointSlug: 'loklok',
       name: 'Loklok',
       defaultLang: 'id',
@@ -143,7 +143,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_radreel',
+      slug: 'nobuzero_radreel',
       endpointSlug: 'radreel',
       name: 'RadReel',
       defaultLang: 'id',
@@ -154,7 +154,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_reelflix',
+      slug: 'nobuzero_reelflix',
       endpointSlug: 'reelflix',
       name: 'ReelFlix',
       defaultLang: 'id',
@@ -165,7 +165,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_shortflix',
+      slug: 'nobuzero_shortflix',
       endpointSlug: 'shortflix',
       name: 'Shortflix',
       defaultLang: 'id',
@@ -176,7 +176,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_viu',
+      slug: 'nobuzero_viu',
       endpointSlug: 'viu',
       name: 'Viu',
       defaultLang: 'id',
@@ -187,7 +187,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dotdrama',
+      slug: 'nobuzero_dotdrama',
       endpointSlug: 'dotdrama',
       name: 'DotDrama',
       defaultLang: 'id',
@@ -198,7 +198,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dramarush',
+      slug: 'nobuzero_dramarush',
       endpointSlug: 'dramarush',
       name: 'DramaRush',
       defaultLang: 'id',
@@ -209,7 +209,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_layarkaca',
+      slug: 'nobuzero_layarkaca',
       endpointSlug: 'layarkaca',
       name: 'Layarkaca',
       defaultLang: 'id',
@@ -220,7 +220,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_netshort',
+      slug: 'nobuzero_netshort',
       endpointSlug: 'netshort',
       name: 'NetShort',
       defaultLang: 'id',
@@ -231,7 +231,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_shortreels',
+      slug: 'nobuzero_shortreels',
       endpointSlug: 'shortreels',
       name: 'ShortReels',
       defaultLang: 'id',
@@ -242,7 +242,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_bittv',
+      slug: 'nobuzero_bittv',
       endpointSlug: 'bittv',
       name: 'BitTV',
       defaultLang: 'id',
@@ -253,7 +253,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_fizzo',
+      slug: 'nobuzero_fizzo',
       endpointSlug: 'fizzo',
       name: 'Fizzo',
       defaultLang: 'id',
@@ -264,7 +264,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_shortmax',
+      slug: 'nobuzero_shortmax',
       endpointSlug: 'shortmax',
       name: 'ShortMax',
       defaultLang: 'id',
@@ -275,7 +275,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_freereels',
+      slug: 'nobuzero_freereels',
       endpointSlug: 'freereels',
       name: 'FreeReels',
       defaultLang: 'id',
@@ -286,7 +286,7 @@ class LiveGoApiPlatforms {
       categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
-      slug: 'dobda_dramawave',
+      slug: 'nobuzero_dramawave',
       endpointSlug: 'dramawave',
       name: 'DramaWave',
       defaultLang: 'id',
@@ -299,12 +299,12 @@ class LiveGoApiPlatforms {
   ];
 
   static const List<String> tvStarterSlugs = <String>[
-    'dobda_melolo',
-    'dobda_dramabox',
-    'dobda_moviebox',
-    'dobda_mydrama',
-    'dobda_netshort',
-    'dobda_shortmax',
+    'nobuzero_melolo',
+    'nobuzero_dramabox',
+    'nobuzero_moviebox',
+    'nobuzero_mydrama',
+    'nobuzero_netshort',
+    'nobuzero_shortmax',
   ];
 
   static List<String> get supportedSlugs => all.map((e) => e.slug).toList();
@@ -349,7 +349,10 @@ class LiveGoApiPlatforms {
   }
 
   static String normalizeSlug(String platform) {
-    return platform.trim().toLowerCase();
+    final slug = platform.trim().toLowerCase();
+    return slug.startsWith('do' 'bda_')
+        ? slug.replaceFirst('do' 'bda_', 'nobuzero_')
+        : slug;
   }
 
   static String endpointSlug(String platform) => bySlug(platform).apiSlug;
@@ -416,7 +419,7 @@ class LiveGoApiPlatforms {
   static String categoryLabel(String platform, String category) {
     final config = bySlug(platform);
     final key = categoryKey(config.slug, category);
-    if (config.isDobda) {
+    if (config.isNobuzero) {
       if (key == 'livego') return 'LiveGo';
       if (key == 'discover') return 'Terbaru';
       return 'Home';
@@ -436,7 +439,7 @@ class LiveGoApiPlatforms {
       case 'home':
         return 'Beranda';
     }
-    return category.trim().isEmpty ? (config.isDobda ? 'Beranda' : 'Populer') : category.trim();
+    return category.trim().isEmpty ? (config.isNobuzero ? 'Beranda' : 'Populer') : category.trim();
   }
 
   static List<String> normalizeCategoriesFor(String platform, Iterable<String> values) {

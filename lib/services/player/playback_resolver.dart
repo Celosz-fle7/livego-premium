@@ -31,7 +31,7 @@ class PlaybackResolver {
 
     final stream = await LiveGoApiGateway.videoInfo(
       item,
-      chapterId: platform.isDobda ? requestedChapter : '$ep',
+      chapterId: platform.isNobuzero ? requestedChapter : '$ep',
     );
     return _sourceFromStream(item, stream, platform: platform, ep: ep);
   }
@@ -59,7 +59,7 @@ class PlaybackResolver {
 
     final stream = await LiveGoApiGateway.fastEpisodeStream(
       item,
-      chapterId: platform.isDobda ? requestedChapter : '$ep',
+      chapterId: platform.isNobuzero ? requestedChapter : '$ep',
       timeout: timeout,
     );
     return _sourceFromStream(item, stream, platform: platform, ep: ep);

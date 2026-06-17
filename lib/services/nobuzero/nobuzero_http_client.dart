@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../api/api_env.dart';
-import '../api/dobda_hmac_signer.dart';
+import '../api/nobuzero_hmac_signer.dart';
 
 class LiveGoAuthConfigException implements Exception {
   final String message;
@@ -19,9 +19,19 @@ class LiveGoAuthException implements Exception {
   String toString() => 'LiveGoAuthException($statusCode): $message';
 }
 
-/// Low-level Dobda/Nobuzero HTTP/HMAC client.
-class DobdaHttpClient {
-  const DobdaHttpClient._();
+/// Low-level Nobuzero HTTP/HMAC client.
+class NobuzeroHttpClient {
+  const NobuzeroHttpClient._();
+
+  static String _resolveApiPath(String basePath, String endpointPath) {
+    final cleanBase = basePath.trim().replaceAll(RegExp(r'/+$'), '');
+    final cleanEndpoint = endpointPath.trim().replaceFirst(RegExp(r'^/+'), '');
+    if (cleanBase.endsWith('/api/v2') && cleanEndpoint.startsWith('api/v2/')) {
+      return '$cleanBase/${cleanEndpoint.substring('api/v2/'.length)}';
+    }
+    if (cleanBase.isEmpty || cleanBase == '/') return '/$cleanEndpoint';
+    return '$cleanBase/$cleanEndpoint';
+  }
 
   static Future<Map<String, dynamic>> getJson(
     String path,
@@ -34,9 +44,9 @@ class DobdaHttpClient {
       );
     }
 
-    final baseUri = Uri.parse(ApiEnv.dobdaBaseUrl);
+    final baseUri = Uri.parse(ApiEnv.nobuzeroBaseUrl);
     final uri = baseUri.replace(
-      path: path,
+      path: _resolveApiPath(baseUri.path, path),
       queryParameters: query.isEmpty ? null : query,
     );
 
@@ -44,11 +54,11 @@ class DobdaHttpClient {
     try {
       final request = await client.getUrl(uri).timeout(ApiEnv.timeout);
 
-      final headers = DobdaHmacSigner.headers(
+      final headers = NobuzeroHmacSigner.headers(
         method: 'GET',
         uri: uri,
-        secret: ApiEnv.dobdaSecret,
-        userId: ApiEnv.dobdaUserId,
+        secret: ApiEnv.nobuzeroSecret,
+        userId: ApiEnv.nobuzeroUserId,
       );
 
       for (final entry in headers.entries) {
