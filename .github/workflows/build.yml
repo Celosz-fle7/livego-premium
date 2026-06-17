@@ -1,117 +1,176 @@
 name: Build LiveGO Premium APK
-'on':
-push:
-branches:
-- main
-workflow_dispatch:
+
+"on":
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
 permissions:
-contents: read
+  contents: read
+
 jobs:
-build:
-runs-on: ubuntu-latest
-env:
-DEFAULT_NOBUZERO_BASE_URL: https://nobuzero.my.id
-steps:
-- name: Checkout
-uses: actions/checkout@v4
+  build:
+    runs-on: ubuntu-latest
 
-  - name: Setup Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: '17'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  - name: Setup Flutter
-    uses: subosito/flutter-action@v2
-    with:
-      flutter-version: '3.22.0'
-      channel: stable
-      cache: true
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  - name: Pub get
-    run: flutter pub get
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: stable
+          cache: true
 
-  - name: Validate required secrets
-    shell: bash
-    env:
-      LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
-      LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
-      LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
-      LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
-      LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
-      LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
-      LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
-      LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
-    run: |
-      missing=0
+      - name: Pub get
+        run: flutter pub get
 
-      if [ -z "$LIVEGO_BASE_URL" ]; then
-        LIVEGO_BASE_URL="$DEFAULT_NOBUZERO_BASE_URL"
-      fi
+      - name: Decode fixed release keystore
+        shell: bash
+        env:
+          LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$LIVEGO_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "Missing required secret: LIVEGO_RELEASE_KEYSTORE_BASE64"
+            exit 1
+          fi
 
-      if [ -z "$LIVEGO_NOBUZERO_BASE_URL" ]; then
-        LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_BASE_URL"
-      fi
+          echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
+          ls -lh android/app/livego-release-key.jks
 
-      for name in LIVEGO_USER_ID LIVEGO_SECRET LIVEGO_RELEASE_KEYSTORE_BASE64 LIVEGO_RELEASE_STORE_PASSWORD LIVEGO_RELEASE_KEY_ALIAS LIVEGO_RELEASE_KEY_PASSWORD; do
-        if [ -z "${!name}" ]; then
-          echo "Missing required secret: $name"
-          missing=1
-        fi
-      done
+      - name: Validate required secrets
+        shell: bash
+        env:
+          LIVEGO_BASE_URL: ${{ secrets.LIVEGO_BASE_URL }}
+          LIVEGO_NOBUZERO_BASE_URL: ${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}
+          LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
+          LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
+          LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+          LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+          LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
+        run: |
+          missing=0
 
-      if [ "$missing" -ne 0 ]; then
-        exit 1
-      fi
+          for name in LIVEGO_BASE_URL LIVEGO_NOBUZERO_BASE_URL LIVEGO_USER_ID LIVEGO_SECRET LIVEGO_RELEASE_STORE_PASSWORD LIVEGO_RELEASE_KEY_ALIAS LIVEGO_RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              missing=1
+            fi
+          done
 
-      echo "LIVEGO_BASE_URL=$LIVEGO_BASE_URL" >> "$GITHUB_ENV"
-      echo "LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL" >> "$GITHUB_ENV"
-      echo "API secret validation passed."
-      echo "Using LIVEGO_BASE_URL=$LIVEGO_BASE_URL"
-      echo "Using LIVEGO_NOBUZERO_BASE_URL=$LIVEGO_NOBUZERO_BASE_URL"
-      echo "LIVEGO_USER_ID is configured."
-      echo "LIVEGO_SECRET is configured."
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
-  - name: Decode fixed release keystore
-    shell: bash
-    env:
-      LIVEGO_RELEASE_KEYSTORE_BASE64: ${{ secrets.LIVEGO_RELEASE_KEYSTORE_BASE64 }}
-    run: |
-      echo "$LIVEGO_RELEASE_KEYSTORE_BASE64" | base64 -d > android/app/livego-release-key.jks
-      ls -lh android/app/livego-release-key.jks
+          echo "API secret validation passed."
+          echo "LIVEGO_BASE_URL is configured."
+          echo "LIVEGO_NOBUZERO_BASE_URL is configured."
+          echo "LIVEGO_USER_ID is configured."
+          echo "LIVEGO_SECRET is configured."
 
-  - name: Analyze
-    run: flutter analyze
+      - name: Analyze
+        run: flutter analyze
 
-  - name: Build universal release APK
-    shell: bash
-    env:
-      LIVEGO_USER_ID: ${{ secrets.LIVEGO_USER_ID }}
-      LIVEGO_SECRET: ${{ secrets.LIVEGO_SECRET }}
-      LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
-      LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
-      LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
-      LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
-    run: |
-      flutter build apk --release \
-        --dart-define=LIVEGO_BASE_URL="$LIVEGO_BASE_URL" \
-        --dart-define=LIVEGO_NOBUZERO_BASE_URL="$LIVEGO_NOBUZERO_BASE_URL" \
-        --dart-define=LIVEGO_USER_ID="$LIVEGO_USER_ID" \
-        --dart-define=LIVEGO_SECRET="$LIVEGO_SECRET"
+      - name: Build universal release APK
+        shell: bash
+        env:
+          LIVEGO_RELEASE_STORE_FILE: livego-release-key.jks
+          LIVEGO_RELEASE_STORE_PASSWORD: ${{ secrets.LIVEGO_RELEASE_STORE_PASSWORD }}
+          LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
+          LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
+        run: |
+          flutter build apk --release \
+            --dart-define=LIVEGO_BASE_URL="${{ secrets.LIVEGO_BASE_URL }}" \
+            --dart-define=LIVEGO_NOBUZERO_BASE_URL="${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" \
+            --dart-define=LIVEGO_USER_ID="${{ secrets.LIVEGO_USER_ID }}" \
+            --dart-define=LIVEGO_SECRET="${{ secrets.LIVEGO_SECRET }}"
 
-  - name: Prepare files
-    shell: bash
-    run: |
-      cd build/app/outputs/flutter-apk
-      cp app-release.apk LiveGO-Premium.apk
-      zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
-      ls -lh LiveGO-Premium.apk livego-premium-artifact.zip
+      - name: Prepare files
+        shell: bash
+        run: |
+          cd build/app/outputs/flutter-apk
+          cp app-release.apk LiveGO-Premium.apk
+          zip -9 livego-premium-artifact.zip LiveGO-Premium.apk
+          ls -lh LiveGO-Premium.apk livego-premium-artifact.zip
 
-  - name: Upload internal APK artifact
-    uses: actions/upload-artifact@v4
-    with:
-      name: livego-premium-internal-apk
-      path: |
-        build/app/outputs/flutter-apk/LiveGO-Premium.apk
-        build/app/outputs/flutter-apk/livego-premium-artifact.zip
-      if-no-files-found: error
+      - name: Upload internal APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: livego-premium-internal-apk
+          path: |
+            build/app/outputs/flutter-apk/LiveGO-Premium.apk
+            build/app/outputs/flutter-apk/livego-premium-artifact.zip
+          if-no-files-found: error
+
+      - name: Send Telegram success notification
+        if: success()
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram notification skipped because TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured."
+            exit 0
+          fi
+
+          message=$(cat <<MSG
+          ✅ LiveGO build sukses
+          Repo: $GITHUB_REPOSITORY
+          Branch: $GITHUB_REF_NAME
+          Run: #$GITHUB_RUN_NUMBER
+          Link: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          MSG
+          )
+
+          curl --silent --show-error --fail \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$message" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null || \
+            echo "Telegram success message failed to send."
+
+          apk_path="build/app/outputs/flutter-apk/LiveGO-Premium.apk"
+          if [ -f "$apk_path" ]; then
+            curl --silent --show-error --fail \
+              -F "chat_id=$TELEGRAM_CHAT_ID" \
+              -F "document=@${apk_path}" \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" >/dev/null || \
+              echo "Telegram APK document failed to send."
+          else
+            echo "Telegram APK document skipped because $apk_path does not exist."
+          fi
+
+      - name: Send Telegram failure notification
+        if: failure()
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Telegram notification skipped because TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured."
+            exit 0
+          fi
+
+          message=$(cat <<MSG
+          ❌ LiveGO build gagal
+          Repo: $GITHUB_REPOSITORY
+          Branch: $GITHUB_REF_NAME
+          Run: #$GITHUB_RUN_NUMBER
+          Link: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          MSG
+          )
+
+          curl --silent --show-error --fail \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=$message" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null || \
+            echo "Telegram failure message failed to send."
