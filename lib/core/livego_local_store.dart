@@ -343,8 +343,8 @@ class LiveGoLocalStore {
           savedHomePlatforms.any(_isLegacyApiSource) ||
           _isLegacyApiSource(json['defaultPlatform']);
 
-      // Kalau setting lama masih berisi Anichin-style source, reset ke Dobda clean starter.
-      // Ini mencegah Home/Source Manager campur engine lama dengan Dobda aktif.
+      // Kalau setting lama masih berisi Anichin-style source, reset ke Nobuzero clean starter.
+      // Ini mencegah Home/Source Manager campur engine lama dengan Nobuzero aktif.
       if (hasLegacyApiSource && active.length < 2) {
         active = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
@@ -352,16 +352,16 @@ class LiveGoLocalStore {
         home = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
 
-      // Dobda migration guard:
-      // Old saved source settings can leave Home with only one Dobda platform
+      // Nobuzero migration guard:
+      // Old saved source settings can leave Home with only one Nobuzero platform
       // (or a legacy alias normalized to dobda_freereels). Always merge the
-      // current Dobda starter pack back into active/home so Source Manager and
-      // Home expose all clean Dobda platforms after update.
-      final defaultDobdaPlatforms = LiveGoSettings.defaultPlatforms
+      // current Nobuzero starter pack back into active/home so Source Manager and
+      // Home expose all clean Nobuzero platforms after update.
+      final defaultNobuzeroPlatforms = LiveGoSettings.defaultPlatforms
           .where(supported.contains)
           .toList(growable: false);
-      if (defaultDobdaPlatforms.isNotEmpty) {
-        for (final slug in defaultDobdaPlatforms) {
+      if (defaultNobuzeroPlatforms.isNotEmpty) {
+        for (final slug in defaultNobuzeroPlatforms) {
           if (!active.contains(slug)) active.add(slug);
           if (!home.contains(slug)) home.add(slug);
         }

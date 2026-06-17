@@ -21,7 +21,7 @@ class LiveGoCatalogPlatformService {
 
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
 
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_freereels' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'melolo' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform);
 

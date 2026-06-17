@@ -3,7 +3,7 @@ import '../models/livego_episode.dart';
 import '../models/stream_info.dart';
 import 'dobda/dobda_api_client_impl.dart';
 
-/// Public Dobda API facade.
+/// Public Nobuzero API facade.
 ///
 /// Keep this file thin. Provider logic, parsing, filtering, and HTTP request
 /// details live in `dobda/dobda_api_client_impl.dart`.

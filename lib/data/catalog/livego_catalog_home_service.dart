@@ -75,7 +75,7 @@ class LiveGoCatalogHomeService {
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_freereels'}) async {
+  static Future<List<ContentItem>> home({String platform = 'melolo'}) async {
     const endpoint = 'home_clean_v2';
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -136,7 +136,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'melolo',
     String category = 'Home',
     bool allowExpired = true,
   }) async {
@@ -157,7 +157,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'melolo',
     String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -251,13 +251,13 @@ class LiveGoCatalogHomeService {
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_freereels'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'melolo'}) async {
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
     return [];
   }
 
-  static Future<ContentItem> hero({String platform = 'dobda_freereels'}) async {
+  static Future<ContentItem> hero({String platform = 'melolo'}) async {
     try {
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;

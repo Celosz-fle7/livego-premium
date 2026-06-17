@@ -10,9 +10,9 @@ import 'dobda_http_client.dart';
 class DobdaApiClientImpl {
   const DobdaApiClientImpl._();
 
-  static String get baseUrl => ApiEnv.dobdaBaseUrl;
-  static final Map<String, List<LiveGoEpisode>> _episodeMemory = <String, List<LiveGoEpisode>>{};
-
+  static String get baseUrl => ApiEnv.nobuzeroApiBaseUrl;
+  static final Map<String, List<LiveGoEpisode>> _episodeMemory =
+      <String, List<LiveGoEpisode>>{};
 
   static Future<List<ContentItem>> home({
     String platform = 'melolo',
@@ -26,7 +26,11 @@ class DobdaApiClientImpl {
     String lang = 'id',
     int page = 1,
   }) async {
-    return homeFeed(platform: platform, lang: lang, page: page);
+    final rows = await _safeRows(
+      _discoverRaw(platform: platform, lang: lang, page: page),
+      '$platform/discover',
+    );
+    return _cleanNobuzeroItems(rows).take(60).toList(growable: false);
   }
 
   static Future<List<ContentItem>> collection({
@@ -49,15 +53,18 @@ class DobdaApiClientImpl {
   }) async {
     // TV Home must be fast. /home is the primary fast path and must not wait
     // for /discover. /discover is only a fallback if /home returns empty.
-    final homeRows = await _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home');
-    final cleanHome = _cleanDobdaItems(homeRows, excludeDubbed: true);
+    final homeRows = await _safeRows(
+      _homeRaw(platform: platform, lang: lang),
+      '$platform/home',
+    );
+    final cleanHome = _cleanNobuzeroItems(homeRows, excludeDubbed: true);
     if (cleanHome.isNotEmpty) return cleanHome.take(60).toList(growable: false);
 
     final discoverRows = await _safeRows(
       _discoverRaw(platform: platform, lang: lang, page: page),
       '$platform/discover-fallback',
     );
-    final cleanDiscover = _cleanDobdaItems(discoverRows, excludeDubbed: true);
+    final cleanDiscover = _cleanNobuzeroItems(discoverRows, excludeDubbed: true);
     return cleanDiscover.take(60).toList(growable: false);
   }
 
@@ -88,7 +95,7 @@ class DobdaApiClientImpl {
 
     for (final rows in results) {
       for (final item in rows) {
-        if (!_isCleanDobdaItem(item)) continue;
+        if (!_isCleanNobuzeroItem(item)) continue;
         if (!_isLiveGoRecommendation(item)) continue;
         final key = _contentKey(item);
         if (seen.add(key)) merged.add(item);
@@ -113,11 +120,16 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.banner, {
-      'category_p': config.apiSlug,
-      'lang': apiLang,
-    });
-    return _parseItems(json, platform: config.slug, lang: apiLang);
+    try {
+      final json = await DobdaHttpClient.getJson(DobdaEndpoints.banner, {
+        'category_p': config.apiSlug,
+        'lang': apiLang,
+      });
+      return _parseItems(json, platform: config.slug, lang: apiLang);
+    } catch (e) {
+      print('LiveGO API BANNER EMPTY ${config.slug}: $e');
+      return const <ContentItem>[];
+    }
   }
 
   static Future<List<ContentItem>> search({
@@ -126,8 +138,13 @@ class DobdaApiClientImpl {
     String lang = 'id',
     int page = 1,
   }) async {
-    final rows = await _searchRaw(query: query, platform: platform, lang: lang, page: page);
-    return _cleanDobdaItems(rows, fromDubSearch: true);
+    final rows = await _searchRaw(
+      query: query,
+      platform: platform,
+      lang: lang,
+      page: page,
+    );
+    return _cleanNobuzeroItems(rows, fromDubSearch: true);
   }
 
   static Future<List<ContentItem>> _safeRows(
@@ -137,7 +154,7 @@ class DobdaApiClientImpl {
     try {
       return await future.timeout(const Duration(seconds: 6));
     } catch (e) {
-      print('DOBDA CLEAN FEED ERROR $label: $e');
+      print('LiveGO API FEED ERROR $label: $e');
       return const <ContentItem>[];
     }
   }
@@ -251,8 +268,8 @@ class DobdaApiClientImpl {
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
     final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Dobda /video membutuhkan chapterId asli dari /detail. Angka 1,2,3
-    // tidak selalu aman sebagai chapterId di semua platform Dobda. Kalau
+    // Nobuzero /video membutuhkan chapterId asli dari /detail. Angka 1,2,3
+    // tidak selalu aman sebagai chapterId di semua platform Nobuzero. Kalau
     // player meminta episode index, resolve dulu ke chapters[].id supaya
     // PREV/NEXT dan daftar episode tidak loncat ke video acak.
     if (requestedIsEpisodeNumber) {
@@ -311,8 +328,8 @@ class DobdaApiClientImpl {
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
     final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Root cause loncat episode Dobda: player TV mengirim episode index
-    // (1,2,3...), sedangkan Dobda /video mengharapkan chapterId asli dari
+    // Root cause loncat episode Nobuzero: player TV mengirim episode index
+    // (1,2,3...), sedangkan Nobuzero /video mengharapkan chapterId asli dari
     // /detail. Probe angka bisa berhasil di beberapa provider, tapi hasilnya
     // bukan selalu episode index yang diminta. Jadi untuk angka, selalu map
     // dulu ke chapters[].id dan jangan tembak angka mentah lebih dulu.
@@ -336,7 +353,7 @@ class DobdaApiClientImpl {
           if (mapped.url.isNotEmpty) return mapped;
         }
       } catch (e) {
-        print('DOBDA FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
+        print('LiveGO API FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
       }
 
       // Fallback terakhir saja. Ini hanya untuk provider yang benar-benar
@@ -382,7 +399,7 @@ class DobdaApiClientImpl {
         timeout: timeout,
       );
     } catch (e) {
-      print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
+      print('LiveGO API FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
       return StreamInfo.empty;
     }
   }
@@ -408,7 +425,7 @@ class DobdaApiClientImpl {
       if (stream.url.isEmpty) return StreamInfo.empty;
       return stream;
     } catch (e) {
-      print('DOBDA VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
+      print('LiveGO API VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
       return StreamInfo.empty;
     }
   }
@@ -452,7 +469,7 @@ class DobdaApiClientImpl {
     }
   }
 
-  static List<ContentItem> _cleanDobdaItems(
+  static List<ContentItem> _cleanNobuzeroItems(
     List<ContentItem> rows, {
     bool fromDubSearch = false,
     bool requireDubbed = false,
@@ -461,7 +478,7 @@ class DobdaApiClientImpl {
     final out = <ContentItem>[];
     final seen = <String>{};
     for (final item in rows) {
-      if (!_isCleanDobdaItem(
+      if (!_isCleanNobuzeroItem(
         item,
         fromDubSearch: fromDubSearch,
         requireDubbed: requireDubbed,
@@ -475,7 +492,7 @@ class DobdaApiClientImpl {
     return out;
   }
 
-  static bool _isCleanDobdaItem(
+  static bool _isCleanNobuzeroItem(
     ContentItem item, {
     bool fromDubSearch = false,
     bool requireDubbed = false,
