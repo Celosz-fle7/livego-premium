@@ -43,104 +43,271 @@ class LiveGoApiPlatform {
 
 class LiveGoApiPlatforms {
   static const List<LiveGoApiPlatform> all = [
-    // DOBDA FAMILY = ON / active.
-    // ANICHIN FAMILY = OFF / legacy/reserved, tidak masuk Home/Source Manager.
-    // Nama source bisa mirip, tapi registry aktif di bawah ini murni Dobda clean starter.
+    LiveGoApiPlatform(
+      slug: 'dobda_melolo',
+      endpointSlug: 'melolo',
+      name: 'Melolo',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_dramabox',
+      endpointSlug: 'dramabox',
+      name: 'DramaBox',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_moviebox',
+      endpointSlug: 'moviebox',
+      name: 'MovieBox',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_mydrama',
+      endpointSlug: 'mydrama',
+      name: 'MyDrama',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_dramanova',
+      endpointSlug: 'dramanova',
+      name: 'DramaNova',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_shorten',
+      endpointSlug: 'shorten',
+      name: 'Shorten',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_dramahub',
+      endpointSlug: 'dramahub',
+      name: 'DramaHub',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_flickshort',
+      endpointSlug: 'flickshort',
+      name: 'FlickShort',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_loklok',
+      endpointSlug: 'loklok',
+      name: 'Loklok',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_radreel',
+      endpointSlug: 'radreel',
+      name: 'RadReel',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_reelflix',
+      endpointSlug: 'reelflix',
+      name: 'ReelFlix',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_shortflix',
+      endpointSlug: 'shortflix',
+      name: 'Shortflix',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_viu',
+      endpointSlug: 'viu',
+      name: 'Viu',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_dotdrama',
+      endpointSlug: 'dotdrama',
+      name: 'DotDrama',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_dramarush',
+      endpointSlug: 'dramarush',
+      name: 'DramaRush',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_layarkaca',
+      endpointSlug: 'layarkaca',
+      name: 'Layarkaca',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_netshort',
+      endpointSlug: 'netshort',
+      name: 'NetShort',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en', 'in'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_shortreels',
+      endpointSlug: 'shortreels',
+      name: 'ShortReels',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_bittv',
+      endpointSlug: 'bittv',
+      name: 'BitTV',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_fizzo',
+      endpointSlug: 'fizzo',
+      name: 'Fizzo',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
+    LiveGoApiPlatform(
+      slug: 'dobda_shortmax',
+      endpointSlug: 'shortmax',
+      name: 'ShortMax',
+      defaultLang: 'id',
+      searchParam: 'q',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en'],
+      supportsSubtitle: true,
+      categories: ['Home', 'Terbaru', 'LiveGo'],
+    ),
     LiveGoApiPlatform(
       slug: 'dobda_freereels',
       endpointSlug: 'freereels',
       name: 'FreeReels',
-      backend: LiveGoApiBackend.dobda,
       defaultLang: 'id',
-      searchParam: 'query',
+      searchParam: 'q',
       videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
+      supportedLangs: ['id', 'en'],
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-    LiveGoApiPlatform(
-      slug: 'dobda_goodshort',
-      endpointSlug: 'goodshort',
-      name: 'GoodShort',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
     LiveGoApiPlatform(
       slug: 'dobda_dramawave',
       endpointSlug: 'dramawave',
       name: 'DramaWave',
-      backend: LiveGoApiBackend.dobda,
       defaultLang: 'id',
-      searchParam: 'query',
+      searchParam: 'q',
       videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
+      supportedLangs: ['id', 'en'],
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Home', 'Terbaru', 'LiveGo'],
     ),
-    LiveGoApiPlatform(
-      slug: 'dobda_reelshort',
-      endpointSlug: 'reelshort',
-      name: 'ReelShort',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-    LiveGoApiPlatform(
-      slug: 'dobda_reelife',
-      endpointSlug: 'reelife',
-      name: 'ReelLife',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-    LiveGoApiPlatform(
-      slug: 'dobda_rapidtv',
-      endpointSlug: 'rapidtv',
-      name: 'RapidTV',
-      backend: LiveGoApiBackend.dobda,
-      defaultLang: 'id',
-      searchParam: 'query',
-      videoType: LiveGoVideoType.hls,
-      supportedLangs: ['id', 'en', 'ja', 'ko', 'th', 'ar', 'pt', 'es', 'vi', 'de', 'fr', 'it', 'tr'],
-      enabledByDefault: true,
-      supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
-    ),
-
   ];
 
-  /// TV starter pack yang diexpose ke Home/Source Manager.
-  ///
-  /// Anichin-style source disimpan sebagai legacy/off. Yang ON hanya Dobda clean
-  /// starter supaya Home tidak campur antara engine Anichin dan engine Dobda.
   static const List<String> tvStarterSlugs = <String>[
-    'dobda_freereels',
-    'dobda_goodshort',
-    'dobda_dramawave',
-    'dobda_reelshort',
-    'dobda_reelife',
-    'dobda_rapidtv',
+    'dobda_melolo',
+    'dobda_dramabox',
+    'dobda_moviebox',
+    'dobda_mydrama',
+    'dobda_netshort',
+    'dobda_shortmax',
   ];
 
-  static List<String> get supportedSlugs => List<String>.unmodifiable(tvStarterSlugs);
+  static List<String> get supportedSlugs => all.map((e) => e.slug).toList();
 
   static List<String> get defaultSlugs => List<String>.unmodifiable(tvStarterSlugs);
 
@@ -198,7 +365,6 @@ class LiveGoApiPlatforms {
     var clean = requested.trim().toLowerCase();
     if (clean.isEmpty) return config.defaultLang;
 
-    // Legacy NetShort alias `in` tetap dinormalisasi hanya jika source itu diaktifkan lagi.
     if (config.apiSlug == 'netshort' && clean == 'id') clean = 'in';
     if (config.apiSlug != 'netshort' && clean == 'in' && config.supportedLangs.contains('id')) {
       clean = 'id';
@@ -228,10 +394,12 @@ class LiveGoApiPlatforms {
       'foryou': 'foryou',
       'untukkamu': 'foryou',
       'rekomendasi': 'foryou',
-      'latest': 'latest',
-      'terbaru': 'latest',
+      'latest': 'discover',
+      'terbaru': 'discover',
+      'discover': 'discover',
+      'jelajah': 'discover',
       'vip': 'vip',
-      'dubindo': 'dubindo',
+      'dubindo': 'livego',
       'dubbing': 'livego',
       'dub': 'livego',
       'sulih': 'livego',
@@ -241,8 +409,6 @@ class LiveGoApiPlatforms {
       'indo': 'livego',
       'indonesiafeed': 'livego',
       'dubindonesia': 'livego',
-      'discover': 'discover',
-      'jelajah': 'discover',
     };
     return aliases[clean] ?? clean;
   }
@@ -251,7 +417,8 @@ class LiveGoApiPlatforms {
     final config = bySlug(platform);
     final key = categoryKey(config.slug, category);
     if (config.isDobda) {
-      if (key == 'livego' || key == 'indonesia' || key == 'dubindo') return 'LiveGo';
+      if (key == 'livego') return 'LiveGo';
+      if (key == 'discover') return 'Terbaru';
       return 'Home';
     }
     switch (key) {
@@ -260,15 +427,14 @@ class LiveGoApiPlatforms {
       case 'foryou':
         return 'Untuk Kamu';
       case 'latest':
+      case 'discover':
         return 'Terbaru';
       case 'vip':
         return 'VIP';
-      case 'dubindo':
-        return 'Dub Indo';
+      case 'livego':
+        return 'LiveGo';
       case 'home':
         return 'Beranda';
-      case 'discover':
-        return 'Jelajah';
     }
     return category.trim().isEmpty ? (config.isDobda ? 'Beranda' : 'Populer') : category.trim();
   }
@@ -287,8 +453,7 @@ class LiveGoApiPlatforms {
         result.add(label);
       }
     }
-    if (result.isEmpty) result.addAll(available.take(2));
+    if (result.isEmpty) result.addAll(available.take(3));
     return result.take(6).toList();
   }
-
 }

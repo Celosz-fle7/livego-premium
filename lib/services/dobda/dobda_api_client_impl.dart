@@ -1,4 +1,3 @@
-
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../../models/stream_info.dart';
@@ -13,16 +12,34 @@ class DobdaApiClientImpl {
   static String get baseUrl => ApiEnv.dobdaBaseUrl;
   static final Map<String, List<LiveGoEpisode>> _episodeMemory = <String, List<LiveGoEpisode>>{};
 
+  static Future<List<String>> languages() async {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.languages, {});
+    final data = json['data'];
+    if (data is List) return data.map((e) => '$e').toList();
+    return const [];
+  }
+
+  static Future<List<String>> categories() async {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {});
+    final data = json['data'];
+    if (data is List) return data.map((e) => '$e').toList();
+    return const [];
+  }
+
+  static Future<Map<String, dynamic>> keyStatus() async {
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.keyStatus, {});
+    return _dataMap(json);
+  }
 
   static Future<List<ContentItem>> home({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) async {
     return homeFeed(platform: platform, lang: lang);
   }
 
   static Future<List<ContentItem>> discover({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -30,7 +47,7 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> collection({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     required String collection,
     String lang = 'id',
     int page = 1,
@@ -43,12 +60,10 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> homeFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
-    // TV Home must be fast. /home is the primary fast path and must not wait
-    // for /discover. /discover is only a fallback if /home returns empty.
     final homeRows = await _safeRows(_homeRaw(platform: platform, lang: lang), '$platform/home');
     final cleanHome = _cleanDobdaItems(homeRows, excludeDubbed: true);
     if (cleanHome.isNotEmpty) return cleanHome.take(60).toList(growable: false);
@@ -62,7 +77,7 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> liveGoFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -98,9 +113,8 @@ class DobdaApiClientImpl {
     return merged.take(60).toList();
   }
 
-  // Migrasi aman untuk setting/cache lama yang masih menyimpan kategori Indonesia.
   static Future<List<ContentItem>> indonesiaFeed({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -108,7 +122,7 @@ class DobdaApiClientImpl {
   }
 
   static Future<List<ContentItem>> banner({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
@@ -122,7 +136,7 @@ class DobdaApiClientImpl {
 
   static Future<List<ContentItem>> search({
     required String query,
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String lang = 'id',
     int page = 1,
   }) async {
@@ -165,6 +179,7 @@ class DobdaApiClientImpl {
     final json = await DobdaHttpClient.getJson(DobdaEndpoints.discover, {
       'category_p': config.apiSlug,
       'lang': apiLang,
+      'sort': 'desc',
       'page': '$page',
       'limit': '20',
     });
@@ -182,20 +197,14 @@ class DobdaApiClientImpl {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
 
-    Future<List<ContentItem>> run(String param) async {
-      final json = await DobdaHttpClient.getJson(DobdaEndpoints.search, {
-        'category_p': config.apiSlug,
-        param: clean,
-        'lang': apiLang,
-        'page': '$page',
-        'limit': '20',
-      });
-      return _parseItems(json, platform: config.slug, lang: apiLang);
-    }
-
-    final byQ = await run('q');
-    if (byQ.isNotEmpty) return byQ;
-    return run('query');
+    final json = await DobdaHttpClient.getJson(DobdaEndpoints.search, {
+      'category_p': config.apiSlug,
+      'q': clean,
+      'lang': apiLang,
+      'page': '$page',
+      'limit': '20',
+    });
+    return _parseItems(json, platform: config.slug, lang: apiLang);
   }
 
   static Future<ContentItem?> detail(ContentItem item) async {
@@ -251,10 +260,6 @@ class DobdaApiClientImpl {
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
     final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Dobda /video membutuhkan chapterId asli dari /detail. Angka 1,2,3
-    // tidak selalu aman sebagai chapterId di semua platform Dobda. Kalau
-    // player meminta episode index, resolve dulu ke chapters[].id supaya
-    // PREV/NEXT dan daftar episode tidak loncat ke video acak.
     if (requestedIsEpisodeNumber) {
       final mappedChapter = await _chapterIdForEpisode(
         item,
@@ -311,11 +316,6 @@ class DobdaApiClientImpl {
     final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
     final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Root cause loncat episode Dobda: player TV mengirim episode index
-    // (1,2,3...), sedangkan Dobda /video mengharapkan chapterId asli dari
-    // /detail. Probe angka bisa berhasil di beberapa provider, tapi hasilnya
-    // bukan selalu episode index yang diminta. Jadi untuk angka, selalu map
-    // dulu ke chapters[].id dan jangan tembak angka mentah lebih dulu.
     if (requestedIsEpisodeNumber) {
       try {
         final mappedChapter = await _chapterIdForEpisode(
@@ -339,8 +339,6 @@ class DobdaApiClientImpl {
         print('DOBDA FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
       }
 
-      // Fallback terakhir saja. Ini hanya untuk provider yang benar-benar
-      // memakai chapterId sama dengan nomor episode.
       final direct = await _tryVideoByChapter(
         item,
         config: config,
@@ -353,8 +351,6 @@ class DobdaApiClientImpl {
       return StreamInfo.empty;
     }
 
-    // Kalau sudah dikirim chapterId asli, langsung pakai. Ini dipakai ketika
-    // fitur lain nanti mengirim row.id dari daftar episode.
     final direct = await _tryVideoByChapter(
       item,
       config: config,
@@ -490,7 +486,6 @@ class DobdaApiClientImpl {
     if (excludeDubbed && dubbed) return false;
     if (requireDubbed) return dubbed;
 
-    // Search biasa tetap boleh menampilkan hasil sesuai kata kunci user.
     if (fromDubSearch) return true;
     return true;
   }
