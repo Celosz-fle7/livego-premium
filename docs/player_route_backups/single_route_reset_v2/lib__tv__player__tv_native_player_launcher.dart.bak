@@ -28,7 +28,7 @@ class TvNativePlayerLauncher {
   static Future<void> open(ContentItem item, {int? episode}) async {
     final ep = _episodeFor(item, episode);
     final playable = _playableItem(item, ep);
-    final requestChapter = _isNobuzeroPlayer(playable)
+    final requestChapter = _isDobdaPlayer(playable)
         ? (playable.chapterId.trim().isNotEmpty ? playable.chapterId.trim() : '$ep')
         : '$ep';
 
@@ -74,11 +74,11 @@ class TvNativePlayerLauncher {
     return total.clamp(1, 999).toInt();
   }
 
-  static bool _isNobuzeroPlayer(ContentItem item) {
+  static bool _isDobdaPlayer(ContentItem item) {
     try {
-      return LiveGoApiPlatforms.bySlug(item.platformSlug).isNobuzero;
+      return LiveGoApiPlatforms.bySlug(item.platformSlug).isDobda;
     } catch (_) {
-      return item.platformSlug.startsWith('nobuzero_');
+      return item.platformSlug.startsWith('dobda_');
     }
   }
 

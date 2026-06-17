@@ -21,7 +21,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
 
   int _loadToken = 0;
   TvHomeContentState? _lastGoodState;
-  String _lastPlatform = 'nobuzero_freereels';
+  String _lastPlatform = 'dobda_freereels';
   String _lastCategory = 'Home';
   String? _requestedKey;
   String? _displayedKey;

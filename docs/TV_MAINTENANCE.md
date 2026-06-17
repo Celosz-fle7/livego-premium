@@ -224,7 +224,7 @@ Final Home remote UX:
 
 ## Source Manager Migration Links Repair
 
-Final rule after Nobuzero migration:
+Final rule after Dobda migration:
 - Source Manager default route opens platform mode.
 - Platform mode shows all supported user platforms and does not show category chips in every row.
 - Home Platform header opens Source Manager platform mode.

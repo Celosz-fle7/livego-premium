@@ -254,7 +254,7 @@ class _LiveGoCachedImageState extends State<LiveGoCachedImage> {
       final uri = Uri.parse(clean);
       if (!uri.hasScheme || uri.host.isEmpty) return clean;
 
-      // Nobuzero image proxy URLs commonly differ in query parameters only.
+      // Dobda image proxy URLs commonly differ in query parameters only.
       // The old key removed query params, so many different posters could share
       // one cache entry and appear as the same image in Home/grid.
       // Keep the full URL for correctness, but drop fragments because they do not

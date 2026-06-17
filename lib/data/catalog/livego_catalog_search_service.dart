@@ -10,7 +10,7 @@ import 'livego_catalog_platform_service.dart';
 class LiveGoCatalogSearchService {
   const LiveGoCatalogSearchService._();
 
-  static Future<List<ContentItem>> search(String query, {String platform = 'nobuzero_freereels'}) async {
+  static Future<List<ContentItem>> search(String query, {String platform = 'dobda_freereels'}) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
     final cached = await LiveGoContentCache.readItems(
@@ -65,7 +65,7 @@ class LiveGoCatalogSearchService {
 
     if (merged.isEmpty) {
       final first = LiveGoCatalogPlatformService.platforms.isEmpty
-          ? 'nobuzero_freereels'
+          ? 'dobda_freereels'
           : LiveGoCatalogPlatformService.platforms.first;
       for (final platform in ApiPlatformFallbackRouter.candidates(first, max: 5)) {
         if (LiveGoCatalogPlatformService.platforms.contains(platform)) continue;

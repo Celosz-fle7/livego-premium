@@ -4,7 +4,7 @@ class ApiEnv {
   // Ganti API utama cukup dari file ini atau via --dart-define.
   static const String baseUrl = String.fromEnvironment(
     'LIVEGO_BASE_URL',
-    defaultValue: 'https://nobuzero.my.id/api/v2',
+    defaultValue: 'https://nobuzero.my.id',
   );
 
   static const String apiKey = String.fromEnvironment(
@@ -12,39 +12,31 @@ class ApiEnv {
     defaultValue: '',
   );
 
-  // Nobuzero API v2. Auth-nya HMAC + UserID.
-  // TODO TEMP TEST MODE: remove source fallback credential after runtime/stress test passes.
-  static const String _primaryBaseUrl = String.fromEnvironment(
-    'LIVEGO_NOBUZERO_BASE_URL',
-    defaultValue: 'https://nobuzero.my.id/api/v2',
+  // API kedua Dobda/Nobuzero. Auth-nya HMAC + UserID.
+  static const String dobdaBaseUrl = String.fromEnvironment(
+    'LIVEGO_DOBDA_BASE_URL',
+    defaultValue: 'https://nobuzero.my.id',
   );
 
-  static String get nobuzeroBaseUrl {
-    final value = _primaryBaseUrl.trim();
-    if (value.isNotEmpty) return value;
-    return 'https://nobuzero.my.id/api/v2';
-  }
-
-  static const String nobuzeroUserId = String.fromEnvironment(
+  static const String dobdaUserId = String.fromEnvironment(
     'LIVEGO_USER_ID',
-    defaultValue: 'lg_2a741cdaf982a247',
+    defaultValue: '',
   );
 
-  static const String nobuzeroSecret = String.fromEnvironment(
+  static const String dobdaSecret = String.fromEnvironment(
     'LIVEGO_SECRET',
-    defaultValue:
-        '<8eddddb070709a2a47cc3477dd761abd4879caf3c1154dac147d9ff7f5d7a1ee>',
+    defaultValue: '',
   );
 
   static const Duration timeout = Duration(seconds: 18);
 
-  /// True jika USER_ID dan SECRET tersedia dari --dart-define atau fallback source.
+  /// True jika USER_ID dan SECRET sudah dikonfigurasi via --dart-define.
   static bool get hasLiveGoCredentials =>
-      nobuzeroUserId.trim().isNotEmpty && nobuzeroSecret.trim().isNotEmpty;
+      dobdaUserId.trim().isNotEmpty && dobdaSecret.trim().isNotEmpty;
 
   /// User ID tersensor untuk keperluan log/debug tanpa mengekspos ID asli secara penuh.
   static String get maskedUserId {
-    final id = nobuzeroUserId.trim();
+    final id = dobdaUserId.trim();
     if (id.isEmpty) return 'none';
     if (id.length < 8) return '***';
     return '${id.substring(0, 3)}...${id.substring(id.length - 4)}';
