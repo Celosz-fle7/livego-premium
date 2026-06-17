@@ -9,7 +9,7 @@ class ApiEnv {
 
   static const String apiKey = String.fromEnvironment(
     'LIVEGO_API_KEY',
-    defaultValue: 'dk_live_c261cb5920f82cf971e29edf0c8183d8',
+    defaultValue: '',
   );
 
   // API kedua Dobda/Nobuzero. Auth-nya HMAC + UserID.
@@ -31,7 +31,9 @@ class ApiEnv {
   static const Duration timeout = Duration(seconds: 18);
 
   static void applyHeaders(HttpHeaders headers) {
-    headers.set('X-API-Key', apiKey);
+    if (apiKey.isNotEmpty) {
+      headers.set('X-API-Key', apiKey);
+    }
     headers.set('Accept', 'application/json');
     headers.set('User-Agent', 'okhttp/4.12.0');
   }
