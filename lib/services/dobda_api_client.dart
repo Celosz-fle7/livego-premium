@@ -38,6 +38,12 @@ class DobdaApiClient {
         page: page,
       );
 
+  static Future<Map<String, List<String>>> categories({
+    String platform = 'melolo',
+    String lang = 'id',
+  }) =>
+      DobdaApiClientImpl.categories(platform: platform, lang: lang);
+
   static Future<List<ContentItem>> homeFeed({
     String platform = 'melolo',
     String lang = 'id',

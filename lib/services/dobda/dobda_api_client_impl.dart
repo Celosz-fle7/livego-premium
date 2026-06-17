@@ -43,7 +43,50 @@ class DobdaApiClientImpl {
     if (key == 'livego' || key == 'indonesia' || key == 'dubindo') {
       return liveGoFeed(platform: platform, lang: lang, page: page);
     }
-    return homeFeed(platform: platform, lang: lang, page: page);
+    if (key == 'latest' || key == 'discover') {
+      return discover(platform: platform, lang: lang, page: page);
+    }
+    if (key == 'trending' || key == 'home') {
+      return homeFeed(platform: platform, lang: lang, page: page);
+    }
+    return search(query: _categorySearchQuery(key), platform: platform, lang: lang, page: page);
+  }
+
+  static Future<Map<String, List<String>>> categories({
+    String platform = 'melolo',
+    String lang = 'id',
+  }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    final apiLang = _providerLang(config.slug, lang);
+
+    Map<String, dynamic> json;
+    try {
+      json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {
+        'category_p': config.apiSlug,
+        'lang': apiLang,
+      }).timeout(const Duration(seconds: 6));
+    } catch (e) {
+      print('LiveGO API CATEGORIES PLATFORM EMPTY ${config.slug}: $e');
+      json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, const <String, String>{})
+          .timeout(const Duration(seconds: 6));
+    }
+
+    final parsed = _parseCategories(json);
+    if (parsed.isEmpty) return const <String, List<String>>{};
+
+    final normalized = <String, List<String>>{};
+    for (final entry in parsed.entries) {
+      final slug = LiveGoApiPlatforms.bySlugOrNull(entry.key)?.slug ??
+          LiveGoApiPlatforms.normalizeSlug(entry.key);
+      final labels = _normalizeCategoryLabels(entry.value);
+      if (labels.isNotEmpty) normalized[slug] = labels;
+    }
+
+    if (normalized.isEmpty) {
+      final labels = _normalizeCategoryLabels(parsed.values.expand((e) => e));
+      if (labels.isNotEmpty) normalized[config.slug] = labels;
+    }
+    return normalized;
   }
 
   static Future<List<ContentItem>> homeFeed({
@@ -145,6 +188,22 @@ class DobdaApiClientImpl {
       page: page,
     );
     return _cleanNobuzeroItems(rows, fromDubSearch: true);
+  }
+
+  static String _categorySearchQuery(String key) {
+    switch (key) {
+      case 'movie':
+        return 'movie';
+      case 'series':
+        return 'series';
+      case 'drama':
+        return 'drama';
+      case 'romance':
+        return 'romance';
+      case 'short':
+        return 'short';
+    }
+    return key;
   }
 
   static Future<List<ContentItem>> _safeRows(
@@ -757,6 +816,98 @@ class DobdaApiClientImpl {
     final data = json['data'];
     if (data is Map) return Map<String, dynamic>.from(data);
     return json;
+  }
+
+  static Map<String, List<String>> _parseCategories(Map<String, dynamic> json) {
+    final out = <String, List<String>>{};
+
+    void add(String platform, Object? raw) {
+      final labels = _categoryNames(raw);
+      if (labels.isEmpty) return;
+      final key = platform.trim().isEmpty ? 'global' : platform.trim().toLowerCase();
+      out[key] = <String>{
+        ...?out[key],
+        ...labels,
+      }.toList(growable: false);
+    }
+
+    void walk(Object? node, {String platform = ''}) {
+      if (node is List) {
+        if (node.every((e) => e is String || e is num)) {
+          add(platform, node);
+          return;
+        }
+        for (final item in node) {
+          walk(item, platform: platform);
+        }
+        return;
+      }
+      if (node is! Map) return;
+      final map = Map<String, dynamic>.from(node);
+
+      final platformKey = _first(map, const ['platform', 'platform_slug', 'platformSlug', 'category_p', 'source', 'slug']);
+      final scopedPlatform = platformKey.isNotEmpty && LiveGoApiPlatforms.bySlugOrNull(platformKey) != null
+          ? LiveGoApiPlatforms.bySlug(platformKey).slug
+          : platform;
+      for (final key in const ['categories', 'items', 'list', 'data', 'results', 'rows']) {
+        final value = map[key];
+        if (value != null) walk(value, platform: scopedPlatform);
+      }
+      final single = _first(map, const ['label', 'name', 'title', 'category']);
+      if (single.isNotEmpty) add(scopedPlatform, <String>[single]);
+
+      for (final entry in map.entries) {
+        final key = '${entry.key}'.trim();
+        if (const {'data', 'categories', 'items', 'list', 'results', 'rows'}.contains(key)) continue;
+        if (LiveGoApiPlatforms.bySlugOrNull(key) != null) add(key, entry.value);
+      }
+    }
+
+    walk(json['data'] ?? json);
+    final direct = json['categories'];
+    if (direct != null) walk(direct);
+    return out;
+  }
+
+  static List<String> _categoryNames(Object? raw) {
+    final labels = <String>[];
+    void addText(Object? value) {
+      final text = '$value'.trim();
+      if (text.isEmpty || text == 'null') return;
+      if (!labels.contains(text)) labels.add(text);
+    }
+
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map) {
+          final map = Map<String, dynamic>.from(item);
+          addText(_first(map, const ['label', 'name', 'title', 'category', 'slug']));
+        } else {
+          addText(item);
+        }
+      }
+    } else if (raw is Map) {
+      for (final entry in raw.entries) {
+        if (entry.value is List || entry.value is Map) {
+          labels.addAll(_categoryNames(entry.value));
+        } else {
+          addText(entry.value);
+        }
+      }
+    } else if (raw != null) {
+      addText(raw);
+    }
+    return labels;
+  }
+
+  static List<String> _normalizeCategoryLabels(Iterable<String> values) {
+    final labels = <String>[];
+    for (final raw in values) {
+      final label = LiveGoApiPlatforms.categoryLabel('melolo', raw);
+      if (label.trim().isEmpty) continue;
+      if (!labels.contains(label)) labels.add(label);
+    }
+    return labels.take(6).toList(growable: false);
   }
 
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {

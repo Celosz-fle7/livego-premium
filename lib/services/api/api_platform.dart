@@ -55,7 +55,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Populer', 'LiveGo'],
     ),
     LiveGoApiPlatform(
       slug: 'dramabox',
@@ -68,7 +68,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Populer', 'Completed'],
     ),
     LiveGoApiPlatform(
       slug: 'moviebox',
@@ -81,7 +81,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Movie', 'Series'],
     ),
     LiveGoApiPlatform(
       slug: 'mydrama',
@@ -94,7 +94,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Romance', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'dramanova',
@@ -107,7 +107,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Romance', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'shorten',
@@ -120,7 +120,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'dramahub',
@@ -133,7 +133,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Romance'],
     ),
     LiveGoApiPlatform(
       slug: 'flickshort',
@@ -146,7 +146,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'loklok',
@@ -159,7 +159,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Movie', 'Series'],
     ),
     LiveGoApiPlatform(
       slug: 'radreel',
@@ -172,7 +172,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'reelflix',
@@ -185,7 +185,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'shortflix',
@@ -198,7 +198,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'viu',
@@ -211,7 +211,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Series'],
     ),
     LiveGoApiPlatform(
       slug: 'dotdrama',
@@ -224,7 +224,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Romance'],
     ),
     LiveGoApiPlatform(
       slug: 'dramarush',
@@ -237,7 +237,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Romance'],
     ),
     LiveGoApiPlatform(
       slug: 'layarkaca',
@@ -250,7 +250,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Movie', 'Series'],
     ),
     LiveGoApiPlatform(
       slug: 'netshort',
@@ -263,7 +263,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'shortreels',
@@ -276,7 +276,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'bittv',
@@ -289,7 +289,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Movie', 'Series'],
     ),
     LiveGoApiPlatform(
       slug: 'fizzo',
@@ -302,7 +302,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Romance'],
     ),
     LiveGoApiPlatform(
       slug: 'shortmax',
@@ -315,7 +315,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'freereels',
@@ -328,7 +328,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
     ),
     LiveGoApiPlatform(
       slug: 'dramawave',
@@ -341,7 +341,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Home', 'LiveGo'],
+      categories: ['Trending', 'Terbaru', 'Drama', 'Romance'],
     ),
 
   ];
@@ -466,6 +466,8 @@ class LiveGoApiPlatforms {
       'rekomendasi': 'foryou',
       'latest': 'latest',
       'terbaru': 'latest',
+      'update': 'latest',
+      'completed': 'latest',
       'vip': 'vip',
       'dubindo': 'dubindo',
       'dubbing': 'livego',
@@ -479,6 +481,14 @@ class LiveGoApiPlatforms {
       'dubindonesia': 'livego',
       'discover': 'discover',
       'jelajah': 'discover',
+      'movie': 'movie',
+      'film': 'movie',
+      'series': 'series',
+      'drama': 'drama',
+      'romance': 'romance',
+      'romantis': 'romance',
+      'short': 'short',
+      'pendek': 'short',
     };
     return aliases[clean] ?? clean;
   }
@@ -486,27 +496,35 @@ class LiveGoApiPlatforms {
   static String categoryLabel(String platform, String category) {
     final config = bySlug(platform);
     final key = categoryKey(config.slug, category);
-    if (config.isNobuzero) {
-      if (key == 'livego' || key == 'indonesia' || key == 'dubindo') return 'LiveGo';
-      return 'Home';
-    }
     switch (key) {
       case 'trending':
-        return 'Populer';
-      case 'foryou':
-        return 'Untuk Kamu';
+        return 'Trending';
       case 'latest':
         return 'Terbaru';
+      case 'livego':
+        return 'LiveGo';
+      case 'movie':
+        return 'Movie';
+      case 'series':
+        return 'Series';
+      case 'drama':
+        return 'Drama';
+      case 'romance':
+        return 'Romance';
+      case 'short':
+        return 'Short';
+      case 'foryou':
+        return 'Untuk Kamu';
       case 'vip':
         return 'VIP';
       case 'dubindo':
         return 'Dub Indo';
       case 'home':
-        return 'Beranda';
+        return config.isNobuzero ? 'Trending' : 'Beranda';
       case 'discover':
-        return 'Jelajah';
+        return config.isNobuzero ? 'Terbaru' : 'Jelajah';
     }
-    return category.trim().isEmpty ? (config.isNobuzero ? 'Beranda' : 'Populer') : category.trim();
+    return category.trim().isEmpty ? (config.isNobuzero ? 'Trending' : 'Populer') : category.trim();
   }
 
   static List<String> normalizeCategoriesFor(String platform, Iterable<String> values) {
@@ -519,7 +537,7 @@ class LiveGoApiPlatforms {
     for (final raw in values) {
       final key = categoryKey(config.slug, raw);
       final label = byKey[key] ?? categoryLabel(config.slug, raw);
-      if (available.contains(label) && !result.contains(label)) {
+      if (label.trim().isNotEmpty && !result.contains(label)) {
         result.add(label);
       }
     }

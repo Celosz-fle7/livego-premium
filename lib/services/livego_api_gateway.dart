@@ -47,6 +47,13 @@ class LiveGoApiGateway {
     );
   }
 
+  static Future<Map<String, List<String>>> categories({
+    String platform = 'melolo',
+    String lang = 'id',
+  }) {
+    return DobdaApiClient.categories(platform: platform, lang: lang);
+  }
+
   static Future<List<ContentItem>> banner({
     String platform = 'melolo',
     String lang = 'id',
