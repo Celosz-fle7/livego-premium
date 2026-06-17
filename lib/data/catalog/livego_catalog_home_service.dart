@@ -75,7 +75,7 @@ class LiveGoCatalogHomeService {
     return const <ContentItem>[];
   }
 
-  static Future<List<ContentItem>> home({String platform = 'dobda_freereels'}) async {
+  static Future<List<ContentItem>> home({String platform = 'dobda_shortmax'}) async {
     const endpoint = 'home_clean_v2';
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -93,7 +93,6 @@ class LiveGoCatalogHomeService {
       timeout: ApiTimeoutPolicy.home,
       request: () => LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang),
     );
-    print('CATALOG HOME $platform -> ${rows.length}');
     if (rows.isNotEmpty) {
       await LiveGoContentCache.writeItems(
         platform: platform,
@@ -136,7 +135,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> cachedHomeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String category = 'Home',
     bool allowExpired = true,
   }) async {
@@ -157,7 +156,7 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> homeByCategory({
-    String platform = 'dobda_freereels',
+    String platform = 'dobda_shortmax',
     String category = 'Home',
   }) async {
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
@@ -186,8 +185,20 @@ class LiveGoCatalogHomeService {
       operation: 'category:$endpoint',
       timeout: ApiTimeoutPolicy.collection,
       request: () {
+        // Mapping Home/Trending -> .home()
         if (key == 'trending' || key.isEmpty || key == 'home') {
           return LiveGoApiProviderRegistry.providerFor(platform).home(lang: lang);
+        }
+        // Mapping Terbaru/Discover -> .discover()
+        if (key == 'discover') {
+          return LiveGoApiProviderRegistry.providerFor(platform).discover(lang: lang);
+        }
+        // Mapping LiveGo/DubIndo -> .collection(collection: 'livego')
+        if (key == 'livego') {
+          return LiveGoApiProviderRegistry.providerFor(platform).collection(
+            collection: 'livego',
+            lang: lang,
+          );
         }
         return LiveGoApiProviderRegistry.providerFor(platform).collection(
           collection: key,
@@ -239,6 +250,7 @@ class LiveGoCatalogHomeService {
     await LiveGoContentCache.cleanExpiredAndTrim();
     final entries = <MapEntry<String, List<ContentItem>>>[];
     final seenKeys = <String>{};
+    // Tetap ambil maksimal 6 platform di Home TV agar device aman.
     for (final platform in LiveGoCatalogPlatformService.platforms.take(6)) {
       final rows = await home(platform: platform);
       final clean = <ContentItem>[];
@@ -251,13 +263,13 @@ class LiveGoCatalogHomeService {
     return Map.fromEntries(entries);
   }
 
-  static Future<List<ContentItem>> banners({String platform = 'dobda_freereels'}) async {
+  static Future<List<ContentItem>> banners({String platform = 'dobda_shortmax'}) async {
     final items = await home(platform: platform);
     if (items.isNotEmpty) return items.take(5).toList();
     return [];
   }
 
-  static Future<ContentItem> hero({String platform = 'dobda_freereels'}) async {
+  static Future<ContentItem> hero({String platform = 'dobda_shortmax'}) async {
     try {
       final items = await home(platform: platform);
       if (items.isNotEmpty) return items.first;
