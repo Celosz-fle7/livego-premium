@@ -224,11 +224,14 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
+    print('LIVEGO_API_REQ endpoint=/home platform=$platform');
     final json = await DobdaHttpClient.getJson(DobdaEndpoints.home, {
       'category_p': config.apiSlug,
       'lang': apiLang,
     });
-    return _parseItems(json, platform: config.slug, lang: apiLang);
+    final items = _parseItems(json, platform: config.slug, lang: apiLang);
+    print('LIVEGO_API_RESP endpoint=/home count=${items.length}');
+    return items;
   }
 
   static Future<List<ContentItem>> _discoverRaw({
@@ -238,13 +241,16 @@ class DobdaApiClientImpl {
   }) async {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final apiLang = _providerLang(config.slug, lang);
+    print('LIVEGO_API_REQ endpoint=/discover platform=$platform');
     final json = await DobdaHttpClient.getJson(DobdaEndpoints.discover, {
       'category_p': config.apiSlug,
       'lang': apiLang,
       'page': '$page',
       'limit': '20',
     });
-    return _parseItems(json, platform: config.slug, lang: apiLang);
+    final items = _parseItems(json, platform: config.slug, lang: apiLang);
+    print('LIVEGO_API_RESP endpoint=/discover count=${items.length}');
+    return items;
   }
 
   static Future<List<ContentItem>> _searchRaw({
@@ -312,25 +318,25 @@ class DobdaApiClientImpl {
       return rows;
     }
 
-    final total = _episodes(_dataMap(json));
-    final fallback = List.generate(total <= 0 ? item.episodes : total, (i) {
-      return LiveGoEpisode(id: '${i + 1}', index: i + 1, title: 'Episode ${i + 1}');
-    });
-    _episodeMemory[key] = fallback;
-    return fallback;
+    print('LIVEGO_API_EMPTY platform=${item.platformSlug} endpoint=/detail id=${item.id}');
+    return const <LiveGoEpisode>[];
   }
 
-  static Future<StreamInfo> videoInfo(ContentItem item, {String? chapterId}) async {
+  static Future<StreamInfo> videoInfo(ContentItem item,
+      {String? chapterId}) async {
     final config = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final apiLang = _providerLang(config.slug, item.lang);
     final ep = _episodeNumber(chapterId ?? item.chapterId);
-    final requested = (chapterId ?? item.chapterId).trim().isEmpty ? '$ep' : (chapterId ?? item.chapterId).trim();
-    final requestedIsEpisodeNumber = RegExp(r'^\d+$').hasMatch(requested);
 
-    // Nobuzero /video membutuhkan chapterId asli dari /detail. Angka 1,2,3
-    // tidak selalu aman sebagai chapterId di semua platform Nobuzero. Kalau
-    // player meminta episode index, resolve dulu ke chapters[].id supaya
-    // PREV/NEXT dan daftar episode tidak loncat ke video acak.
+    // Filter chapterId: kalau kosong atau '1' tapi episodes > 1, coba resolve dulu.
+    var requested = (chapterId ?? item.chapterId).trim();
+    if (requested.isEmpty && item.episodes > 1) {
+      requested = ''; // Biar diresolve di bawah
+    }
+
+    final requestedIsEpisodeNumber =
+        requested.isEmpty || RegExp(r'^\d+$').hasMatch(requested);
+
     if (requestedIsEpisodeNumber) {
       final mappedChapter = await _chapterIdForEpisode(
         item,
@@ -338,6 +344,18 @@ class DobdaApiClientImpl {
         apiLang: apiLang,
         episodeIndex: ep,
       );
+      if (mappedChapter.isNotEmpty && !RegExp(r'^\d+$').hasMatch(mappedChapter)) {
+        final mapped = await _tryVideoByChapter(
+          item,
+          config: config,
+          apiLang: apiLang,
+          chapterId: mappedChapter,
+          episodeIndex: ep,
+        );
+        if (mapped.url.isNotEmpty) return mapped;
+      }
+
+      // Jika mappedChapter masih angka, ini mungkin memang format ID-nya angka.
       if (mappedChapter.isNotEmpty) {
         final mapped = await _tryVideoByChapter(
           item,
@@ -350,27 +368,15 @@ class DobdaApiClientImpl {
       }
     }
 
-    final direct = await _tryVideoByChapter(
-      item,
-      config: config,
-      apiLang: apiLang,
-      chapterId: requested,
-      episodeIndex: ep,
-    );
-    if (direct.url.isNotEmpty) return direct;
-
-    if (!requestedIsEpisodeNumber) {
-      final mappedChapter = await _chapterIdForEpisode(item, config: config, apiLang: apiLang, episodeIndex: ep);
-      if (mappedChapter.isNotEmpty && mappedChapter != requested) {
-        final mapped = await _tryVideoByChapter(
-          item,
-          config: config,
-          apiLang: apiLang,
-          chapterId: mappedChapter,
-          episodeIndex: ep,
-        );
-        if (mapped.url.isNotEmpty) return mapped;
-      }
+    if (requested.isNotEmpty) {
+      final direct = await _tryVideoByChapter(
+        item,
+        config: config,
+        apiLang: apiLang,
+        chapterId: requested,
+        episodeIndex: ep,
+      );
+      if (direct.url.isNotEmpty) return direct;
     }
 
     return StreamInfo.empty;
@@ -400,6 +406,7 @@ class DobdaApiClientImpl {
           apiLang: apiLang,
           episodeIndex: ep,
         ).timeout(_shorterTimeout(timeout, const Duration(seconds: 4)));
+
         if (mappedChapter.isNotEmpty) {
           final mapped = await _tryVideoByChapter(
             item,
@@ -415,18 +422,8 @@ class DobdaApiClientImpl {
         print('LiveGO API FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
       }
 
-      // Fallback terakhir saja. Ini hanya untuk provider yang benar-benar
-      // memakai chapterId sama dengan nomor episode.
-      final direct = await _tryVideoByChapter(
-        item,
-        config: config,
-        apiLang: apiLang,
-        chapterId: requested,
-        episodeIndex: ep,
-        timeout: _shorterTimeout(timeout, const Duration(seconds: 3)),
-      );
-      if (direct.url.isNotEmpty) return direct;
-      return StreamInfo.empty;
+      // Jangan asal tembak angka kalau tidak yakin itu chapterId.
+      // Kecuali kalau mappedChapter memang angka dari API.
     }
 
     // Kalau sudah dikirim chapterId asli, langsung pakai. Ini dipakai ketika
@@ -472,6 +469,7 @@ class DobdaApiClientImpl {
     Duration? timeout,
   }) async {
     try {
+      print('LIVEGO_VIDEO_REQ id=${item.id} chapterId=$chapterId');
       var future = DobdaHttpClient.getJson(DobdaEndpoints.video, {
         'category_p': config.apiSlug,
         'id': item.id,
@@ -480,11 +478,19 @@ class DobdaApiClientImpl {
       });
       if (timeout != null) future = future.timeout(timeout);
       final json = await future;
-      final stream = _parseStream(json, item: item, fallbackEpisode: episodeIndex, lang: apiLang);
+      final stream = _parseStream(json,
+          item: item, fallbackEpisode: episodeIndex, lang: apiLang);
+
+      final host = stream.url.isNotEmpty ? Uri.parse(stream.url).host : '';
+      final path = stream.url.isNotEmpty ? Uri.parse(stream.url).path : '';
+      final tail = path.length > 30 ? path.substring(path.length - 30) : path;
+      print('LIVEGO_VIDEO_RESP url_empty=${stream.url.isEmpty} host=$host tail=$tail');
+
       if (stream.url.isEmpty) return StreamInfo.empty;
       return stream;
     } catch (e) {
-      print('LiveGO API VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
+      print(
+          'LiveGO API VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
       return StreamInfo.empty;
     }
   }
@@ -498,16 +504,18 @@ class DobdaApiClientImpl {
     final key = _episodeKey(item, apiLang);
     var rows = _episodeMemory[key];
     rows ??= await episodes(item);
-    if (rows.isEmpty) return '$episodeIndex';
+    if (rows.isEmpty) return '';
 
     for (final row in rows) {
-      if (row.index == episodeIndex && row.id.trim().isNotEmpty) return row.id.trim();
+      if (row.index == episodeIndex && row.id.trim().isNotEmpty) {
+        return row.id.trim();
+      }
     }
     final pos = episodeIndex - 1;
     if (pos >= 0 && pos < rows.length && rows[pos].id.trim().isNotEmpty) {
       return rows[pos].id.trim();
     }
-    return '$episodeIndex';
+    return '';
   }
 
   static Duration _shorterTimeout(Duration a, Duration b) {
@@ -557,14 +565,30 @@ class DobdaApiClientImpl {
     bool requireDubbed = false,
     bool excludeDubbed = false,
   }) {
-    if (item.id.trim().isEmpty) return false;
-    if (item.title.trim().isEmpty || item.title == 'Untitled') return false;
-    if (item.posterUrl.trim().isEmpty || item.posterUrl.trim().endsWith('url=')) return false;
-    if (item.episodes <= 0) return false;
+    if (item.id.trim().isEmpty) {
+      return false;
+    }
+    if (item.title.trim().isEmpty ||
+        item.title == 'Untitled' ||
+        item.title.contains('Sample Drama')) {
+      return false;
+    }
+    if (item.posterUrl.trim().isEmpty ||
+        item.posterUrl.trim().endsWith('url=') ||
+        item.posterUrl.contains('placeholder')) {
+      return false;
+    }
+    if (item.episodes <= 0) {
+      return false;
+    }
 
     final dubbed = _isDubbed(item);
-    if (excludeDubbed && dubbed) return false;
-    if (requireDubbed) return dubbed;
+    if (excludeDubbed && dubbed) {
+      return false;
+    }
+    if (requireDubbed) {
+      return dubbed;
+    }
 
     // Search biasa tetap boleh menampilkan hasil sesuai kata kunci user.
     if (fromDubSearch) return true;
@@ -664,12 +688,48 @@ class DobdaApiClientImpl {
     required String lang,
   }) {
     final config = LiveGoApiPlatforms.bySlug(platform);
-    final id = _first(json, const ['id', 'bookId', 'book_id', 'dramaId', 'seriesId']);
-    final title = _first(json, const ['title', 'name', 'bookName', 'dramaName'], fallback: 'Untitled');
-    final cover = _first(json, const ['cover', 'poster', 'posterUrl', 'coverUrl', 'image', 'thumbnail']);
-    final backdrop = _first(json, const ['backdrop', 'banner', 'cover', 'poster', 'image']);
-    final description = _first(json, const ['synopsis', 'description', 'desc', 'summary']);
-    final source = _first(json, const ['platform', 'source', 'author'], fallback: config.name);
+    final id = _first(json, const [
+      'id',
+      'bookId',
+      'book_id',
+      'dramaId',
+      'seriesId',
+      'movieId',
+      'contentId'
+    ]);
+    final title = _first(json, const [
+      'title',
+      'name',
+      'bookName',
+      'dramaName',
+      'movieName',
+      'seriesName'
+    ], fallback: 'Untitled');
+    final cover = _first(json, const [
+      'cover',
+      'poster',
+      'posterUrl',
+      'coverUrl',
+      'image',
+      'thumbnail',
+      'poster_path',
+      'imageUrl'
+    ]);
+
+    print('LIVEGO_API_ITEM title=$title id=$id poster_empty=${cover.isEmpty}');
+
+    final backdrop = _first(json, const [
+      'backdrop',
+      'banner',
+      'cover',
+      'poster',
+      'image',
+      'bannerUrl'
+    ]);
+    final description = _first(
+        json, const ['synopsis', 'description', 'desc', 'summary', 'intro']);
+    final source = _first(json, const ['platform', 'source', 'author'],
+        fallback: config.name);
     final episodes = _episodes(json);
     final firstChapter = _firstChapterId(json);
 
@@ -682,10 +742,10 @@ class DobdaApiClientImpl {
       posterUrl: cover,
       backdropUrl: backdrop.isEmpty ? cover : backdrop,
       rating: 8.0,
-      episodes: episodes <= 0 ? 1 : episodes,
+      episodes: episodes <= 0 ? 0 : episodes,
       updated: true,
       platformSlug: config.slug,
-      chapterId: firstChapter.isEmpty ? '1' : firstChapter,
+      chapterId: firstChapter,
       lang: lang,
     );
   }
@@ -727,16 +787,36 @@ class DobdaApiClientImpl {
       for (final row in streams) {
         if (row is! Map) continue;
         final map = Map<String, dynamic>.from(row);
-        final rawUrl = _first(map, const ['url', 'src', 'videoUrl', 'hlsUrl', 'streamUrl']);
+        final rawUrl = _first(map, const [
+          'url',
+          'playUrl',
+          'videoUrl',
+          'm3u8',
+          'hls',
+          'streamUrl',
+          'source',
+          'src'
+        ]);
         if (rawUrl.isEmpty) continue;
-        final label = _first(map, const ['quality', 'resolution', 'label', 'name'], fallback: 'Auto');
-        qualities.add(StreamQuality(label: label.isEmpty ? 'Auto' : label, url: _normalizeUrl(rawUrl)));
+        final label = _first(map, const ['quality', 'resolution', 'label', 'name'],
+            fallback: 'Auto');
+        qualities.add(StreamQuality(
+            label: label.isEmpty ? 'Auto' : label, url: _normalizeUrl(rawUrl)));
       }
       if (qualities.isNotEmpty) url = qualities.first.url;
     }
 
     if (url.isEmpty) {
-      final direct = _first(data, const ['url', 'src', 'videoUrl', 'hlsUrl', 'streamUrl']);
+      final direct = _first(data, const [
+        'url',
+        'playUrl',
+        'videoUrl',
+        'm3u8',
+        'hls',
+        'streamUrl',
+        'source',
+        'src'
+      ]);
       if (direct.isNotEmpty) url = _normalizeUrl(direct);
     }
 
@@ -750,7 +830,8 @@ class DobdaApiClientImpl {
       'User-Agent': 'okhttp/4.12.0',
       'Accept': '*/*',
     };
-    final streamHeaders = data['streamHeaders'] ?? data['headers'];
+    final streamHeaders =
+        data['headers'] ?? data['streamHeaders'] ?? data['requestHeaders'];
     if (streamHeaders is Map) {
       for (final entry in streamHeaders.entries) {
         final key = '${entry.key}'.trim();
@@ -784,8 +865,12 @@ class DobdaApiClientImpl {
         fallback: idx,
       );
       final safeIndex = index <= 0 ? idx : index;
-      final id = _first(row, const ['id', 'chapterId', 'chapter_id', 'videoId', 'video_id'], fallback: '$safeIndex');
-      final title = _first(row, const ['title', 'name', 'chapterName', 'chapter_name'], fallback: 'Episode $safeIndex');
+      final id = _first(row,
+          const ['id', 'chapterId', 'chapter_id', 'episodeId', 'eid', 'videoId', 'video_id'],
+          fallback: '$safeIndex');
+      final title = _first(row,
+          const ['title', 'name', 'chapterName', 'chapter_name'],
+          fallback: 'Episode $safeIndex');
       return LiveGoEpisode(id: id, index: safeIndex, title: title);
     }).toList()
       ..sort((a, b) => a.index.compareTo(b.index));
@@ -857,9 +942,14 @@ class DobdaApiClientImpl {
       if (single.isNotEmpty) add(scopedPlatform, <String>[single]);
 
       for (final entry in map.entries) {
-        final key = '${entry.key}'.trim();
-        if (const {'data', 'categories', 'items', 'list', 'results', 'rows'}.contains(key)) continue;
-        if (LiveGoApiPlatforms.bySlugOrNull(key) != null) add(key, entry.value);
+        final key = entry.key.toString().trim();
+        if (const {'data', 'categories', 'items', 'list', 'results', 'rows'}
+            .contains(key)) {
+          continue;
+        }
+        if (LiveGoApiPlatforms.bySlugOrNull(key) != null) {
+          add(key, entry.value);
+        }
       }
     }
 
@@ -913,11 +1003,20 @@ class DobdaApiClientImpl {
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
     Object? data = _dataMap(json);
     while (data is Map) {
-      final next = data['chapters'] ?? data['episodes'] ?? data['episodeList'] ?? data['chapterList'];
+      final next = data['chapters'] ??
+          data['chapterList'] ??
+          data['episodes'] ??
+          data['episodeList'] ??
+          data['list'];
       if (next == null || identical(next, data)) break;
       data = next;
     }
-    if (data is List) return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     return const <Map<String, dynamic>>[];
   }
 
@@ -955,9 +1054,10 @@ class DobdaApiClientImpl {
   }
 
   static String _firstChapterId(Map<String, dynamic> json) {
-    final chapters = json['chapters'];
-    if (chapters is List && chapters.isNotEmpty && chapters.first is Map) {
-      return _first(Map<String, dynamic>.from(chapters.first), const ['id', 'chapterId', 'chapter_id']);
+    final chapters = _episodeList(json);
+    if (chapters.isNotEmpty) {
+      return _first(Map<String, dynamic>.from(chapters.first),
+          const ['id', 'chapterId', 'chapter_id', 'episodeId', 'eid']);
     }
     return '';
   }
@@ -977,10 +1077,20 @@ class DobdaApiClientImpl {
   }
 
   static int _episodes(Map<String, dynamic> json) {
-    final raw = json['chapters'] ?? json['total_episodes'] ?? json['totalEpisodes'] ?? json['episodes'];
-    if (raw is List) return raw.length;
-    final parsed = _parseInt(raw, fallback: 1);
-    return parsed <= 0 ? 1 : parsed;
+    final chapters = json['chapters'] ??
+        json['chapterList'] ??
+        json['episodes'] ??
+        json['episodeList'] ??
+        json['list'];
+    if (chapters is List) return chapters.length;
+
+    final raw = json['total_episodes'] ??
+        json['totalEpisodes'] ??
+        json['episodeCount'] ??
+        json['chapterCount'] ??
+        json['episodes'];
+    final parsed = _parseInt(raw, fallback: 0);
+    return parsed;
   }
 
   static String _providerLang(String slug, String requested) {
