@@ -1,24 +1,19 @@
 name: Build LiveGO Premium APK
-
-on:
+'on':
 push:
 branches:
 - main
 workflow_dispatch:
-
 permissions:
 contents: read
-
 jobs:
 build:
 runs-on: ubuntu-latest
-
 env:
-  DEFAULT_NOBUZERO_BASE_URL: https://nobuzero.my.id
-
+DEFAULT_NOBUZERO_BASE_URL: https://nobuzero.my.id
 steps:
-  - name: Checkout
-    uses: actions/checkout@v4
+- name: Checkout
+uses: actions/checkout@v4
 
   - name: Setup Java
     uses: actions/setup-java@v4
