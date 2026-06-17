@@ -21,7 +21,7 @@ class LiveGoCatalogPlatformService {
 
   static List<String> labelsFor(List<String> values) => values.map(label).toList();
 
-  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_freereels' : platforms.first);
+  static List<String> get categories => categoriesFor(platforms.isEmpty ? 'dobda_shortmax' : platforms.first);
 
   static List<String> categoriesFor(String platform) => LiveGoSettings.categoriesFor(platform);
 
@@ -41,6 +41,19 @@ class LiveGoCatalogPlatformService {
       LiveGoApiPlatforms.bySlug(platform).isDobda;
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
+    try {
+      // Prioritaskan dynamic category dari API jika tersedia di masa depan.
+      // Untuk sekarang, pastikan fallback minimal Home/Terbaru/LiveGo.
+      final dynamicCategories = await LiveGoApiGateway.categories()
+          .timeout(const Duration(seconds: 5), onTimeout: () => <String>[]);
+
+      if (dynamicCategories.isNotEmpty) {
+        return dynamicCategories;
+      }
+    } catch (e) {
+      print('FETCH DYNAMIC CATEGORIES ERROR $platform: $e');
+    }
+
     return availableCategoriesFor(platform);
   }
 
