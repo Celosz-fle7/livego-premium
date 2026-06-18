@@ -19,6 +19,9 @@ class ApiEnv {
     defaultValue: '8eddddb070709a2a47cc3477dd761abd4879caf3c1154dac147d9ff7f5d7a1ee',
   );
 
+  static bool get isNobuzeroStaging =>
+      nobuzeroApiBaseUrl.contains('/api/staging/v2');
+
   static const Duration timeout = Duration(seconds: 10);
 
   static void applyHeaders(HttpHeaders headers) {
