@@ -15,6 +15,10 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    final now = DateTime.now();
+    debugPrint(
+        'LIVEGO_BUILD commit=bfcbba8 time=${now.toIso8601String()}');
+
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
       debugPrint('LIVEGO FLUTTER ERROR: ${details.exception}');
