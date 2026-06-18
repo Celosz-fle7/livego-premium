@@ -13,6 +13,7 @@ class DobdaApiClientImpl {
   static String get baseUrl => ApiEnv.nobuzeroApiBaseUrl;
   static final Map<String, List<LiveGoEpisode>> _episodeMemory =
       <String, List<LiveGoEpisode>>{};
+  static final Map<String, String> _stagingCategoryKeys = <String, String>{};
 
   static Future<List<ContentItem>> home({
     String platform = 'melolo',
@@ -39,6 +40,19 @@ class DobdaApiClientImpl {
     String lang = 'id',
     int page = 1,
   }) async {
+    final config = LiveGoApiPlatforms.bySlug(platform);
+    if (ApiEnv.isNobuzeroStaging) {
+      final key = _stagingCategoryKeys['$platform:$collection'] ??
+          _normalizeStagingKey(collection);
+      print(
+          'LIVEGO_STAGING_REQ endpoint=/catalog platform=$platform category=$key');
+      final json = await DobdaHttpClient.getJson(DobdaEndpoints.catalog, {
+        'platform': config.slug,
+        'category': key,
+      });
+      return _parseItems(json, platform: config.slug, lang: lang);
+    }
+
     final key = LiveGoApiPlatforms.categoryKey(platform, collection);
     if (key == 'livego' || key == 'indonesia' || key == 'dubindo') {
       return liveGoFeed(platform: platform, lang: lang, page: page);
@@ -61,14 +75,50 @@ class DobdaApiClientImpl {
 
     Map<String, dynamic> json;
     try {
-      json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {
-        'category_p': config.apiSlug,
-        'lang': apiLang,
-      }).timeout(const Duration(seconds: 6));
+      if (ApiEnv.isNobuzeroStaging) {
+        print('LIVEGO_STAGING_REQ endpoint=/categories platform=$platform');
+        json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {
+          'platform': config.slug,
+        }).timeout(const Duration(seconds: 6));
+      } else {
+        json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, {
+          'category_p': config.apiSlug,
+          'lang': apiLang,
+        }).timeout(const Duration(seconds: 6));
+      }
     } catch (e) {
       print('LiveGO API CATEGORIES PLATFORM EMPTY ${config.slug}: $e');
       json = await DobdaHttpClient.getJson(DobdaEndpoints.categories, const <String, String>{})
           .timeout(const Duration(seconds: 6));
+    }
+
+    if (ApiEnv.isNobuzeroStaging) {
+      final data = _dataMap(json);
+      final rawCats = data['categories'];
+      if (rawCats is List) {
+        final labels = <String>[];
+        for (final item in rawCats) {
+          String? key;
+          String? label;
+          if (item is Map) {
+            key = '${item['key'] ?? ''}'.trim();
+            label = '${item['label'] ?? item['name'] ?? ''}'.trim();
+          } else if (item is String) {
+            label = item.trim();
+          }
+
+          if (label != null && label.isNotEmpty) {
+            final finalKey = (key != null && key.isNotEmpty)
+                ? key
+                : _normalizeStagingKey(label);
+            _stagingCategoryKeys['$platform:$label'] = finalKey;
+            labels.add(label);
+          }
+        }
+        if (labels.isNotEmpty) {
+          return {config.slug: labels};
+        }
+      }
     }
 
     final parsed = _parseCategories(json);
@@ -307,11 +357,20 @@ class DobdaApiClientImpl {
     final cached = _episodeMemory[key];
     if (cached != null && cached.length > 1) return cached;
 
-    final json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
-      'category_p': config.apiSlug,
-      'id': item.id,
-      'lang': apiLang,
-    });
+    Map<String, dynamic> json;
+    if (ApiEnv.isNobuzeroStaging) {
+      print('LIVEGO_STAGING_REQ endpoint=/episodes id=${item.id}');
+      json = await DobdaHttpClient.getJson(DobdaEndpoints.episodes, {
+        'platform': config.slug,
+        'id': item.id,
+      });
+    } else {
+      json = await DobdaHttpClient.getJson(DobdaEndpoints.detail, {
+        'category_p': config.apiSlug,
+        'id': item.id,
+        'lang': apiLang,
+      });
+    }
     final rows = _episodesFromJson(json);
     if (rows.isNotEmpty) {
       _episodeMemory[key] = rows;
@@ -469,17 +528,32 @@ class DobdaApiClientImpl {
     Duration? timeout,
   }) async {
     try {
-      print('LIVEGO_VIDEO_REQ id=${item.id} chapterId=$chapterId');
-      var future = DobdaHttpClient.getJson(DobdaEndpoints.video, {
-        'category_p': config.apiSlug,
-        'id': item.id,
-        'chapterId': chapterId,
-        'lang': apiLang,
-      });
+      Future<Map<String, dynamic>> future;
+      if (ApiEnv.isNobuzeroStaging) {
+        print(
+            'LIVEGO_STAGING_REQ endpoint=/play id=${item.id} episode_id=$chapterId');
+        future = DobdaHttpClient.getJson(DobdaEndpoints.play, {
+          'platform': config.slug,
+          'id': item.id,
+          'episode_id': chapterId,
+        });
+      } else {
+        print('LIVEGO_VIDEO_REQ id=${item.id} chapterId=$chapterId');
+        future = DobdaHttpClient.getJson(DobdaEndpoints.video, {
+          'category_p': config.apiSlug,
+          'id': item.id,
+          'chapterId': chapterId,
+          'lang': apiLang,
+        });
+      }
       if (timeout != null) future = future.timeout(timeout);
       final json = await future;
       final stream = _parseStream(json,
           item: item, fallbackEpisode: episodeIndex, lang: apiLang);
+
+      if (ApiEnv.isNobuzeroStaging && stream.url.isNotEmpty) {
+        print('LIVEGO_STAGING_PLAY url=${stream.url}');
+      }
 
       final host = stream.url.isNotEmpty ? Uri.parse(stream.url).host : '';
       final path = stream.url.isNotEmpty ? Uri.parse(stream.url).path : '';
@@ -573,9 +647,10 @@ class DobdaApiClientImpl {
         item.title.contains('Sample Drama')) {
       return false;
     }
-    if (item.posterUrl.trim().isEmpty ||
-        item.posterUrl.trim().endsWith('url=') ||
-        item.posterUrl.contains('placeholder')) {
+    if (!ApiEnv.isNobuzeroStaging &&
+        (item.posterUrl.trim().isEmpty ||
+            item.posterUrl.trim().endsWith('url=') ||
+            item.posterUrl.contains('placeholder'))) {
       return false;
     }
     if (item.episodes <= 0) {
@@ -689,6 +764,10 @@ class DobdaApiClientImpl {
   }) {
     final config = LiveGoApiPlatforms.bySlug(platform);
     final id = _first(json, const [
+      'source_id',
+      'sourceId',
+      'livego_id',
+      'livegoId',
       'id',
       'bookId',
       'book_id',
@@ -808,12 +887,15 @@ class DobdaApiClientImpl {
 
     if (url.isEmpty) {
       final direct = _first(data, const [
-        'url',
+        'play_url',
         'playUrl',
+        'url',
+        'video_url',
         'videoUrl',
+        'stream_url',
+        'streamUrl',
         'm3u8',
         'hls',
-        'streamUrl',
         'source',
         'src'
       ]);
@@ -1126,5 +1208,9 @@ class DobdaApiClientImpl {
   static int _parseInt(Object? value, {required int fallback}) {
     if (value is int) return value;
     return int.tryParse('$value') ?? fallback;
+  }
+
+  static String _normalizeStagingKey(String label) {
+    return label.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
   }
 }

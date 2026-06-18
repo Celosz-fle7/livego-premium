@@ -11,9 +11,12 @@ class LiveGoEpisode {
 
   factory LiveGoEpisode.fromJson(Map<String, dynamic> json) {
     return LiveGoEpisode(
-      id: '${json['id'] ?? json['chapterId'] ?? json['index'] ?? ''}',
-      index: int.tryParse('${json['index'] ?? json['id'] ?? 0}') ?? 0,
-      title: '${json['title'] ?? 'Episode ${json['index'] ?? json['id'] ?? ''}'}',
+      id: '${json['episode_id'] ?? json['episodeId'] ?? json['id'] ?? json['chapterId'] ?? json['index'] ?? ''}',
+      index: int.tryParse(
+              '${json['serial_number'] ?? json['serialNumber'] ?? json['index'] ?? json['id'] ?? 0}') ??
+          0,
+      title:
+          '${json['title'] ?? 'Episode ${json['serial_number'] ?? json['serialNumber'] ?? json['index'] ?? json['id'] ?? ''}'}',
     );
   }
 }
