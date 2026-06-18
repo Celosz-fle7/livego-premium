@@ -53,13 +53,13 @@ jobs:
           LIVEGO_RELEASE_KEY_ALIAS: ${{ secrets.LIVEGO_RELEASE_KEY_ALIAS }}
           LIVEGO_RELEASE_KEY_PASSWORD: ${{ secrets.LIVEGO_RELEASE_KEY_PASSWORD }}
         run: |
-          if [ -z "${{ secrets.LIVEGO_BASE_URL }}" ] || [ -z "${{ secrets.LIVEGO_DOBDA_BASE_URL }}" ] || [ -z "${{ secrets.LIVEGO_USER_ID }}" ] || [ -z "${{ secrets.LIVEGO_SECRET }}" ]; then
+          if [ -z "${{ secrets.LIVEGO_BASE_URL }}" ] || [ -z "${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" ] || [ -z "${{ secrets.LIVEGO_USER_ID }}" ] || [ -z "${{ secrets.LIVEGO_SECRET }}" ]; then
             echo "Error: One or more required secrets are missing."
             exit 1
           fi
           flutter build apk --release \
             --dart-define=LIVEGO_BASE_URL="${{ secrets.LIVEGO_BASE_URL }}" \
-            --dart-define=LIVEGO_DOBDA_BASE_URL="${{ secrets.LIVEGO_DOBDA_BASE_URL }}" \
+            --dart-define=LIVEGO_NOBUZERO_BASE_URL="${{ secrets.LIVEGO_NOBUZERO_BASE_URL }}" \
             --dart-define=LIVEGO_USER_ID="${{ secrets.LIVEGO_USER_ID }}" \
             --dart-define=LIVEGO_SECRET="${{ secrets.LIVEGO_SECRET }}"
 

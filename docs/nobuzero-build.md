@@ -9,7 +9,7 @@ Aplikasi membutuhkan credential yang dikirim via `--dart-define` saat proses com
 | Nama | Deskripsi | Default |
 |------|-----------|---------|
 | `LIVEGO_BASE_URL` | URL Base API v2 | `https://nobuzero.my.id` |
-| `LIVEGO_DOBDA_BASE_URL` | URL Base API Dobda/Nobuzero | `https://nobuzero.my.id` |
+| `LIVEGO_NOBUZERO_BASE_URL` | URL Base API Nobuzero/Nobuzero | `https://nobuzero.my.id` |
 | `LIVEGO_USER_ID` | User ID dari Admin UI | (Kosong) |
 | `LIVEGO_SECRET` | Secret Key dari Admin UI | (Kosong) |
 
@@ -21,7 +21,7 @@ Gunakan command ini untuk menghasilkan file installer APK:
 ```bash
 flutter build apk --release \
   --dart-define=LIVEGO_BASE_URL=https://nobuzero.my.id \
-  --dart-define=LIVEGO_DOBDA_BASE_URL=https://nobuzero.my.id \
+  --dart-define=LIVEGO_NOBUZERO_BASE_URL=https://nobuzero.my.id \
   --dart-define=LIVEGO_USER_ID=ISI_USER_ID_ANDA \
   --dart-define=LIVEGO_SECRET=ISI_SECRET_ANDA
 ```

@@ -58,7 +58,7 @@ class ApiCapabilityLock {
       case LiveGoApiBackend.anichin:
         return 'ANICHIN';
       case LiveGoApiBackend.nobuzero:
-        return 'DOBDA';
+        return 'NOBUZERO';
     }
   }
 

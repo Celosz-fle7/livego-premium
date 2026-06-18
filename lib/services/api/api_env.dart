@@ -14,7 +14,7 @@ class ApiEnv {
 
   // API Nobuzero. Auth-nya HMAC + UserID.
   static const String nobuzeroBaseUrl = String.fromEnvironment(
-    'LIVEGO_DOBDA_BASE_URL',
+    'LIVEGO_NOBUZERO_BASE_URL',
     defaultValue: 'https://nobuzero.my.id',
   );
 

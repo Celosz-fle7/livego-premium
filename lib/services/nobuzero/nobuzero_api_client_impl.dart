@@ -151,7 +151,7 @@ class NobuzeroApiClientImpl {
     try {
       return await future.timeout(const Duration(seconds: 6));
     } catch (e) {
-      print('DOBDA CLEAN FEED ERROR $label: $e');
+      print('NOBUZERO CLEAN FEED ERROR $label: $e');
       return const <ContentItem>[];
     }
   }
@@ -336,7 +336,7 @@ class NobuzeroApiClientImpl {
           if (mapped.url.isNotEmpty) return mapped;
         }
       } catch (e) {
-        print('DOBDA FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
+        print('NOBUZERO FAST MAP EMPTY ${item.platformSlug} ep=$ep: $e');
       }
 
       final direct = await _tryVideoByChapter(
@@ -378,7 +378,7 @@ class NobuzeroApiClientImpl {
         timeout: timeout,
       );
     } catch (e) {
-      print('DOBDA FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
+      print('NOBUZERO FAST VIDEO EMPTY ${item.platformSlug} chapter=$chapterId: $e');
       return StreamInfo.empty;
     }
   }
@@ -404,7 +404,7 @@ class NobuzeroApiClientImpl {
       if (stream.url.isEmpty) return StreamInfo.empty;
       return stream;
     } catch (e) {
-      print('DOBDA VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
+      print('NOBUZERO VIDEO EMPTY ${config.slug} chapter=$chapterId ep=$episodeIndex: $e');
       return StreamInfo.empty;
     }
   }

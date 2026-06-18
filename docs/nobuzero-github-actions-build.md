@@ -10,7 +10,7 @@ Before running the workflow, ensure the following secrets are added to your GitH
 | Secret Name | Description |
 |-------------|-------------|
 | `LIVEGO_BASE_URL` | The base URL of the Nobuzero API. |
-| `LIVEGO_DOBDA_BASE_URL` | Secondary base URL for legacy compatibility. |
+| `LIVEGO_NOBUZERO_BASE_URL` | Secondary base URL for legacy compatibility. |
 | `LIVEGO_USER_ID` | Your User ID from the Nobuzero Admin UI. |
 | `LIVEGO_SECRET` | Your Secret Key from the Nobuzero Admin UI. |
 | `LIVEGO_RELEASE_KEYSTORE_BASE64` | Base64 encoded `.jks` release keystore file. |
