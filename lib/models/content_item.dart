@@ -47,8 +47,33 @@ class ContentItem {
       source: '${json['author'] ?? json['platform'] ?? platformSlug}',
       category: firstGenre.isNotEmpty ? firstGenre : (firstTag.isNotEmpty ? firstTag : 'Drama'),
       description: '${json['synopsis'] ?? json['description'] ?? ''}',
-      posterUrl: '${json['cover'] ?? json['poster'] ?? ''}',
-      backdropUrl: '${json['backdrop'] ?? json['cover'] ?? json['poster'] ?? ''}',
+      posterUrl: _firstString(json, const [
+        'cover',
+        'poster',
+        'cover_url',
+        'poster_url',
+        'coverUrl',
+        'posterUrl',
+        'imageUrl',
+        'image_url',
+        'thumbnail'
+      ]),
+      backdropUrl: _firstString(json, const [
+        'backdrop',
+        'backdrop_url',
+        'backdropUrl',
+        'banner',
+        'banner_url',
+        'bannerUrl',
+        'cover',
+        'poster',
+        'cover_url',
+        'poster_url',
+        'coverUrl',
+        'posterUrl',
+        'imageUrl',
+        'image_url'
+      ]),
       rating: _parseRating(json),
       episodes: chapters <= 0 ? 1 : chapters,
       updated: '${json['status'] ?? ''}'.toLowerCase().contains('complete'),
@@ -56,6 +81,15 @@ class ContentItem {
       chapterId: '1',
       lang: lang,
     );
+  }
+
+  static String _firstString(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final value = json[key];
+      final text = value == null ? '' : '$value'.trim();
+      if (text.isNotEmpty && text != 'null') return text;
+    }
+    return '';
   }
 
   static double _parseRating(Map<String, dynamic> json) {

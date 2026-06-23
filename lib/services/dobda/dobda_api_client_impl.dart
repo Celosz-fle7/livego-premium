@@ -728,10 +728,15 @@ class DobdaApiClientImpl {
       'poster',
       'posterUrl',
       'coverUrl',
+      'cover_url',
+      'poster_url',
+      'posterURL',
+      'imageUrl',
+      'image_url',
       'image',
       'thumbnail',
       'poster_path',
-      'imageUrl'
+      'thumbnail_url'
     ]);
 
     print('LIVEGO_API_ITEM title=$title id=$id poster_empty=${cover.isEmpty}');
@@ -742,7 +747,16 @@ class DobdaApiClientImpl {
       'cover',
       'poster',
       'image',
-      'bannerUrl'
+      'bannerUrl',
+      'banner_url',
+      'backdropUrl',
+      'backdrop_url',
+      'coverUrl',
+      'cover_url',
+      'posterUrl',
+      'poster_url',
+      'imageUrl',
+      'image_url'
     ]);
     final description = _first(
         json, const ['synopsis', 'description', 'desc', 'summary', 'intro']);
@@ -759,9 +773,9 @@ class DobdaApiClientImpl {
       description: description,
       posterUrl: cover,
       backdropUrl: backdrop.isEmpty ? cover : backdrop,
-      rating: 8.0,
+      rating: _parseRating(json),
       episodes: episodes <= 0 ? 0 : episodes,
-      updated: true,
+      updated: _isServerUpdated(json),
       platformSlug: config.slug,
       chapterId: firstChapter,
       lang: lang,
@@ -959,8 +973,18 @@ class DobdaApiClientImpl {
         final value = map[key];
         if (value != null) walk(value, platform: scopedPlatform);
       }
-      final single = _first(map, const ['label', 'name', 'title', 'category']);
-      if (single.isNotEmpty) add(scopedPlatform, <String>[single]);
+      final isPlatformRow =
+          _first(map, const [
+                'platform',
+                'platform_slug',
+                'platformSlug',
+                'category_p',
+                'source',
+                'slug'
+              ]).isNotEmpty ||
+              _first(map, const ['display_name', 'displayName']).isNotEmpty;
+      final single = _first(map, const ['label', 'category']);
+      if (!isPlatformRow && single.isNotEmpty) add(scopedPlatform, <String>[single]);
 
       for (final entry in map.entries) {
         final key = entry.key.toString().trim();
@@ -1019,6 +1043,32 @@ class DobdaApiClientImpl {
       if (!labels.contains(label)) labels.add(label);
     }
     return labels.take(4).toList(growable: false);
+  }
+
+  static double _parseRating(Map<String, dynamic> json) {
+    final raw = _first(json, const ['rating', 'score', 'rate', 'imdb']);
+    final parsed = double.tryParse(raw);
+    return parsed == null || parsed <= 0 ? 0 : parsed;
+  }
+
+  static bool _isServerUpdated(Map<String, dynamic> json) {
+    final raw = _first(json, const [
+      'updated',
+      'isUpdated',
+      'is_updated',
+      'new',
+      'isNew',
+      'is_new',
+      'badge',
+      'label',
+      'status'
+    ]);
+    final value = raw.trim().toLowerCase();
+    return value == 'true' ||
+        value == '1' ||
+        value == 'update' ||
+        value == 'updated' ||
+        value == 'new';
   }
 
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {
