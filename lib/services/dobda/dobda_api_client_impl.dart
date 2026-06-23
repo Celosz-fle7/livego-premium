@@ -1014,11 +1014,11 @@ class DobdaApiClientImpl {
   static List<String> _normalizeCategoryLabels(Iterable<String> values) {
     final labels = <String>[];
     for (final raw in values) {
-      final label = LiveGoApiPlatforms.categoryLabel('melolo', raw);
-      if (label.trim().isEmpty) continue;
+      final label = raw.trim();
+      if (label.isEmpty) continue;
       if (!labels.contains(label)) labels.add(label);
     }
-    return labels.take(6).toList(growable: false);
+    return labels.take(4).toList(growable: false);
   }
 
   static List<Map<String, dynamic>> _episodeList(Map<String, dynamic> json) {

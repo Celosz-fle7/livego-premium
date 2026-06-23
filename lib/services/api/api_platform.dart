@@ -530,19 +530,16 @@ class LiveGoApiPlatforms {
   static List<String> normalizeCategoriesFor(String platform, Iterable<String> values) {
     final config = bySlug(platform);
     final available = categoriesFor(config.slug);
-    final byKey = <String, String>{
-      for (final item in available) categoryKey(config.slug, item): item,
-    };
     final result = <String>[];
+    final seenKeys = <String>{};
     for (final raw in values) {
-      final key = categoryKey(config.slug, raw);
-      final label = byKey[key] ?? categoryLabel(config.slug, raw);
-      if (label.trim().isNotEmpty && !result.contains(label)) {
-        result.add(label);
-      }
+      final label = raw.trim();
+      if (label.isEmpty) continue;
+      final key = categoryKey(config.slug, label);
+      if (seenKeys.add(key)) result.add(label);
     }
     if (result.isEmpty) result.addAll(available.take(2));
-    return result.take(6).toList();
+    return result.take(4).toList();
   }
 
 }
