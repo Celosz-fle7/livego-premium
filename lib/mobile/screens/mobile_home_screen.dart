@@ -42,7 +42,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     try {
       // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
       final baseCategories = await LiveGoCatalog.fetchCategoriesFor(platform)
-          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform).take(6).toList());
+          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform).take(4).toList());
       if (category >= baseCategories.length) category = 0;
       final selectedCategory = baseCategories.isEmpty ? 'Populer' : baseCategories[category];
       final items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
@@ -70,7 +70,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       return _HomeState(
         banners: const <ContentItem>[],
         items: const <ContentItem>[],
-        categories: LiveGoCatalog.categoriesFor(platform).take(6).toList(),
+        categories: LiveGoCatalog.categoriesFor(platform).take(4).toList(),
       );
     }
   }
@@ -92,7 +92,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
-        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform).take(6).toList();
+        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform).take(4).toList();
         if (category >= categories.length) category = 0;
         final items = _filtered(state?.items ?? const <ContentItem>[], categories);
         final platforms = LiveGoCatalog.platforms.take(6).toList();
@@ -126,6 +126,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
               const SizedBox(height: 9),
               _OneLineSelector(
                 title: 'Kategori',
+                maxVisible: 4,
                 items: categories,
                 selected: category,
                 onSelected: (v) {
@@ -276,11 +277,18 @@ class _OneLineSelector extends StatelessWidget {
   final List<String> items;
   final int selected;
   final ValueChanged<int> onSelected;
-  const _OneLineSelector({required this.title, required this.items, required this.selected, required this.onSelected});
+  final int maxVisible;
+  const _OneLineSelector({
+    required this.title,
+    required this.items,
+    required this.selected,
+    required this.onSelected,
+    this.maxVisible = 6,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final shown = items.take(6).toList();
+    final shown = items.take(maxVisible).toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
