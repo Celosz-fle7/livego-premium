@@ -82,8 +82,6 @@ class TvPosterTile extends StatelessWidget {
                                 ),
                           if (focused) ...[
                             Positioned(top: 7, left: 7, child: _TvPosterBadge(text: '${item.episodes} Ep')),
-                            if (item.updated) const Positioned(top: 7, right: 7, child: _TvPosterBadge(text: 'UPDATE')),
-                            Positioned(right: 7, bottom: 10, child: _TvPosterBadge(text: item.rating.toStringAsFixed(1))),
                           ],
                         ],
                       ),

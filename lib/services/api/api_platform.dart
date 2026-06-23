@@ -328,7 +328,7 @@ class LiveGoApiPlatforms {
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,
-      categories: ['Trending', 'Terbaru', 'Short', 'Drama'],
+      categories: ['Trending', 'Terbaru', 'Populer', 'Completed'],
     ),
     LiveGoApiPlatform(
       slug: 'dramawave',

@@ -86,9 +86,7 @@ class _PosterCardState extends State<PosterCard> {
                                 ),
                               ),
                               Positioned(top: 8, left: 8, child: _Badge(text: '${widget.item.episodes} Ep')),
-                              if (widget.item.updated) const Positioned(top: 8, right: 8, child: _Badge(text: 'UPDATE')),
                               if (fav) const Positioned(right: 8, top: 38, child: _RoundIcon(icon: Icons.favorite_rounded)),
-                              Positioned(right: 8, bottom: 12, child: _Badge(text: widget.item.rating.toStringAsFixed(1))),
                               if (progress > 0)
                                 Positioned(
                                   left: 0,
