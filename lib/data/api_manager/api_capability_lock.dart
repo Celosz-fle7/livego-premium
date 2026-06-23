@@ -55,9 +55,7 @@ class ApiCapabilityLock {
 
   static String _backendBadge(LiveGoApiBackend backend) {
     switch (backend) {
-      case LiveGoApiBackend.anichin:
-        return 'ANICHIN';
-      case LiveGoApiBackend.dobda:
+      case LiveGoApiBackend.nobuzero:
         return 'LIVEGO API';
     }
   }

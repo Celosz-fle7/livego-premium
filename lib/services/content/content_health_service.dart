@@ -234,7 +234,7 @@ class ContentHealthService {
     final title = normalizeTitle(item.title);
     if (title.length < 4) return '';
     final episodePart = item.episodes > 0 ? ':${item.episodes}' : '';
-    final sourceGroup = item.platformSlug.toLowerCase().startsWith('dobda_') ? 'dobda' : item.platformSlug.toLowerCase();
+    final sourceGroup = item.platformSlug.toLowerCase();
     return '$sourceGroup:$title$episodePart';
   }
 

@@ -1,32 +1,38 @@
 import 'dart:io';
 
+import 'livego_api_signer.dart';
+
 class ApiEnv {
-  // Ganti API utama cukup dari file ini.
-  static const String baseUrl = 'https://priv-api.anichin.bio';
-  static const String apiKey = 'dk_live_c261cb5920f82cf971e29edf0c8183d8';
-
-  // API v2 Nobuzero untuk thin-client mapping.
-  static const String nobuzeroApiBaseUrl = String.fromEnvironment(
-    'NOBUZERO_API_BASE_URL',
-    defaultValue: 'https://nobuzero.my.id/api/v2',
+  // Single source of truth for the generated Nobuzero LiveGo API.
+  static const String baseUrl = String.fromEnvironment(
+    'LIVEGO_BASE_URL',
+    defaultValue: 'https://nobuzero.my.id',
   );
-  static const String nobuzeroUserId = String.fromEnvironment(
-    'NOBUZERO_USER_ID',
-    defaultValue: 'lg_2a741cdaf982a247',
+  static const String userId = String.fromEnvironment(
+    'LIVEGO_USER_ID',
+    defaultValue: 'lg_cbbc2c523c3af527',
   );
-  static const String nobuzeroSecret = String.fromEnvironment(
-    'NOBUZERO_SECRET',
-    defaultValue: '8eddddb070709a2a47cc3477dd761abd4879caf3c1154dac147d9ff7f5d7a1ee',
+  static const String secret = String.fromEnvironment(
+    'LIVEGO_SECRET',
+    defaultValue:
+        'c3f6a21f55e60e5c3057271c580200faaf59e0c48f8c8a4fa2cefef925f31a9a',
   );
-
-  static bool get isNobuzeroStaging =>
-      nobuzeroApiBaseUrl.contains('/api/staging/v2');
 
   static const Duration timeout = Duration(seconds: 10);
 
-  static void applyHeaders(HttpHeaders headers) {
-    headers.set('X-API-Key', apiKey);
-    headers.set('Accept', 'application/json');
-    headers.set('User-Agent', 'okhttp/4.12.0');
+  static Uri apiV2Uri(String path, Map<String, String> query) {
+    final base = Uri.parse(baseUrl);
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    final apiPath = cleanPath.startsWith('/api/v2/')
+        ? cleanPath
+        : '/api/v2$cleanPath';
+    return base.replace(
+      path: apiPath,
+      queryParameters: query.isEmpty ? null : query,
+    );
+  }
+
+  static void applyHeaders(HttpHeaders headers, {required String method, required Uri uri}) {
+    LiveGoApiSigner.apply(headers, method: method, uri: uri);
   }
 }
