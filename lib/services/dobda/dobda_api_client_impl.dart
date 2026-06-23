@@ -293,6 +293,9 @@ class DobdaApiClientImpl {
     if (rows.isNotEmpty) {
       _episodeMemory[_episodeKey(item, apiLang)] = rows;
     }
+    if (config.slug == 'freereels') {
+      print('LIVEGO_FREEREELS_DETAIL id=${item.id} chapters=${rows.length}');
+    }
 
     final parsed = _parseItem(data, platform: config.slug, lang: apiLang);
     return _preserveIdentity(parsed, fallback: item, lang: apiLang);
@@ -542,6 +545,7 @@ class DobdaApiClientImpl {
   }) {
     final out = <ContentItem>[];
     final seen = <String>{};
+    var filtered = 0;
     for (final item in rows) {
       if (!_isCleanNobuzeroItem(
         item,
@@ -549,10 +553,19 @@ class DobdaApiClientImpl {
         requireDubbed: requireDubbed,
         excludeDubbed: excludeDubbed,
       )) {
+        filtered += 1;
         continue;
       }
       final key = _contentKey(item);
-      if (seen.add(key)) out.add(item);
+      if (seen.add(key)) {
+        out.add(item);
+      } else {
+        filtered += 1;
+      }
+    }
+    if (rows.any((item) => item.platformSlug == 'freereels')) {
+      print(
+          'LIVEGO_FREEREELS_FILTER in=${rows.length} out=${out.length} filtered=$filtered');
     }
     return out;
   }
@@ -571,9 +584,12 @@ class DobdaApiClientImpl {
         item.title.contains('Sample Drama')) {
       return false;
     }
-    if ((item.posterUrl.trim().isEmpty ||
-            item.posterUrl.trim().endsWith('url=') ||
-            item.posterUrl.contains('placeholder'))) {
+    // Temporary Nobuzero compatibility: generated FreeReels test rows can
+    // legitimately point at server-side placeholder covers while upstream
+    // artwork is still being hydrated. Keep rejecting empty/broken poster URLs,
+    // but do not reject URLs only because they contain `placeholder`.
+    if (item.posterUrl.trim().isEmpty ||
+        item.posterUrl.trim().endsWith('url=')) {
       return false;
     }
     if (item.episodes <= 0) {
