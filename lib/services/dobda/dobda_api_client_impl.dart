@@ -886,6 +886,14 @@ class DobdaApiClientImpl {
     }
 
     if (item.platformSlug == 'freereels') {
+      final freeReelsUrl = parsedDataPlayUrl.isNotEmpty ? parsedDataPlayUrl : parsedDataUrl;
+      if (freeReelsUrl.isNotEmpty) {
+        url = _normalizeUrl(freeReelsUrl);
+        qualities
+          ..clear()
+          ..add(StreamQuality(label: 'Auto', url: url, isDefault: true));
+      }
+
       final playbackType = LiveGoApiPlatforms.bySlug(item.platformSlug).videoType.name;
       print(
         'LIVEGO FREEREELS STREAM_PARSE itemId=${item.id} chapterId=$requestedChapterId '
