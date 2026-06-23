@@ -21,7 +21,7 @@ class LiveGoNetworkStatus {
     _lastCheckedAt = now;
 
     try {
-      final result = await InternetAddress.lookup('priv-api.anichin.bio').timeout(timeout);
+      final result = await InternetAddress.lookup('nobuzero.my.id').timeout(timeout);
       _lastOnline = result.isNotEmpty && result.first.rawAddress.isNotEmpty;
     } catch (_) {
       try {

@@ -8,15 +8,12 @@ class ApiHttpClient {
     String path,
     Map<String, String> query,
   ) async {
-    final uri = Uri.parse(ApiEnv.baseUrl).replace(
-      path: path,
-      queryParameters: query.isEmpty ? null : query,
-    );
+    final uri = ApiEnv.apiV2Uri(path, query);
 
     final client = HttpClient();
     try {
       final request = await client.getUrl(uri).timeout(ApiEnv.timeout);
-      ApiEnv.applyHeaders(request.headers);
+      ApiEnv.applyHeaders(request.headers, method: 'GET', uri: uri);
 
       final response = await request.close().timeout(ApiEnv.timeout);
       final body = await response.transform(utf8.decoder).join();

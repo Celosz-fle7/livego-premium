@@ -354,7 +354,7 @@ class LiveGoLocalStore {
 
       // Nobuzero migration guard:
       // Old saved source settings can leave Home with only one Nobuzero platform
-      // (or a legacy alias normalized to dobda_freereels). Always merge the
+      // (or a legacy alias normalized to freereels). Always merge the
       // current Nobuzero starter pack back into active/home so Source Manager and
       // Home expose all clean Nobuzero platforms after update.
       final defaultNobuzeroPlatforms = LiveGoSettings.defaultPlatforms
@@ -444,18 +444,12 @@ class LiveGoLocalStore {
       'meloshort',
       'dramabox',
       'melolo',
-      'dobda_shortmax',
-      'dobda_netshort',
-      'dobda_pinedrama',
-      'dobda_flickreels',
-      'dobda_meloshort',
-      'dobda_melolo',
     }.contains(slug);
   }
 
   static String _normalizeSavedPlatform(Object? value) {
     final slug = '${value ?? ''}'.trim().toLowerCase();
-    if (_isLegacyApiSource(slug)) return 'dobda_freereels';
+    if (_isLegacyApiSource(slug)) return 'freereels';
     return slug;
   }
 
