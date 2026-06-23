@@ -479,8 +479,13 @@ class DobdaApiClientImpl {
       });
       if (timeout != null) future = future.timeout(timeout);
       final json = await future;
-      final stream = _parseStream(json,
-          item: item, fallbackEpisode: episodeIndex, lang: apiLang);
+      final stream = _parseStream(
+        json,
+        item: item,
+        requestedChapterId: chapterId,
+        fallbackEpisode: episodeIndex,
+        lang: apiLang,
+      );
 
       final host = stream.url.isNotEmpty ? Uri.parse(stream.url).host : '';
       final path = stream.url.isNotEmpty ? Uri.parse(stream.url).path : '';
@@ -807,12 +812,15 @@ class DobdaApiClientImpl {
   static StreamInfo _parseStream(
     Map<String, dynamic> json, {
     required ContentItem item,
+    required String requestedChapterId,
     required int fallbackEpisode,
     required String lang,
   }) {
     final data = _dataMap(json);
     final streams = data['streams'];
     final qualities = <StreamQuality>[];
+    final parsedDataUrl = '${data['url'] ?? ''}'.trim();
+    final parsedDataPlayUrl = '${data['play_url'] ?? ''}'.trim();
     String url = '';
 
     if (streams is List) {
@@ -875,6 +883,14 @@ class DobdaApiClientImpl {
           headers[key] = value;
         }
       }
+    }
+
+    if (item.platformSlug == 'freereels') {
+      final playbackType = LiveGoApiPlatforms.bySlug(item.platformSlug).videoType.name;
+      print(
+        'LIVEGO FREEREELS STREAM_PARSE itemId=${item.id} chapterId=$requestedChapterId '
+        'data.url=$parsedDataUrl data.play_url=$parsedDataPlayUrl finalUrl=$url playbackType=$playbackType',
+      );
     }
 
     return StreamInfo(
