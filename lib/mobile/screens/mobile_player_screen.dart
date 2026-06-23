@@ -14,6 +14,7 @@ import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
+import '../../services/api/api_platform.dart';
 import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
@@ -372,15 +373,26 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   String _resolvedInitialUrl() {
-    if (_quality.toLowerCase() == 'auto') {
-      return widget.stream.autoStartUrl;
-    }
-    return widget.stream.urlForQuality(_quality);
+    final url = _quality.toLowerCase() == 'auto'
+        ? widget.stream.autoStartUrl
+        : widget.stream.urlForQuality(_quality);
+    _logFreeReelsPlayerUrl('PLAYER_URL_RESOLVED', url);
+    return url;
+  }
+
+  void _logFreeReelsPlayerUrl(String stage, String url) {
+    if (widget.item.platformSlug != 'freereels') return;
+    final playbackType = LiveGoApiPlatforms.bySlug(widget.item.platformSlug).videoType.name;
+    debugPrint(
+      'LIVEGO FREEREELS $stage itemId=${widget.item.id} chapterId=${widget.item.chapterId} '
+      'finalUrl=$url playbackType=$playbackType',
+    );
   }
 
   Future<void> _openResolvedUrl(String url, {required bool resume, required bool autoplay}) async {
     try {
       _activeUrl = url;
+      _logFreeReelsPlayerUrl('PLAYER_OPEN', url);
       _logStreamUrl('open_stream', url);
       final old = _controller;
       old?.removeListener(_listen);
