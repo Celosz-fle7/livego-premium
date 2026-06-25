@@ -1,7 +1,7 @@
 import '../services/api/api_platform.dart';
 
 class LiveGoSettings {
-  static const appName = 'LiveGo';
+  static const appName = 'FreeReels';
   static const layoutAuto = 'Auto';
   static const layoutMobile = 'Mobile';
   static const layoutTv = 'TV';
@@ -9,7 +9,7 @@ class LiveGoSettings {
   static bool _runtimeLockedToTv = false;
 
   static String language = 'id';
-  static String defaultPlatform = 'melolo';
+  static String defaultPlatform = 'freereels';
   static String quality = 'Auto';
   static String layoutMode = layoutAuto;
   static String drmMode = 'Auto';
@@ -20,7 +20,6 @@ class LiveGoSettings {
   static bool backgroundPoster = true;
   static bool cachePlayback = true;
   static bool manualRotateButton = true;
-  // Internal/debug-only TV route player override. Empty means Flutter default.
   static String tvPlayerEngineOverride = '';
   static bool tvSourceSetupCompleted = false;
   static int mobileHomeGrid = 3;
@@ -56,36 +55,33 @@ class LiveGoSettings {
   }
 
   static void applyRuntimeLayoutGuard({required bool isTvRuntime}) {
-    if (isTvRuntime) {
-      lockRuntimeToTv();
-      return;
-    }
+    if (isTvRuntime) { lockRuntimeToTv(); return; }
     clearRuntimeTvLock();
   }
 
-  static final List<String> defaultPlatforms = LiveGoApiPlatforms.defaultSlugs;
-
-  static final List<String> supportedPlatforms = LiveGoApiPlatforms.supportedSlugs;
-
+  static final List<String> defaultPlatforms =
+      LiveGoApiPlatforms.defaultSlugs;
+  static final List<String> supportedPlatforms =
+      LiveGoApiPlatforms.supportedSlugs;
   static final Set<String> activePlatforms = defaultPlatforms.toSet();
-  static final List<String> homePlatforms = List<String>.from(defaultPlatforms);
+  static final List<String> homePlatforms =
+      List<String>.from(defaultPlatforms);
 
   static final Map<String, String> platformLanguages = {
-    for (final platform in LiveGoApiPlatforms.all)
-      platform.slug: platform.defaultLang,
+    for (final p in LiveGoApiPlatforms.all) p.slug: p.defaultLang,
   };
 
   static final Map<String, List<String>> homeCategories = {
-    for (final platform in LiveGoApiPlatforms.all)
-      platform.slug: List<String>.from(platform.categories),
+    for (final p in LiveGoApiPlatforms.all)
+      p.slug: List<String>.from(p.categories),
   };
 
-  // unknown, online, slow, offline. Disimpan selama sesi aplikasi berjalan.
   static final Map<String, String> platformStatus = {
-    for (final platform in supportedPlatforms) platform: 'unknown',
+    for (final p in supportedPlatforms) p: 'unknown',
   };
 
-  static bool isPlatformActive(String slug) => activePlatforms.contains(slug);
+  static bool isPlatformActive(String slug) =>
+      activePlatforms.contains(slug);
 
   static void togglePlatform(String slug) {
     if (activePlatforms.contains(slug)) {
@@ -101,7 +97,8 @@ class LiveGoSettings {
     if (homePlatforms.isEmpty) homePlatforms.add(defaultPlatform);
   }
 
-  static bool isHomePlatform(String slug) => homePlatforms.contains(slug);
+  static bool isHomePlatform(String slug) =>
+      homePlatforms.contains(slug);
 
   static void toggleHomePlatform(String slug) {
     if (homePlatforms.contains(slug)) {
@@ -123,7 +120,8 @@ class LiveGoSettings {
 
   static void setLanguageForPlatform(String platform, String value) {
     final config = LiveGoApiPlatforms.bySlug(platform);
-    platformLanguages[config.slug] = LiveGoApiPlatforms.langFor(config.slug, value);
+    platformLanguages[config.slug] =
+        LiveGoApiPlatforms.langFor(config.slug, value);
   }
 
   static List<String> categoriesFor(String platform) {
@@ -134,29 +132,23 @@ class LiveGoSettings {
 
   static void setCategoriesFor(String platform, List<String> values) {
     final config = LiveGoApiPlatforms.bySlug(platform);
-    homeCategories[config.slug] = LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, values);
+    homeCategories[config.slug] =
+        LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, values);
   }
 
   static void setPlatformStatus(String slug, String status) {
     platformStatus[slug] = status;
   }
 
-  static String statusFor(String slug) => platformStatus[slug] ?? 'unknown';
+  static String statusFor(String slug) =>
+      platformStatus[slug] ?? 'unknown';
 
-
-  static void setMobileHomeGrid(int value) {
-    // Grid HP dikunci agar tidak bentrok dengan layout TV.
-    mobileHomeGrid = 3;
-  }
-
-  static void setTvHomeGrid(int value) {
-    // Grid TV dikunci untuk stabilitas remote dan layout Home.
-    tvHomeGrid = 7;
-  }
+  static void setMobileHomeGrid(int value) { mobileHomeGrid = 3; }
+  static void setTvHomeGrid(int value) { tvHomeGrid = 7; }
 
   static void reset() {
     language = 'id';
-    defaultPlatform = 'melolo';
+    defaultPlatform = 'freereels';
     quality = 'Auto';
     layoutMode = layoutAuto;
     drmMode = 'Auto';
@@ -172,23 +164,18 @@ class LiveGoSettings {
     mobileHomeGrid = 3;
     tvHomeGrid = 7;
     tvLastHomeCategories.clear();
-    activePlatforms
-      ..clear()
-      ..addAll(defaultPlatforms);
-    homePlatforms
-      ..clear()
-      ..addAll(defaultPlatforms);
+    activePlatforms..clear()..addAll(defaultPlatforms);
+    homePlatforms..clear()..addAll(defaultPlatforms);
     platformLanguages
       ..clear()
       ..addAll({
-        for (final platform in LiveGoApiPlatforms.all)
-          platform.slug: platform.defaultLang,
+        for (final p in LiveGoApiPlatforms.all) p.slug: p.defaultLang,
       });
     homeCategories
       ..clear()
       ..addAll({
-        for (final platform in LiveGoApiPlatforms.all)
-          platform.slug: List<String>.from(platform.categories),
+        for (final p in LiveGoApiPlatforms.all)
+          p.slug: List<String>.from(p.categories),
       });
   }
 }
