@@ -254,7 +254,7 @@ class ContentHealthService {
     if (item.title.trim().isEmpty || item.title.trim().toLowerCase() == 'untitled') return false;
     final cover = item.posterUrl.trim();
     if (cover.isEmpty || cover.endsWith('url=')) return false;
-    if (item.episodes <= 0) return false;
+    if (item.episodes < 0) return false;
     return true;
   }
 

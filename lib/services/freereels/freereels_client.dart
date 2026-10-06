@@ -144,7 +144,7 @@ class FreereelsClient {
           posterUrl: '${m['cover'] ?? ''}',
           backdropUrl: '${m['cover'] ?? ''}',
           rating: 0,
-          episodes: 0,
+          episodes: 1,
           platformSlug: 'freereels',
           lang: 'id',
         ));
