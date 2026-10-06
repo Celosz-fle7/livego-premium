@@ -10,7 +10,7 @@
 class FreereelsConfig {
   static const String salt = String.fromEnvironment(
     'FREEREELS_SALT',
-    defaultValue: 'ISI_SALT_DISINI',
+    defaultValue: '8IAcbWyCsVhYv82S2eofRqK1DF3nNDAv',
   );
 
   // === Identitas app — JANGAN DIRUBAH (meniru APK) ===
