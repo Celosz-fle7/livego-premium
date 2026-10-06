@@ -558,11 +558,7 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      if (_navCloseFocused) {
-        _closeNavRestoreContent();
-      } else {
-        _focusNavClose();
-      }
+      _closeNavRestoreContent();
       return;
     }
     if (_index == TvNavIndex.home) {
