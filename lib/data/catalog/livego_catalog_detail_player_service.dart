@@ -60,11 +60,13 @@ class LiveGoCatalogDetailPlayerService {
     final List<LiveGoEpisode> rows;
     if (dramaSource != null) {
       // Sumber drama eksternal (multi-APK): episode via registry.
+      List<LiveGoEpisode> fetched;
       try {
-        rows = await dramaSource.episodes(item.id);
+        fetched = await dramaSource.episodes(item.id);
       } catch (_) {
-        rows = const <LiveGoEpisode>[];
+        fetched = const <LiveGoEpisode>[];
       }
+      rows = fetched;
     } else {
       rows = await LiveGoApiManager.fetchEpisodes(
         item: item,
