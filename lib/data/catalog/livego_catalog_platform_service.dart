@@ -29,10 +29,11 @@ class LiveGoCatalogPlatformService {
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'melolo' : platforms.first);
 
   static List<String> categoriesFor(String platform) {
-    // Sumber drama eksternal (multi-APK): kategori dari registry, tanpa network.
+    // Sumber drama eksternal (multi-APK): tiap provider punya kategori
+    // sendiri-sendiri — tampilkan semua, tanpa batas maxVisibleCategories.
     final source = DramaSourceRegistry.forSlug(platform);
     if (source != null) {
-      return source.categories.take(maxVisibleCategories).toList(growable: false);
+      return source.categories.toList(growable: false);
     }
     final config = LiveGoApiPlatforms.bySlug(platform);
     final cached = _categoryCache[config.slug];

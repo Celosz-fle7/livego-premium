@@ -43,7 +43,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     try {
       // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
       final baseCategories = await LiveGoCatalog.fetchCategoriesFor(platform)
-          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform).take(4).toList());
+          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform));
       if (category >= baseCategories.length) category = 0;
       final selectedCategory = baseCategories.isEmpty ? 'Populer' : baseCategories[category];
       final List<ContentItem> items;
@@ -79,7 +79,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       return _HomeState(
         banners: const <ContentItem>[],
         items: const <ContentItem>[],
-        categories: LiveGoCatalog.categoriesFor(platform).take(4).toList(),
+        categories: LiveGoCatalog.categoriesFor(platform),
       );
     }
   }
@@ -101,7 +101,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       builder: (context, snap) {
         final loading = snap.connectionState != ConnectionState.done;
         final state = snap.data;
-        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform).take(4).toList();
+        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform);
         if (category >= categories.length) category = 0;
         final items = _filtered(state?.items ?? const <ContentItem>[], categories);
         final platforms = LiveGoCatalog.platforms.take(6).toList();
