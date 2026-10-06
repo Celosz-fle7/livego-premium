@@ -153,6 +153,19 @@ class PlaybackResolver {
     await PlayerPreferences.load();
     _syncPlayerSettings();
 
+    // Sumber drama eksternal (multi-APK): resolve via registry, meniru APK.
+    // (TV pakai jalur fast ini; tanpa branch ini FreeReels di TV gagal.)
+    final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
+    if (dramaSource != null) {
+      return _resolveFromDramaSource(dramaSource, item, chapterId: chapterId)
+          .timeout(timeout, onTimeout: () => PlaybackSource.empty(
+                platform: dramaSource.slug,
+                dramaId: item.id,
+                episodeNumber: _episodeNumber(chapterId ?? item.chapterId),
+                videoType: LiveGoVideoType.mp4,
+              ));
+    }
+
     final platform = LiveGoApiPlatforms.bySlug(item.platformSlug);
     final requestedChapter = chapterId ?? item.chapterId;
     final ep = _episodeNumber(requestedChapter);
