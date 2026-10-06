@@ -11,6 +11,10 @@ import 'freereels_config.dart';
 class FreereelsSource implements DramaSource {
   final FreereelsClient _client = FreereelsClient();
 
+  /// Cache episodeId -> stream m3u8, diisi saat episodes() dipanggil.
+  /// Format key: "$seriesId:$episodeId".
+  final Map<String, String> _streamCache = {};
+
   @override
   String get slug => 'freereels';
 
@@ -28,16 +32,49 @@ class FreereelsSource implements DramaSource {
   }
 
   @override
-  Future<List<LiveGoEpisode>> episodes(String seriesId) {
-    // TODO: isi setelah format endpoint episode diketahui
-    // Kandidat: GET /frv2-api/drama/info_v2 / /frv2-api/advertise/series/resolve
-    throw UnimplementedError('FreereelsSource.episodes belum diimplementasi');
+  Future<List<LiveGoEpisode>> episodes(String seriesId) async {
+    final raw = await _client.episodeList(seriesId);
+    final out = <LiveGoEpisode>[];
+    for (final e in raw) {
+      final id = '${e['id'] ?? ''}';
+      if (id.isEmpty) continue;
+      final url = _pickStreamUrl(e);
+      if (url.isNotEmpty) _streamCache['$seriesId:$id'] = url;
+      out.add(LiveGoEpisode(
+        id: id,
+        index: int.tryParse('${e['index'] ?? 0}') ?? 0,
+        title: '${e['name'] ?? 'Episode ${e['index'] ?? ''}'}',
+      ));
+    }
+    return out;
   }
 
   @override
-  Future<String> streamUrl({required String seriesId, required String episodeId}) {
-    // TODO: isi setelah format endpoint stream diketahui
-    // Kandidat: GET /frv2-api/getplayinfo/v4
-    throw UnimplementedError('FreereelsSource.streamUrl belum diimplementasi');
+  Future<String> streamUrl({required String seriesId, required String episodeId}) async {
+    final cached = _streamCache['$seriesId:$episodeId'];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    // Belum di-cache: ambil ulang episode list lalu cari episode-nya.
+    final raw = await _client.episodeList(seriesId);
+    for (final e in raw) {
+      if ('${e['id'] ?? ''}' == episodeId) {
+        final url = _pickStreamUrl(e);
+        if (url.isNotEmpty) {
+          _streamCache['$seriesId:$episodeId'] = url;
+          return url;
+        }
+      }
+    }
+    throw Exception('FreeReels: stream URL tidak ditemukan ($seriesId/$episodeId)');
+  }
+
+  /// Pilih URL stream terbaik dari item episode.
+  /// Verified: external_audio_h264_m3u8 -> 200 audio/x-mpegurl.
+  String _pickStreamUrl(Map<String, dynamic> e) {
+    for (final k in ['external_audio_h264_m3u8', 'm3u8_url', 'external_audio_h265_m3u8']) {
+      final v = '${e[k] ?? ''}';
+      if (v.isNotEmpty) return v;
+    }
+    return '';
   }
 }

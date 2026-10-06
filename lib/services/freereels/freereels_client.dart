@@ -149,4 +149,21 @@ class FreereelsClient {
     }
     return all;
   }
+
+  /// Detail series: GET /frv2-api/drama/info_v2?series_id={key}
+  /// Mengembalikan list episode mentah (data.info.episode_list).
+  /// Tiap episode: id, index, name, cover, duration,
+  /// external_audio_h264_m3u8 / m3u8_url (stream langsung, sudah verified 200).
+  Future<List<Map<String, dynamic>>> episodeList(String seriesId) async {
+    final res = await _getJson('/drama/info_v2', {'series_id': seriesId});
+
+    final code = res['code'];
+    if (code != 200 && code != 0) {
+      throw Exception('FreeReels info_v2 code=$code msg=${res['msg']}');
+    }
+
+    final info = (res['data'] as Map?)?['info'] as Map?;
+    final list = info?['episode_list'] as List? ?? const [];
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
 }
