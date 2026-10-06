@@ -479,11 +479,21 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
 
+    final navState = ref.read(tvNavigationProvider);
+    if (navState.navFocused || navState.owner == TvRemoteOwner.navbar) {
+      return KeyEventResult.ignored;
+    }
+
     _requestHomeRootFocus();
     return _reduceHomeKey(hero, event.logicalKey);
   }
 
   KeyEventResult _reduceHomeKey(ContentItem? hero, LogicalKeyboardKey key) {
+    final navState = ref.read(tvNavigationProvider);
+    if (navState.navFocused || navState.owner == TvRemoteOwner.navbar) {
+      return KeyEventResult.ignored;
+    }
+
     if (tvIsBackKey(key)) {
       _handleBack();
       return KeyEventResult.handled;
@@ -711,29 +721,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.platform:
-        if (_controlFocus == _HomeControlFocus.platformHeader) {
+        if (_controlFocus == _HomeControlFocus.platformHeader || _platformIndex == 0) {
           _moveToNav();
-        } else if (_platformIndex == 0) {
-          _setManualZone(
-            TvZone.platform,
-            _platformIndex,
-            scroll: false,
-            controlFocus: _HomeControlFocus.platformHeader,
-          );
         } else {
           _setManualZone(TvZone.platform, _platformIndex - 1, scroll: false);
         }
         return;
       case TvZone.category:
-        if (_controlFocus == _HomeControlFocus.categoryHeader) {
+        if (_controlFocus == _HomeControlFocus.categoryHeader || _categoryIndex == 0) {
           _moveToNav();
-        } else if (_categoryIndex == 0) {
-          _setManualZone(
-            TvZone.category,
-            _categoryIndex,
-            scroll: false,
-            controlFocus: _HomeControlFocus.categoryHeader,
-          );
         } else {
           _setManualZone(TvZone.category, _categoryIndex - 1, scroll: false);
         }
@@ -1280,6 +1276,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   KeyEventResult _emptyKey(KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final navState = ref.read(tvNavigationProvider);
+    if (navState.navFocused || navState.owner == TvRemoteOwner.navbar) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
     if (tvIsBackKey(key)) {
       _handleBack();

@@ -206,10 +206,11 @@ class _TvShellState extends ConsumerState<TvShell> {
       _navCloseFocused = false;
       _navCursorIndex = _index;
     });
+    if (_rootFocusNode.canRequestFocus) {
+      _rootFocusNode.requestFocus();
+    }
+    _syncOwner(navFocused: true);
 
-    // Navigation contract:
-    // Shell owns owner sync; navbar cursor is separate from active content.
-    // FocusNav performs the owner sync after focus is attached.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _navMode != TvSideNavMode.focused) return;
       _focusNav(_navCursorIndex);

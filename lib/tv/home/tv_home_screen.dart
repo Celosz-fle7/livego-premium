@@ -385,7 +385,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           return Focus(
                             focusNode: _emptyNode,
                             skipTraversal: true,
-                            onKeyEvent: (node, event) => this._homeRootKey(home.hero, event),
+                            onKeyEvent: (node, event) => this._emptyKey(event),
                             onFocusChange: (focused) {
                               if (focused) this._rememberFocus(TvZone.placeholder, 0);
                             },

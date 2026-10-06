@@ -91,13 +91,6 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       debugPrint('TV HOME CACHE LOAD ERROR: $error');
     }
 
-    final online = await _repository.isOnline();
-    if (!_active(token, requestKey)) return;
-    if (!online) {
-      _showOffline(requestKey);
-      return;
-    }
-
     try {
       final network = await _repository.loadNetwork(
         platform: platform,
