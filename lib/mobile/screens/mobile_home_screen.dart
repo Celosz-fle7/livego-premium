@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../services/cache/livego_content_cache.dart';
 import '../../services/drama_source.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/poster_card.dart';
@@ -49,9 +50,28 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       final List<ContentItem> items;
       final dramaSource = DramaSourceRegistry.forSlug(platform);
       if (dramaSource != null) {
-        // Sumber drama eksternal (multi-APK): lewat registry, meniru perilaku APK.
-        items = await dramaSource.homeByCategory(selectedCategory)
-            .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+        // Sumber drama eksternal (multi-APK): disk cache dulu biar instan,
+        // baru network kalau cache kosong. Tulis cache tiap sukses fetch.
+        final cached = await LiveGoContentCache.readItems(
+          platform: platform,
+          endpoint: 'home',
+          params: {'category': selectedCategory},
+        ).timeout(const Duration(seconds: 3), onTimeout: () => null);
+        if (cached != null && cached.isNotEmpty) {
+          items = cached;
+        } else {
+          final fresh = await dramaSource.homeByCategory(selectedCategory)
+              .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+          items = fresh;
+          if (fresh.isNotEmpty) {
+            unawaited(LiveGoContentCache.writeItems(
+              platform: platform,
+              endpoint: 'home',
+              params: {'category': selectedCategory},
+              items: fresh,
+            ));
+          }
+        }
       } else {
         items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
             .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);

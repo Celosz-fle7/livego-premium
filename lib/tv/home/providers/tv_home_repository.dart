@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../data/livego_catalog.dart';
 import '../../../models/content_item.dart';
+import '../../../services/cache/livego_content_cache.dart';
 import '../../../services/content/content_health_service.dart';
 import '../../../services/drama_source.dart';
 import '../../../services/network/livego_network_status.dart';
@@ -71,14 +74,27 @@ class TvHomeRepository {
     required String platform,
     required String selectedCategory,
   }) async {
-    final cached = await LiveGoCatalog.cachedHomeByCategory(
-      platform: platform,
-      category: selectedCategory,
-      allowExpired: false,
-    ).timeout(
-      TvHomePerformanceConfig.cacheReadTimeout,
-      onTimeout: () => const <ContentItem>[],
-    );
+    final List<ContentItem> cached;
+    if (DramaSourceRegistry.handles(platform)) {
+      // Sumber drama eksternal: baca disk cache (ditulis saat loadNetwork).
+      cached = await LiveGoContentCache.readItems(
+        platform: platform,
+        endpoint: 'home',
+        params: {'category': selectedCategory},
+      ).timeout(
+        TvHomePerformanceConfig.cacheReadTimeout,
+        onTimeout: () => null,
+      ) ?? const <ContentItem>[];
+    } else {
+      cached = await LiveGoCatalog.cachedHomeByCategory(
+        platform: platform,
+        category: selectedCategory,
+        allowExpired: false,
+      ).timeout(
+        TvHomePerformanceConfig.cacheReadTimeout,
+        onTimeout: () => const <ContentItem>[],
+      );
+    }
 
     final prepared = _prepareItems(cached);
     if (prepared.isEmpty) return null;
@@ -104,6 +120,17 @@ class TvHomeRepository {
         TvHomePerformanceConfig.foregroundNetworkTimeout,
         onTimeout: () => const <ContentItem>[],
       );
+      // Tulis disk cache biar tidak request ulang terus (ala Netflix/MovieBox).
+      if (items.isNotEmpty) {
+        unawaited(
+          LiveGoContentCache.writeItems(
+            platform: platform,
+            endpoint: 'home',
+            params: {'category': selectedCategory},
+            items: items,
+          ),
+        );
+      }
     } else {
       items = await LiveGoCatalog.homeByCategory(
         platform: platform,
