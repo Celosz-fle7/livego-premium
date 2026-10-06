@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/livego_catalog.dart';
 import '../../../models/content_item.dart';
 import '../../../services/content/content_health_service.dart';
+import '../../../services/drama_source.dart';
 import '../../../services/network/livego_network_status.dart';
 import '../../cache/tv_ram_cache.dart';
 import '../tv_home_performance_config.dart';
@@ -95,13 +96,23 @@ class TvHomeRepository {
     required String platform,
     required String selectedCategory,
   }) async {
-    final items = await LiveGoCatalog.homeByCategory(
-      platform: platform,
-      category: selectedCategory,
-    ).timeout(
-      TvHomePerformanceConfig.foregroundNetworkTimeout,
-      onTimeout: () => const <ContentItem>[],
-    );
+    final List<ContentItem> items;
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      // Sumber drama eksternal (multi-APK): lewat registry, meniru perilaku APK.
+      items = await dramaSource.homeByCategory(selectedCategory).timeout(
+        TvHomePerformanceConfig.foregroundNetworkTimeout,
+        onTimeout: () => const <ContentItem>[],
+      );
+    } else {
+      items = await LiveGoCatalog.homeByCategory(
+        platform: platform,
+        category: selectedCategory,
+      ).timeout(
+        TvHomePerformanceConfig.foregroundNetworkTimeout,
+        onTimeout: () => const <ContentItem>[],
+      );
+    }
 
     final prepared = _prepareItems(items);
     if (prepared.isEmpty) return null;

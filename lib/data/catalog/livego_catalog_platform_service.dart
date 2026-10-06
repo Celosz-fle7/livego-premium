@@ -1,5 +1,6 @@
 import '../../core/livego_settings.dart';
 import '../../services/api/api_platform.dart';
+import '../../services/drama_source.dart';
 import '../../services/livego_api_gateway.dart';
 import '../api_manager/api_timeout_policy.dart';
 import '../api_manager/api_provider_registry.dart';
@@ -28,6 +29,11 @@ class LiveGoCatalogPlatformService {
   static List<String> get categories => categoriesFor(platforms.isEmpty ? 'melolo' : platforms.first);
 
   static List<String> categoriesFor(String platform) {
+    // Sumber drama eksternal (multi-APK): kategori dari registry, tanpa network.
+    final source = DramaSourceRegistry.forSlug(platform);
+    if (source != null) {
+      return source.categories.take(maxVisibleCategories).toList(growable: false);
+    }
     final config = LiveGoApiPlatforms.bySlug(platform);
     final cached = _categoryCache[config.slug];
     if (cached != null && cached.isNotEmpty) return cached.take(maxVisibleCategories).toList(growable: false);
@@ -50,6 +56,8 @@ class LiveGoCatalogPlatformService {
       LiveGoApiPlatforms.bySlug(platform).isDobda;
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
+    // Sumber drama eksternal (multi-APK): kategori statis, tanpa network.
+    if (DramaSourceRegistry.handles(platform)) return categoriesFor(platform);
     final config = LiveGoApiPlatforms.bySlug(platform);
     final cached = _categoryCache[config.slug];
     if (cached != null && cached.isNotEmpty) return cached.take(maxVisibleCategories).toList(growable: false);

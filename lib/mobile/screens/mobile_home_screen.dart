@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../services/drama_source.dart';
 import '../../shared/widgets/hero_banner.dart';
 import '../../shared/widgets/poster_card.dart';
 import '../mobile_player_entry.dart';
@@ -45,8 +46,16 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
           .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform).take(4).toList());
       if (category >= baseCategories.length) category = 0;
       final selectedCategory = baseCategories.isEmpty ? 'Populer' : baseCategories[category];
-      final items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
-          .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+      final List<ContentItem> items;
+      final dramaSource = DramaSourceRegistry.forSlug(platform);
+      if (dramaSource != null) {
+        // Sumber drama eksternal (multi-APK): lewat registry, meniru perilaku APK.
+        items = await dramaSource.homeByCategory(selectedCategory)
+            .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+      } else {
+        items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
+            .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+      }
 
       final categories = baseCategories;
       final fallbackBanners = items.take(5).toList();

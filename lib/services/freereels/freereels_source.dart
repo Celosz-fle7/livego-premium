@@ -1,0 +1,28 @@
+import '../../models/content_item.dart';
+import '../drama_source.dart';
+import 'freereels_client.dart';
+import 'freereels_config.dart';
+
+/// Adapter FreeReels sebagai DramaSource.
+///
+/// Meniru 100% perilaku APK: kategori = tab bawaan APK,
+/// home = GET /frv2-api/homepage/v2/tab/index per tab_key.
+class FreereelsSource implements DramaSource {
+  final FreereelsClient _client = FreereelsClient();
+
+  @override
+  String get slug => 'freereels';
+
+  @override
+  String get label => 'FreeReels';
+
+  @override
+  List<String> get categories => FreereelsConfig.tabKeys.keys.toList(growable: false);
+
+  @override
+  Future<List<ContentItem>> homeByCategory(String category) {
+    final tabKey =
+        FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
+    return _client.tabFeed(tabKey: tabKey, category: category);
+  }
+}
