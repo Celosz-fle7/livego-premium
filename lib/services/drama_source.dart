@@ -1,11 +1,12 @@
 import 'freereels/freereels_source.dart';
 
 import '../models/content_item.dart';
+import '../models/livego_episode.dart';
 
 /// Kontrak satu sumber drama (satu APK).
 ///
 /// Tiap APK yang protokolnya sudah dibedah (free-reels, drama-XX, ...)
-/// implement interface ini. Home (mobile + TV) tidak perlu tahu
+/// implement interface ini. Home (mobile + TV) dan Player tidak perlu tahu
 /// detail protokol tiap sumber — cukup panggil lewat registry.
 abstract class DramaSource {
   /// Slug unik sumber, mis. 'freereels'. Dipakai sebagai `platform`.
@@ -19,6 +20,15 @@ abstract class DramaSource {
 
   /// Ambil daftar konten satu kategori.
   Future<List<ContentItem>> homeByCategory(String category);
+
+  /// Ambil daftar episode satu series.
+  Future<List<LiveGoEpisode>> episodes(String seriesId);
+
+  /// Ambil stream URL satu episode.
+  Future<String> streamUrl({
+    required String seriesId,
+    required String episodeId,
+  });
 }
 
 /// Registry semua sumber drama.
