@@ -2,6 +2,7 @@ import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../../models/stream_info.dart';
 import '../../services/cache/livego_content_cache.dart';
+import '../../services/drama_source.dart';
 import '../../services/player/playback_resolver.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/api_timeout_policy.dart';
@@ -55,11 +56,22 @@ class LiveGoCatalogDetailPlayerService {
     // from the active LiveGo source so the player sheet shows all episodes again.
     if (cached != null && cached.length > 1) return cached;
 
-    final rows = await LiveGoApiManager.fetchEpisodes(
-      item: item,
-      request: () => LiveGoApiProviderRegistry.providerFor(item.platformSlug).episodes(item),
-      fallback: cached ?? const <LiveGoEpisode>[],
-    );
+    final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
+    final List<LiveGoEpisode> rows;
+    if (dramaSource != null) {
+      // Sumber drama eksternal (multi-APK): episode via registry.
+      try {
+        rows = await dramaSource.episodes(item.id);
+      } catch (_) {
+        rows = const <LiveGoEpisode>[];
+      }
+    } else {
+      rows = await LiveGoApiManager.fetchEpisodes(
+        item: item,
+        request: () => LiveGoApiProviderRegistry.providerFor(item.platformSlug).episodes(item),
+        fallback: cached ?? const <LiveGoEpisode>[],
+      );
+    }
     if (rows.length > 1) {
       await LiveGoContentCache.writeEpisodes(item, rows);
       return rows;
