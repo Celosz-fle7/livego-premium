@@ -8,6 +8,7 @@ class TvAccountConfig {
   const TvAccountConfig._();
 
   static const int backGuardMs = 420;
+  static const int selectGuardMs = 300;
   static const int visibleMenuRowsWithoutScroll = 3;
 
   static const double topPadding = TvSafeZone.accountTop;

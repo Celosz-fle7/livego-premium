@@ -47,6 +47,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   static const double _topPadding = TvAccountConfig.topPadding;
   static const double _horizontalPadding = TvAccountConfig.horizontalPadding;
   static const double _bottomPadding = TvAccountConfig.bottomPadding;
+  static const double _headerHeight = TvAccountConfig.headerHeight;
+  static const double _afterHeader = TvAccountConfig.afterHeader;
   static const int _gridColumnCount = TvAccountConfig.gridColumnCount;
   static const double _cardHeight = TvAccountConfig.cardHeight;
   static const double _cardGap = TvAccountConfig.cardGap;
