@@ -77,6 +77,39 @@ class FreereelsClient {
     }
   }
 
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    await _session.ensureLogin();
+
+    final cleanPath = path.startsWith(FreereelsConfig.apiPrefix)
+        ? path
+        : '${FreereelsConfig.apiPrefix}$path';
+    final uri = Uri.parse(FreereelsConfig.baseUrl).replace(path: cleanPath);
+
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri).timeout(FreereelsConfig.timeout);
+      _applyHeaders(request.headers);
+      request.headers.set('Content-Type', 'application/json; charset=UTF-8');
+      request.write(jsonEncode(body));
+      final response = await request.close().timeout(FreereelsConfig.timeout);
+      final respBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('FreeReels ${response.statusCode} ${uri.path}: $respBody');
+      }
+      if (respBody.trim().isEmpty) return <String, dynamic>{};
+      final decoded = jsonDecode(respBody);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return <String, dynamic>{'success': true, 'data': decoded};
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   /// GET /homepage/v2/tab/index?tab_key=..&position_index=..
   /// Return list ContentItem (id=key, posterUrl=cover).
   Future<List<ContentItem>> tabFeed({
@@ -148,6 +181,50 @@ class FreereelsClient {
       await Future.delayed(const Duration(milliseconds: 300));
     }
     return all;
+  }
+
+  /// Cari drama: POST /frv2-api/search/drama body {"keyword": q}
+  /// Response: data.items[] (id, name, cover, ...), page_info.next untuk paging.
+  Future<List<ContentItem>> search(
+    String keyword, {
+    String pageToken = '',
+  }) async {
+    final body = <String, dynamic>{'keyword': keyword};
+    if (pageToken.isNotEmpty) {
+      // page_info.next format: "offset=20&page_size=20"
+      for (final part in pageToken.split('&')) {
+        final kv = part.split('=');
+        if (kv.length == 2) body[kv[0]] = kv[1];
+      }
+    }
+    final res = await _postJson('/search/drama', body);
+
+    final code = res['code'];
+    if (code != 200 && code != 0) {
+      throw Exception('FreeReels search code=$code msg=${res['msg']}');
+    }
+
+    final data = res['data'] as Map? ?? {};
+    final items = data['items'] as List? ?? [];
+    final out = <ContentItem>[];
+    for (final item in items) {
+      final m = item as Map;
+      final id = '${m['id'] ?? m['key'] ?? ''}';
+      if (id.isEmpty) continue;
+      out.add(ContentItem(
+        id: id,
+        title: '${m['name'] ?? m['title'] ?? 'No title'}',
+        source: 'freereels',
+        category: 'search',
+        description: '${m['desc'] ?? ''}',
+        posterUrl: '${m['cover'] ?? ''}',
+        backdropUrl: '${m['cover'] ?? ''}',
+        rating: 0.0,
+        episodes: int.tryParse('${m['episode_count'] ?? 0}') ?? 0,
+        platformSlug: 'freereels',
+      ));
+    }
+    return out;
   }
 
   /// Detail series: GET /frv2-api/drama/info_v2?series_id={key}

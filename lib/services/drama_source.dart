@@ -29,6 +29,53 @@ abstract class DramaSource {
     required String seriesId,
     required String episodeId,
   });
+
+  /// Cari konten. Default: tidak didukung (return kosong).
+  Future<List<ContentItem>> search(String query) async => const [];
+
+  /// Info ekstra satu episode (subtitle, kualitas, status unlock).
+  /// Default: tidak ada (return null).
+  Future<DramaEpisodeExtras?> episodeExtras(
+    String seriesId,
+    String episodeId,
+  ) async =>
+      null;
+}
+
+/// Info ekstra satu episode untuk player.
+class DramaEpisodeExtras {
+  final List<DramaSubtitle> subtitles;
+  final List<DramaQuality> qualities;
+  final List<String> audioLanguages;
+  final bool unlocked;
+  final int episodePrice;
+
+  const DramaEpisodeExtras({
+    this.subtitles = const [],
+    this.qualities = const [],
+    this.audioLanguages = const [],
+    this.unlocked = true,
+    this.episodePrice = 0,
+  });
+}
+
+class DramaSubtitle {
+  final String language;
+  final String displayName;
+  final String url;
+
+  const DramaSubtitle({
+    required this.language,
+    required this.displayName,
+    required this.url,
+  });
+}
+
+class DramaQuality {
+  final String label;
+  final String resolution;
+
+  const DramaQuality({required this.label, required this.resolution});
 }
 
 /// Registry semua sumber drama.

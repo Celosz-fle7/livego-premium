@@ -15,6 +15,10 @@ class FreereelsSource implements DramaSource {
   /// Format key: "$seriesId:$episodeId".
   final Map<String, String> _streamCache = {};
 
+  /// Cache data episode mentah untuk extras (subtitle, kualitas, unlock).
+  /// Format key: "$seriesId:$episodeId".
+  final Map<String, Map<String, dynamic>> _episodeCache = {};
+
   @override
   String get slug => 'freereels';
 
@@ -40,6 +44,7 @@ class FreereelsSource implements DramaSource {
       if (id.isEmpty) continue;
       final url = _pickStreamUrl(e);
       if (url.isNotEmpty) _streamCache['$seriesId:$id'] = url;
+      _episodeCache['$seriesId:$id'] = e;
       out.add(LiveGoEpisode(
         id: id,
         index: int.tryParse('${e['index'] ?? 0}') ?? 0,
@@ -69,12 +74,70 @@ class FreereelsSource implements DramaSource {
   }
 
   /// Pilih URL stream terbaik dari item episode.
-  /// Verified: external_audio_h264_m3u8 -> 200 audio/x-mpegurl.
+  /// Verified: external_audio_h264_m3u8 -> 200 audio/x-mpegurl (master playlist).
   String _pickStreamUrl(Map<String, dynamic> e) {
     for (final k in ['external_audio_h264_m3u8', 'm3u8_url', 'external_audio_h265_m3u8']) {
       final v = '${e[k] ?? ''}';
       if (v.isNotEmpty) return v;
     }
     return '';
+  }
+
+  @override
+  Future<List<ContentItem>> search(String query) {
+    return _client.search(query);
+  }
+
+  @override
+  Future<DramaEpisodeExtras?> episodeExtras(
+    String seriesId,
+    String episodeId,
+  ) async {
+    var raw = _episodeCache['$seriesId:$episodeId'];
+    if (raw == null) {
+      // Belum di-cache: ambil episode list dulu.
+      await episodes(seriesId);
+      raw = _episodeCache['$seriesId:$episodeId'];
+    }
+    if (raw == null) return null;
+
+    final subtitles = <DramaSubtitle>[];
+    final subList = raw['subtitle_list'] as List? ?? const [];
+    for (final s in subList) {
+      final m = s as Map;
+      final url = '${m['vtt'] ?? m['subtitle'] ?? ''}';
+      if (url.isEmpty) continue;
+      subtitles.add(DramaSubtitle(
+        language: '${m['language'] ?? ''}',
+        displayName: '${m['display_name'] ?? m['language'] ?? ''}',
+        url: url,
+      ));
+    }
+
+    final qualities = <DramaQuality>[];
+    final res = '${raw['trans_resolution'] ?? ''}';
+    for (final r in res.split(',')) {
+      final t = r.trim();
+      if (t.isEmpty) continue;
+      final h = t.split('x');
+      final label = h.length == 2 ? '${h[1]}p' : t;
+      qualities.add(DramaQuality(label: label, resolution: t));
+    }
+
+    final audioLangs = <String>[];
+    final audio = raw['audio'] as List?;
+    if (audio != null) {
+      for (final a in audio) {
+        audioLangs.add('$a');
+      }
+    }
+
+    return DramaEpisodeExtras(
+      subtitles: subtitles,
+      qualities: qualities,
+      audioLanguages: audioLangs,
+      unlocked: raw['unlock'] != false,
+      episodePrice: int.tryParse('${raw['episode_price'] ?? 0}') ?? 0,
+    );
   }
 }

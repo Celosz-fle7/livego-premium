@@ -68,6 +68,41 @@ class PlaybackResolver {
         );
       }
       final nextIdx = episodes.indexWhere((e) => e.id == episodeId);
+
+      // Extras: subtitle, kualitas, status unlock (jika provider mendukung).
+      List<SubtitleTrack> subtitles = const [];
+      List<StreamQuality> qualities = const [];
+      try {
+        final extras = await source.episodeExtras(item.id, episodeId);
+        if (extras != null) {
+          if (!extras.unlocked) {
+            // Episode terkunci: kembalikan source kosong dengan info harga.
+            return PlaybackSource.empty(
+              platform: source.slug,
+              dramaId: item.id,
+              episodeNumber: ep,
+              videoType: LiveGoVideoType.mp4,
+            );
+          }
+          subtitles = extras.subtitles
+              .map((s) => SubtitleTrack(
+                    language: s.language,
+                    format: 'vtt',
+                    url: s.url,
+                  ))
+              .toList();
+          qualities = extras.qualities
+              .map((q) => StreamQuality(
+                    label: q.label,
+                    url: url,
+                    isDefault: q.label == '720p',
+                  ))
+              .toList();
+        }
+      } catch (_) {
+        // Extras opsional; lanjut tanpa subtitle/kualitas.
+      }
+
       final stream = StreamInfo(
         url: url,
         episodeIndex: ep,
@@ -77,7 +112,8 @@ class PlaybackResolver {
             : '0',
         prevEpisodeId: nextIdx > 0 ? episodes[nextIdx - 1].id : '0',
         headers: const {},
-        subtitles: const [],
+        subtitles: subtitles,
+        qualities: qualities,
       );
       return PlaybackSource.fromStreamInfo(
         stream: stream,

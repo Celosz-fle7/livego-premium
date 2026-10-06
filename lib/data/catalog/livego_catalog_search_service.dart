@@ -1,6 +1,7 @@
 import '../../models/content_item.dart';
 import '../../services/cache/livego_content_cache.dart';
 import '../../services/content/content_health_service.dart';
+import '../../services/drama_source.dart';
 import '../api_manager/api_platform_fallback_router.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/api_timeout_policy.dart';
@@ -13,6 +14,17 @@ class LiveGoCatalogSearchService {
   static Future<List<ContentItem>> search(String query, {String platform = 'melolo'}) async {
     final clean = query.trim();
     if (clean.isEmpty) return [];
+
+    // Sumber drama eksternal (multi-APK): search via registry.
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      try {
+        return await dramaSource.search(clean);
+      } catch (_) {
+        return const <ContentItem>[];
+      }
+    }
+
     final cached = await LiveGoContentCache.readItems(
       platform: platform,
       endpoint: 'search',
