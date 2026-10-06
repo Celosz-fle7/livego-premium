@@ -1,6 +1,7 @@
 package com.livego.premium
 
 import android.app.UiModeManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -175,11 +176,22 @@ class MainActivity : FlutterActivity() {
 
                 "openInstallPermissionSettings" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                            Uri.parse("package:$packageName")
-                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-                        startActivity(intent)
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:$packageName")
+                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            startActivity(intent)
+                        } catch (e: ActivityNotFoundException) {
+                            try {
+                                val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(fallbackIntent)
+                            } catch (ignored: Exception) {
+                            }
+                        } catch (ignored: Exception) {
+                        }
                     }
                     result.success(true)
                 }
