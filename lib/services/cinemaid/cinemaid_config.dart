@@ -6,7 +6,7 @@ class CinemaIdConfig {
   CinemaIdConfig._();
 
   /// Fallback base URL, verified ada di biner APK.
-  static const fallbackBaseUrl = 'http://dg10.tv';
+  static const fallbackBaseUrl = 'kuth.52s7g.com';
 
   /// Path init (tanpa prefix /api, client yang menambahkan).
   static const initPath = '/public/init';
