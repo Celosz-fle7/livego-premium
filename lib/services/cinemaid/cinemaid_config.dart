@@ -22,14 +22,20 @@ class CinemaIdConfig {
   static const categories = <String>[
     'For You',
     'Netflix',
-    'Viu',
-    'WeTV',
     'Vidio',
+    'Vivamax',
     'Prime Video',
     'Hotstar',
+    'WeTV',
+    'Viu',
+    'Apple TV',
+    'Apple TV+',
+    'Sushiroll',
+    'Serial TV',
     'Movie',
     'Drama',
     'Anime',
+    '18+',
   ];
 
   /// Taruh token auth sebagai header DAN query param.
