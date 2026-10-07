@@ -1,3 +1,4 @@
+import 'cinemaid/cinemaid_source.dart';
 import 'freereels/freereels_source.dart';
 
 import '../models/content_item.dart';
@@ -87,6 +88,7 @@ class DramaQuality {
 class DramaSourceRegistry {
   static final Map<String, DramaSource> _sources = {
     'freereels': FreereelsSource(),
+    'cinemaid': CinemaIdSource(),
   };
 
   static void register(DramaSource source) {
