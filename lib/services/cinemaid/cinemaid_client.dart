@@ -3,29 +3,27 @@ import 'dart:io';
 
 import '../../models/content_item.dart';
 import 'cinemaid_config.dart';
+import 'cinemaid_crypto.dart';
 
-/// HTTP client CinemaID — meniru request APK (native Kotlin, ExoPlayer).
-///
-/// - Semua API di bawah {base}/api/... ; base server-driven dari
-///   GET /api/public/init -> data.sys_conf.api_url (fallback http://dg10.tv)
-/// - Request GET dengan query param (gaya ?vod_id= terobservasi di biner)
-/// - Auth: token dari /api/public/login|register, dikirim sebagai
-///   Authorization header DAN query param `token` (lihat CinemaIdConfig)
 class CinemaIdClient {
   String? _baseUrl;
   String? _token;
   bool _initTried = false;
+  final String _deviceId = 'd79148d1c6bebfd5';
 
   String? get token => _token;
   void setToken(String token) => _token = token;
 
   void _applyHeaders(HttpHeaders headers) {
-    headers.set('User-Agent', CinemaIdConfig.userAgent);
-    headers.set('Accept', 'application/json');
-    headers.set('Content-Type', 'application/json; charset=UTF-8');
-    if (CinemaIdConfig.sendTokenAsHeader && _token != null) {
-      headers.set('Authorization', 'Bearer $_token');
-    }
+    final curTime = DateTime.now().millisecondsSinceEpoch.toString();
+    final signed = CinemaIdCrypto.buildHeaders(
+      deviceId: _deviceId,
+      curTime: curTime,
+      token: _token ?? '',
+    );
+    signed.forEach((k, v) {
+      headers.set(k, v);
+    });
   }
 
   /// Pastikan base URL sudah di-resolve via /api/public/init dan handshake portal lokal port 60000.
@@ -34,7 +32,7 @@ class CinemaIdClient {
     try {
       final localClient = HttpClient();
       final localReq = await localClient
-          .getUrl(Uri.parse('http://127.0.0.1:60000/control?msg=verify&device_id=d79148d1c6bebfd5'))
+          .getUrl(Uri.parse('http://127.0.0.1:60000/control?msg=verify&device_id=$_deviceId'))
           .timeout(const Duration(milliseconds: 500));
       final localResp = await localReq.close().timeout(const Duration(milliseconds: 500));
       if (localResp.statusCode == 200) {
@@ -50,7 +48,7 @@ class CinemaIdClient {
     var resolved = _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
     try {
       final uri = Uri.parse('$resolved/api${CinemaIdConfig.initPath}');
-      final res = await _rawGet(uri);
+      final res = await _rawPost(uri, {});
       final sysConf = (res['data'] as Map?)?['sys_conf'] as Map?;
       final apiUrl = '${sysConf?['api_url'] ?? ''}'.trim();
       if (apiUrl.isNotEmpty) resolved = _normalizeUrl(apiUrl);
@@ -72,21 +70,26 @@ class CinemaIdClient {
     return url;
   }
 
-  Future<Map<String, dynamic>> _rawGet(Uri uri) async {
+  Future<Map<String, dynamic>> _rawPost(Uri uri, Map<String, dynamic> form) async {
     final client = HttpClient();
     try {
-      final request = await client.getUrl(uri).timeout(CinemaIdConfig.timeout);
+      final request = await client.postUrl(uri).timeout(CinemaIdConfig.timeout);
       _applyHeaders(request.headers);
+      final encodedBody = form.entries
+          .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent('${e.value}')}')
+          .join('&');
+      request.write(encodedBody);
       final response = await request.close().timeout(CinemaIdConfig.timeout);
-      final body = await response.transform(utf8.decoder).join();
+      final rawBody = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('CinemaID ${response.statusCode} ${uri.path}: $body');
+        throw Exception('CinemaID ${response.statusCode} ${uri.path}: $rawBody');
       }
-      if (body.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'success': true, 'data': decoded};
+      if (rawBody.trim().isEmpty) return <String, dynamic>{};
+      
+      final decrypted = CinemaIdCrypto.decryptResponse(rawBody);
+      if (decrypted is Map<String, dynamic>) return decrypted;
+      if (decrypted is Map) return Map<String, dynamic>.from(decrypted);
+      return <String, dynamic>{'success': true, 'data': decrypted};
     } finally {
       client.close(force: true);
     }
@@ -97,18 +100,13 @@ class CinemaIdClient {
     Map<String, String> query,
   ) async {
     final base = await _base();
-    final params = Map<String, String>.from(query);
-    if (CinemaIdConfig.sendTokenAsQuery && _token != null) {
-      params[CinemaIdConfig.tokenQueryKey] = _token!;
+    final uri = Uri.parse('$base/api$path');
+    final params = Map<String, dynamic>.from(query);
+    if (_token != null && _token!.isNotEmpty) {
+      params['token'] = _token!;
     }
-    final uri = Uri.parse('$base/api$path').replace(
-      queryParameters: params.isEmpty ? null : params,
-    );
-    final res = await _rawGet(uri);
+    final res = await _rawPost(uri, params);
     final code = res['code'];
-    // Wrapper tidak konsisten antar backend drama: 0/1/200 semua berarti
-    // sukses di beberapa API. Hanya throw kalau data kosong DAN code
-    // jelas bukan kode sukses — jangan gagalkan home gara-gara code.
     const okCodes = {0, 1, 200, '0', '1', '200'};
     final codeOk = code == null || okCodes.contains(code);
     if (!codeOk && res['data'] == null) {
@@ -122,31 +120,12 @@ class CinemaIdClient {
     Map<String, dynamic> body,
   ) async {
     final base = await _base();
-    var uri = Uri.parse('$base/api$path');
-    if (CinemaIdConfig.sendTokenAsQuery && _token != null) {
-      uri = uri.replace(queryParameters: {
-        ...uri.queryParameters,
-        CinemaIdConfig.tokenQueryKey: _token!,
-      });
+    final uri = Uri.parse('$base/api$path');
+    final params = Map<String, dynamic>.from(body);
+    if (_token != null && _token!.isNotEmpty) {
+      params['token'] = _token!;
     }
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri).timeout(CinemaIdConfig.timeout);
-      _applyHeaders(request.headers);
-      request.write(jsonEncode(body));
-      final response = await request.close().timeout(CinemaIdConfig.timeout);
-      final respBody = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('CinemaID ${response.statusCode} $path: $respBody');
-      }
-      if (respBody.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(respBody);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'success': true, 'data': decoded};
-    } finally {
-      client.close(force: true);
-    }
+    return _rawPost(uri, params);
   }
 
   ContentItem _toContentItem(Map m, String category) {
