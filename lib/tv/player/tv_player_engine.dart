@@ -5,8 +5,8 @@ import '../../models/content_item.dart';
 
 /// TV player engine selection contract.
 ///
-/// TV starts on the Flutter player by default.
-/// Native ExoPlayer is reserved for explicit overrides or playback fallback.
+/// TV starts on the hardware-accelerated Native ExoPlayer by default
+/// for fast, lightweight, and smooth playback on Android TV chipsets.
 enum PlayerEngineType {
   nativeExo,
   legacyHybrid,
@@ -34,7 +34,7 @@ class TvPlayerEngineConfig {
     defaultValue: '',
   );
 
-  static PlayerEngineType get defaultEngine => PlayerEngineType.flutterFallback;
+  static PlayerEngineType get defaultEngine => PlayerEngineType.nativeExo;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override}) {
     return override ??

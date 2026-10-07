@@ -21,8 +21,8 @@ class TvPlayerEntry {
       episode: episode,
       engine: selected.wireName,
       reason: selected == PlayerEngineType.nativeExo
-          ? 'manual_native_override'
-          : (engine == null ? 'default_flutter' : 'explicit_override'),
+          ? (engine == null ? 'default_native' : 'manual_native_override')
+          : (engine == null ? 'default_fallback' : 'explicit_override'),
     );
     return Navigator.of(context).push(_routeFor(item: item, episode: episode, engine: selected));
   }
