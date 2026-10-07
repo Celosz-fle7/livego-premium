@@ -1,38 +1,17 @@
-/// Konfigurasi statis CinemaID (com.movieph.bj.playvibes).
-///
-/// Base URL server-driven: GET {base}/api/public/init -> data.sys_conf.api_url
-/// (fallback hardcoded ke [fallbackBaseUrl], mirror dari biner APK).
 class CinemaIdConfig {
-  CinemaIdConfig._();
+  const CinemaIdConfig._();
 
-  /// Fallback base URL, verified ada di biner APK.
-  static const fallbackBaseUrl = 'kuth.52s7g.com';
+  static const String baseUrl = 'https://freecinenewph.t62nds.com';
+  static const String cdnBaseUrl = 'http://movieph.xrrqe.com';
 
-  /// Path init (tanpa prefix /api, client yang menambahkan).
-  static const initPath = '/public/init';
+  static const String appId = 'com.movieph.bj.playvibes';
+  static const String version = '50007';
+  static const String versionName = 'V5.0.7';
 
-  static const userAgent =
-      'Mozilla/5.0 (Linux; Android 13; M2010J19CG Build/TKQ1.221114.001) '
-      'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 '
-      'Chrome/120.0.0.0 Mobile Safari/537.36';
+  // Salt & Secret Token dari ekstraksi libvindictus.so
+  static const String secretToken = 'gcAIKnfz';
+  static const String salt1 = 'A21635498FB7F1E13648270050E1346E+com.movieph.bj.playvibes+63';
+  static const String salt2 = 'BE2FB29B23E42031B1900D85E0756B75+com.movieph.bj.playvibes+63';
 
-  static const timeout = Duration(seconds: 15);
-
-  /// Kategori bawaan (sinkron, tanpa network). Nama modul aktual bisa
-  /// beda-beda; homeByCategory mencocokkan dengan module_name dari
-  /// /api/topic/list, kalau tidak ketemu pakai modul pertama.
-  static const categories = <String>[
-    'For You',
-    'Movie',
-    'Drama',
-    'Variety',
-    'Anime',
-  ];
-
-  /// Taruh token auth sebagai header DAN query param.
-  /// Dari static analysis penempatan pastinya tidak jelas;
-  /// mengirim keduanya aman dan kompatibel dengan kedua gaya.
-  static const sendTokenAsHeader = true;
-  static const sendTokenAsQuery = true;
-  static const tokenQueryKey = 'token';
+  static const String userAgent = 'Mozilla/5.0 (Linux; Android 14; com.movieph.bj.playvibes; Mobile)';
 }
