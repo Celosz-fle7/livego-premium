@@ -678,7 +678,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           TvZone.platform,
           _platformIndex,
           scroll: false,
-          controlFocus: _HomeControlFocus.platformHeader,
+          controlFocus: _controlFocus == _HomeControlFocus.platformHeader
+              ? _HomeControlFocus.platformHeader
+              : _HomeControlFocus.platformChip,
         );
         return;
       case TvZone.platform:
@@ -721,15 +723,29 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.platform:
-        if (_controlFocus == _HomeControlFocus.platformHeader || _platformIndex == 0) {
+        if (_controlFocus == _HomeControlFocus.platformHeader) {
           _moveToNav();
+        } else if (_platformIndex == 0) {
+          _setManualZone(
+            TvZone.platform,
+            0,
+            scroll: false,
+            controlFocus: _HomeControlFocus.platformHeader,
+          );
         } else {
           _setManualZone(TvZone.platform, _platformIndex - 1, scroll: false);
         }
         return;
       case TvZone.category:
-        if (_controlFocus == _HomeControlFocus.categoryHeader || _categoryIndex == 0) {
+        if (_controlFocus == _HomeControlFocus.categoryHeader) {
           _moveToNav();
+        } else if (_categoryIndex == 0) {
+          _setManualZone(
+            TvZone.category,
+            0,
+            scroll: false,
+            controlFocus: _HomeControlFocus.categoryHeader,
+          );
         } else {
           _setManualZone(TvZone.category, _categoryIndex - 1, scroll: false);
         }
@@ -795,18 +811,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         _returnToCategoryAnchor();
         return;
       case TvZone.category:
-        if (_controlFocus == _HomeControlFocus.categoryHeader) {
-          _requestExit();
-        } else {
-          _returnToPlatformAnchor();
-        }
+        _returnToPlatformAnchor();
         return;
       case TvZone.platform:
-        if (_controlFocus == _HomeControlFocus.platformHeader) {
-          _requestExit();
-        } else {
-          _returnToBanner();
-        }
+        _returnToBanner();
         return;
       case TvZone.banner:
       default:

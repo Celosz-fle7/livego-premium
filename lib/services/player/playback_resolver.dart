@@ -120,7 +120,7 @@ class PlaybackResolver {
         platform: source.slug,
         dramaId: item.id,
         episodeNumber: ep,
-        videoType: LiveGoVideoType.mp4,
+        videoType: LiveGoVideoType.hls,
         selectedQuality: PlayerPreferences.quality,
         selectedSubtitle:
             PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
@@ -131,7 +131,7 @@ class PlaybackResolver {
         platform: source.slug,
         dramaId: item.id,
         episodeNumber: ep,
-        videoType: LiveGoVideoType.mp4,
+        videoType: LiveGoVideoType.hls,
       );
     }
   }
@@ -162,7 +162,7 @@ class PlaybackResolver {
                 platform: dramaSource.slug,
                 dramaId: item.id,
                 episodeNumber: _episodeNumber(chapterId ?? item.chapterId),
-                videoType: LiveGoVideoType.mp4,
+                videoType: LiveGoVideoType.hls,
               ));
     }
 
