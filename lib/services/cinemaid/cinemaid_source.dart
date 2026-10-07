@@ -45,45 +45,74 @@ class CinemaIdSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
-    final modules = await _client.topicModules();
-
-    // Cari modul yang namanya cocok dengan kategori (case-insensitive).
-    Map<String, dynamic>? picked;
-    final needle = category.toLowerCase();
-    for (final m in modules) {
-      final name = '${m['module_name'] ?? m['name'] ?? ''}'.toLowerCase();
-      if (name.isNotEmpty && (name == needle || name.contains(needle) || needle.contains(name))) {
-        picked = m;
-        break;
-      }
+    List<Map<String, dynamic>> modules = const [];
+    try {
+      modules = await _client.topicModules();
+    } catch (_) {
+      // module gagal / firewall -> fallback ke search
     }
-    // Tidak ketemu -> gabung semua modul.
-    final targets = picked != null ? [picked] : modules;
 
-    final out = <ContentItem>[];
-    final seen = <String>{};
-    for (final m in targets) {
-      final videos = m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
-      if (videos is! List) continue;
-      for (final v in videos) {
-        if (v is! Map) continue;
-        final item = ContentItem(
-          id: '${v['vod_id'] ?? v['id'] ?? ''}',
-          title: '${v['vod_name'] ?? v['title'] ?? v['name'] ?? 'No title'}',
+    if (modules.isNotEmpty) {
+      // Cari modul yang namanya cocok dengan kategori (case-insensitive).
+      Map<String, dynamic>? picked;
+      final needle = category.toLowerCase();
+      for (final m in modules) {
+        final name = '${m['module_name'] ?? m['name'] ?? ''}'.toLowerCase();
+        if (name.isNotEmpty && (name == needle || name.contains(needle) || needle.contains(name))) {
+          picked = m;
+          break;
+        }
+      }
+      final targets = picked != null ? [picked] : modules;
+
+      final out = <ContentItem>[];
+      final seen = <String>{};
+      for (final m in targets) {
+        final videos = m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
+        if (videos is! List) continue;
+        for (final v in videos) {
+          if (v is! Map) continue;
+          final item = ContentItem(
+            id: '${v['vod_id'] ?? v['id'] ?? ''}',
+            title: '${v['vod_name'] ?? v['title'] ?? v['name'] ?? 'No title'}',
+            source: 'cinemaid',
+            category: category,
+            description: '${v['vod_desc'] ?? v['desc'] ?? ''}',
+            posterUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
+            backdropUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
+            rating: double.tryParse('${v['vod_score'] ?? v['rating'] ?? 0}') ?? 0,
+            episodes: int.tryParse('${v['vod_episode'] ?? 0}') ?? 0,
+            platformSlug: 'cinemaid',
+          );
+          if (item.id.isEmpty || !seen.add(item.id)) continue;
+          out.add(item);
+        }
+      }
+      if (out.isNotEmpty) return out;
+    }
+
+    // Jika modul kosong atau kategori streaming provider (Netflix, Viu, WeTV, Vidio, Prime, Hotstar):
+    // Fallback panggil search API menggunakan nama kategori!
+    try {
+      final query = category.toLowerCase() == 'for you' ? '2024' : category;
+      final searchResults = await _client.search(query);
+      if (searchResults.isNotEmpty) {
+        return searchResults.map((e) => ContentItem(
+          id: e.id,
+          title: e.title,
           source: 'cinemaid',
           category: category,
-          description: '${v['vod_desc'] ?? v['desc'] ?? ''}',
-          posterUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
-          backdropUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
-          rating: double.tryParse('${v['vod_score'] ?? v['rating'] ?? 0}') ?? 0,
-          episodes: int.tryParse('${v['vod_episode'] ?? 0}') ?? 0,
+          description: e.description,
+          posterUrl: e.posterUrl,
+          backdropUrl: e.backdropUrl,
+          rating: e.rating,
+          episodes: e.episodes,
           platformSlug: 'cinemaid',
-        );
-        if (item.id.isEmpty || !seen.add(item.id)) continue;
-        out.add(item);
+        )).toList();
       }
-    }
-    return out;
+    } catch (_) {}
+
+    return const [];
   }
 
   @override

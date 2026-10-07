@@ -5,8 +5,8 @@
 class CinemaIdConfig {
   CinemaIdConfig._();
 
-  /// Fallback base URL, verified ada di biner APK.
-  static const fallbackBaseUrl = 'kuth.52s7g.com';
+  /// Fallback base URL aktif (server live).
+  static const fallbackBaseUrl = 'https://freecinenewph.t62nds.com';
 
   /// Path init (tanpa prefix /api, client yang menambahkan).
   static const initPath = '/public/init';
@@ -18,14 +18,17 @@ class CinemaIdConfig {
 
   static const timeout = Duration(seconds: 15);
 
-  /// Kategori bawaan (sinkron, tanpa network). Nama modul aktual bisa
-  /// beda-beda; homeByCategory mencocokkan dengan module_name dari
-  /// /api/topic/list, kalau tidak ketemu pakai modul pertama.
+  /// Kategori bawaan provider streaming populer dan channel CinemaID.
   static const categories = <String>[
     'For You',
+    'Netflix',
+    'Viu',
+    'WeTV',
+    'Vidio',
+    'Prime Video',
+    'Hotstar',
     'Movie',
     'Drama',
-    'Variety',
     'Anime',
   ];
 

@@ -31,25 +31,32 @@ class CinemaIdClient {
   /// Pastikan base URL sudah di-resolve via /api/public/init.
   Future<String> _base() async {
     if (_baseUrl != null) return _baseUrl!;
-    if (_initTried) return CinemaIdConfig.fallbackBaseUrl;
+    if (_initTried) return _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
     _initTried = true;
 
-    var resolved = CinemaIdConfig.fallbackBaseUrl;
+    var resolved = _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
     try {
-      final uri = Uri.parse('${CinemaIdConfig.fallbackBaseUrl}/api${CinemaIdConfig.initPath}');
+      final uri = Uri.parse('$resolved/api${CinemaIdConfig.initPath}');
       final res = await _rawGet(uri);
       final sysConf = (res['data'] as Map?)?['sys_conf'] as Map?;
       final apiUrl = '${sysConf?['api_url'] ?? ''}'.trim();
-      if (apiUrl.isNotEmpty) resolved = apiUrl;
+      if (apiUrl.isNotEmpty) resolved = _normalizeUrl(apiUrl);
       final apiUrl2 = '${sysConf?['api_url2'] ?? ''}'.trim();
-      if (resolved == CinemaIdConfig.fallbackBaseUrl && apiUrl2.isNotEmpty) {
-        resolved = apiUrl2;
+      if (resolved == _normalizeUrl(CinemaIdConfig.fallbackBaseUrl) && apiUrl2.isNotEmpty) {
+        resolved = _normalizeUrl(apiUrl2);
       }
     } catch (_) {
       // init gagal -> pakai fallback hardcoded, tanpa retry
     }
     _baseUrl = resolved;
     return resolved;
+  }
+
+  String _normalizeUrl(String url) {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return 'https://$url';
+    }
+    return url;
   }
 
   Future<Map<String, dynamic>> _rawGet(Uri uri) async {
