@@ -60,7 +60,7 @@ class LiveGoApiPlatforms {
     ),
   ];
 
-  static const List<String> tvStarterSlugs = <String>['freereels'];
+  static const List<String> tvStarterSlugs = <String>['freereels', 'cinemaid'];
 
   static List<String> get supportedSlugs =>
       List<String>.unmodifiable(tvStarterSlugs);

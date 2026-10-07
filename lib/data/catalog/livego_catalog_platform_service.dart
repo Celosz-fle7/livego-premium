@@ -50,8 +50,11 @@ class LiveGoCatalogPlatformService {
   static String languageFor(String platform) =>
       LiveGoSettings.languageForPlatform(platform);
 
-  static String backendLabel(String platform) =>
-      LiveGoApiPlatforms.backendLabel(platform);
+  static String backendLabel(String platform) {
+    // Sumber drama eksternal dikelompokkan di bawah header sendiri.
+    if (DramaSourceRegistry.handles(platform)) return 'DRAMA';
+    return LiveGoApiPlatforms.backendLabel(platform);
+  }
 
   static bool isDobdaPlatform(String platform) =>
       LiveGoApiPlatforms.bySlug(platform).isDobda;
@@ -97,6 +100,10 @@ class LiveGoCatalogPlatformService {
   }
 
   static Future<String> pingPlatform(String platform) async {
+    // Sumber drama eksternal tidak lewat gateway API — jangan ping pakai
+    // config platform lain (bySlug fallback). Status unknown sampai ada
+    // mekanisme ping khusus DramaSource.
+    if (DramaSourceRegistry.handles(platform)) return 'unknown';
     return LiveGoApiManager.runStatus(
       platform: platform,
       operation: 'ping',
@@ -107,6 +114,9 @@ class LiveGoCatalogPlatformService {
   }
 
   static String label(String slug) {
+    // Sumber drama eksternal: pakai label dari registry.
+    final dramaSource = DramaSourceRegistry.forSlug(slug);
+    if (dramaSource != null) return dramaSource.label;
     final config = LiveGoApiPlatforms.bySlugOrNull(slug);
     if (config != null) return config.name;
     return slug
