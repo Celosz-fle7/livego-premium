@@ -28,8 +28,21 @@ class CinemaIdClient {
     }
   }
 
-  /// Pastikan base URL sudah di-resolve via /api/public/init.
+  /// Pastikan base URL sudah di-resolve via /api/public/init dan handshake portal lokal port 60000.
   Future<String> _base() async {
+    // 1. Coba handshake dengan portal lokal libvindictus di 127.0.0.1:60000 jika aplikasi CinemaID aktif
+    try {
+      final localClient = HttpClient();
+      final localReq = await localClient
+          .getUrl(Uri.parse('http://127.0.0.1:60000/control?msg=verify&device_id=d79148d1c6bebfd5'))
+          .timeout(const Duration(milliseconds: 500));
+      final localResp = await localReq.close().timeout(const Duration(milliseconds: 500));
+      if (localResp.statusCode == 200) {
+        // Portal lokal aktif
+      }
+      localClient.close(force: true);
+    } catch (_) {}
+
     if (_baseUrl != null) return _baseUrl!;
     if (_initTried) return _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
     _initTried = true;
