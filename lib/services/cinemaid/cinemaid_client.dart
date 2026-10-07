@@ -86,8 +86,12 @@ class CinemaIdClient {
     );
     final res = await _rawGet(uri);
     final code = res['code'];
-    // Beberapa backend pakai code 200, beberapa 0, beberapa tidak ada field.
-    if (code != null && code != 200 && code != 0 && code != '200' && code != '0') {
+    // Wrapper tidak konsisten antar backend drama: 0/1/200 semua berarti
+    // sukses di beberapa API. Hanya throw kalau data kosong DAN code
+    // jelas bukan kode sukses — jangan gagalkan home gara-gara code.
+    const okCodes = {0, 1, 200, '0', '1', '200'};
+    final codeOk = code == null || okCodes.contains(code);
+    if (!codeOk && res['data'] == null) {
       throw Exception('CinemaID code=$code msg=${res['msg'] ?? res['message']} path=$path');
     }
     return res;
@@ -153,7 +157,13 @@ class CinemaIdClient {
   Future<List<Map<String, dynamic>>> topicModules() async {
     final res = await _getJson('/topic/list', const {});
     final data = res['data'];
-    final list = data is Map ? _asMaps(data['block_list']) : const <Map>[];
+    final list = data is Map
+        ? _asMaps(data['block_list'] ??
+            data['list'] ??
+            data['items'] ??
+            data['modules'] ??
+            data['data'])
+        : _asMaps(data);
     return list.map((m) => Map<String, dynamic>.from(m)).toList();
   }
 
@@ -229,7 +239,10 @@ class CinemaIdClient {
     });
     final data = res['data'] as Map? ?? {};
     final info = (data['vod'] ?? data['info'] ?? {}) as Map? ?? {};
-    final episodes = _asMaps(data['vod_collection'])
+    final episodes = _asMaps(data['vod_collection'] ??
+            data['episode_list'] ??
+            data['episodes'] ??
+            data['list'])
         .map((m) => Map<String, dynamic>.from(m))
         .toList();
     return {
