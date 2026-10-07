@@ -1,5 +1,6 @@
 import 'cinemaid/cinemaid_source.dart';
 import 'freereels/freereels_source.dart';
+import 'melolo/melolo_source.dart';
 
 import '../models/content_item.dart';
 import '../models/livego_episode.dart';
@@ -89,6 +90,7 @@ class DramaSourceRegistry {
   static final Map<String, DramaSource> _sources = {
     'freereels': FreereelsSource(),
     'cinemaid': CinemaIdSource(),
+    'melolo': MeloloSource(),
   };
 
   static void register(DramaSource source) {
