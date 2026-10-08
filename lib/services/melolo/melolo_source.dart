@@ -14,7 +14,9 @@ import 'melolo_config.dart';
 /// - Episode: POST /novel/player/video_detail/v1/ {series_id}
 ///   -> episode_list[] (fallback: multi_video_detail)
 /// - Stream: POST /novel/player/video_model/v1/ {series_id, video_id}
-///   -> main_url = stream langsung per episode (fallback: multi_video_model)
+///   -> data.videoModel -> VideoInfo{ main_url (direct), backup_url_1..3
+///   (Base64-decode), file_id, file_hash } — blueprint bytecode 2026-10-08.
+///   Prioritas: main_url dulu, lalu backup_urls[] yang sudah di-decode.
 /// - Search: GET /i18n_novel/search/page/v1/ {keyword}
 /// - Kategori: GET /i18n_novel/bookmall/tab/v1/ (tab bawaan sinkron di config)
 /// - Subtitle: sub_title_list / series_sub_title_list (dukungan app-level,
@@ -124,16 +126,20 @@ class MeloloSource implements DramaSource {
     throw Exception('Melolo: stream URL tidak ditemukan ($seriesId/$episodeId)');
   }
 
-  /// main_url = stream langsung per episode (pola mirip FreeReels/CinemaID).
+  /// main_url = direct string (TANPA decode); backup_url_1..3 sudah
+  /// di-Base64-decode di client menjadi backup_urls[]
+  /// (blueprint bytecode 2026-10-08).
   String _pickStreamUrl(Map<String, dynamic> m) {
-    for (final k in [
-      'main_url',
-      'play_url',
-      'video_url',
-      'url',
-      'm3u8_url',
-      'stream_url'
-    ]) {
+    final main = '${m['main_url'] ?? ''}';
+    if (main.isNotEmpty && main.startsWith('http')) return main;
+    final backups = m['backup_urls'];
+    if (backups is List) {
+      for (final b in backups) {
+        final s = '$b';
+        if (s.startsWith('http')) return s;
+      }
+    }
+    for (final k in ['play_url', 'video_url', 'url', 'm3u8_url', 'stream_url']) {
       final v = '${m[k] ?? ''}';
       if (v.isNotEmpty && v.startsWith('http')) return v;
     }

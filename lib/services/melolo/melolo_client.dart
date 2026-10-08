@@ -302,33 +302,87 @@ class MeloloClient {
     };
   }
 
-  /// POST /novel/player/video_model/v1/ -> playinfo satu episode (main_url).
+  /// POST /novel/player/video_model/v1/ -> playinfo satu episode.
   ///
-  /// Return map playinfo mentah (atau kosong kalau gagal).
+  /// Struktur TERKONFIRMASI (blueprint bytecode 2026-10-08):
+  ///   response.data.videoModel -> VideoInfo{ main_url (direct string),
+  ///   backup_url_1..3 (Base64-encoded), file_id, file_hash }
+  ///   response.data juga bawa: authorization, expireTime, playAuthToken,
+  ///   videoWidth, videoHeight.
+  /// Return map ternormalisasi (atau kosong kalau gagal).
   Future<Map<String, dynamic>> videoModel(
       String seriesId, String videoId) async {
     final fields = <String, String>{
       'series_id': seriesId,
       'video_id': videoId,
     };
+    Map<String, dynamic> data = const {};
     try {
-      final data = _dataOf('video_model',
+      data = _dataOf('video_model',
           await _postForm(MeloloConfig.videoModelPath, fields));
-      final model = (data['video_model'] ??
-          data['model'] ??
-          data['play_info'] ??
-          data) as Map? ??
-          {};
-      return Map<String, dynamic>.from(model);
     } catch (_) {}
-    // Varian multi sebagai fallback.
+    if (data.isEmpty) {
+      // Varian multi sebagai fallback.
+      try {
+        data = _dataOf('multi_video_model',
+            await _postForm(MeloloConfig.multiVideoModelPath, fields));
+      } catch (_) {}
+    }
+    if (data.isEmpty) return const {};
+    return _normalizeVideoModel(data);
+  }
+
+  /// Normalisasi data.videoModel sesuai blueprint:
+  /// main_url = direct string; backup_url_1..3 di-Base64-decode -> backup_urls[].
+  Map<String, dynamic> _normalizeVideoModel(Map<String, dynamic> data) {
+    final rawVm = data['videoModel'] ??
+        data['video_model'] ??
+        data['model'] ??
+        data['play_info'] ??
+        data;
+    final Map<String, dynamic> vm = rawVm is Map<String, dynamic>
+        ? rawVm
+        : rawVm is Map
+            ? Map<String, dynamic>.from(rawVm)
+            : <String, dynamic>{};
+    final out = Map<String, dynamic>.from(vm);
+
+    final backups = <String>[];
+    void addBackup(Object? v) {
+      final s = '$v'.trim();
+      if (s.isEmpty || s == 'null') return;
+      final dec = _tryBase64(s);
+      final url = dec.isNotEmpty ? dec : s;
+      if (url.startsWith('http') && !backups.contains(url)) backups.add(url);
+    }
+
+    addBackup(vm['backup_url_1']);
+    addBackup(vm['backup_url_2']);
+    addBackup(vm['backup_url_3']);
+    addBackup(vm['backup_url']);
+    out['backup_urls'] = backups;
+
+    // Metadata level data (kalau belum ada di videoModel).
+    out['expire_time'] ??= data['expireTime'] ?? data['expire_time'];
+    out['play_auth_token'] ??= data['playAuthToken'] ?? data['play_auth_token'];
+    out['video_width'] ??= data['videoWidth'] ?? data['video_width'];
+    out['video_height'] ??= data['videoHeight'] ?? data['video_height'];
+    out['authorization'] ??= data['authorization'];
+    return out;
+  }
+
+  /// Base64 decode toleran (URL-safe + padding otomatis). '' kalau gagal.
+  String _tryBase64(String s) {
     try {
-      final data = _dataOf('multi_video_model',
-          await _postForm(MeloloConfig.multiVideoModelPath, fields));
-      final model = (data['video_model'] ?? data['model'] ?? data) as Map? ??
-          {};
-      return Map<String, dynamic>.from(model);
-    } catch (_) {}
-    return const {};
+      var t = s
+          .replaceAll('-', '+')
+          .replaceAll('_', '/')
+          .replaceAll(RegExp(r'\s'), '');
+      final mod = t.length % 4;
+      if (mod != 0) t += '=' * (4 - mod);
+      return utf8.decode(base64.decode(t));
+    } catch (_) {
+      return '';
+    }
   }
 }
