@@ -17,7 +17,14 @@ import 'melolo_config.dart';
 ///   -> data.videoModel -> VideoInfo{ main_url (direct), backup_url_1..3
 ///   (Base64-decode), file_id, file_hash } — blueprint bytecode 2026-10-08.
 ///   Prioritas: main_url dulu, lalu backup_urls[] yang sudah di-decode.
-/// - Search: GET /i18n_novel/search/page/v1/ {keyword}
+/// - Search: GET /i18n_novel/search/page/v1/ {query} (param `query`
+///   terverifikasi live via echo query_word)
+/// - BATASAN SERVER (terverifikasi live 2026-10-08): endpoint discovery
+///   (bookmall/tab -> BOOKMALL_RISK_CONTROL_ERROR 1050007, search ->
+///   code 0 tapi search_data kosong, homepage -> 4000 butuh user_id)
+///   di-gate risk control ByteDance untuk request unsigned (tanpa
+///   X-Argus/device identity valid). Jalur playback (video_detail/
+///   video_model) TIDAK di-gate — bekerja tanpa signing.
 /// - Kategori: GET /i18n_novel/bookmall/tab/v1/ (tab bawaan sinkron di config)
 /// - Subtitle: sub_title_list / series_sub_title_list (dukungan app-level,
 ///   key ada di dex — API kemungkinan mengembalikan)

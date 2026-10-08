@@ -182,8 +182,18 @@ class MeloloClient {
   String _short(String s) => s.length > 160 ? '${s.substring(0, 160)}...' : s;
 
   /// Ambil data efektif: {code, data} -> data; atau map langsung.
-  /// Throw kalau code jelas error (mis. 123 = invalid aid).
+  /// Juga tangani wrapper BaseResp{StatusCode, StatusMessage} (player API).
+  /// Throw kalau code jelas error (mis. 123 = invalid aid,
+  /// 1050007 = risk control, 101001 = series tidak ada).
   Map<String, dynamic> _dataOf(String path, Map<String, dynamic> res) {
+    final baseResp = res['BaseResp'];
+    if (baseResp is Map) {
+      final sc = int.tryParse('${baseResp['StatusCode']}');
+      if (sc != null && sc != 0) {
+        throw Exception('Melolo BaseResp=$sc '
+            'msg=${baseResp['StatusMessage'] ?? res['message']} path=$path');
+      }
+    }
     final code = res['code'];
     if (code != null) {
       final c = int.tryParse('$code');
@@ -260,10 +270,11 @@ class MeloloClient {
         data['cell_list'] ?? data['list'] ?? data['items'], category);
   }
 
-  /// GET /i18n_novel/search/page/v1/ {keyword} -> hasil pencarian.
+  /// GET /i18n_novel/search/page/v1/ {query} -> hasil pencarian.
+  /// Nama param terverifikasi live: `query` (server echo query_word).
   Future<List<ContentItem>> searchPage(String keyword) async {
     final data = _dataOf('search',
-        await _get(MeloloConfig.searchPagePath, {'keyword': keyword}));
+        await _get(MeloloConfig.searchPagePath, {'query': keyword}));
     return _itemsFrom(
         data['list'] ?? data['items'] ?? data['results'], 'search');
   }
