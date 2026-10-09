@@ -117,6 +117,28 @@ class _PosterCardState extends State<PosterCard> {
                         height: 1.1,
                       ),
                     ),
+                    // Genre tags dari server (maks 2, seperti APK asli).
+                    if (widget.item.tags.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: widget.item.tags.take(2).map((t) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            t,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
+                          ),
+                        )).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),

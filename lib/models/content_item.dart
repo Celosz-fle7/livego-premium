@@ -12,6 +12,7 @@ class ContentItem {
   final String platformSlug;
   final String chapterId;
   final String lang;
+  final List<String> tags;
 
   const ContentItem({
     required this.id,
@@ -27,6 +28,7 @@ class ContentItem {
     this.platformSlug = 'shortmax',
     this.chapterId = '1',
     this.lang = 'id',
+    this.tags = const [],
   });
 
   factory ContentItem.fromApi(
@@ -80,7 +82,22 @@ class ContentItem {
       platformSlug: platformSlug,
       chapterId: '1',
       lang: lang,
+      tags: extractTags(json),
     );
+  }
+
+  /// Ekstrak tags dari berbagai kemungkinan field API.
+  static List<String> extractTags(Map<String, dynamic> json) {
+    for (final key in ['tags', 'labels', 'genres', 'tag_list', 'label_list']) {
+      final v = json[key];
+      if (v is List) {
+        return v.map((e) => '$e'.trim()).where((s) => s.isNotEmpty).toList();
+      }
+      if (v is String && v.trim().isNotEmpty) {
+        return v.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList();
+      }
+    }
+    return const [];
   }
 
   static String _firstString(Map<String, dynamic> json, List<String> keys) {

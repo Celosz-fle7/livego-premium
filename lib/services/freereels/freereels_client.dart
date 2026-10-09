@@ -147,6 +147,7 @@ class FreereelsClient {
           episodes: 1,
           platformSlug: 'freereels',
           lang: 'id',
+          tags: ContentItem.extractTags(m),
         ));
       }
     }
@@ -222,6 +223,7 @@ class FreereelsClient {
         rating: 0.0,
         episodes: int.tryParse('${m['episode_count'] ?? 0}') ?? 0,
         platformSlug: 'freereels',
+        tags: ContentItem.extractTags(m),
       ));
     }
     return out;
