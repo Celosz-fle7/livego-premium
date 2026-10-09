@@ -26,19 +26,10 @@ class FreereelsSource implements DramaSource {
   String get label => 'FreeReels';
 
   @override
-  List<String> get categories => [
-        ...FreereelsConfig.tabKeys.keys,
-        ...FreereelsConfig.genreTags.keys,
-      ];
+  List<String> get categories => FreereelsConfig.tabKeys.keys.toList(growable: false);
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) {
-    // Genre tag → pakai search endpoint dengan keyword Inggris.
-    final tagKeyword = FreereelsConfig.genreTags[category];
-    if (tagKeyword != null) {
-      return _client.search(tagKeyword);
-    }
-    // Tab bawaan → pakai tab feed seperti biasa.
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
     return _client.tabFeed(tabKey: tabKey, category: category);

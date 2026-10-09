@@ -40,27 +40,4 @@ class FreereelsConfig {
     'Male': '506',
     'Anime': '547',
   };
-
-  /// Genre tags dari layar preferensi APK (untuk discovery via search).
-  /// Key = label Indonesia (tampil di UI), value = keyword Inggris (untuk API).
-  static const Map<String, String> genreTags = {
-    'Balas Dendam': 'revenge',
-    'Identitas Rahasia': 'secret identity',
-    'Identitas Salah': 'mistaken identity',
-    'Pengkhianatan': 'betrayal',
-    'Serangan Balik': 'counterattack',
-    'Cinta Satu Malam': 'one night',
-    'Terlahir Kembali': 'rebirth',
-    'Fantasi': 'fantasy',
-    'Misteri': 'mystery',
-    'Romansa': 'romance',
-    'Sci-Fi': 'sci-fi',
-    'Perkotaan': 'urban',
-    'Sejarah Alternatif': 'alternate history',
-    'Drama': 'drama',
-    'Drama Keluarga': 'family drama',
-    'Keluarga': 'family',
-    'Wanita Kuat': 'strong female',
-    'Romansa Manis': 'sweet romance',
-  };
 }
