@@ -158,7 +158,7 @@ class FreereelsClient {
   Future<List<ContentItem>> allSeriesFromTab({
     required String tabKey,
     required String category,
-    int maxPages = 50,
+    int maxPages = 20,
   }) async {
     final seen = <String>{};
     final all = <ContentItem>[];

@@ -32,7 +32,8 @@ class FreereelsSource implements DramaSource {
   Future<List<ContentItem>> homeByCategory(String category) {
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
-    return _client.tabFeed(tabKey: tabKey, category: category);
+    // Ambil semua halaman (paginasi) agar konten ratusan, bukan cuma 10.
+    return _client.allSeriesFromTab(tabKey: tabKey, category: category);
   }
 
   @override
