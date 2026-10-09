@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
+import '../../services/freereels/freereels_config.dart';
 import '../../shared/widgets/poster_card.dart';
 import '../mobile_player_entry.dart';
 
@@ -109,6 +110,26 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
               }),
             ],
           ),
+        ),
+        const SizedBox(height: 20),
+        // Genre tags FreeReels — tap untuk quick search.
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Genre', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: FreereelsConfig.genreTags.entries.map((e) {
+            return ActionChip(
+              label: Text(e.key, style: const TextStyle(fontSize: 12)),
+              onPressed: () {
+                _controller.text = e.key;
+                _search(e.value);
+              },
+            );
+          }).toList(),
         ),
         const SizedBox(height: 20),
         if (loading)

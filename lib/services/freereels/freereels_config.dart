@@ -22,8 +22,8 @@ class FreereelsConfig {
 
   // === Device spoof — meniru script Python (JANGAN DIRUBAH) ===
   static const String device = 'android';
-  static const String language = 'en';
-  static const String country = 'US';
+  static const String language = 'id';
+  static const String country = 'ID';
   static const String deviceModel = 'Pixel 6';
   static const String screenWidth = '1080';
   static const String screenHeight = '2400';
@@ -39,5 +39,26 @@ class FreereelsConfig {
     'Female': '504',
     'Male': '506',
     'Anime': '547',
+  };
+
+  /// Genre tags dari APK untuk quick search (bukan kategori utama).
+  /// Key = label Indonesia, value = keyword untuk search API.
+  static const Map<String, String> genreTags = {
+    'Balas Dendam': 'revenge',
+    'Identitas Rahasia': 'secret identity',
+    'Pengkhianatan': 'betrayal',
+    'Serangan Balik': 'counterattack',
+    'Cinta Satu Malam': 'one night love',
+    'Terlahir Kembali': 'rebirth',
+    'Fantasi': 'fantasy',
+    'Misteri': 'mystery',
+    'Romansa': 'romance',
+    'Sci-Fi': 'sci-fi',
+    'Perkotaan': 'urban',
+    'Drama': 'drama',
+    'Drama Keluarga': 'family drama',
+    'Keluarga': 'family',
+    'Wanita Kuat': 'strong female',
+    'Romansa Manis': 'sweet romance',
   };
 }
