@@ -87,7 +87,7 @@ class ContentItem {
   }
 
   /// Ekstrak tags dari berbagai kemungkinan field API.
-  static List<String> extractTags(Map<String, dynamic> json) {
+  static List<String> extractTags(Map json) {
     for (final key in ['tags', 'labels', 'genres', 'tag_list', 'label_list']) {
       final v = json[key];
       if (v is List) {
