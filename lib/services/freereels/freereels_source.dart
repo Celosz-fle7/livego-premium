@@ -29,11 +29,24 @@ class FreereelsSource implements DramaSource {
   List<String> get categories => FreereelsConfig.tabKeys.keys.toList(growable: false);
 
   @override
-  Future<List<ContentItem>> homeByCategory(String category) {
+  Future<List<ContentItem>> homeByCategory(String category) async {
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
-    // Ambil semua halaman (paginasi) agar konten ratusan, bukan cuma 10.
-    return _client.allSeriesFromTab(tabKey: tabKey, category: category);
+    // Ambil semua halaman (paginasi) agar konten maksimal per tab.
+    final items = await _client.allSeriesFromTab(tabKey: tabKey, category: category);
+
+    // Workaround: tab Dubbing & New di API cuma 10 item unik.
+    // Tambah hasil search agar lebih banyak.
+    if (category == 'Dubbing') {
+      try {
+        final searchItems = await _client.search('sulih suara');
+        final seen = items.map((e) => e.id).toSet();
+        for (final s in searchItems) {
+          if (seen.add(s.id)) items.add(s);
+        }
+      } catch (_) {}
+    }
+    return items;
   }
 
   @override
