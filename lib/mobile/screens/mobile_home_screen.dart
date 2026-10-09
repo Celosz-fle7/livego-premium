@@ -155,7 +155,6 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
               const SizedBox(height: 9),
               _OneLineSelector(
                 title: 'Kategori',
-                maxVisible: 4,
                 items: categories,
                 selected: category,
                 onSelected: (v) {
@@ -317,7 +316,8 @@ class _OneLineSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = items.take(maxVisible).toList();
+    // Tampilkan SEMUA kategori dengan horizontal scroll (tidak dibatasi maxVisible).
+    final shown = items.toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
@@ -331,17 +331,19 @@ class _OneLineSelector extends StatelessWidget {
         children: [
           Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
           const SizedBox(height: 8),
-          Row(
-            children: List.generate(shown.length, (i) {
-              final active = i == selected;
-              return Expanded(
-                child: Padding(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(shown.length, (i) {
+                final active = i == selected;
+                return Padding(
                   padding: EdgeInsets.only(right: i == shown.length - 1 ? 0 : 5),
                   child: GestureDetector(
                     onTap: () => onSelected(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       height: 34,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
@@ -358,9 +360,9 @@ class _OneLineSelector extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ],
       ),

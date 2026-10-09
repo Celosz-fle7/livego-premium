@@ -9,7 +9,7 @@ import '../api_manager/livego_api_manager.dart';
 class LiveGoCatalogPlatformService {
   const LiveGoCatalogPlatformService._();
 
-  static const int maxVisibleCategories = 4;
+  // Batas kategori dihapus — tampilkan semua kategori yang tersedia.
 
   static final Map<String, List<String>> _categoryCache = <String, List<String>>{};
 
@@ -37,8 +37,8 @@ class LiveGoCatalogPlatformService {
     }
     final config = LiveGoApiPlatforms.bySlug(platform);
     final cached = _categoryCache[config.slug];
-    if (cached != null && cached.isNotEmpty) return cached.take(maxVisibleCategories).toList(growable: false);
-    return LiveGoSettings.categoriesFor(config.slug).take(maxVisibleCategories).toList(growable: false);
+    if (cached != null && cached.isNotEmpty) return cached.toList(growable: false);
+    return LiveGoSettings.categoriesFor(config.slug).toList(growable: false);
   }
 
   static List<String> availableCategoriesFor(String platform) =>
@@ -64,7 +64,7 @@ class LiveGoCatalogPlatformService {
     if (DramaSourceRegistry.handles(platform)) return categoriesFor(platform);
     final config = LiveGoApiPlatforms.bySlug(platform);
     final cached = _categoryCache[config.slug];
-    if (cached != null && cached.isNotEmpty) return cached.take(maxVisibleCategories).toList(growable: false);
+    if (cached != null && cached.isNotEmpty) return cached.toList(growable: false);
 
     try {
       final remote = await LiveGoApiGateway.categories(
@@ -76,7 +76,7 @@ class LiveGoCatalogPlatformService {
         if (remoteConfig == null) continue;
         final normalized = LiveGoApiPlatforms.normalizeCategoriesFor(remoteConfig.slug, entry.value);
         if (normalized.isNotEmpty) {
-          _categoryCache[remoteConfig.slug] = normalized.take(maxVisibleCategories).toList(growable: false);
+          _categoryCache[remoteConfig.slug] = normalized.toList(growable: false);
           LiveGoSettings.setCategoriesFor(remoteConfig.slug, normalized);
         }
       }
@@ -84,7 +84,7 @@ class LiveGoCatalogPlatformService {
       if (selected != null && selected.isNotEmpty) {
         final normalized = LiveGoApiPlatforms.normalizeCategoriesFor(config.slug, selected);
         if (normalized.isNotEmpty) {
-          _categoryCache[config.slug] = normalized.take(maxVisibleCategories).toList(growable: false);
+          _categoryCache[config.slug] = normalized.toList(growable: false);
           LiveGoSettings.setCategoriesFor(config.slug, normalized);
           return _categoryCache[config.slug]!;
         }
@@ -93,7 +93,7 @@ class LiveGoCatalogPlatformService {
       print('LIVEGO CATEGORY FETCH FALLBACK ${config.slug}: $e');
     }
 
-    final fallback = LiveGoApiPlatforms.categoriesFor(config.slug).take(maxVisibleCategories).toList(growable: false);
+    final fallback = LiveGoApiPlatforms.categoriesFor(config.slug).toList(growable: false);
     _categoryCache[config.slug] = fallback;
     LiveGoSettings.setCategoriesFor(config.slug, fallback);
     return fallback;
