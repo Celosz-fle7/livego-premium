@@ -5,6 +5,7 @@ import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'melolo_config.dart';
+import 'melolo_stream_proxy.dart';
 
 /// HTTP Client untuk Melolo API (https://api.tmtreader.com).
 /// Meniru permintaan jaringan resmi Melolo untuk discovery, episode, dan pemutaran stream.
@@ -262,10 +263,30 @@ class MeloloClient {
 
     if (selectedQuality != null) {
       final rawMainUrl = '${selectedQuality['main_url'] ?? selectedQuality['backup_url_1'] ?? ''}';
+      final spadeA = '${selectedQuality['spade_a'] ?? vm['spade_a'] ?? ''}';
+
       if (rawMainUrl.isNotEmpty) {
-        final decoded = _tryBase64Decode(rawMainUrl);
-        if (decoded.startsWith('http')) return decoded;
-        if (rawMainUrl.startsWith('http')) return rawMainUrl;
+        var videoUrl = _tryBase64Decode(rawMainUrl);
+        if (!videoUrl.startsWith('http')) {
+          videoUrl = rawMainUrl;
+        }
+
+        if (videoUrl.startsWith('http')) {
+          if (spadeA.isNotEmpty) {
+            try {
+              return await MeloloStreamProxy.instance.prepareStreamUrl(
+                seriesId: seriesId,
+                episodeId: episodeId,
+                rawVideoUrl: videoUrl,
+                spadeA: spadeA,
+              );
+            } catch (e) {
+              // Jika proxy gagal, kembalikan URL langsung sebagai fallback
+              return videoUrl;
+            }
+          }
+          return videoUrl;
+        }
       }
     }
 

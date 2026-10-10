@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:livego_premium/services/api/api_platform.dart';
 import 'package:livego_premium/services/drama_source.dart';
+import 'package:livego_premium/services/melolo/melolo_cenc_decryptor.dart';
 import 'package:livego_premium/services/melolo/melolo_config.dart';
 import 'package:livego_premium/services/melolo/melolo_source.dart';
 
@@ -41,6 +42,15 @@ void main() {
       expect(platform.name, 'Melolo');
       expect(platform.categories, contains('Romance'));
       expect(platform.categories, contains('Billionaire'));
+    });
+
+    test('MeloloCencDecryptor extracts spade_a key accurately', () {
+      const spadeA = 'kLwex2WOH95OlwLZe5EH3kqlB9h6pCvpVZAF7HinBulNowWXlw==';
+      final key = MeloloCencDecryptor.extractKeyFromSpadeA(spadeA);
+      expect(key, isNotNull);
+      expect(key!.length, 16);
+      final hexKey = key.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      expect(hexKey, '5ed3c99357a1d74e6fee95eb8dd3e514');
     });
   });
 }
