@@ -148,6 +148,34 @@ class MeloloClient {
             ) ??
             1;
 
+        // Ekstrak tag genre resmi dari metadata server 'category_info'
+        final itemTags = <String>[];
+        final rawCatInfo = book['category_info'];
+        if (rawCatInfo is String && rawCatInfo.trim().isNotEmpty) {
+          try {
+            final decodedCats = jsonDecode(rawCatInfo);
+            if (decodedCats is List) {
+              for (final catItem in decodedCats) {
+                if (catItem is Map) {
+                  final tagName = '${catItem['Name'] ?? catItem['name'] ?? ''}'.trim();
+                  if (tagName.isNotEmpty && !itemTags.contains(tagName)) {
+                    itemTags.add(tagName);
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        } else if (rawCatInfo is List) {
+          for (final catItem in rawCatInfo) {
+            if (catItem is Map) {
+              final tagName = '${catItem['Name'] ?? catItem['name'] ?? ''}'.trim();
+              if (tagName.isNotEmpty && !itemTags.contains(tagName)) {
+                itemTags.add(tagName);
+              }
+            }
+          }
+        }
+
         items.add(ContentItem(
           id: id,
           title: title,
@@ -160,6 +188,7 @@ class MeloloClient {
           episodes: episodesCount <= 0 ? 1 : episodesCount,
           platformSlug: 'melolo',
           lang: 'id',
+          tags: itemTags.isNotEmpty ? itemTags : ContentItem.extractTags(book),
         ));
       }
     }

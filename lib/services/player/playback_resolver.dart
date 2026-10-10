@@ -162,12 +162,18 @@ class PlaybackResolver {
     // (TV pakai jalur fast ini; tanpa branch ini FreeReels di TV gagal.)
     final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
     if (dramaSource != null) {
+      final effectiveTimeout = dramaSource.slug == 'melolo'
+          ? const Duration(seconds: 15)
+          : timeout;
+      final videoType = dramaSource.slug == 'melolo'
+          ? LiveGoVideoType.mp4
+          : LiveGoVideoType.hls;
       return _resolveFromDramaSource(dramaSource, item, chapterId: chapterId)
-          .timeout(timeout, onTimeout: () => PlaybackSource.empty(
+          .timeout(effectiveTimeout, onTimeout: () => PlaybackSource.empty(
                 platform: dramaSource.slug,
                 dramaId: item.id,
                 episodeNumber: _episodeNumber(chapterId ?? item.chapterId),
-                videoType: LiveGoVideoType.hls,
+                videoType: videoType,
               ));
     }
 

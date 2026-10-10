@@ -138,7 +138,7 @@ class MeloloStreamProxy {
     if (await decryptedFile.exists()) {
       final size = await decryptedFile.length();
       if (size > 102400) {
-        final token = 'melolo_${sanitizedSeries}_$sanitizedEp';
+        final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
         _fileRegistry[token] = decryptedFile.path;
         return 'http://127.0.0.1:$_port/$token';
       }
@@ -182,7 +182,7 @@ class MeloloStreamProxy {
     // Tulis ke file cache
     await decryptedFile.writeAsBytes(decryptedBytes, flush: true);
 
-    final token = 'melolo_${sanitizedSeries}_$sanitizedEp';
+    final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
     _fileRegistry[token] = decryptedFile.path;
     debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes) -> 127.0.0.1:$_port/$token');
 

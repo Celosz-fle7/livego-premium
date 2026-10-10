@@ -56,58 +56,18 @@ class MeloloConfig {
 
   static const Duration timeout = Duration(seconds: 15);
 
-  /// Kategori & Filter resmi Melolo sesuai APK asli (Beranda & Tag Preferensi)
+  /// 3 Kategori Utama Rekomendasi Melolo sesuai permintaan user:
+  /// Konten di dalamnya membawa tag-tag preferensi resmi langsung dari server.
   static const List<String> categories = [
     'Populer',
     'Anime',
     'Peringkat',
-    'Rakyat Jelata',
-    'Putri Yang Tertukar',
-    'Anak Kesayangan',
-    'Romansa Urban',
-    'Fantasi Perkotaan',
-    'Romansa Klasik',
-    'Cinta yang manis',
-    'Cinta modern',
-    'Bayi Lucu',
-    'Cinta yang pahit',
-    'Pemeran Utama Wanita Kuat',
-    'Mafia',
-    'CEO',
-    'Identitas Tersembunyi',
-    'Kelahiran kembali (Rebirth)',
-    'Harem',
-    'Horor / Thriller',
-    'Menantu',
-    'Cinta Setelah Pernikahan',
   ];
 
-  /// Mapping kata kunci langsung Bahasa Indonesia yang terverifikasi menghasilkan drama lokal Melolo
+  /// Mapping kata kunci pencarian rekomendasi untuk 3 tab utama
   static const Map<String, String> categoryQueryMap = {
-    // Menu Filter Beranda Utama
     'Populer': 'Populer',
     'Anime': 'Anime',
     'Peringkat': 'Peringkat',
-    'Rakyat Jelata': 'Rakyat Jelata',
-    'Putri Yang Tertukar': 'Putri Yang Tertukar',
-    'Anak Kesayangan': 'Anak Kesayangan',
-    'Romansa Urban': 'Romansa Urban',
-    'Fantasi Perkotaan': 'Fantasi Perkotaan',
-    'Romansa Klasik': 'Romansa Klasik',
-
-    // Tag Preferensi Resmi APK
-    'Cinta yang manis': 'Cinta yang manis',
-    'Cinta modern': 'Cinta modern',
-    'Bayi Lucu': 'Bayi Lucu',
-    'Cinta yang pahit': 'Cinta yang pahit',
-    'Pemeran Utama Wanita Kuat': 'Pemeran Utama Wanita Kuat',
-    'Mafia': 'Mafia',
-    'CEO': 'CEO',
-    'Identitas Tersembunyi': 'Identitas Tersembunyi',
-    'Kelahiran kembali (Rebirth)': 'Kelahiran kembali',
-    'Harem': 'Harem',
-    'Horor / Thriller': 'Horor',
-    'Menantu': 'Menantu',
-    'Cinta Setelah Pernikahan': 'Cinta Setelah Pernikahan',
   };
 }
