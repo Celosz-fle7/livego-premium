@@ -350,6 +350,7 @@ class MeloloClient {
     return const DramaEpisodeExtras(
       qualities: [
         DramaQuality(label: '720p', resolution: '720x1280'),
+        DramaQuality(label: '480p', resolution: '480x854'),
       ],
       unlocked: true,
     );
