@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player_media_kit/video_player_media_kit.dart';
 
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
@@ -14,6 +15,9 @@ import 'tv/tv_app.dart';
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    VideoPlayerMediaKit.ensureInitialized(
+      android: true,
+    );
 
     final now = DateTime.now();
     debugPrint(

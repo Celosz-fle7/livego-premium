@@ -1,5 +1,5 @@
 name: livego_premium
-version: 1.0.63+63
+version: 1.0.64+64
 publish_to: none
 
 environment:
@@ -11,6 +11,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   crypto: ^3.0.3
   video_player: ^2.9.1
+  video_player_media_kit: ^2.0.0
+  media_kit_libs_android_video: any
   path_provider: ^2.1.5
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1

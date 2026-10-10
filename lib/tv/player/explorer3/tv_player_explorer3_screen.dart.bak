@@ -1,0 +1,2015 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:video_player/video_player.dart';
+
+import '../../../core/app_theme.dart';
+import '../../../core/livego_local_store.dart';
+import '../../../core/livego_settings.dart';
+import '../../../models/content_item.dart';
+import '../../../models/stream_info.dart';
+import '../../../services/player/player_preferences.dart';
+import '../../../services/player/playback_contract.dart';
+import '../tv_player_engine.dart';
+import '../tv_player_service.dart';
+import 'tv_player_explorer3_native_payload.dart';
+import 'tv_player_explorer3_timing.dart';
+import 'widgets/tv_player_explorer3_controls.dart';
+
+/// TV Player Explorer 3.
+///
+/// Lightweight streaming-player structure:
+/// - one root Focus
+/// - one remote handler
+/// - one VideoPlayerController owner
+/// - modular lightweight overlay widgets
+/// - no debug recorder / no MediaStore / no native player route
+class TvPlayerExplorer3Screen extends StatefulWidget {
+  final ContentItem item;
+  final int? episode;
+  final bool preferNativeSurface;
+  final Future<void> Function(BuildContext context, String reason)? onFallbackToNative;
+
+  const TvPlayerExplorer3Screen({
+    super.key,
+    required this.item,
+    this.episode,
+    this.preferNativeSurface = true,
+    this.onFallbackToNative,
+  });
+
+  @override
+  State<TvPlayerExplorer3Screen> createState() => _TvPlayerExplorer3ScreenState();
+}
+
+enum _Explorer3Mode {
+  watching,
+  controls,
+  episode,
+  quality,
+  subtitle,
+  options,
+}
+
+class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
+  final FocusNode _rootFocus = FocusNode(skipTraversal: true, debugLabel: 'tv-player-explorer3-root');
+  final TvPlayerService _service = const TvPlayerService();
+  static const MethodChannel _nativeSurfacePlayer = MethodChannel('livego/native_surface_player');
+
+  VideoPlayerController? _controller;
+  int? _controllerEpisode;
+  String _controllerChapterId = '';
+  StreamInfo _streamInfo = StreamInfo.empty;
+
+  int _loadToken = 0;
+  int _nativeResolveToken = 0;
+  late int _episode;
+  String _chapterId = '';
+  bool _loading = true;
+  bool _closing = false;
+  bool _allowRoutePop = false;
+  bool _surfaceReady = false;
+  bool _muted = false;
+  bool _fitCover = false;
+  bool _showPlayerDiag = false;
+
+  String _status = 'Membuka player...';
+  String _error = '';
+  String _subtitleStatus = 'Auto';
+  String _lastStreamUrl = '-';
+  String _lastStreamHost = '-';
+  String _lastStreamTail = '-';
+  String _lastCodecHint = '-';
+  String _lastQualityLabels = '-';
+  String _activeQuality = 'Auto';
+
+  int _controlCursor = 1;
+  int _episodeCursor = 1;
+  int _episodeListTotal = 0;
+  int _qualityCursor = 0;
+  int _subtitleCursor = 0;
+  int _optionCursor = 0;
+  int _lastCursorMoveMs = 0;
+  int _lastPlayerUiTickMs = 0;
+  int _lastProgressSaveMs = 0;
+
+  double _speed = 1.0;
+  _Explorer3Mode _mode = _Explorer3Mode.controls;
+
+  Timer? _surfaceTimer;
+  Timer? _hideControlsTimer;
+  Timer? _statusTimer;
+  Timer? _prefetchTimer;
+  Timer? _episodeWarmupTimer;
+  final Set<String> _prefetchKeys = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _nativeSurfacePlayer.setMethodCallHandler(_handleNativeSurfaceMethod);
+    _episode = widget.episode ?? int.tryParse(widget.item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(widget.item);
+    _episode = _episode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    _episodeCursor = _episode;
+    _chapterId = widget.item.chapterId.trim().isNotEmpty ? widget.item.chapterId.trim() : '$_episode';
+    LiveGoLocalStore.addHistory(widget.item);
+    unawaited(PlayerPreferences.load());
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _rootFocus.requestFocus();
+      unawaited(_load());
+    });
+  }
+
+  ContentItem _playableItem() {
+    return ContentItem(
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: _chapterId.trim().isNotEmpty ? _chapterId.trim() : '$_episode',
+      lang: widget.item.lang,
+    );
+  }
+
+  ContentItem _playableItemFor({
+    required int episode,
+    required String chapterId,
+  }) {
+    return ContentItem(
+      id: widget.item.id,
+      title: widget.item.title,
+      source: widget.item.source,
+      category: widget.item.category,
+      description: widget.item.description,
+      posterUrl: widget.item.posterUrl,
+      backdropUrl: widget.item.backdropUrl,
+      rating: widget.item.rating,
+      episodes: widget.item.episodes <= 0 ? 1 : widget.item.episodes,
+      updated: widget.item.updated,
+      platformSlug: widget.item.platformSlug,
+      chapterId: chapterId.trim().isNotEmpty ? chapterId.trim() : '$episode',
+      lang: widget.item.lang,
+    );
+  }
+
+  bool _active(int token) => mounted && !_closing && token == _loadToken;
+
+  bool _activeNativeResolve(int token) =>
+      mounted && !_closing && token == _nativeResolveToken;
+
+  int _episodeTotal() {
+    final fromStream = _streamInfo.totalEpisodes;
+    if (fromStream > 1) return fromStream.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final fromWarmList = _episodeListTotal;
+    if (fromWarmList > 1) return fromWarmList.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final fromItem = widget.item.episodes;
+    if (fromItem > 1) return fromItem.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    return TvPlayerExplorer3Timing.maxEpisode;
+  }
+
+  List<String> get _qualityChoices {
+    final rows = <String>['Auto'];
+    for (final quality in _streamInfo.qualities) {
+      final label = quality.label.trim().isEmpty ? 'Auto' : quality.label.trim();
+      if (!rows.any((e) => e.toLowerCase() == label.toLowerCase())) {
+        rows.add(label);
+      }
+    }
+    return rows;
+  }
+
+  List<String> get _subtitleChoices {
+    final rows = <String>['OFF'];
+    for (final track in _streamInfo.subtitles) {
+      final lang = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+      final format = track.format.trim().isEmpty ? '' : ' ${track.format.toUpperCase()}';
+      rows.add('$lang$format');
+    }
+    if (rows.length == 1) rows.add('Tidak tersedia');
+    return rows;
+  }
+
+  int _qualityIndexFor(String quality) {
+    final rows = _qualityChoices;
+    final normalized = quality.toLowerCase();
+    final exact = rows.indexWhere((e) => e.toLowerCase() == normalized);
+    if (exact >= 0) return exact;
+    if (normalized.contains('480')) return rows.indexWhere((e) => e.toLowerCase().contains('480')).clamp(0, rows.length - 1).toInt();
+    if (normalized.contains('720')) return rows.indexWhere((e) => e.toLowerCase().contains('720')).clamp(0, rows.length - 1).toInt();
+    if (normalized.contains('1080')) return rows.indexWhere((e) => e.toLowerCase().contains('1080')).clamp(0, rows.length - 1).toInt();
+    return 0;
+  }
+
+  bool _looksUnsafeForLowEndTv(StreamQuality quality) {
+    final joined = '${quality.label} ${quality.url}'.toLowerCase();
+    return joined.contains('h265') ||
+        joined.contains('hevc') ||
+        joined.contains('x265') ||
+        joined.contains('10bit') ||
+        joined.contains('10-bit');
+  }
+
+  String _safeAutoUrl(StreamInfo stream) {
+    final qualities = stream.qualities;
+    if (qualities.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
+
+    final safe = qualities.where((q) => q.url.trim().isNotEmpty && !_looksUnsafeForLowEndTv(q)).toList();
+    final pool = safe.isNotEmpty ? safe : qualities.where((q) => q.url.trim().isNotEmpty).toList();
+    if (pool.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
+
+    pool.sort((a, b) {
+      final ah = a.height <= 0 ? 9999 : a.height;
+      final bh = b.height <= 0 ? 9999 : b.height;
+      return ah.compareTo(bh);
+    });
+    return pool.first.url;
+  }
+
+  String _safeUrlForQuality(StreamInfo stream, String quality) {
+    final q = quality.trim();
+    if (q.isEmpty || q.toLowerCase() == 'auto') return _safeAutoUrl(stream);
+    final selected = stream.urlForQuality(q).trim();
+    return selected.isNotEmpty ? selected : _safeAutoUrl(stream);
+  }
+
+  void _setStreamDiagnostic(StreamInfo stream, String url) {
+    Uri? uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      uri = null;
+    }
+
+    final lower = url.toLowerCase();
+    final hint = lower.contains('h265') || lower.contains('hevc') || lower.contains('x265')
+        ? 'HEVC/H265'
+        : lower.contains('h264') || lower.contains('avc')
+            ? 'H264/AVC'
+            : lower.contains('.m3u8')
+                ? 'HLS unknown'
+                : lower.contains('.mp4')
+                    ? 'MP4 unknown'
+                    : 'unknown';
+
+    final qualityLabels = stream.qualities.isEmpty
+        ? 'none'
+        : stream.qualities
+            .map((q) {
+              final qLower = '${q.label} ${q.url}'.toLowerCase();
+              final unsafe = qLower.contains('h265') ||
+                  qLower.contains('hevc') ||
+                  qLower.contains('x265') ||
+                  qLower.contains('10bit') ||
+                  qLower.contains('10-bit');
+              return unsafe ? '${q.label}!' : q.label;
+            })
+            .join(',');
+
+    _lastStreamUrl = url;
+    _lastStreamHost = uri?.host.isNotEmpty == true ? uri!.host : '-';
+    _lastStreamTail = url.length <= 42 ? url : url.substring(url.length - 42);
+    _lastCodecHint = hint;
+    _lastQualityLabels = qualityLabels;
+  }
+
+  int _nativePayloadTotal(StreamInfo stream) {
+    if (stream.totalEpisodes > 1) return stream.totalEpisodes.clamp(1, 999).toInt();
+    if (widget.item.episodes > 1) return widget.item.episodes.clamp(1, 999).toInt();
+    return _episodeTotal();
+  }
+
+  Map<String, Object?> _nativePlayerPayload(StreamInfo stream, String url) {
+    return _nativePlayerPayloadFor(
+      stream: stream,
+      url: url,
+      episode: _episode,
+      chapterId: _chapterId,
+    );
+  }
+
+  Map<String, Object?> _nativePlayerPayloadFor({
+    required StreamInfo stream,
+    required String url,
+    required int episode,
+    required String chapterId,
+  }) {
+    return TvPlayerExplorer3NativePayload.build(
+      item: widget.item,
+      stream: stream,
+      url: url,
+      episode: episode,
+      chapterId: chapterId,
+      totalEpisodes: _nativePayloadTotal(stream),
+    );
+  }
+
+  String _nativePlaybackKeyFor({required int episode, required String chapterId}) {
+    final platform = widget.item.platformSlug.trim();
+    final id = widget.item.id.trim();
+    final source = widget.item.source.trim();
+    final chapter = chapterId.trim().isNotEmpty ? chapterId.trim() : '$episode';
+    return '$platform|$id|$source|$episode|$chapter';
+  }
+
+  bool _isCurrentNativePlayback(Map<dynamic, dynamic> raw) {
+    final eventKey = '${raw['playbackKey'] ?? ''}'.trim();
+    final eventEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
+    final eventChapter = '${raw['chapterId'] ?? ''}'.trim();
+    final expectedKey = _nativePlaybackKeyFor(episode: _episode, chapterId: _chapterId);
+    if (eventKey.isNotEmpty) return eventKey == expectedKey;
+    if (eventEpisode != _episode) return false;
+    return eventChapter.isEmpty || eventChapter == _chapterId.trim();
+  }
+
+  Future<dynamic> _handleNativeSurfaceMethod(MethodCall call) async {
+    if (call.method == 'resolveEpisode') {
+      return _resolveEpisodeForNative(call.arguments);
+    }
+    if (call.method == 'nativeProgress') {
+      await _saveNativeProgress(call.arguments);
+      return true;
+    }
+    if (call.method == 'nativePreference') {
+      await _syncNativePreference(call.arguments);
+      return true;
+    }
+    if (call.method == 'nativeClosed') {
+      _closeFromNative();
+      return true;
+    }
+    if (call.method == 'setAutoNext') {
+      final raw = call.arguments;
+      final enabled = raw is Map
+          ? raw['enabled'] == true || '${raw['enabled']}'.toLowerCase() == 'true'
+          : raw == true || '$raw'.toLowerCase() == 'true';
+      LiveGoSettings.autoNextEnabled = enabled;
+      await LiveGoLocalStore.saveSettings();
+      return true;
+    }
+    return null;
+  }
+
+  Future<MapEntry<int, String>> _resolveOrderedEpisodeTarget(int requestedEpisode) async {
+    final currentEpisode = _episode;
+    final currentChapterId = _chapterId.trim();
+    final delta = requestedEpisode == currentEpisode ? 0 : (requestedEpisode > currentEpisode ? 1 : -1);
+
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeResolveTimeout);
+      final cleanRows = rows
+          .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
+          .toList(growable: false);
+
+      if (cleanRows.length <= 1) {
+        final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+        return MapEntry(safeEpisode, '$safeEpisode');
+      }
+
+      int indexOfCurrent() {
+        final byChapterId = currentChapterId.isNotEmpty
+            ? cleanRows.indexWhere((episode) => episode.id.trim() == currentChapterId)
+            : -1;
+        if (byChapterId >= 0) return byChapterId;
+        return cleanRows.indexWhere((episode) => episode.index == currentEpisode);
+      }
+
+      MapEntry<int, String> fromRow(dynamic row) {
+        final rawIndex = row.index is int ? row.index as int : requestedEpisode;
+        final index = rawIndex > 0 ? rawIndex : requestedEpisode;
+        final rawId = '${row.id}'.trim();
+        final chapterId = rawId.isNotEmpty ? rawId : '$index';
+        return MapEntry(index.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt(), chapterId);
+      }
+
+      final currentPos = indexOfCurrent();
+
+      // Native Auto Next / Prev sends current +/- 1.
+      // Treat that as movement by provider row order, not raw episode math.
+      if ((requestedEpisode - currentEpisode).abs() == 1 && currentPos >= 0) {
+        final nextPos = currentPos + delta;
+        if (nextPos >= 0 && nextPos < cleanRows.length) {
+          return fromRow(cleanRows[nextPos]);
+        }
+        return MapEntry(currentEpisode, currentChapterId.isNotEmpty ? currentChapterId : '$currentEpisode');
+      }
+
+      // Direct episode grid selection still tries exact displayed index first.
+      final exact = cleanRows.indexWhere((episode) => episode.index == requestedEpisode);
+      if (exact >= 0) return fromRow(cleanRows[exact]);
+
+      final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+      return MapEntry(safeEpisode, '$safeEpisode');
+    } catch (_) {
+      final safeEpisode = requestedEpisode.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+      return MapEntry(safeEpisode, '$safeEpisode');
+    }
+  }
+
+  void _cancelEpisodeListWarmup() {
+    _episodeWarmupTimer?.cancel();
+    _episodeWarmupTimer = null;
+  }
+
+  void _scheduleEpisodeListWarmup({Duration delay = TvPlayerExplorer3Timing.episodeWarmupDelay}) {
+    _cancelEpisodeListWarmup();
+
+    final token = _loadToken;
+    _episodeWarmupTimer = Timer(delay, () {
+      if (!_active(token)) return;
+      unawaited(_warmEpisodeListCache(token));
+    });
+  }
+
+  Future<void> _warmEpisodeListCache(int token) async {
+    if (!_active(token)) return;
+
+    final key = [
+      'episodes',
+      widget.item.platformSlug.trim(),
+      widget.item.id.trim(),
+    ].join('|');
+    if (!_rememberPrefetchKey(key)) return;
+
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeWarmupTimeout);
+      if (!_active(token)) return;
+
+      var maxIndex = 0;
+      for (final row in rows) {
+        if (row.index > maxIndex) maxIndex = row.index;
+      }
+
+      final inferredTotal = maxIndex > rows.length ? maxIndex : rows.length;
+      if (inferredTotal > 1 && inferredTotal != _episodeListTotal) {
+        if (!mounted) return;
+        setState(() {
+          _episodeListTotal = inferredTotal.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+        });
+      }
+
+      debugPrint('LIVEGO TV PLAYER EPISODE LIST WARM total=$inferredTotal rows=${rows.length}');
+    } catch (error) {
+      debugPrint('LIVEGO TV PLAYER EPISODE LIST WARM SKIP error=$error');
+    }
+  }
+
+  Future<List<MapEntry<int, String>>> _orderedPrefetchTargets(int count) async {
+    try {
+      final rows = await _service.episodes(_playableItem()).timeout(TvPlayerExplorer3Timing.episodeResolveTimeout);
+      final cleanRows = rows
+          .where((episode) => episode.index > 0 || episode.id.trim().isNotEmpty)
+          .toList(growable: false);
+
+      if (cleanRows.length <= 1) {
+        return List<MapEntry<int, String>>.generate(count, (index) {
+          final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+          return MapEntry(episode, '$episode');
+        });
+      }
+
+      int currentIndex() {
+        final currentChapterId = _chapterId.trim();
+        final byChapterId = currentChapterId.isNotEmpty
+            ? cleanRows.indexWhere((episode) => episode.id.trim() == currentChapterId)
+            : -1;
+        if (byChapterId >= 0) return byChapterId;
+        return cleanRows.indexWhere((episode) => episode.index == _episode);
+      }
+
+      MapEntry<int, String> fromRow(dynamic row) {
+        final rawIndex = row.index is int ? row.index as int : 0;
+        final index = rawIndex > 0 ? rawIndex : 1;
+        final rawId = '${row.id}'.trim();
+        final chapterId = rawId.isNotEmpty ? rawId : '$index';
+        return MapEntry(index.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt(), chapterId);
+      }
+
+      final current = currentIndex();
+      if (current < 0) {
+        return List<MapEntry<int, String>>.generate(count, (index) {
+          final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+          return MapEntry(episode, '$episode');
+        });
+      }
+
+      final targets = <MapEntry<int, String>>[];
+      for (var offset = 1; offset <= count; offset += 1) {
+        final nextIndex = current + offset;
+        if (nextIndex < 0 || nextIndex >= cleanRows.length) break;
+        targets.add(fromRow(cleanRows[nextIndex]));
+      }
+      return targets;
+    } catch (_) {
+      return List<MapEntry<int, String>>.generate(count, (index) {
+        final episode = (_episode + index + 1).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+        return MapEntry(episode, '$episode');
+      });
+    }
+  }
+
+  String _prefetchKeyFor(int episode, String chapterId) {
+    return [
+      widget.item.platformSlug.trim(),
+      widget.item.id.trim(),
+      chapterId.trim(),
+      episode,
+      _activeQuality.trim(),
+    ].join('|');
+  }
+
+  bool _rememberPrefetchKey(String key) {
+    if (_prefetchKeys.contains(key)) return false;
+    _prefetchKeys.add(key);
+    if (_prefetchKeys.length > TvPlayerExplorer3Timing.prefetchKeyLimit) {
+      _prefetchKeys.remove(_prefetchKeys.first);
+    }
+    return true;
+  }
+
+  void _cancelLightPrefetch() {
+    _prefetchTimer?.cancel();
+    _prefetchTimer = null;
+  }
+
+  void _scheduleLightPrefetch({Duration delay = TvPlayerExplorer3Timing.lightPrefetchDelay}) {
+    _cancelLightPrefetch();
+
+    final token = _loadToken;
+    final episodeSnapshot = _episode;
+    final chapterSnapshot = _chapterId;
+
+    _prefetchTimer = Timer(delay, () {
+      if (!_active(token)) return;
+      if (_episode != episodeSnapshot || _chapterId != chapterSnapshot) return;
+      unawaited(_prefetchNextStreams(token, episodeSnapshot, chapterSnapshot));
+    });
+  }
+
+  Future<void> _prefetchNextStreams(
+    int token,
+    int baseEpisode,
+    String baseChapterId,
+  ) async {
+    if (!_active(token)) return;
+
+    final targets = await _orderedPrefetchTargets(TvPlayerExplorer3Timing.defaultPrefetchCount);
+    for (final target in targets) {
+      if (!_active(token)) return;
+      if (_episode != baseEpisode || _chapterId != baseChapterId) return;
+
+      final targetEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+      final targetChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$targetEpisode';
+
+      if (targetEpisode == _episode && targetChapterId == _chapterId.trim()) {
+        continue;
+      }
+
+      final key = _prefetchKeyFor(targetEpisode, targetChapterId);
+      if (!_rememberPrefetchKey(key)) continue;
+
+      final item = _playableItemFor(
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
+
+      try {
+        final result = await _service
+            .prefetchStream(
+              item,
+              chapterId: item.chapterId,
+              episode: targetEpisode,
+            )
+            .timeout(TvPlayerExplorer3Timing.lightPrefetchTimeout);
+
+        if (result.hasStream) {
+          debugPrint('LIVEGO TV PLAYER PREFETCH OK ep=$targetEpisode chapter=$targetChapterId source=${result.source}');
+        } else {
+          debugPrint('LIVEGO TV PLAYER PREFETCH MISS ep=$targetEpisode chapter=$targetChapterId source=${result.source}');
+        }
+      } catch (error) {
+        debugPrint('LIVEGO TV PLAYER PREFETCH SKIP ep=$targetEpisode chapter=$targetChapterId error=$error');
+      }
+    }
+  }
+
+  Future<Map<String, Object?>> _resolveEpisodeForNative(Object? args) async {
+    final token = ++_nativeResolveToken;
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    final requestedEpisode = int.tryParse('${raw['episode'] ?? _episode}') ?? _episode;
+    final requestedQuality = '${raw['quality'] ?? _activeQuality}'.trim().isEmpty ? 'Auto' : '${raw['quality'] ?? _activeQuality}'.trim();
+
+    final previousEpisode = _episode;
+    final previousChapterId = _chapterId;
+    final previousStream = _streamInfo;
+
+    try {
+      final target = await _resolveOrderedEpisodeTarget(requestedEpisode);
+      if (!_activeNativeResolve(token)) {
+        return <String, Object?>{
+          'error': 'Stale native episode resolve',
+          'episode': previousEpisode,
+          'chapterId': previousChapterId,
+        };
+      }
+
+      final targetEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+      final targetChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$targetEpisode';
+      final item = _playableItemFor(
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
+      final resolved = await _service.resolveStream(
+        item,
+        chapterId: item.chapterId,
+        episode: targetEpisode,
+      );
+      if (!_activeNativeResolve(token)) {
+        return <String, Object?>{
+          'error': 'Stale native episode resolve',
+          'episode': previousEpisode,
+          'chapterId': previousChapterId,
+        };
+      }
+
+      final stream = resolved.stream;
+      final url = _safeUrlForQuality(stream, requestedQuality).trim();
+      if (url.isEmpty) throw StateError('Stream kosong');
+
+      _episode = targetEpisode;
+      _chapterId = targetChapterId;
+      _episodeCursor = targetEpisode;
+      _streamInfo = stream;
+      _activeQuality = requestedQuality;
+
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = '';
+          _status = 'Native episode $_episode';
+          _qualityCursor = _qualityIndexFor(requestedQuality);
+        });
+      }
+
+      _scheduleLightPrefetch();
+      return _nativePlayerPayloadFor(
+        stream: stream,
+        url: url,
+        episode: targetEpisode,
+        chapterId: targetChapterId,
+      );
+    } catch (error) {
+      if (_activeNativeResolve(token)) {
+        _episode = previousEpisode;
+        _chapterId = previousChapterId;
+        _episodeCursor = previousEpisode;
+        _streamInfo = previousStream;
+      }
+      return <String, Object?>{
+        'error': '$error',
+        'episode': previousEpisode,
+        'chapterId': previousChapterId,
+      };
+    }
+  }
+
+  Future<void> _saveNativeProgress(Object? args) async {
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    if (!_isCurrentNativePlayback(raw)) return;
+
+    final positionMs = int.tryParse('${raw['positionMs'] ?? 0}') ?? 0;
+    final durationMs = int.tryParse('${raw['durationMs'] ?? 0}') ?? 0;
+    if (durationMs <= 0 || positionMs <= 0 || positionMs > durationMs) return;
+
+    final itemId = widget.item.id.trim();
+    final platformSlug = widget.item.platformSlug.trim();
+    if (itemId.isEmpty || platformSlug.isEmpty) return;
+
+    final episode = (int.tryParse('${raw['episode'] ?? _episode}') ?? _episode)
+        .clamp(1, TvPlayerExplorer3Timing.maxEpisode)
+        .toInt();
+    final chapterId = '${raw['chapterId'] ?? _chapterId}'.trim().isNotEmpty
+        ? '${raw['chapterId'] ?? _chapterId}'.trim()
+        : '$episode';
+
+    await LiveGoLocalStore.saveProgress(
+      _playableItemFor(episode: episode, chapterId: chapterId),
+      episode,
+      Duration(milliseconds: positionMs),
+      Duration(milliseconds: durationMs),
+    );
+  }
+
+  Future<void> _syncNativePreference(Object? args) async {
+    final raw = args is Map ? Map<dynamic, dynamic>.from(args) : <dynamic, dynamic>{};
+    if (!_isCurrentNativePlayback(raw)) return;
+
+    final name = '${raw['name'] ?? ''}'.trim().toLowerCase();
+    final value = raw['value'];
+    final text = '$value'.trim();
+    if (name.isEmpty || text.isEmpty) return;
+
+    switch (name) {
+      case 'quality':
+        LiveGoSettings.quality = text;
+        _activeQuality = text;
+        _qualityCursor = _qualityIndexFor(text);
+        await PlayerPreferences.setQuality(text);
+        break;
+      case 'subtitle':
+        final off = text.toLowerCase() == 'off' || text.toLowerCase() == 'matikan';
+        LiveGoSettings.subtitlesEnabled = !off;
+        _subtitleStatus = off ? 'OFF' : text;
+        await PlayerPreferences.setSubtitle(enabled: !off, language: off ? 'OFF' : text);
+        break;
+      case 'audio':
+        await PlayerPreferences.setAudioTrack(text);
+        break;
+      case 'speed':
+        final speed = value is num ? value.toDouble() : double.tryParse(text);
+        if (speed == null) return;
+        _speed = speed.clamp(0.5, 2.0).toDouble();
+        await PlayerPreferences.setSpeed(_speed);
+        break;
+      default:
+        return;
+    }
+
+    await LiveGoLocalStore.saveSettings();
+    if (mounted && !_closing) setState(() {});
+  }
+
+
+  void _closeFromNative() {
+    if (!mounted) return;
+    _exitFlutterPlayerRoute(source: 'nativeClosed');
+  }
+
+  void _exitFlutterPlayerRoute({required String source}) {
+    if (!mounted) return;
+
+    unawaited(_saveProgressNow(force: true));
+    _cancelEpisodeListWarmup();
+    _cancelLightPrefetch();
+    _cancelAutoHide();
+    _statusTimer?.cancel();
+    _surfaceTimer?.cancel();
+
+    setState(() {
+      _closing = true;
+      _allowRoutePop = true;
+      _mode = _Explorer3Mode.watching;
+      _status = source;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+        return;
+      }
+
+      final rootNavigator = Navigator.of(context, rootNavigator: true);
+      if (rootNavigator.canPop()) {
+        rootNavigator.pop();
+        return;
+      }
+
+      // Safety fallback: if there is no pop target, do not leave the
+      // player route permanently black and locked. Re-enable BACK handling.
+      if (!mounted) return;
+      setState(() {
+        _closing = false;
+        _allowRoutePop = false;
+        _mode = _Explorer3Mode.controls;
+        _status = 'Tekan BACK untuk keluar';
+      });
+      _rootFocus.requestFocus();
+    });
+  }
+
+  Future<void> _load() async {
+    final token = ++_loadToken;
+    _nativeResolveToken++;
+    final item = _playableItem();
+
+    _cancelEpisodeListWarmup();
+
+    _cancelLightPrefetch();
+
+    _surfaceTimer?.cancel();
+    _surfaceTimer = null;
+
+    setState(() {
+      _loading = true;
+      _surfaceReady = false;
+      _error = '';
+      _status = 'Mencari stream EP $_episode...';
+      _mode = _Explorer3Mode.controls;
+    });
+
+    try {
+      final resolved = await _service.resolveStream(
+        item,
+        chapterId: item.chapterId,
+        episode: _episode,
+      );
+      if (!_active(token)) return;
+
+      final stream = resolved.stream;
+      _streamInfo = stream;
+
+      // Always start TV playback with a safe Auto stream.
+      // Saved/high quality can be re-applied manually from the Quality panel.
+      final url = _safeUrlForQuality(stream, _activeQuality).trim();
+      if (url.isEmpty) throw StateError('Stream kosong');
+      _setStreamDiagnostic(stream, url);
+
+      setState(() {
+        _status = 'Menyiapkan video...';
+        _qualityCursor = _qualityIndexFor(_activeQuality);
+        if (stream.subtitles.isEmpty) {
+          _subtitleStatus = LiveGoSettings.subtitlesEnabled ? 'Tidak tersedia' : 'OFF';
+          _subtitleCursor = LiveGoSettings.subtitlesEnabled ? 1 : 0;
+        } else if (!LiveGoSettings.subtitlesEnabled) {
+          _subtitleStatus = 'OFF';
+          _subtitleCursor = 0;
+        } else {
+          _subtitleCursor = _subtitleCursor.clamp(1, stream.subtitles.length).toInt();
+          final track = stream.subtitles[_subtitleCursor - 1];
+          _subtitleStatus = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+        }
+      });
+
+      _scheduleEpisodeListWarmup();
+      if (widget.preferNativeSurface) {
+        final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
+        if (nativeOpened) {
+          _scheduleLightPrefetch();
+          return;
+        }
+      } else {
+        TvPlayerDebugLog.event(
+          'player_engine_selected',
+          item: widget.item,
+          episode: _episode,
+          engine: PlayerEngineType.flutterFallback.wireName,
+          reason: 'native_surface_disabled',
+        );
+      }
+
+      await _startController(token, stream, url);
+    } catch (error) {
+      if (!_active(token)) return;
+      if (!widget.preferNativeSurface && widget.onFallbackToNative != null) {
+        final reason = _lastStreamUrl.toLowerCase().contains('.m3u8')
+            ? 'hls_requires_native'
+            : 'flutter_failed';
+        TvPlayerDebugLog.event(
+          'player_engine_fallback',
+          item: widget.item,
+          episode: _episode,
+          engine: PlayerEngineType.nativeExo.wireName,
+          reason: reason,
+          host: _lastStreamHost,
+          tail: _lastStreamTail,
+          error: error,
+        );
+        await widget.onFallbackToNative!(context, reason);
+        return;
+      }
+      await _disposeController();
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _surfaceReady = false;
+        _error = '$error';
+        _status = 'ERROR';
+        _mode = _Explorer3Mode.controls;
+      });
+    }
+  }
+
+  Future<bool> _openNativeSurfacePlayer(int token, StreamInfo stream, String url) async {
+    if (!_active(token)) return true;
+    TvPlayerDebugLog.event('player_engine_selected', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, host: _lastStreamHost, tail: _lastStreamTail);
+
+    try {
+      await PlayerPreferences.load();
+      await _nativeSurfacePlayer
+          .invokeMethod<bool>('open', _nativePlayerPayload(stream, url))
+          .timeout(
+            TvPlayerExplorer3Timing.nativeOpenTimeout,
+            onTimeout: () => throw TimeoutException('Native open timeout'),
+          );
+
+      if (!mounted || !_active(token)) return true;
+
+      setState(() {
+        _loading = false;
+        _status = 'Native Surface Player';
+        _mode = _Explorer3Mode.watching;
+      });
+
+      // Keep the Flutter route alive behind the native Activity.
+      // Native can ask this State to resolve next/previous/selected episodes.
+      return true;
+    } catch (error) {
+      if (!mounted || !_active(token)) return true;
+      TvPlayerDebugLog.event('player_engine_fallback', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'native_open_failed', error: error);
+      setState(() {
+        _status = 'Flutter fallback: $error';
+      });
+      return false;
+    }
+  }
+
+  Future<void> _startController(int token, StreamInfo stream, String url) async {
+    TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, host: _lastStreamHost, tail: _lastStreamTail);
+    final controller = PlaybackContractRules.createController(
+      url,
+      headers: stream.headers,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+    );
+
+    try {
+      await controller.initialize().timeout(
+        TvPlayerExplorer3Timing.fallbackControllerInitTimeout,
+        onTimeout: () => throw TimeoutException('Initialize video timeout'),
+      );
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.setPlaybackSpeed(_speed);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.setVolume(_muted ? 0 : 1);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.play();
+      TvPlayerDebugLog.event('player_legacy_controller_init_done', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      await _saveProgressNow(force: true);
+      if (!_active(token)) {
+        await controller.dispose();
+        return;
+      }
+
+      final old = _controller;
+      old?.removeListener(_onControllerTick);
+      _controller = controller;
+      _controllerEpisode = _episode;
+      _controllerChapterId = _chapterId;
+      controller.addListener(_onControllerTick);
+      await old?.dispose();
+
+      if (!_active(token)) {
+        controller.removeListener(_onControllerTick);
+        if (_controller == controller) {
+          _controller = null;
+          _controllerEpisode = null;
+          _controllerChapterId = '';
+        }
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _status = 'PLAY';
+        _mode = _Explorer3Mode.controls;
+        _episodeCursor = _episode;
+      });
+
+      _surfaceTimer?.cancel();
+      _surfaceTimer = null;
+      _detectVideoPlayback(token);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_closing) _onControllerTick();
+      });
+      _scheduleEpisodeListWarmup();
+      _scheduleLightPrefetch();
+      _scheduleAutoHide();
+    } catch (_) {
+      controller.removeListener(_onControllerTick);
+      if (_controller == controller) {
+        _controller = null;
+        _controllerEpisode = null;
+        _controllerChapterId = '';
+      }
+      await controller.dispose();
+      rethrow;
+    }
+  }
+
+  void _detectVideoPlayback(int token) {
+    int checkCount = 0;
+    final maxChecks = TvPlayerExplorer3Timing.surfaceMaxChecks;
+    final checkInterval = TvPlayerExplorer3Timing.surfaceCheckInterval;
+
+    void checkProgress() {
+      if (!_active(token)) return;
+
+      final c = _controller;
+      if (c == null || !c.value.isInitialized) {
+        _surfaceTimer = Timer(checkInterval, checkProgress);
+        return;
+      }
+
+      if (c.value.hasError) {
+        _surfaceTimer?.cancel();
+        _surfaceTimer = null;
+        if (!mounted) return;
+        setState(() {
+          _error = c.value.errorDescription ?? 'Video error';
+          _loading = false;
+          _surfaceReady = false;
+          _status = 'ERROR';
+          _mode = _Explorer3Mode.controls;
+        });
+        return;
+      }
+
+      checkCount += 1;
+      final currentPos = c.value.position;
+      final hasMotion = currentPos.inMilliseconds > 50;
+      final hasSize = c.value.size.width > 0 && c.value.size.height > 0;
+      final hasPlaybackSignal = c.value.isPlaying || hasMotion || !c.value.isBuffering;
+      final timedOut = checkCount >= maxChecks;
+      final sizeStableEnough = hasSize && checkCount >= 8;
+
+      if ((hasSize && hasPlaybackSignal) || sizeStableEnough || timedOut) {
+        _surfaceTimer?.cancel();
+        _surfaceTimer = null;
+        if (!_active(token)) return;
+        TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'surface_timeout_or_size_ready');
+        setState(() => _surfaceReady = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_closing) _rootFocus.requestFocus();
+        });
+        return;
+      }
+
+      _surfaceTimer = Timer(checkInterval, checkProgress);
+    }
+
+    checkProgress();
+  }
+
+  void _onControllerTick() {
+    if (!mounted || _closing) return;
+
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.hasError) return;
+
+    final value = c.value;
+    final hasSize = value.size.width > 0 && value.size.height > 0;
+    final hasPlaybackSignal = value.isPlaying ||
+        value.position.inMilliseconds > 0 ||
+        !value.isBuffering;
+
+    if (!_surfaceReady && hasSize && hasPlaybackSignal) {
+      TvPlayerDebugLog.event('player_legacy_ready', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
+      setState(() {
+        _surfaceReady = true;
+        _loading = false;
+        _status = value.isPlaying ? 'PLAY' : 'PAUSE';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_closing) _rootFocus.requestFocus();
+      });
+      return;
+    }
+
+    unawaited(_saveProgressNow());
+
+    // Keep the visible progress text fresh without adding a recorder/timer.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= TvPlayerExplorer3Timing.playerUiTickMs) {
+      _lastPlayerUiTickMs = now;
+      setState(() {});
+    }
+  }
+
+  Future<void> _saveProgressNow({bool force = false}) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized || c.value.hasError) return;
+
+    final value = c.value;
+    final duration = value.duration;
+    final position = value.position;
+    if (duration <= Duration.zero || position <= Duration.zero) return;
+    if (position > duration) return;
+
+    final itemId = widget.item.id.trim();
+    final platformSlug = widget.item.platformSlug.trim();
+    if (itemId.isEmpty || platformSlug.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!force && now - _lastProgressSaveMs < TvPlayerExplorer3Timing.progressSaveThrottleMs) return;
+    _lastProgressSaveMs = now;
+
+    final episode = (_controllerEpisode ?? _episode).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final chapterId = _controllerChapterId.trim().isNotEmpty ? _controllerChapterId.trim() : '$episode';
+    await LiveGoLocalStore.saveProgress(
+      _playableItemFor(episode: episode, chapterId: chapterId),
+      episode,
+      position,
+      duration,
+    );
+  }
+
+  Future<void> _disposeController() async {
+    _surfaceTimer?.cancel();
+    _surfaceTimer = null;
+    await _saveProgressNow(force: true);
+    final c = _controller;
+    _controller = null;
+    _controllerEpisode = null;
+    _controllerChapterId = '';
+    if (c != null) {
+      c.removeListener(_onControllerTick);
+      await c.dispose();
+    }
+  }
+
+  void _cancelAutoHide() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = null;
+  }
+
+  void _scheduleAutoHide() {
+    _cancelAutoHide();
+    _hideControlsTimer = Timer(TvPlayerExplorer3Timing.autoHideDelay, () {
+      if (!mounted || _loading || _error.isNotEmpty) return;
+      if (_mode == _Explorer3Mode.controls) {
+        setState(() => _mode = _Explorer3Mode.watching);
+      }
+    });
+  }
+
+  void _showControls({bool defaultPlay = false}) {
+    _cancelAutoHide();
+    if (!mounted) return;
+    setState(() {
+      _mode = _Explorer3Mode.controls;
+      if (defaultPlay) _controlCursor = 1;
+      _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE';
+    });
+    _rootFocus.requestFocus();
+    _scheduleAutoHide();
+  }
+
+  void _showPanel(_Explorer3Mode mode) {
+    _cancelAutoHide();
+    if (!mounted) return;
+    setState(() {
+      _mode = mode;
+      if (mode == _Explorer3Mode.episode) {
+        _episodeCursor = _episode;
+        _status = 'Episode';
+      } else if (mode == _Explorer3Mode.quality) {
+        _qualityCursor = _qualityIndexFor(_activeQuality);
+        _status = 'Quality';
+      } else if (mode == _Explorer3Mode.subtitle) {
+        _subtitleCursor = _subtitleCursor.clamp(0, _subtitleChoices.length - 1).toInt();
+        _status = 'Subtitle';
+      } else if (mode == _Explorer3Mode.options) {
+        _status = 'Options';
+      }
+    });
+    _rootFocus.requestFocus();
+  }
+
+  void _hideOverlays() {
+    _cancelAutoHide();
+    if (!mounted) return;
+    setState(() {
+      _mode = _Explorer3Mode.watching;
+      _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE';
+    });
+    _rootFocus.requestFocus();
+  }
+
+  void _showStatus(String message, {Duration duration = TvPlayerExplorer3Timing.statusDelay}) {
+    _statusTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _status = message;
+      if (_mode == _Explorer3Mode.watching) _mode = _Explorer3Mode.controls;
+    });
+    _statusTimer = Timer(duration, () {
+      if (!mounted || _loading || _error.isNotEmpty) return;
+      setState(() => _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE');
+    });
+    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
+  }
+
+  bool _allowCursorMove([int ms = TvPlayerExplorer3Timing.cursorMoveGuardMs]) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastCursorMoveMs < ms) return false;
+    _lastCursorMoveMs = now;
+    return true;
+  }
+
+  bool _isBack(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.browserBack;
+  }
+
+  bool _isSelect(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.mediaPlayPause;
+  }
+
+  bool _isMenu(LogicalKeyboardKey key) {
+    return key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
+  }
+
+  Future<void> _togglePlay() async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      await c.pause();
+    } else {
+      await c.play();
+    }
+    if (!mounted) return;
+    setState(() {
+      _status = c.value.isPlaying ? 'PLAY' : 'PAUSE';
+      if (_mode == _Explorer3Mode.watching) _mode = _Explorer3Mode.controls;
+    });
+    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
+  }
+
+  Future<void> _seekBy(Duration delta) async {
+    final c = _controller;
+    if (c == null || !c.value.isInitialized) return;
+
+    final duration = c.value.duration;
+    final current = c.value.position;
+    final raw = current + delta;
+    final target = raw < Duration.zero
+        ? Duration.zero
+        : (duration > Duration.zero && raw > duration ? duration : raw);
+
+    await c.seekTo(target);
+    if (!mounted) return;
+    setState(() {
+      _status = delta.isNegative ? '-10s' : '+10s';
+      if (_mode == _Explorer3Mode.watching) _mode = _Explorer3Mode.controls;
+    });
+    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
+  }
+
+  Future<void> _openEpisodeTarget(
+    int requestedEpisode, {
+    String? boundaryStatus,
+  }) async {
+    if (_loading) return;
+
+    final total = _episodeTotal();
+    final requested = requestedEpisode.clamp(1, total).toInt();
+
+    if (requested == _episode) {
+      if (boundaryStatus != null) {
+        _showStatus(boundaryStatus);
+      } else {
+        _showControls();
+      }
+      return;
+    }
+
+    await _saveProgressNow(force: true);
+    if (!mounted || _loading) return;
+
+    setState(() {
+      _status = 'Mencari EP $requested...';
+      _mode = _Explorer3Mode.controls;
+    });
+
+    final target = await _resolveOrderedEpisodeTarget(requested);
+    if (!mounted || _loading) return;
+
+    final nextEpisode = target.key.clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
+    final nextChapterId = target.value.trim().isNotEmpty ? target.value.trim() : '$nextEpisode';
+
+    if (nextEpisode == _episode && nextChapterId == _chapterId.trim()) {
+      _showControls();
+      return;
+    }
+
+    setState(() {
+      _episode = nextEpisode;
+      _chapterId = nextChapterId;
+      _episodeCursor = nextEpisode;
+      _error = '';
+      _status = 'EP $nextEpisode';
+      _mode = _Explorer3Mode.controls;
+    });
+    await _load();
+  }
+
+  Future<void> _changeEpisode(int delta) async {
+    if (_loading) return;
+    final total = _episodeTotal();
+    final next = (_episode + delta).clamp(1, total).toInt();
+
+    if (next == _episode) {
+      _showStatus(delta < 0 ? 'Episode pertama' : 'Episode terakhir');
+      return;
+    }
+
+    await _openEpisodeTarget(next);
+  }
+
+  Future<void> _selectEpisodeCursor() async {
+    if (_loading) return;
+    final total = _episodeTotal();
+    final next = _episodeCursor.clamp(1, total).toInt();
+
+    if (next == _episode) {
+      _showControls();
+      return;
+    }
+
+    await _openEpisodeTarget(next);
+  }
+
+  Future<void> _applyQualityChoice() async {
+    final choices = _qualityChoices;
+    if (choices.isEmpty) {
+      _showControls();
+      return;
+    }
+
+    final safe = _qualityCursor.clamp(0, choices.length - 1).toInt();
+    final label = choices[safe];
+
+    TvPlayerDebugLog.event('player_quality_switch_start', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
+    await _saveProgressNow(force: true);
+    if (!mounted) return;
+
+    setState(() {
+      _activeQuality = label;
+      LiveGoSettings.quality = label;
+      _status = 'Quality $label';
+      _mode = _Explorer3Mode.controls;
+    });
+    unawaited(LiveGoLocalStore.saveSettings());
+    try {
+      await _load();
+      TvPlayerDebugLog.event('player_quality_switch_success', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
+    } catch (error) {
+      TvPlayerDebugLog.event('player_quality_switch_failed', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label, error: error);
+      rethrow;
+    }
+  }
+
+  Future<void> _applySubtitleChoice() async {
+    final choices = _subtitleChoices;
+    final safe = _subtitleCursor.clamp(0, choices.length - 1).toInt();
+
+    if (safe == 0) {
+      setState(() {
+        LiveGoSettings.subtitlesEnabled = false;
+        _subtitleStatus = 'OFF';
+        _subtitleCursor = 0;
+        _status = 'Subtitle OFF';
+        _mode = _Explorer3Mode.controls;
+      });
+      unawaited(LiveGoLocalStore.saveSettings());
+      _scheduleAutoHide();
+      return;
+    }
+
+    final trackIndex = safe - 1;
+    if (_streamInfo.subtitles.isEmpty || trackIndex >= _streamInfo.subtitles.length) {
+      _showStatus('Subtitle tidak tersedia');
+      _showControls();
+      return;
+    }
+
+    final track = _streamInfo.subtitles[trackIndex];
+    final label = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+    setState(() {
+      LiveGoSettings.subtitlesEnabled = true;
+      _subtitleCursor = safe;
+      _subtitleStatus = label;
+      _status = 'Subtitle $label';
+      _mode = _Explorer3Mode.controls;
+    });
+    unawaited(LiveGoLocalStore.saveSettings());
+    _scheduleAutoHide();
+  }
+
+  Future<void> _cycleSpeed() async {
+    final speeds = <double>[0.75, 1.0, 1.25, 1.5, 2.0];
+    var index = speeds.indexWhere((value) => (value - _speed).abs() < 0.01);
+    if (index < 0) index = 1;
+    final next = speeds[(index + 1) % speeds.length];
+
+    final c = _controller;
+    if (c != null && c.value.isInitialized) {
+      await c.setPlaybackSpeed(next);
+    }
+    if (!mounted) return;
+    setState(() {
+      _speed = next;
+      _status = 'Speed ${_formatSpeed(next)}';
+    });
+    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
+  }
+
+  String _formatSpeed(double value) {
+    return '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2)}x';
+  }
+
+  void _toggleMute() {
+    final next = !_muted;
+    _controller?.setVolume(next ? 0 : 1);
+    setState(() {
+      _muted = next;
+      _status = next ? 'Mute' : 'Volume normal';
+    });
+  }
+
+  void _toggleFit() {
+    setState(() {
+      _fitCover = !_fitCover;
+      _status = _fitCover ? 'Layar Cover' : 'Layar Fit';
+    });
+  }
+
+  void _toggleAutoNext() {
+    setState(() {
+      LiveGoSettings.autoNextEnabled = !LiveGoSettings.autoNextEnabled;
+      _status = LiveGoSettings.autoNextEnabled ? 'Auto Next ON' : 'Auto Next OFF';
+    });
+    unawaited(LiveGoLocalStore.saveSettings());
+  }
+
+  void _moveControlCursor(int delta) {
+    if (!_allowCursorMove()) return;
+    setState(() {
+      _controlCursor = (_controlCursor + delta).clamp(0, 7).toInt();
+      _status = 'CONTROL';
+    });
+    _scheduleAutoHide();
+  }
+
+  void _moveEpisodeCursor(int delta) {
+    if (!_allowCursorMove()) return;
+    final total = _episodeTotal();
+    setState(() {
+      _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt();
+      _status = 'EP $_episodeCursor';
+    });
+  }
+
+  void _moveQualityCursor(int delta) {
+    if (!_allowCursorMove()) return;
+    final count = _qualityChoices.length;
+    if (count <= 0) return;
+    setState(() {
+      _qualityCursor = (_qualityCursor + delta).clamp(0, count - 1).toInt();
+      _status = _qualityChoices[_qualityCursor];
+    });
+  }
+
+  void _moveSubtitleCursor(int delta) {
+    if (!_allowCursorMove()) return;
+    final count = _subtitleChoices.length;
+    if (count <= 0) return;
+    setState(() {
+      _subtitleCursor = (_subtitleCursor + delta).clamp(0, count - 1).toInt();
+      _status = _subtitleChoices[_subtitleCursor];
+    });
+  }
+
+  void _moveOptionCursor(int delta) {
+    if (!_allowCursorMove()) return;
+    setState(() => _optionCursor = (_optionCursor + delta).clamp(0, 5).toInt());
+  }
+
+  void _activateControl() {
+    switch (_controlCursor) {
+      case 0:
+        unawaited(_changeEpisode(-1));
+        return;
+      case 1:
+        unawaited(_togglePlay());
+        return;
+      case 2:
+        unawaited(_changeEpisode(1));
+        return;
+      case 3:
+        _showPanel(_Explorer3Mode.episode);
+        return;
+      case 4:
+        _showPanel(_Explorer3Mode.quality);
+        return;
+      case 5:
+        _showPanel(_Explorer3Mode.subtitle);
+        return;
+      case 6:
+        unawaited(_cycleSpeed());
+        return;
+      case 7:
+        _showPanel(_Explorer3Mode.options);
+        return;
+    }
+  }
+
+  void _activateOption() {
+    switch (_optionCursor) {
+      case 0:
+        unawaited(_cycleSpeed());
+        return;
+      case 1:
+        _toggleAutoNext();
+        return;
+      case 2:
+        _toggleFit();
+        return;
+      case 3:
+        _toggleMute();
+        return;
+      case 4:
+        _showPanel(_Explorer3Mode.quality);
+        return;
+      case 5:
+        _showPanel(_Explorer3Mode.subtitle);
+        return;
+    }
+  }
+
+  void _handleBackIntent() {
+    if (_closing) return;
+
+    // During loading or error, back should exit immediately.
+    if (_loading || _error.isNotEmpty) {
+      _close();
+      return;
+    }
+
+    if (_mode != _Explorer3Mode.watching) {
+      _hideOverlays();
+      return;
+    }
+
+    _close();
+  }
+
+  void _close() {
+    if (_closing && !_allowRoutePop) return;
+    _exitFlutterPlayerRoute(source: 'back');
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+    final repeat = event is KeyRepeatEvent;
+
+    if (repeat && (_isBack(key) || _isSelect(key) || _isMenu(key))) {
+      return KeyEventResult.handled;
+    }
+
+    if (_isBack(key)) {
+      _handleBackIntent();
+      return KeyEventResult.handled;
+    }
+
+    final selectPressed = _isSelect(key);
+
+    if (_loading) {
+      if (selectPressed) _showStatus('Memuat video...');
+      return KeyEventResult.handled;
+    }
+
+    if (_error.isNotEmpty) {
+      if (selectPressed) {
+        unawaited(_load());
+      } else if (key == LogicalKeyboardKey.arrowRight) {
+        unawaited(_changeEpisode(1));
+      } else if (key == LogicalKeyboardKey.arrowLeft) {
+        unawaited(_changeEpisode(-1));
+      }
+      return KeyEventResult.handled;
+    }
+
+    if (_isMenu(key)) {
+      _showPanel(_Explorer3Mode.options);
+      return KeyEventResult.handled;
+    }
+
+    switch (_mode) {
+      case _Explorer3Mode.episode:
+        if (key == LogicalKeyboardKey.arrowUp) {
+          _moveEpisodeCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _moveEpisodeCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          _showControls();
+        } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
+          unawaited(_selectEpisodeCursor());
+        }
+        return KeyEventResult.handled;
+
+      case _Explorer3Mode.quality:
+        if (key == LogicalKeyboardKey.arrowUp) {
+          _moveQualityCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _moveQualityCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          _showControls();
+        } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
+          unawaited(_applyQualityChoice());
+        }
+        return KeyEventResult.handled;
+
+      case _Explorer3Mode.subtitle:
+        if (key == LogicalKeyboardKey.arrowUp) {
+          _moveSubtitleCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _moveSubtitleCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          _showControls();
+        } else if (key == LogicalKeyboardKey.arrowRight || selectPressed) {
+          unawaited(_applySubtitleChoice());
+        }
+        return KeyEventResult.handled;
+
+      case _Explorer3Mode.options:
+        if (key == LogicalKeyboardKey.arrowUp) {
+          _moveOptionCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _moveOptionCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight ||
+            selectPressed) {
+          _activateOption();
+        }
+        return KeyEventResult.handled;
+
+      case _Explorer3Mode.controls:
+        if (key == LogicalKeyboardKey.arrowLeft) {
+          _moveControlCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          _moveControlCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowUp) {
+          _showPanel(_Explorer3Mode.options);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _showPanel(_Explorer3Mode.episode);
+        } else if (selectPressed) {
+          _activateControl();
+        }
+        return KeyEventResult.handled;
+
+      case _Explorer3Mode.watching:
+        if (selectPressed) {
+          unawaited(_togglePlay());
+        } else if (key == LogicalKeyboardKey.arrowLeft) {
+          unawaited(_seekBy(const Duration(seconds: -10)));
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          unawaited(_seekBy(const Duration(seconds: 10)));
+        } else if (key == LogicalKeyboardKey.arrowUp) {
+          _showControls(defaultPlay: true);
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _showPanel(_Explorer3Mode.episode);
+        } else {
+          return KeyEventResult.ignored;
+        }
+        return KeyEventResult.handled;
+    }
+  }
+
+  Widget _videoSurface() {
+    final c = _controller;
+    if (!_surfaceReady || c == null || !c.value.isInitialized || c.value.hasError) {
+      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
+      return const ColoredBox(color: Colors.black);
+    }
+
+    final value = c.value;
+    final size = value.size;
+    if (size.width <= 0 || size.height <= 0) {
+      return const ColoredBox(color: Colors.black);
+    }
+
+    // Android TV safety:
+    // Do not wrap VideoPlayer in FittedBox/SizedBox with raw native texture size.
+    // Some TV boxes play audio but render a white native texture with that layout.
+    // The earlier stable Explorer 3 surface used Center + AspectRatio; keep it.
+    final aspect = value.aspectRatio;
+
+    Widget player = AspectRatio(
+      aspectRatio: aspect > 0 ? aspect : 16 / 9,
+      child: VideoPlayer(c),
+    );
+
+    if (_fitCover) {
+      player = SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
+            child: VideoPlayer(c),
+          ),
+        ),
+      );
+    }
+
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(child: player),
+    );
+  }
+
+  Widget _playerDiagnosticOverlay() {
+    if (!_showPlayerDiag) return const SizedBox.shrink();
+
+    final c = _controller;
+    final value = c?.value;
+    final size = value?.size;
+    final pos = value?.position.inMilliseconds ?? 0;
+    final dur = value?.duration.inMilliseconds ?? 0;
+    final aspect = value?.aspectRatio.toStringAsFixed(3) ?? '-';
+
+    final lines = <String>[
+      'LIVEGO PLAYER SAFE DIAG V3',
+      'mode=${_mode.name} loading=$_loading surface=$_surfaceReady closing=$_closing',
+      'q=$_activeQuality codec=$_lastCodecHint',
+      'host=$_lastStreamHost',
+      'tail=$_lastStreamTail',
+      'qualities=$_lastQualityLabels',
+      'ctrl=${c != null} init=${value?.isInitialized ?? false} play=${value?.isPlaying ?? false} buf=${value?.isBuffering ?? false} err=${value?.hasError ?? false}',
+      'size=${size == null ? '-' : '${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'} aspect=$aspect',
+      'pos=${pos}ms dur=${dur}ms',
+    ];
+
+    return IgnorePointer(
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Container(
+            margin: const EdgeInsets.all(18),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            constraints: const BoxConstraints(maxWidth: 760),
+            decoration: BoxDecoration(
+              color: const Color(0xE6000000),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.cyan.withOpacity(0.75)),
+              boxShadow: const [BoxShadow(color: Colors.black87, blurRadius: 14)],
+            ),
+            child: Text(
+              lines.join('\n'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11.5,
+                height: 1.16,
+                fontWeight: FontWeight.w900,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusCenter({
+    required String title,
+    required String subtitle,
+    required bool loading,
+  }) {
+    if (loading) {
+      return const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              color: AppTheme.cyan,
+              strokeWidth: 3,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ColoredBox(
+      color: Colors.black.withOpacity(0.82),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
+          child: Text(
+            '$title\n$subtitle',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              height: 1.35,
+              fontWeight: FontWeight.w800,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _showsControls => _mode == _Explorer3Mode.controls;
+  bool get _showsPanel => _mode == _Explorer3Mode.episode ||
+      _mode == _Explorer3Mode.quality ||
+      _mode == _Explorer3Mode.subtitle ||
+      _mode == _Explorer3Mode.options;
+
+  @override
+  void dispose() {
+    _episodeWarmupTimer?.cancel();
+    _prefetchTimer?.cancel();
+    _surfaceTimer?.cancel();
+    _hideControlsTimer?.cancel();
+    _statusTimer?.cancel();
+    _rootFocus.dispose();
+    unawaited(_saveProgressNow(force: true));
+    _controller?.removeListener(_onControllerTick);
+    _controller?.dispose();
+    TvPlayerDebugLog.event('player_dispose', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName);
+    _nativeSurfacePlayer.setMethodCallHandler(null);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _controller;
+    final ready = c != null && c.value.isInitialized && _error.isEmpty;
+
+    return PopScope(
+      canPop: _allowRoutePop,
+      onPopInvoked: (didPop) {
+        if (!didPop) _handleBackIntent();
+      },
+      child: Focus(
+        focusNode: _rootFocus,
+        autofocus: true,
+        skipTraversal: true,
+        onKeyEvent: _onKey,
+        child: Material(
+          color: Colors.black,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                const ColoredBox(color: Colors.black),
+                _videoSurface(),
+                if (!_surfaceReady)
+                  const ColoredBox(color: Colors.black),
+                if (_loading || _error.isNotEmpty)
+                  _statusCenter(
+                    title: _error.isEmpty ? _status : 'Gagal membuka video',
+                    subtitle: _error.isEmpty ? 'Explorer 3 • EP $_episode' : _error,
+                    loading: _loading && _error.isEmpty,
+                  ),
+                if (ready && (_showsControls || _showsPanel))
+                  TvPlayerExplorer3InfoOverlay(
+                    title: widget.item.title,
+                    episode: _episode,
+                    totalEpisodes: _episodeTotal(),
+                    speed: _speed,
+                    quality: _activeQuality,
+                    subtitle: _subtitleStatus,
+                    autoNext: LiveGoSettings.autoNextEnabled,
+                    muted: _muted,
+                  ),
+                if (ready && _showsControls)
+                  Positioned(
+                    left: 44,
+                    right: 44,
+                    bottom: 0,
+                    child: SafeArea(
+                      bottom: true,
+                      minimum: const EdgeInsets.only(bottom: 28),
+                      child: TvPlayerExplorer3Controls(
+                        controller: c,
+                        title: widget.item.title,
+                        episode: _episode,
+                        totalEpisodes: _episodeTotal(),
+                        status: _status,
+                        selectedIndex: _controlCursor,
+                        isPlaying: c.value.isPlaying,
+                        speed: _speed,
+                      ),
+                    ),
+                  ),
+                if (ready && _mode == _Explorer3Mode.episode)
+                  Positioned(
+                    right: 48,
+                    top: 0,
+                    bottom: 0,
+                    width: 390,
+                    child: SafeArea(
+                      top: true,
+                      right: true,
+                      bottom: true,
+                      minimum: const EdgeInsets.only(top: 28, bottom: 28),
+                      child: TvPlayerExplorer3EpisodePanel(
+                        selected: _episode,
+                        cursor: _episodeCursor,
+                        total: _episodeTotal(),
+                      ),
+                    ),
+                  ),
+                if (ready && _mode == _Explorer3Mode.quality)
+                  Positioned(
+                    right: 48,
+                    bottom: 0,
+                    child: SafeArea(
+                      right: true,
+                      bottom: true,
+                      minimum: const EdgeInsets.only(bottom: 188),
+                      child: TvPlayerExplorer3ChoicePanel(
+                        title: 'Kualitas Video',
+                        subtitle: 'UP/DOWN pilih • OK terapkan • BACK kembali',
+                        choices: _qualityChoices,
+                        cursor: _qualityCursor,
+                      ),
+                    ),
+                  ),
+                if (ready && _mode == _Explorer3Mode.subtitle)
+                  Positioned(
+                    right: 48,
+                    bottom: 0,
+                    child: SafeArea(
+                      right: true,
+                      bottom: true,
+                      minimum: const EdgeInsets.only(bottom: 188),
+                      child: TvPlayerExplorer3ChoicePanel(
+                        title: 'Subtitle',
+                        subtitle: 'UP/DOWN pilih • OK aktifkan • BACK kembali',
+                        choices: _subtitleChoices,
+                        cursor: _subtitleCursor,
+                      ),
+                    ),
+                  ),
+                if (ready && _mode == _Explorer3Mode.options)
+                  Positioned(
+                    right: 48,
+                    bottom: 0,
+                    child: SafeArea(
+                      right: true,
+                      bottom: true,
+                      minimum: const EdgeInsets.only(bottom: 188),
+                      child: TvPlayerExplorer3OptionsPanel(
+                        cursor: _optionCursor,
+                        speed: _formatSpeed(_speed),
+                        autoNext: LiveGoSettings.autoNextEnabled,
+                        fitCover: _fitCover,
+                        muted: _muted,
+                        quality: _activeQuality,
+                        subtitle: _subtitleStatus,
+                      ),
+                    ),
+                  ),
+                _playerDiagnosticOverlay(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
