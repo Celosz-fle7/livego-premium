@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'melolo_cenc_decryptor.dart';
+import 'melolo_config.dart';
 
 /// Embedded Local Streaming Server & Decryption Cache untuk Melolo di LiveGo.
 ///
@@ -156,7 +157,7 @@ class MeloloStreamProxy {
     final httpClient = HttpClient();
     httpClient.connectionTimeout = const Duration(seconds: 15);
     final req = await httpClient.getUrl(Uri.parse(rawVideoUrl));
-    req.headers.set('User-Agent', 'okhttp/4.9.3');
+    req.headers.set('User-Agent', MeloloConfig.userAgent);
     req.headers.set('Accept', '*/*');
     final res = await req.close();
 

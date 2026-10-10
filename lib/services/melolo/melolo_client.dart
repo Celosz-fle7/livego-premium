@@ -14,22 +14,41 @@ class MeloloClient {
         'aid': MeloloConfig.aid,
         'device_id': MeloloConfig.deviceId,
         'iid': MeloloConfig.iid,
-        'device_platform': MeloloConfig.devicePlatform,
         'app_name': MeloloConfig.appName,
-        'language': MeloloConfig.language,
+        'version_code': MeloloConfig.versionCode,
+        'version_name': MeloloConfig.versionName,
+        'device_platform': MeloloConfig.devicePlatform,
+        'os': MeloloConfig.os,
+        'ssmix': MeloloConfig.ssmix,
+        'device_type': MeloloConfig.deviceType,
         'device_brand': MeloloConfig.deviceBrand,
+        'language': MeloloConfig.language,
         'os_api': MeloloConfig.osApi,
-        'channel': MeloloConfig.channel,
-        'app_language': MeloloConfig.appLanguage,
-        'app_region': MeloloConfig.appRegion,
-        'carrier_region': MeloloConfig.carrierRegion,
-        'carrier_region_v2': MeloloConfig.carrierRegionV2,
+        'os_version': MeloloConfig.osVersion,
+        'openudid': MeloloConfig.openudid,
+        'manifest_version_code': MeloloConfig.manifestVersionCode,
+        'resolution': MeloloConfig.resolution,
+        'dpi': MeloloConfig.dpi,
+        'update_version_code': MeloloConfig.updateVersionCode,
         'current_region': MeloloConfig.currentRegion,
+        'carrier_region': MeloloConfig.carrierRegion,
+        'app_language': MeloloConfig.appLanguage,
+        'sys_language': MeloloConfig.sysLanguage,
+        'app_region': MeloloConfig.appRegion,
+        'sys_region': MeloloConfig.sysRegion,
+        'mcc_mnc': MeloloConfig.mccMnc,
+        'carrier_region_v2': MeloloConfig.carrierRegionV2,
+        'user_language': MeloloConfig.userLanguage,
+        'time_zone': MeloloConfig.timeZone,
+        'ui_language': MeloloConfig.uiLanguage,
+        'cdid': MeloloConfig.cdid,
+        'channel': MeloloConfig.channel,
+        'ac': MeloloConfig.ac,
       };
 
   void _applyHeaders(HttpHeaders headers) {
-    headers.set('User-Agent', 'okhttp/4.9.3');
-    headers.set('Accept', 'application/json');
+    headers.set('User-Agent', MeloloConfig.userAgent);
+    headers.set('Accept', 'application/json; charset=utf-8,application/x-protobuf');
     headers.set('X-Xs-From-Web', 'false');
   }
 
