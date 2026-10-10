@@ -280,9 +280,11 @@ class MeloloClient {
                 rawVideoUrl: videoUrl,
                 spadeA: spadeA,
               );
-            } catch (e) {
-              // Jika proxy gagal, kembalikan URL langsung sebagai fallback
-              return videoUrl;
+            } catch (e, stack) {
+              // Catat error kegagalan decrypt/proxy agar tidak crash senyap
+              // ignore: avoid_print
+              print('LIVEGO Melolo stream proxy error: $e\n$stack');
+              rethrow;
             }
           }
           return videoUrl;

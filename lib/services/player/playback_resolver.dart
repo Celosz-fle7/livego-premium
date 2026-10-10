@@ -115,12 +115,15 @@ class PlaybackResolver {
         subtitles: subtitles,
         qualities: qualities,
       );
+      final videoType = source.slug == 'melolo'
+          ? LiveGoVideoType.mp4
+          : LiveGoVideoType.hls;
       return PlaybackSource.fromStreamInfo(
         stream: stream,
         platform: source.slug,
         dramaId: item.id,
         episodeNumber: ep,
-        videoType: LiveGoVideoType.hls,
+        videoType: videoType,
         selectedQuality: PlayerPreferences.quality,
         selectedSubtitle:
             PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
@@ -131,7 +134,9 @@ class PlaybackResolver {
         platform: source.slug,
         dramaId: item.id,
         episodeNumber: ep,
-        videoType: LiveGoVideoType.hls,
+        videoType: source.slug == 'melolo'
+            ? LiveGoVideoType.mp4
+            : LiveGoVideoType.hls,
       );
     }
   }

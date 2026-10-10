@@ -33,35 +33,58 @@ class MeloloConfig {
 
   static const Duration timeout = Duration(seconds: 15);
 
-  /// Kategori resmi Melolo yang diverifikasi menghasilkan ratusan konten
+  /// Kategori & Filter resmi Melolo sesuai APK asli (Beranda & Tag Preferensi)
   static const List<String> categories = [
-    'Romance',
-    'Billionaire',
-    'Rebirth',
-    'Male Lead',
-    'Counterattack',
-    'Fantasy',
-    'Love After Marriage',
-    'Paranormal',
-    'Mystery',
-    'Teen Fic',
-    'Modern Love',
+    'Populer',
+    'Anime',
+    'Peringkat',
+    'Rakyat Jelata',
+    'Putri Yang Tertukar',
+    'Anak Kesayangan',
+    'Romansa Urban',
+    'Fantasi Perkotaan',
+    'Romansa Klasik',
+    'Cinta yang manis',
+    'Cinta modern',
+    'Bayi Lucu',
+    'Cinta yang pahit',
+    'Pemeran Utama Wanita Kuat',
+    'Mafia',
     'CEO',
+    'Identitas Tersembunyi',
+    'Kelahiran kembali (Rebirth)',
+    'Harem',
+    'Horor / Thriller',
+    'Menantu',
+    'Cinta Setelah Pernikahan',
   ];
 
-  /// Mapping nama kategori ke query pencarian Melolo
+  /// Mapping nama kategori ke query pencarian Melolo yang terbukti mengembalikan katalog melimpah
   static const Map<String, String> categoryQueryMap = {
-    'Romance': 'Romantic',
-    'Billionaire': 'Billionaire',
-    'Rebirth': 'Rebirth',
-    'Male Lead': 'Male Lead',
-    'Counterattack': 'Counterattack',
-    'Fantasy': 'Fantasy',
-    'Love After Marriage': 'Love After Marriage',
-    'Paranormal': 'Paranormal',
-    'Mystery': 'Mystery',
-    'Teen Fic': 'Teen Fic',
-    'Modern Love': 'Modern Love',
-    'CEO': 'CEO',
+    // Menu Filter Beranda Utama
+    'Populer': 'Hot',
+    'Anime': 'Anime',
+    'Peringkat': 'Best',
+    'Rakyat Jelata': 'Commoner',
+    'Putri Yang Tertukar': 'Real and Fake Daughter',
+    'Anak Kesayangan': 'Beloved Child',
+    'Romansa Urban': 'Urban Romance',
+    'Fantasi Perkotaan': 'Urban Fantasy',
+    'Romansa Klasik': 'Classic Romance',
+
+    // Tag Preferensi Resmi APK
+    'Cinta yang manis': 'Romantic',
+    'Cinta modern': 'Metropolitan',
+    'Bayi Lucu': 'Cute baby',
+    'Cinta yang pahit': 'Bitter love',
+    'Pemeran Utama Wanita Kuat': 'Strong Female Lead',
+    'Mafia': 'Mafia',
+    'CEO': 'Billionaire',
+    'Identitas Tersembunyi': 'Hidden Identity',
+    'Kelahiran kembali (Rebirth)': 'Rebirth',
+    'Harem': 'Harem',
+    'Horor / Thriller': 'Thriller',
+    'Menantu': 'Son in law',
+    'Cinta Setelah Pernikahan': 'Love After Marriage',
   };
 }
