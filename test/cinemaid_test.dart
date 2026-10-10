@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:livego/services/cinemaid/cinemaid_client.dart';
-import 'package:livego/services/cinemaid/cinemaid_config.dart';
+import 'package:livego_premium/services/cinemaid/cinemaid_client.dart';
+import 'package:livego_premium/services/cinemaid/cinemaid_config.dart';
 
 void main() {
   group('CinemaID Tests', () {

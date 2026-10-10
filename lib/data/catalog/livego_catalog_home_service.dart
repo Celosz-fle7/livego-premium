@@ -1,5 +1,6 @@
 import '../../services/api/api_platform.dart';
 import '../../models/content_item.dart';
+import '../../services/drama_source.dart';
 import '../../services/cache/livego_content_cache.dart';
 import '../../services/content/content_health_service.dart';
 import '../../services/feed/feed_config.dart';
@@ -76,6 +77,14 @@ class LiveGoCatalogHomeService {
   }
 
   static Future<List<ContentItem>> home({String platform = 'melolo'}) async {
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      final firstCat = dramaSource.categories.isNotEmpty
+          ? dramaSource.categories.first
+          : 'Romance';
+      return dramaSource.homeByCategory(firstCat);
+    }
+
     const endpoint = 'home_clean_v2';
     final lang = LiveGoCatalogPlatformService.languageFor(platform);
     final cached = await LiveGoContentCache.readItems(
@@ -160,6 +169,11 @@ class LiveGoCatalogHomeService {
     String platform = 'melolo',
     String category = 'Home',
   }) async {
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      return dramaSource.homeByCategory(category);
+    }
+
     final key = LiveGoApiPlatforms.categoryKey(platform, category);
     final endpoint = key.isEmpty ? 'home' : key;
     final lang = LiveGoCatalogPlatformService.languageFor(platform);

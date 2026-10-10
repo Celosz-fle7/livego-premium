@@ -1,61 +1,67 @@
-/// Konfigurasi statis Melolo (com.worldance.drama v5.3.7, infrastruktur ByteDance).
-///
-/// Hasil static teardown 2026-10-07 (114 endpoint, sensus anotasi dex):
-/// - Host: https://api.tmtreader.com (utama), https://api-my.tmtreader.com (MY)
-/// - Semua request API bawa param TT standar: aid, did, iid, device_id,
-///   app_name, version_code, dsb.
-/// - aid=645713 TERKONFIRMASI dari dex (deep-link scheme worldance645713://
-///   dan param app_id=645713 ke api.tmtreader.com).
-/// - Signing X-Argus/X-Gorgon/X-Ladon (libtobEmbedPagEncrypt.so, native)
-///   TIDAK bisa direplika dari static — request dikirim tanpa header sign;
-///   endpoint publik kemungkinan tetap menjawab (perlu 1 capture runtime
-///   untuk konfirmasi, lihat ~/workspace/apkanalysis/melolo-protocol.md).
-/// - Struktur respons video_detail/video_model BELUM terverifikasi live;
-///   client memakai banyak fallback key (pola sama seperti CinemaID).
+/// Konfigurasi API Melolo (com.worldance.drama).
+/// Berdasarkan reverse engineering APK dan rekaman trafik autentik:
+/// - Host: https://api.tmtreader.com
+/// - Param aid: 645713 (ByteDance)
+/// - Endpoint discovery: /i18n_novel/search/page/v1/ (pencarian & kategori)
+/// - Endpoint detail: /novel/player/video_detail/v1/
+/// - Endpoint streaming: /novel/player/video_model/v1/
 class MeloloConfig {
   MeloloConfig._();
 
-  static const primaryHost = 'https://api.tmtreader.com';
-  static const regionalHost = 'https://api-my.tmtreader.com';
+  static const String baseUrl = 'https://api.tmtreader.com';
+  static const String searchEndpoint = '/i18n_novel/search/page/v1/';
+  static const String videoDetailEndpoint = '/novel/player/video_detail/v1/';
+  static const String videoModelEndpoint = '/novel/player/video_model/v1/';
 
-  /// App ID ByteDance Melolo — confirmed dari dex (bukan 1371 milik Pangle).
-  static const aid = '645713';
-  static const appName = 'melolo';
+  // Header dan Device Identitas ByteDance yang terverifikasi
+  static const String aid = '645713';
+  static const String deviceId = '7514640337227908615';
+  static const String iid = '7685755891161237255';
+  static const String appName = 'melolo';
+  static const String versionCode = '53018';
+  static const String versionName = '5.3.0';
+  static const String devicePlatform = 'android';
+  static const String language = 'id';
+  static const String appLanguage = 'id';
+  static const String deviceBrand = 'Infinix';
+  static const String osApi = '34';
+  static const String channel = 'google_play';
+  static const String appRegion = 'US';
+  static const String carrierRegion = 'US';
+  static const String carrierRegionV2 = 'US';
+  static const String currentRegion = 'US';
 
-  /// version_code tinggi agar tidak ditolak sebagai client jadul.
-  static const versionCode = '999999999';
+  static const Duration timeout = Duration(seconds: 15);
 
-  static const userAgent =
-      'Mozilla/5.0 (Linux; Android 13; CPH2205 Build/TKQ1.221114.001) '
-      'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 '
-      'Chrome/120.0.0.0 Mobile Safari/537.36';
-
-  static const timeout = Duration(seconds: 15);
-
-  /// Key SharedPreferences untuk did/iid persisten.
-  static const deviceIdPrefKey = 'melolo_device_id';
-  static const installIdPrefKey = 'melolo_install_id';
-
-  // ---- Endpoint (hasil sensus dex) ----
-  static const deviceRegisterPath =
-      'https://log.byteoversea.com/service/2/device_register/';
-  static const tabPath = '/i18n_novel/bookmall/tab/v1/';
-  static const cellChangePath = '/i18n_novel/bookmall/cell/change/v1/';
-  static const homepagePath = '/i18n_novel/userapi/get_homepage/v1/';
-  static const searchPagePath = '/i18n_novel/search/page/v1/';
-  static const searchSuggestPath = '/i18n_novel/search/suggest/v1/';
-  static const videoDetailPath = '/novel/player/video_detail/v1/';
-  static const videoModelPath = '/novel/player/video_model/v1/';
-  static const multiVideoDetailPath = '/novel/player/multi_video_detail/v1/';
-  static const multiVideoModelPath = '/novel/player/multi_video_model/v1/';
-
-  /// Kategori sinkron (tanpa network). Nama tab aktual diambil dari
-  /// /i18n_novel/bookmall/tab/v1/ dan dicocokkan di homeByCategory.
-  static const categories = <String>[
-    'For You',
-    'Drama',
+  /// Kategori resmi Melolo yang diverifikasi menghasilkan ratusan konten
+  static const List<String> categories = [
     'Romance',
-    'Thriller',
-    'Comedy',
+    'Billionaire',
+    'Rebirth',
+    'Male Lead',
+    'Counterattack',
+    'Fantasy',
+    'Love After Marriage',
+    'Paranormal',
+    'Mystery',
+    'Teen Fic',
+    'Modern Love',
+    'CEO',
   ];
+
+  /// Mapping nama kategori ke query pencarian Melolo
+  static const Map<String, String> categoryQueryMap = {
+    'Romance': 'Romantic',
+    'Billionaire': 'Billionaire',
+    'Rebirth': 'Rebirth',
+    'Male Lead': 'Male Lead',
+    'Counterattack': 'Counterattack',
+    'Fantasy': 'Fantasy',
+    'Love After Marriage': 'Love After Marriage',
+    'Paranormal': 'Paranormal',
+    'Mystery': 'Mystery',
+    'Teen Fic': 'Teen Fic',
+    'Modern Love': 'Modern Love',
+    'CEO': 'CEO',
+  };
 }

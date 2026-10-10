@@ -58,6 +58,33 @@ class LiveGoApiPlatforms {
       streamFromAllEpisodes: true,
       categories: ['Trending', 'Terbaru', 'Populer', 'Completed'],
     ),
+    LiveGoApiPlatform(
+      slug: 'melolo',
+      endpointSlug: 'melolo',
+      name: 'Melolo',
+      backend: LiveGoApiBackend.nobuzero,
+      defaultLang: 'id',
+      searchParam: 'query',
+      videoType: LiveGoVideoType.mp4,
+      supportedLangs: ['id'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Romance',
+        'Billionaire',
+        'Rebirth',
+        'Male Lead',
+        'Counterattack',
+        'Fantasy',
+        'Love After Marriage',
+        'Paranormal',
+        'Mystery',
+        'Teen Fic',
+        'Modern Love',
+        'CEO',
+      ],
+    ),
   ];
 
   static const List<String> tvStarterSlugs = <String>['freereels', 'cinemaid', 'melolo'];

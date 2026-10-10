@@ -1,397 +1,297 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/content_item.dart';
+import '../../models/livego_episode.dart';
+import '../drama_source.dart';
 import 'melolo_config.dart';
 
-/// HTTP client Melolo — meniru request APK (ByteDance TT stack).
-///
-/// Alur identitas:
-/// 1. device_register (ByteDance standar, biasanya lolos tanpa signing)
-///    -> device_id (did) + install_id (iid), persisten per install.
-/// 2. Semua request API bawa param TT: aid=645713, app_name=melolo,
-///    version_code, device_id, iid, did, device_brand/type, os, resolution...
-/// 3. Header sign X-Argus/X-Gorgon TIDAK direplika (native) — request
-///    dikirim tanpa; kalau server menolak, error-nya jelas di exception.
-///
-/// Parsing toleran: struktur respons video_detail/video_model belum
-/// terverifikasi live (butuh 1 capture runtime), jadi semua akses field
-/// pakai fallback key berlapis.
+/// HTTP Client untuk Melolo API (https://api.tmtreader.com).
+/// Meniru permintaan jaringan resmi Melolo untuk discovery, episode, dan pemutaran stream.
 class MeloloClient {
-  String _host = MeloloConfig.primaryHost;
-  String? _deviceId;
-  String? _installId;
-  bool _registerTried = false;
+  Map<String, String> get _commonParams => {
+        'aid': MeloloConfig.aid,
+        'device_id': MeloloConfig.deviceId,
+        'iid': MeloloConfig.iid,
+        'device_platform': MeloloConfig.devicePlatform,
+        'app_name': MeloloConfig.appName,
+        'language': MeloloConfig.language,
+        'device_brand': MeloloConfig.deviceBrand,
+        'os_api': MeloloConfig.osApi,
+        'channel': MeloloConfig.channel,
+        'app_language': MeloloConfig.appLanguage,
+        'app_region': MeloloConfig.appRegion,
+        'carrier_region': MeloloConfig.carrierRegion,
+        'carrier_region_v2': MeloloConfig.carrierRegionV2,
+        'current_region': MeloloConfig.currentRegion,
+      };
 
-  /// Param TT umum (dari dex + probe script).
-  Map<String, String> _commonParams() {
-    return {
-      'aid': MeloloConfig.aid,
-      'app_name': MeloloConfig.appName,
-      'version_code': MeloloConfig.versionCode,
-      'device_brand': 'OPPO',
-      'device_type': 'CPH2205',
-      'os': 'android',
-      'os_version': '13',
-      'os_api': '33',
-      'resolution': '1080*2400',
-      'tz_name': 'Asia/Jakarta',
-      'channel': 'official',
-    };
+  void _applyHeaders(HttpHeaders headers) {
+    headers.set('User-Agent', 'okhttp/4.9.3');
+    headers.set('Accept', 'application/json');
+    headers.set('X-Xs-From-Web', 'false');
   }
 
-  Future<Map<String, String>> _identity() async {
-    if (_deviceId != null && _installId != null) {
-      return {'device_id': _deviceId!, 'iid': _installId!, 'did': _deviceId!};
-    }
-    final prefs = await SharedPreferences.getInstance();
-    var did = prefs.getString(MeloloConfig.deviceIdPrefKey);
-    var iid = prefs.getString(MeloloConfig.installIdPrefKey);
-    if (did == null || did.isEmpty || iid == null || iid.isEmpty) {
-      final reg = await _deviceRegister();
-      did = reg['device_id'];
-      iid = reg['install_id'];
-      if (did == null || did.isEmpty) {
-        // Register gagal — pakai identitas acak; endpoint publik
-        // kemungkinan tetap menjawab.
-        final rnd = Random.secure();
-        did = List<int>.generate(8, (_) => rnd.nextInt(256))
-            .map((b) => b.toRadixString(16).padLeft(2, '0'))
-            .join();
-        iid = List<int>.generate(8, (_) => rnd.nextInt(256))
-            .map((b) => b.toRadixString(16).padLeft(2, '0'))
-            .join();
-      }
-      await prefs.setString(MeloloConfig.deviceIdPrefKey, did);
-      await prefs.setString(MeloloConfig.installIdPrefKey, iid ?? '');
-    }
-    _deviceId = did;
-    _installId = iid;
-    return {'device_id': did!, 'iid': iid ?? '', 'did': did};
-  }
+  Future<Map<String, dynamic>> _getJson(
+    String path,
+    Map<String, String> query,
+  ) async {
+    final uri = Uri.parse(MeloloConfig.baseUrl).replace(
+      path: path,
+      queryParameters: {
+        ..._commonParams,
+        ...query,
+      },
+    );
 
-  /// POST device_register (ByteDance). Return {device_id, install_id} atau kosong.
-  Future<Map<String, String>> _deviceRegister() async {
-    if (_registerTried) return const {};
-    _registerTried = true;
-    final out = <String, String>{};
-    try {
-      final client = HttpClient();
-      try {
-        final uri = Uri.parse(MeloloConfig.deviceRegisterPath);
-        final req = await client.postUrl(uri).timeout(MeloloConfig.timeout);
-        req.headers.set('User-Agent', MeloloConfig.userAgent);
-        req.headers.set('Content-Type',
-            'application/x-www-form-urlencoded; charset=UTF-8');
-        final body = <String, String>{
-          ..._commonParams(),
-          'device_id': '0',
-          'iid': '0',
-        };
-        req.write(Uri(queryParameters: body).query);
-        final resp = await req.close().timeout(MeloloConfig.timeout);
-        final text = await resp.transform(utf8.decoder).join();
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          final decoded = jsonDecode(text);
-          final data = decoded is Map ? (decoded['data'] ?? decoded) : {};
-          if (data is Map) {
-            final did = '${data['device_id'] ?? data['did'] ?? ''}';
-            final iid = '${data['install_id'] ?? data['iid'] ?? ''}';
-            if (did.isNotEmpty && did != '0') out['device_id'] = did;
-            if (iid.isNotEmpty && iid != '0') out['install_id'] = iid;
-          }
-        }
-      } finally {
-        client.close(force: true);
-      }
-    } catch (_) {}
-    return out;
-  }
-
-  Uri _uri(String path, [Map<String, String>? extra]) {
-    final params = <String, String>{
-      ..._commonParams(),
-      ...?extra,
-    };
-    return Uri.parse('$_host$path').replace(queryParameters: params);
-  }
-
-  /// GET {host}{path} + param TT. Return Map decoded (toleran).
-  Future<Map<String, dynamic>> _get(
-    String path, [
-    Map<String, String>? query,
-  ]) async {
-    final id = await _identity();
-    final uri = _uri(path, {...id, ...?query});
     final client = HttpClient();
     try {
-      final req = await client.getUrl(uri).timeout(MeloloConfig.timeout);
-      req.headers.set('User-Agent', MeloloConfig.userAgent);
-      req.headers.set('Accept', 'application/json');
-      final resp = await req.close().timeout(MeloloConfig.timeout);
-      final text = await resp.transform(utf8.decoder).join();
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        throw Exception('Melolo ${resp.statusCode} $path: ${_short(text)}');
+      final request = await client.getUrl(uri).timeout(MeloloConfig.timeout);
+      _applyHeaders(request.headers);
+      final response = await request.close().timeout(MeloloConfig.timeout);
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Melolo GET ${response.statusCode} $path: $body');
       }
-      return _decode(text);
+      if (body.trim().isEmpty) return <String, dynamic>{};
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return <String, dynamic>{'data': decoded};
     } finally {
       client.close(force: true);
     }
   }
 
-  /// POST form {host}{path} + param TT. Return Map decoded (toleran).
   Future<Map<String, dynamic>> _postForm(
     String path,
-    Map<String, String> fields,
-  ) async {
-    final id = await _identity();
-    final uri = _uri(path, id);
+    Map<String, String> body, {
+    Map<String, String>? extraQuery,
+  }) async {
+    final uri = Uri.parse(MeloloConfig.baseUrl).replace(
+      path: path,
+      queryParameters: {
+        ..._commonParams,
+        ...?extraQuery,
+      },
+    );
+
     final client = HttpClient();
     try {
-      final req = await client.postUrl(uri).timeout(MeloloConfig.timeout);
-      req.headers.set('User-Agent', MeloloConfig.userAgent);
-      req.headers.set('Accept', 'application/json');
-      req.headers.set(
-          'Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
-      if (fields.isNotEmpty) {
-        req.write(Uri(queryParameters: fields).query);
+      final request = await client.postUrl(uri).timeout(MeloloConfig.timeout);
+      _applyHeaders(request.headers);
+      request.headers.set(
+        'Content-Type',
+        'application/x-www-form-urlencoded; charset=UTF-8',
+      );
+      if (body.isNotEmpty) {
+        request.write(Uri(queryParameters: body).query);
       }
-      final resp = await req.close().timeout(MeloloConfig.timeout);
-      final text = await resp.transform(utf8.decoder).join();
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        throw Exception('Melolo ${resp.statusCode} $path: ${_short(text)}');
+      final response = await request.close().timeout(MeloloConfig.timeout);
+      final respBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Melolo POST ${response.statusCode} $path: $respBody');
       }
-      return _decode(text);
+      if (respBody.trim().isEmpty) return <String, dynamic>{};
+      final decoded = jsonDecode(respBody);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      return <String, dynamic>{'data': decoded};
     } finally {
       client.close(force: true);
     }
   }
 
-  Map<String, dynamic> _decode(String text) {
-    final t = text.trim();
-    if (t.isEmpty) return const {};
-    final decoded = jsonDecode(t);
-    if (decoded is Map<String, dynamic>) return decoded;
-    if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    return <String, dynamic>{'data': decoded};
-  }
+  /// Ekstrak daftar ContentItem dari respons search / kategori
+  List<ContentItem> _extractBooks(Map<String, dynamic> res, String category) {
+    final data = res['data'] as Map?;
+    final searchData = data?['search_data'] as List? ?? [];
+    final items = <ContentItem>[];
+    final seenIds = <String>{};
 
-  String _short(String s) => s.length > 160 ? '${s.substring(0, 160)}...' : s;
+    for (final block in searchData) {
+      if (block is! Map) continue;
+      final books = block['books'] as List? ?? [];
+      for (final book in books) {
+        if (book is! Map) continue;
+        final id = '${book['book_id'] ?? ''}';
+        if (id.isEmpty || seenIds.contains(id)) continue;
+        seenIds.add(id);
 
-  /// Ambil data efektif: {code, data} -> data; atau map langsung.
-  /// Juga tangani wrapper BaseResp{StatusCode, StatusMessage} (player API).
-  /// Throw kalau code jelas error (mis. 123 = invalid aid,
-  /// 1050007 = risk control, 101001 = series tidak ada).
-  Map<String, dynamic> _dataOf(String path, Map<String, dynamic> res) {
-    final baseResp = res['BaseResp'];
-    if (baseResp is Map) {
-      final sc = int.tryParse('${baseResp['StatusCode']}');
-      if (sc != null && sc != 0) {
-        throw Exception('Melolo BaseResp=$sc '
-            'msg=${baseResp['StatusMessage'] ?? res['message']} path=$path');
+        final title = '${book['book_name'] ?? 'Untitled'}';
+        final desc = '${book['abstract'] ?? ''}';
+        final cover = '${book['thumb_url'] ?? book['cover'] ?? book['book_cover'] ?? ''}';
+        final episodesCount = int.tryParse(
+              '${book['serial_count'] ?? book['total_episodes'] ?? book['episode_cnt'] ?? 1}',
+            ) ??
+            1;
+
+        items.add(ContentItem(
+          id: id,
+          title: title,
+          source: 'melolo',
+          category: category,
+          description: desc,
+          posterUrl: cover,
+          backdropUrl: cover,
+          rating: 8.5,
+          episodes: episodesCount <= 0 ? 1 : episodesCount,
+          platformSlug: 'melolo',
+          lang: 'id',
+        ));
       }
     }
-    final code = res['code'];
-    if (code != null) {
-      final c = int.tryParse('$code');
-      // 0 = sukses (konvensi umum); 123 = invalid aid (terverifikasi).
-      if (c != null && c != 0) {
-        throw Exception(
-            'Melolo code=$c msg=${res['message'] ?? res['msg']} path=$path');
+
+    return items;
+  }
+
+  /// Ambil feed konten untuk kategori dengan pagination awal
+  Future<List<ContentItem>> feedForCategory(String category) async {
+    final queryTerm = MeloloConfig.categoryQueryMap[category] ?? category;
+    final allItems = <ContentItem>[];
+    final seen = <String>{};
+
+    // Ambil 2 batch pertama (offset 0 dan offset 20) agar katalog melimpah
+    for (final offset in [0, 20]) {
+      try {
+        final res = await _getJson(MeloloConfig.searchEndpoint, {
+          'query': queryTerm,
+          'offset': '$offset',
+          'limit': '20',
+        });
+        final batch = _extractBooks(res, category);
+        for (final item in batch) {
+          if (seen.add(item.id)) {
+            allItems.add(item);
+          }
+        }
+      } catch (_) {
+        break;
       }
     }
-    final data = res['data'];
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
-    if (data is List) return <String, dynamic>{'list': data};
-    return res;
+
+    return allItems;
   }
 
-  List<Map> _asMaps(Object? raw) {
-    if (raw is List) return raw.whereType<Map>().toList();
-    return const [];
+  /// Pencarian konten Melolo
+  Future<List<ContentItem>> search(String keyword) async {
+    if (keyword.trim().isEmpty) return const [];
+    try {
+      final res = await _getJson(MeloloConfig.searchEndpoint, {
+        'query': keyword.trim(),
+        'offset': '0',
+        'limit': '30',
+      });
+      return _extractBooks(res, 'Search');
+    } catch (_) {
+      return const [];
+    }
   }
 
-  ContentItem _toContentItem(Map m, String category) {
-    final id = '${m['series_id'] ?? m['book_id'] ?? m['id'] ?? ''}';
-    return ContentItem(
-      id: id,
-      title: '${m['title'] ?? m['name'] ?? m['book_name'] ?? 'No title'}',
-      source: 'melolo',
-      category: category,
-      description:
-          '${m['description'] ?? m['desc'] ?? m['synopsis'] ?? m['introduction'] ?? ''}',
-      posterUrl:
-          '${m['cover'] ?? m['poster'] ?? m['cover_url'] ?? m['image'] ?? m['thumb'] ?? ''}',
-      backdropUrl:
-          '${m['cover'] ?? m['poster'] ?? m['cover_url'] ?? m['image'] ?? ''}',
-      rating: double.tryParse('${m['score'] ?? m['rating'] ?? 0}') ?? 0,
-      episodes:
-          int.tryParse('${m['total_episode'] ?? m['episode_count'] ?? m['chapters'] ?? 0}') ??
-              0,
-      platformSlug: 'melolo',
+  /// Ambil daftar episode drama Melolo
+  Future<List<LiveGoEpisode>> episodeList(String seriesId) async {
+    final res = await _postForm(
+      MeloloConfig.videoDetailEndpoint,
+      {'series_id': seriesId},
+    );
+
+    final data = res['data'] as Map?;
+    final videoData = data?['video_data'] as Map?;
+    final rawList = videoData?['video_list'] as List? ?? [];
+
+    final episodes = <LiveGoEpisode>[];
+    var fallbackIndex = 1;
+
+    for (final item in rawList) {
+      if (item is! Map) continue;
+      final vid = '${item['vid'] ?? item['id'] ?? ''}';
+      if (vid.isEmpty) continue;
+
+      final idx = int.tryParse(
+            '${item['vid_index'] ?? item['episode'] ?? fallbackIndex}',
+          ) ??
+          fallbackIndex;
+
+      episodes.add(LiveGoEpisode(
+        id: vid,
+        index: idx,
+        title: 'Episode $idx',
+      ));
+      fallbackIndex++;
+    }
+
+    return episodes;
+  }
+
+  /// Ambil URL stream video untuk suatu episode
+  Future<String> streamUrl({
+    required String seriesId,
+    required String episodeId,
+  }) async {
+    final res = await _postForm(
+      MeloloConfig.videoModelEndpoint,
+      {
+        'series_id': seriesId,
+        'video_id': episodeId,
+      },
+    );
+
+    final data = res['data'] as Map?;
+    if (data == null) {
+      throw Exception('Melolo: data video model kosong ($seriesId/$episodeId)');
+    }
+
+    dynamic rawVm = data['video_model'] ?? data['videoModel'];
+    if (rawVm is String) {
+      try {
+        rawVm = jsonDecode(rawVm);
+      } catch (_) {}
+    }
+
+    final vm = rawVm is Map ? rawVm : <dynamic, dynamic>{};
+    final videoList = vm['video_list'];
+
+    Map? selectedQuality;
+    if (videoList is Map && videoList.isNotEmpty) {
+      selectedQuality = (videoList['video_1'] ?? videoList.values.first) as Map?;
+    } else if (videoList is List && videoList.isNotEmpty) {
+      selectedQuality = videoList.first as Map?;
+    }
+
+    if (selectedQuality != null) {
+      final rawMainUrl = '${selectedQuality['main_url'] ?? selectedQuality['backup_url_1'] ?? ''}';
+      if (rawMainUrl.isNotEmpty) {
+        final decoded = _tryBase64Decode(rawMainUrl);
+        if (decoded.startsWith('http')) return decoded;
+        if (rawMainUrl.startsWith('http')) return rawMainUrl;
+      }
+    }
+
+    throw Exception('Melolo: URL stream tidak ditemukan ($seriesId/$episodeId)');
+  }
+
+  Future<DramaEpisodeExtras?> episodeExtras(
+    String seriesId,
+    String episodeId,
+  ) async {
+    return const DramaEpisodeExtras(
+      qualities: [
+        DramaQuality(label: '720p', resolution: '720x1280'),
+      ],
+      unlocked: true,
     );
   }
 
-  List<ContentItem> _itemsFrom(Object? raw, String category) {
-    return _asMaps(raw)
-        .map((m) => _toContentItem(m, category))
-        .where((c) => c.id.isNotEmpty)
-        .toList();
-  }
-
-  /// GET /i18n_novel/bookmall/tab/v1/ -> daftar tab kategori.
-  Future<List<Map<String, dynamic>>> tabList() async {
-    final data = _dataOf('tab', await _get(MeloloConfig.tabPath));
-    final list = _asMaps(data['tab_list'] ??
-        data['tabs'] ??
-        data['list'] ??
-        data['items']);
-    return list.map((m) => Map<String, dynamic>.from(m)).toList();
-  }
-
-  /// GET /i18n_novel/userapi/get_homepage/v1/ -> feed homepage.
-  Future<List<ContentItem>> homepage({String category = ''}) async {
-    final data = _dataOf('homepage', await _get(MeloloConfig.homepagePath));
-    return _itemsFrom(
-        data['cell_list'] ?? data['list'] ?? data['items'] ?? data['feeds'],
-        category);
-  }
-
-  /// GET /i18n_novel/bookmall/cell/change/v1/ -> konten per cell/tab.
-  Future<List<ContentItem>> cellChange(Map<String, String> query,
-      {String category = ''}) async {
-    final data =
-        _dataOf('cell/change', await _get(MeloloConfig.cellChangePath, query));
-    return _itemsFrom(
-        data['cell_list'] ?? data['list'] ?? data['items'], category);
-  }
-
-  /// GET /i18n_novel/search/page/v1/ {query} -> hasil pencarian.
-  /// Nama param terverifikasi live: `query` (server echo query_word).
-  Future<List<ContentItem>> searchPage(String keyword) async {
-    final data = _dataOf('search',
-        await _get(MeloloConfig.searchPagePath, {'query': keyword}));
-    return _itemsFrom(
-        data['list'] ?? data['items'] ?? data['results'], 'search');
-  }
-
-  /// POST /novel/player/video_detail/v1/ {series_id} -> detail + episode.
-  ///
-  /// Return: { 'info': <Map>, 'episodes': <List<Map>> }.
-  /// Struktur respons belum terverifikasi live — fallback key berlapis.
-  Future<Map<String, dynamic>> videoDetail(String seriesId) async {
-    var data = _dataOf('video_detail',
-        await _postForm(MeloloConfig.videoDetailPath, {'series_id': seriesId}));
-    // Coba varian multi kalau video_detail kosong.
-    if (_asMaps(data['episode_list']).isEmpty &&
-        _asMaps(data['episodes']).isEmpty &&
-        _asMaps(data['list']).isEmpty) {
-      try {
-        data = _dataOf('multi_video_detail', await _postForm(
-            MeloloConfig.multiVideoDetailPath, {'series_id': seriesId}));
-      } catch (_) {}
-    }
-    final info = (data['video_info'] ??
-        data['series_info'] ??
-        data['info'] ??
-        data['detail'] ??
-        {}) as Map? ??
-        {};
-    final episodes = _asMaps(data['episode_list'] ??
-            data['episodes'] ??
-            data['video_list'] ??
-            data['list'])
-        .map((m) => Map<String, dynamic>.from(m))
-        .toList();
-    return {
-      'info': Map<String, dynamic>.from(info),
-      'episodes': episodes,
-    };
-  }
-
-  /// POST /novel/player/video_model/v1/ -> playinfo satu episode.
-  ///
-  /// Struktur TERKONFIRMASI (blueprint bytecode 2026-10-08):
-  ///   response.data.videoModel -> VideoInfo{ main_url (direct string),
-  ///   backup_url_1..3 (Base64-encoded), file_id, file_hash }
-  ///   response.data juga bawa: authorization, expireTime, playAuthToken,
-  ///   videoWidth, videoHeight.
-  /// Return map ternormalisasi (atau kosong kalau gagal).
-  Future<Map<String, dynamic>> videoModel(
-      String seriesId, String videoId) async {
-    final fields = <String, String>{
-      'series_id': seriesId,
-      'video_id': videoId,
-    };
-    Map<String, dynamic> data = const {};
+  String _tryBase64Decode(String str) {
     try {
-      data = _dataOf('video_model',
-          await _postForm(MeloloConfig.videoModelPath, fields));
-    } catch (_) {}
-    if (data.isEmpty) {
-      // Varian multi sebagai fallback.
-      try {
-        data = _dataOf('multi_video_model',
-            await _postForm(MeloloConfig.multiVideoModelPath, fields));
-      } catch (_) {}
-    }
-    if (data.isEmpty) return const {};
-    return _normalizeVideoModel(data);
-  }
-
-  /// Normalisasi data.videoModel sesuai blueprint:
-  /// main_url = direct string; backup_url_1..3 di-Base64-decode -> backup_urls[].
-  Map<String, dynamic> _normalizeVideoModel(Map<String, dynamic> data) {
-    final rawVm = data['videoModel'] ??
-        data['video_model'] ??
-        data['model'] ??
-        data['play_info'] ??
-        data;
-    final Map<String, dynamic> vm = rawVm is Map<String, dynamic>
-        ? rawVm
-        : rawVm is Map
-            ? Map<String, dynamic>.from(rawVm)
-            : <String, dynamic>{};
-    final out = Map<String, dynamic>.from(vm);
-
-    final backups = <String>[];
-    void addBackup(Object? v) {
-      final s = '$v'.trim();
-      if (s.isEmpty || s == 'null') return;
-      final dec = _tryBase64(s);
-      final url = dec.isNotEmpty ? dec : s;
-      if (url.startsWith('http') && !backups.contains(url)) backups.add(url);
-    }
-
-    addBackup(vm['backup_url_1']);
-    addBackup(vm['backup_url_2']);
-    addBackup(vm['backup_url_3']);
-    addBackup(vm['backup_url']);
-    out['backup_urls'] = backups;
-
-    // Metadata level data (kalau belum ada di videoModel).
-    out['expire_time'] ??= data['expireTime'] ?? data['expire_time'];
-    out['play_auth_token'] ??= data['playAuthToken'] ?? data['play_auth_token'];
-    out['video_width'] ??= data['videoWidth'] ?? data['video_width'];
-    out['video_height'] ??= data['videoHeight'] ?? data['video_height'];
-    out['authorization'] ??= data['authorization'];
-    return out;
-  }
-
-  /// Base64 decode toleran (URL-safe + padding otomatis). '' kalau gagal.
-  String _tryBase64(String s) {
-    try {
-      var t = s
-          .replaceAll('-', '+')
-          .replaceAll('_', '/')
-          .replaceAll(RegExp(r'\s'), '');
-      final mod = t.length % 4;
-      if (mod != 0) t += '=' * (4 - mod);
-      return utf8.decode(base64.decode(t));
+      var s = str.replaceAll('-', '+').replaceAll('_', '/').trim();
+      final mod = s.length % 4;
+      if (mod != 0) {
+        s += '=' * (4 - mod);
+      }
+      return utf8.decode(base64.decode(s));
     } catch (_) {
       return '';
     }
