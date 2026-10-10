@@ -379,6 +379,21 @@ class MeloloCencDecryptor {
       mp4Bytes[enca + 3] = 0x61; // 'a'
     }
 
+    // Netralkan semua box sinf dan senc menjadi free box (0x66, 0x72, 0x65, 0x65)
+    // agar ExoPlayer / Android MediaCodec tidak mendeteksi sisa header DRM dan mengira video masih terenkripsi.
+    for (final boxType in ['sinf', 'senc']) {
+      var pos = 0;
+      while (pos < mp4Bytes.length - 4) {
+        final idx = _findBox(mp4Bytes, boxType, pos, mp4Bytes.length);
+        if (idx < 0) break;
+        mp4Bytes[idx] = 0x66;     // 'f'
+        mp4Bytes[idx + 1] = 0x72; // 'r'
+        mp4Bytes[idx + 2] = 0x65; // 'e'
+        mp4Bytes[idx + 3] = 0x65; // 'e'
+        pos = idx + 4;
+      }
+    }
+
     return mp4Bytes;
   }
 }
