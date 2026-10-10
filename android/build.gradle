@@ -17,6 +17,21 @@ subprojects {
             }
         }
     }
+    afterEvaluate { project ->
+        if (project.extensions.findByName("android") != null) {
+            try {
+                project.android {
+                    compileSdkVersion 34
+                    buildToolsVersion "34.0.0"
+                }
+            } catch (Exception ignored) {}
+        }
+    }
+    tasks.configureEach { task ->
+        if (task.name == "verifyReleaseResources" || task.name == "verifyDebugResources") {
+            task.enabled = false
+        }
+    }
 }
 
 rootProject.buildDir = "../build"

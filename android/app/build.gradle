@@ -35,7 +35,8 @@ def livegoHasReleaseSigning =
 
 android {
     namespace = "com.livego.premium"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34
+    buildToolsVersion = "34.0.0"
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
