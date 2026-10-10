@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:video_player/video_player.dart';
+
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
 
@@ -64,5 +68,36 @@ class PlaybackContractRules {
       ));
     }
     return List<StreamQuality>.unmodifiable(rows);
+  }
+
+  /// Membuat VideoPlayerController secara universal:
+  /// Mendeteksi otomatis apakah skema URI adalah file lokal (`file://` atau path absolut)
+  /// atau URL HTTP jaringan, sehingga menghindari PlatformException Source error.
+  static VideoPlayerController createController(
+    String url, {
+    Map<String, String>? headers,
+    VideoPlayerOptions? videoPlayerOptions,
+  }) {
+    final cleanUrl = url.trim();
+    final uri = Uri.tryParse(cleanUrl);
+    final isLocal = cleanUrl.startsWith('file://') ||
+        (uri != null && uri.scheme == 'file') ||
+        (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://') && File(cleanUrl).existsSync());
+
+    if (isLocal) {
+      final filePath = cleanUrl.startsWith('file://')
+          ? (uri != null && uri.scheme == 'file' ? uri.toFilePath() : cleanUrl.substring(7))
+          : cleanUrl;
+      return VideoPlayerController.file(
+        File(filePath),
+        videoPlayerOptions: videoPlayerOptions,
+      );
+    }
+
+    return VideoPlayerController.networkUrl(
+      Uri.parse(cleanUrl),
+      httpHeaders: headers ?? const {},
+      videoPlayerOptions: videoPlayerOptions,
+    );
   }
 }

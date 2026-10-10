@@ -361,30 +361,60 @@ class MeloloCencDecryptor {
       _decryptTrack(mp4Bytes, aTrak, mp4Bytes.length, roundKeys);
     }
 
+    // Cari batas atom moov agar modifikasi metadata hanya dilakukan di dalam moov
+    // dan tidak menyentuh payload mdat sama sekali.
+    final moovPos = _findBox(mp4Bytes, 'moov', 0, mp4Bytes.length);
+    var searchStart = 0;
+    var searchEnd = mp4Bytes.length;
+    if (moovPos >= 4) {
+      final moovSize = _readUint32(mp4Bytes, moovPos - 4);
+      if (moovSize > 8 && moovPos - 4 + moovSize <= mp4Bytes.length) {
+        searchStart = moovPos - 4;
+        searchEnd = moovPos - 4 + moovSize;
+      }
+    }
+
     // Ubah sample entry encv -> hvc1
-    final encv = _findBox(mp4Bytes, 'encv', 0, mp4Bytes.length);
-    if (encv >= 0) {
-      mp4Bytes[encv] = 0x68; // 'h'
-      mp4Bytes[encv + 1] = 0x76; // 'v'
-      mp4Bytes[encv + 2] = 0x63; // 'c'
-      mp4Bytes[encv + 3] = 0x31; // '1'
+    var pos = searchStart;
+    while (pos < searchEnd - 4) {
+      final idx = _findBox(mp4Bytes, 'encv', pos, searchEnd);
+      if (idx < 0) break;
+      mp4Bytes[idx] = 0x68;     // 'h'
+      mp4Bytes[idx + 1] = 0x76; // 'v'
+      mp4Bytes[idx + 2] = 0x63; // 'c'
+      mp4Bytes[idx + 3] = 0x31; // '1'
+      pos = idx + 4;
     }
 
     // Ubah sample entry enca -> mp4a
-    final enca = _findBox(mp4Bytes, 'enca', 0, mp4Bytes.length);
-    if (enca >= 0) {
-      mp4Bytes[enca] = 0x6d; // 'm'
-      mp4Bytes[enca + 1] = 0x70; // 'p'
-      mp4Bytes[enca + 2] = 0x34; // '4'
-      mp4Bytes[enca + 3] = 0x61; // 'a'
+    pos = searchStart;
+    while (pos < searchEnd - 4) {
+      final idx = _findBox(mp4Bytes, 'enca', pos, searchEnd);
+      if (idx < 0) break;
+      mp4Bytes[idx] = 0x6d;     // 'm'
+      mp4Bytes[idx + 1] = 0x70; // 'p'
+      mp4Bytes[idx + 2] = 0x34; // '4'
+      mp4Bytes[idx + 3] = 0x61; // 'a'
+      pos = idx + 4;
     }
 
-    // Netralkan semua box sinf dan senc menjadi free box (0x66, 0x72, 0x65, 0x65)
-    // agar ExoPlayer / Android MediaCodec tidak mendeteksi sisa header DRM dan mengira video masih terenkripsi.
-    for (final boxType in ['sinf', 'senc']) {
-      var pos = 0;
-      while (pos < mp4Bytes.length - 4) {
-        final idx = _findBox(mp4Bytes, boxType, pos, mp4Bytes.length);
+    // Netralkan semua box DRM CENC (sinf, senc, saio, saiz, schm, schi, tenc, pssh)
+    // menjadi free box (0x66, 0x72, 0x65, 0x65) di dalam moov.
+    // Ini menghilangkan 100% jejak Common Encryption di stbl/stsd sehingga ExoPlayer
+    // memperlakukan video sebagai standard clear MP4 tanpa mengaktifkan DrmSessionManager.
+    for (final boxType in [
+      'sinf',
+      'senc',
+      'saio',
+      'saiz',
+      'schm',
+      'schi',
+      'tenc',
+      'pssh',
+    ]) {
+      pos = searchStart;
+      while (pos < searchEnd - 4) {
+        final idx = _findBox(mp4Bytes, boxType, pos, searchEnd);
         if (idx < 0) break;
         mp4Bytes[idx] = 0x66;     // 'f'
         mp4Bytes[idx + 1] = 0x72; // 'r'

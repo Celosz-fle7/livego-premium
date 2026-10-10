@@ -19,6 +19,7 @@ import '../../services/content/content_health_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
+import '../../services/player/playback_contract.dart';
 import '../../services/download/download_service.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
@@ -406,9 +407,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       old?.removeListener(_listen);
       await old?.dispose();
 
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(url),
-        httpHeaders: widget.stream.headers.isEmpty ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'} : widget.stream.headers,
+      final controller = PlaybackContractRules.createController(
+        url,
+        headers: widget.stream.headers.isEmpty ? const {'User-Agent': 'okhttp/4.12.0', 'Accept': '*/*'} : widget.stream.headers,
       );
       _controller = controller;
       controller.addListener(_listen);

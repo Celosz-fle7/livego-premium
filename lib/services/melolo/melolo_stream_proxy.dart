@@ -125,7 +125,7 @@ class MeloloStreamProxy {
       cacheDir = Directory.systemTemp;
     }
 
-    final targetDir = Directory('${cacheDir.path}/livego_melolo_cache_v2');
+    final targetDir = Directory('${cacheDir.path}/livego_melolo_cache_v3');
     if (!await targetDir.exists()) {
       await targetDir.create(recursive: true);
     }
@@ -140,7 +140,7 @@ class MeloloStreamProxy {
       if (size > 102400) {
         final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
         _fileRegistry[token] = decryptedFile.path;
-        return 'http://127.0.0.1:$_port/$token';
+        return decryptedFile.uri.toString();
       }
     }
 
@@ -184,8 +184,8 @@ class MeloloStreamProxy {
 
     final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
     _fileRegistry[token] = decryptedFile.path;
-    debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes) -> 127.0.0.1:$_port/$token');
+    debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes) -> ${decryptedFile.uri}');
 
-    return 'http://127.0.0.1:$_port/$token';
+    return decryptedFile.uri.toString();
   }
 }

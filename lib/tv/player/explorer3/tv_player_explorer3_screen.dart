@@ -10,6 +10,7 @@ import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
+import '../../../services/player/playback_contract.dart';
 import '../tv_player_engine.dart';
 import '../tv_player_service.dart';
 import 'tv_player_explorer3_native_payload.dart';
@@ -936,9 +937,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   Future<void> _startController(int token, StreamInfo stream, String url) async {
     TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, host: _lastStreamHost, tail: _lastStreamTail);
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      httpHeaders: stream.headers,
+    final controller = PlaybackContractRules.createController(
+      url,
+      headers: stream.headers,
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
     );
 

@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../models/content_item.dart';
+import '../../services/player/playback_contract.dart';
 import '../player/tv_player_engine.dart';
 import '../player/tv_player_service.dart';
 
@@ -93,9 +94,9 @@ class _TvBasicPlayerScreenState extends State<TvBasicPlayerScreen> {
       setState(() => _status = 'Menyiapkan video...');
 
       TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.legacyHybrid.wireName);
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(url),
-        httpHeaders: stream.headers,
+      final controller = PlaybackContractRules.createController(
+        url,
+        headers: stream.headers,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
       );
 
