@@ -300,6 +300,16 @@ class MeloloClient {
     }
 
     final vm = rawVm is Map ? rawVm : <dynamic, dynamic>{};
+
+    // ===== DIAGNOSTIK MELOLO (sementara) =====
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: mVersion=${vm['mVersion'] ?? vm['m_version'] ?? 'N/A'}');
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: key_seed=${vm['key_seed'] != null ? 'ADA(${(vm['key_seed'] as String).substring(0, (vm['key_seed'] as String).length.clamp(0, 20))}...)' : 'KOSONG'}');
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: vm keys=${vm.keys.toList()}');
+    // ===== END DIAGNOSTIK =====
+
     final videoList = vm['video_list'];
 
     Map? selectedQuality;
@@ -313,8 +323,23 @@ class MeloloClient {
       final rawMainUrl = '${selectedQuality['main_url'] ?? selectedQuality['backup_url_1'] ?? ''}';
       final spadeA = '${selectedQuality['spade_a'] ?? vm['spade_a'] ?? ''}';
 
+      // ===== DIAGNOSTIK URL (sementara) =====
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: rawMainUrl(100)=${rawMainUrl.substring(0, rawMainUrl.length.clamp(0, 100))}');
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: spadeA(20)=${spadeA.substring(0, spadeA.length.clamp(0, 20))}...');
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: quality keys=${selectedQuality.keys.toList()}');
+      // ===== END DIAGNOSTIK =====
+
       if (rawMainUrl.isNotEmpty) {
         var videoUrl = _tryBase64Decode(rawMainUrl);
+        // ===== DIAGNOSTIK DECODE (sementara) =====
+        // ignore: avoid_print
+        print('LIVEGO MELOLO DIAG: decoded(100)=${videoUrl.substring(0, videoUrl.length.clamp(0, 100))}');
+        // ignore: avoid_print
+        print('LIVEGO MELOLO DIAG: isHttp=${videoUrl.startsWith('http')}');
+        // ===== END DIAGNOSTIK =====
         if (!videoUrl.startsWith('http')) {
           videoUrl = rawMainUrl;
         }

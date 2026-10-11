@@ -172,12 +172,30 @@ class MeloloStreamProxy {
     httpClient.close(force: true);
 
     final rawBytes = builder.takeBytes();
+    // ===== DIAGNOSTIK DOWNLOAD (sementara) =====
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: downloaded ${rawBytes.length} bytes');
+    if (rawBytes.length >= 12) {
+      // ignore: avoid_print
+      final header = String.fromCharCodes(rawBytes.sublist(4, 12));
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: file header(4-12)="$header" (ftyp=MP4 valid)');
+    }
+    // ===== END DIAGNOSTIK =====
     if (rawBytes.length < 1024) {
       throw Exception('Ukuran video Melolo terlalu kecil (${rawBytes.length} bytes)');
     }
 
     // Dekripsi CENC in-place menggunakan Pure Dart
     final decryptedBytes = MeloloCencDecryptor.decryptMp4Bytes(rawBytes, aesKey);
+    // ===== DIAGNOSTIK DECRYPT (sementara) =====
+    if (decryptedBytes.length >= 12) {
+      // ignore: avoid_print
+      final decHeader = String.fromCharCodes(decryptedBytes.sublist(4, 12));
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: decrypted header(4-12)="$decHeader"');
+    }
+    // ===== END DIAGNOSTIK =====
 
     // Tulis ke file cache
     await decryptedFile.writeAsBytes(decryptedBytes, flush: true);
