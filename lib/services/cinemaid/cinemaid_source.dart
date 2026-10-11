@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
@@ -44,6 +45,274 @@ class CinemaIdSource implements DramaSource {
   List<String> get categories => CinemaIdConfig.categories;
 
   static final List<ContentItem> _seedCatalog = [
+    // --- Kategori Inti: Kurasi & Ranking ---
+    // Trending
+    const ContentItem(
+      id: 'cinemaid_trend_1',
+      title: 'Deadpool & Wolverine',
+      source: 'cinemaid',
+      category: 'Trending',
+      description: 'Pertarungan heboh melintasi multiverse untuk menyelamatkan garis waktu.',
+      posterUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1200',
+      rating: 9.1,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_trend_2',
+      title: 'House of the Dragon Season 2',
+      source: 'cinemaid',
+      category: 'Trending',
+      description: 'Perang saudara naga Targaryen mencapai babak paling berdarah.',
+      posterUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200',
+      rating: 9.3,
+      episodes: 8,
+      platformSlug: 'cinemaid',
+    ),
+
+    // 10 Klik Teratas Film
+    const ContentItem(
+      id: 'cinemaid_top_movie_1',
+      title: 'Dune: Part Two',
+      source: 'cinemaid',
+      category: '10 Klik Teratas Film',
+      description: 'Paul Atreides memimpin kebangkitan Arrakis.',
+      posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200',
+      rating: 9.2,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_top_movie_2',
+      title: 'Exhuma',
+      source: 'cinemaid',
+      category: '10 Klik Teratas Film',
+      description: 'Misteri makam terkutuk yang membangkitkan entitas kuno berbahaya.',
+      posterUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200',
+      rating: 8.9,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+
+    // 10 Klik Teratas Series
+    const ContentItem(
+      id: 'cinemaid_top_series_1',
+      title: 'Shogun Season 1',
+      source: 'cinemaid',
+      category: '10 Klik Teratas Series',
+      description: 'Intrik politik dan taktik perang klan feodal Jepang.',
+      posterUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1200',
+      rating: 9.5,
+      episodes: 10,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_top_series_2',
+      title: 'The Boys Season 4',
+      source: 'cinemaid',
+      category: '10 Klik Teratas Series',
+      description: 'Konflik klimaks kaum The Boys melawan kediktatoran Homelander.',
+      posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200',
+      rating: 9.0,
+      episodes: 8,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Netflix Top 10
+    const ContentItem(
+      id: 'cinemaid_netflix_top_1',
+      title: 'Queen of Tears',
+      source: 'cinemaid',
+      category: 'Netflix Top 10',
+      description: 'Drama romansa penuh intrik keluarga konglomerat Korea.',
+      posterUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200',
+      rating: 9.4,
+      episodes: 16,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Amazon Prime Top 10
+    const ContentItem(
+      id: 'cinemaid_prime_top_1',
+      title: 'Fallout Season 1',
+      source: 'cinemaid',
+      category: 'Amazon Prime Top 10',
+      description: 'Petualangan distopia gurun radioaktif pasca perang nuklir.',
+      posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200',
+      rating: 9.1,
+      episodes: 8,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Apple Top 10
+    const ContentItem(
+      id: 'cinemaid_apple_top_1',
+      title: 'Severance Season 1',
+      source: 'cinemaid',
+      category: 'Apple Top 10',
+      description: 'Misteri eksperimen psikologis pemisahan memori kerja.',
+      posterUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200',
+      rating: 9.3,
+      episodes: 9,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Film Indonesia Populer
+    const ContentItem(
+      id: 'cinemaid_indo_1',
+      title: 'Agak Laen',
+      source: 'cinemaid',
+      category: 'Film Indonesia Populer',
+      description: 'Empat penjaga rumah hantu pasar malam panik saat seorang pengunjung meninggal jantungan.',
+      posterUrl: 'https://images.unsplash.com/photo-1518173946687-a4c8a383392e?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1518173946687-a4c8a383392e?w=1200',
+      rating: 9.0,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_indo_2',
+      title: 'Siksa Kubur',
+      source: 'cinemaid',
+      category: 'Film Indonesia Populer',
+      description: 'Pencarian pembuktian siksa kubur yang berujung pada teror supranatural mencekam.',
+      posterUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200',
+      rating: 8.8,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Harus Dilihat Bulan Ini
+    const ContentItem(
+      id: 'cinemaid_mustwatch_1',
+      title: 'Inside Out 2',
+      source: 'cinemaid',
+      category: 'Harus Dilihat Bulan Ini',
+      description: 'Emosi baru Anxiety, Envy, dan Ennui merombak markas besar pikiran Riley.',
+      posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200',
+      rating: 9.2,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Box-Office
+    const ContentItem(
+      id: 'cinemaid_boxoffice_1',
+      title: 'Oppenheimer',
+      source: 'cinemaid',
+      category: 'Box-Office',
+      description: 'Biografi epik bapak bom atom J. Robert Oppenheimer dan Proyek Manhattan.',
+      posterUrl: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1200',
+      rating: 9.3,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Marvel
+    const ContentItem(
+      id: 'cinemaid_marvel_1',
+      title: 'Avengers: Endgame',
+      source: 'cinemaid',
+      category: 'Marvel',
+      description: 'Pertarungan pamungkas para Avengers membalikkan jentikan jari Thanos.',
+      posterUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1200',
+      rating: 9.4,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_marvel_2',
+      title: 'Loki Season 2',
+      source: 'cinemaid',
+      category: 'Marvel',
+      description: 'Loki berkelana melintasi waktu untuk menstabilkan Sacred Timeline.',
+      posterUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200',
+      rating: 9.2,
+      episodes: 6,
+      platformSlug: 'cinemaid',
+    ),
+
+    // DC
+    const ContentItem(
+      id: 'cinemaid_dc_1',
+      title: 'The Batman',
+      source: 'cinemaid',
+      category: 'DC',
+      description: 'Batman mengungkap korupsi Gotham yang terhubung dengan keluarganya sendiri.',
+      posterUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200',
+      rating: 9.0,
+      episodes: 1,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_dc_2',
+      title: 'Peacemaker Season 1',
+      source: 'cinemaid',
+      category: 'DC',
+      description: 'Aksi konyol dan menegangkan Peacemaker menjalankan misi rahasia Project Butterfly.',
+      posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200',
+      rating: 8.9,
+      episodes: 8,
+      platformSlug: 'cinemaid',
+    ),
+
+    // iFlix
+    const ContentItem(
+      id: 'cinemaid_iflix_1',
+      title: 'Imperfect The Series',
+      source: 'cinemaid',
+      category: 'iFlix',
+      description: 'Keseharian empat penghuni kos putri yang penuh kelucuan dan pelajaran hidup.',
+      posterUrl: 'https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1524712245354-2c4e5e7121c0?w=1200',
+      rating: 8.7,
+      episodes: 12,
+      platformSlug: 'cinemaid',
+    ),
+
+    // Crunchyroll
+    const ContentItem(
+      id: 'cinemaid_crunchy_1',
+      title: 'Solo Leveling Season 1',
+      source: 'cinemaid',
+      category: 'Crunchyroll',
+      description: 'Hunter Sung Jinwoo mendapatkan kemampuan misterius naik level tanpa batas.',
+      posterUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1200',
+      rating: 9.4,
+      episodes: 12,
+      platformSlug: 'cinemaid',
+    ),
+    const ContentItem(
+      id: 'cinemaid_crunchy_2',
+      title: 'Jujutsu Kaisen Season 2',
+      source: 'cinemaid',
+      category: 'Crunchyroll',
+      description: 'Insiden Shibuya mempertemukan para penyihir jujutsu dalam pertarungan hidup mati.',
+      posterUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=600',
+      backdropUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=1200',
+      rating: 9.5,
+      episodes: 23,
+      platformSlug: 'cinemaid',
+    ),
+
+    // --- Platform & Provider OTT ---
     // Netflix
     const ContentItem(
       id: 'cinemaid_netflix_1',
@@ -548,6 +817,20 @@ class CinemaIdSource implements DramaSource {
     'http://movieph.xrrqe.com/vod/2/2024/11/12/b2b00a4677f2/index5.m3u8?wsSecret=40f5a94a180642ec318fa4b4494ab0fe&wsTime=6ac5ecbd',
   ];
 
+  /// Format URL ke proxy lokal CinemaID (127.0.0.1:7000) jika raw stream dari CDN movieph.
+  String _formatStreamUrl(String rawUrl) {
+    if (rawUrl.isEmpty) return rawUrl;
+    if (rawUrl.startsWith('http://127.0.0.1:') || rawUrl.startsWith('http://localhost:')) {
+      return rawUrl;
+    }
+    try {
+      final b64 = base64.encode(utf8.encode(rawUrl));
+      return 'http://127.0.0.1:7000/resource.m3u8?src=$b64';
+    } catch (_) {
+      return rawUrl;
+    }
+  }
+
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
     // 1. Coba ambil dari network live jika backend merespons
@@ -555,9 +838,10 @@ class CinemaIdSource implements DramaSource {
       final modules = await _client.topicModules();
       if (modules.isNotEmpty) {
         Map<String, dynamic>? picked;
-        final needle = category.toLowerCase();
+        final needle = category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
         for (final m in modules) {
-          final name = '${m['module_name'] ?? m['name'] ?? ''}'.toLowerCase();
+          final rawName = '${m['module_name'] ?? m['name'] ?? ''}';
+          final name = rawName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
           if (name.isNotEmpty && (name == needle || name.contains(needle) || needle.contains(name))) {
             picked = m;
             break;
@@ -591,15 +875,19 @@ class CinemaIdSource implements DramaSource {
       }
     } catch (_) {}
 
-    // 2. Fallback cerdas: Tampilkan katalog multi-provider CinemaID
-    final cLower = category.toLowerCase().trim();
-    if (cLower == 'for you' || cLower.isEmpty) {
-      return _seedCatalog;
+    // 2. Fallback cerdas: Tampilkan katalog multi-provider CinemaID terkelompok
+    final cClean = category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
+    if (cClean == 'foryou' || cClean.isEmpty || cClean == 'trending') {
+      final trending = _seedCatalog.where((item) {
+        final iCat = item.category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        return iCat.contains('trending') || iCat.contains('top10') || iCat.contains('boxoffice') || iCat.contains('populer');
+      }).toList();
+      return trending.isNotEmpty ? trending : _seedCatalog.take(10).toList();
     }
 
     final matched = _seedCatalog.where((item) {
-      final iCat = item.category.toLowerCase().trim();
-      return iCat == cLower || iCat.contains(cLower) || cLower.contains(iCat);
+      final iClean = item.category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
+      return iClean == cClean || iClean.contains(cClean) || cClean.contains(iClean);
     }).toList();
 
     return matched.isNotEmpty ? matched : _seedCatalog.take(6).toList();
@@ -625,7 +913,7 @@ class CinemaIdSource implements DramaSource {
                 ? '${e['vod_id'] ?? e['id']}'
                 : '$seriesId:$epNum';
             final url = _pickStreamUrl(e);
-            if (url.isNotEmpty) _streamCache['$seriesId:$id'] = url;
+            if (url.isNotEmpty) _streamCache['$seriesId:$id'] = _formatStreamUrl(url);
             _episodeCache['$seriesId:$id'] = e;
             out.add(LiveGoEpisode(
               id: id,
@@ -649,8 +937,8 @@ class CinemaIdSource implements DramaSource {
     final out = <LiveGoEpisode>[];
     for (var i = 1; i <= count; i++) {
       final epId = '$seriesId:$i';
-      final streamUrl = _sampleLiveStreams[(i - 1) % _sampleLiveStreams.length];
-      _streamCache['$seriesId:$epId'] = streamUrl;
+      final rawStream = _sampleLiveStreams[(i - 1) % _sampleLiveStreams.length];
+      _streamCache['$seriesId:$epId'] = _formatStreamUrl(rawStream);
       out.add(LiveGoEpisode(
         id: epId,
         index: i,
@@ -666,12 +954,12 @@ class CinemaIdSource implements DramaSource {
     required String episodeId,
   }) async {
     final cached = _streamCache['$seriesId:$episodeId'];
-    if (cached != null && cached.isNotEmpty) return cached;
+    if (cached != null && cached.isNotEmpty) return _formatStreamUrl(cached);
 
     // Belum di-cache: ambil ulang detail lalu cari episode-nya.
     await episodes(seriesId);
     final retry = _streamCache['$seriesId:$episodeId'];
-    if (retry != null && retry.isNotEmpty) return retry;
+    if (retry != null && retry.isNotEmpty) return _formatStreamUrl(retry);
     throw Exception('CinemaID: stream URL tidak ditemukan ($seriesId/$episodeId)');
   }
 

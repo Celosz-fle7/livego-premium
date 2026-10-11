@@ -6,7 +6,11 @@ class CinemaIdConfig {
   CinemaIdConfig._();
 
   /// Fallback base URL aktif (server live).
+  static const baseUrl = 'https://freecinenewph.t62nds.com';
   static const fallbackBaseUrl = 'https://freecinenewph.t62nds.com';
+  static const cdnBaseUrl = 'http://movieph.xrrqe.com';
+  static const secretToken = 'gcAIKnfz';
+  static const localProxyBaseUrl = 'http://127.0.0.1:7000';
 
   /// Path init (tanpa prefix /api, client yang menambahkan).
   static const initPath = '/public/init';
@@ -18,24 +22,36 @@ class CinemaIdConfig {
 
   static const timeout = Duration(seconds: 15);
 
-  /// Kategori bawaan provider streaming populer dan channel CinemaID.
+  /// Kategori bawaan CinemaID terkelompok rapi:
+  /// 1. Kategori Kurasi & Ranking Inti (Trending, Top 10 Film/Series, Box-Office, dll)
+  /// 2. Platform & Provider OTT (Netflix, Vidio, Vivamax, Amazon Prime, Disney+ Hotstar, dll)
+  /// 3. Universe & Studio Franchise (Marvel, DC)
   static const categories = <String>[
-    'For You',
+    // --- Kategori Inti: Kurasi & Ranking ---
+    'Trending',
+    '10 Klik Teratas Film',
+    '10 Klik Teratas Series',
+    'Netflix Top 10',
+    'Amazon Prime Top 10',
+    'Apple Top 10',
+    'Film Indonesia Populer',
+    'Harus Dilihat Bulan Ini',
+    'Box-Office',
+
+    // --- Platform & Provider OTT ---
     'Netflix',
     'Vidio',
     'Vivamax',
-    'Prime Video',
-    'Hotstar',
-    'WeTV',
+    'Amazon Prime',
+    'Disney+ Hotstar',
     'Viu',
-    'Apple TV',
+    'iFlix',
     'Apple TV+',
-    'Sushiroll',
-    'Serial TV',
-    'Movie',
-    'Drama',
-    'Anime',
-    '18+',
+    'Crunchyroll',
+
+    // --- Franchise & Universe ---
+    'Marvel',
+    'DC',
   ];
 
   /// Taruh token auth sebagai header DAN query param.
