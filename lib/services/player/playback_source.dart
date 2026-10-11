@@ -106,6 +106,7 @@ class PlaybackSource {
   bool get isPlayable => url.trim().isNotEmpty && !encrypted;
   bool get isHls => videoType == LiveGoVideoType.hls;
   bool get isMp4 => videoType == LiveGoVideoType.mp4;
+  bool get isCenc => videoType == LiveGoVideoType.cenc;
 
   factory PlaybackSource.empty({
     String platform = '',

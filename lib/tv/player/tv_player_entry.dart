@@ -14,7 +14,7 @@ class TvPlayerEntry {
     int? episode,
     PlayerEngineType? engine,
   }) {
-    final selected = TvPlayerEngineConfig.selectedEngine(override: engine);
+    final selected = TvPlayerEngineConfig.selectedEngine(override: engine, isCenc: item.platformSlug == 'melolo');
     TvPlayerDebugLog.event(
       'player_engine_selected',
       item: item,

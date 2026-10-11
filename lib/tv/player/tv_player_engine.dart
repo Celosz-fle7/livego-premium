@@ -36,7 +36,8 @@ class TvPlayerEngineConfig {
 
   static PlayerEngineType get defaultEngine => PlayerEngineType.legacyHybrid;
 
-  static PlayerEngineType selectedEngine({PlayerEngineType? override}) {
+  static PlayerEngineType selectedEngine({PlayerEngineType? override, bool isCenc = false}) {
+    if (isCenc) return PlayerEngineType.nativeExo;
     return override ??
         _fromName(LiveGoSettings.tvPlayerEngineOverride) ??
         _fromName(_defineEngine) ??

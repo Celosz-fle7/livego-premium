@@ -95,31 +95,19 @@ class CinemaIdSource implements DramaSource {
             break;
           }
         }
-        final targets = picked != null ? [picked] : modules;
+        final targets = picked != null ? [picked] : modules.take(3);
         final out = <ContentItem>[];
         final seen = <String>{};
         for (final m in targets) {
-          final videoList = m['videoList'] ?? m['video_list'] ?? m['list'] ?? m['block_list'] ?? const [];
-          if (videoList is! List) continue;
-          for (final v in videoList) {
-            if (v is! Map) continue;
-            final id = '${v['vod_id'] ?? v['id'] ?? ''}';
-            final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
-            final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
-            if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
-            out.add(ContentItem(
-              id: id,
-              title: title,
-              source: 'cinemaid',
-              category: category,
-              description: '${v['vod_desc'] ?? v['desc'] ?? v['vod_blurb'] ?? ''}',
-              posterUrl: pic,
-              backdropUrl: pic,
-              rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
-              episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 0}') ?? 0,
-              platformSlug: 'cinemaid',
-            ));
-          }
+          final moduleId = '${m['module_id'] ?? m['id'] ?? ''}';
+          if (moduleId.isEmpty) continue;
+          try {
+            final vods = await _client.topicVods(moduleId, category: category);
+            for (final v in vods) {
+              if (v.id.isEmpty || !seen.add(v.id)) continue;
+              out.add(v);
+            }
+          } catch (_) {}
         }
         if (out.isNotEmpty) return out;
       }

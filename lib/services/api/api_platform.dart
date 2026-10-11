@@ -4,6 +4,7 @@ enum LiveGoVideoType {
   mp4,
   hls,
   encrypted,
+  cenc,
 }
 
 class LiveGoApiPlatform {
