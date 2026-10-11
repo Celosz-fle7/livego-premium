@@ -65,14 +65,19 @@ class CinemaIdClient {
   }
 
   String _normalizeUrl(String url) {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return 'https://$url';
+    var u = url.trim();
+    if (!u.startsWith('http://') && !u.startsWith('https://')) {
+      u = 'https://$u';
     }
-    return url;
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
   }
 
   Future<Map<String, dynamic>> _rawPost(Uri uri, Map<String, dynamic> form) async {
     final client = HttpClient();
+    client.badCertificateCallback = (cert, host, port) => true;
     try {
       final request = await client.postUrl(uri).timeout(CinemaIdConfig.timeout);
       _applyHeaders(request.headers);
