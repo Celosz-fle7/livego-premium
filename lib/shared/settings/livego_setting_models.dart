@@ -186,7 +186,7 @@ class LiveGoSettingsMenuData {
               id: LiveGoSettingId.tvPlayerEngine,
               icon: Icons.settings_input_component_rounded,
               title: 'TV Player Engine',
-              subtitle: 'Pilih engine player default untuk TV (ExoPlayer atau Flutter Player).',
+              subtitle: 'Pilih engine player TV (Native / Hybrid / Flutter).',
               value: LiveGoSettings.tvPlayerEngineOverride.isEmpty
                   ? 'Default'
                   : LiveGoSettings.tvPlayerEngineOverride,

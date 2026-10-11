@@ -282,6 +282,8 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       switch (id) {
         case LiveGoSettingId.tvPlayerEngine:
           if (LiveGoSettings.tvPlayerEngineOverride == 'nativeExo') {
+            LiveGoSettings.tvPlayerEngineOverride = 'legacyHybrid';
+          } else if (LiveGoSettings.tvPlayerEngineOverride == 'legacyHybrid') {
             LiveGoSettings.tvPlayerEngineOverride = 'flutterFallback';
           } else if (LiveGoSettings.tvPlayerEngineOverride == 'flutterFallback') {
             LiveGoSettings.tvPlayerEngineOverride = '';
