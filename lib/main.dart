@@ -27,15 +27,19 @@ void main() {
       if (stack != null) debugPrint(stack.toString());
     };
 
+    // Unified Video Player Engine:
+    // media_kit (MPV / libmpv) aktif 100% untuk Mobile dan TV.
+    // Menghandle semua format (TS, MP4, HLS m3u8, CENC/AES, H.264, H.265/HEVC, VP9, AV1)
+    // dengan decoder native ffmpeg/hwdec tanpa tumpang tindih player atau patch terpisah.
+    VideoPlayerMediaKit.ensureInitialized(
+      android: true,
+      iOS: true,
+      windows: true,
+      macOS: true,
+      linux: true,
+    );
+    debugPrint('LIVEGO PLAYER: Unified Player Engine media_kit (MPV) aktif 100%');
     final isTvRuntime = await LiveGoRuntimeDetector.isTvRuntime();
-    // TV pakai media_kit (MPV) karena ExoPlayer bermasalah di TV box.
-    // Mobile pakai ExoPlayer bawaan (ringan, responsif).
-    if (isTvRuntime) {
-      VideoPlayerMediaKit.ensureInitialized(android: true);
-      debugPrint('LIVEGO PLAYER: media_kit (MPV) aktif untuk TV');
-    } else {
-      debugPrint('LIVEGO PLAYER: ExoPlayer bawaan untuk mobile');
-    }
     LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: isTvRuntime);
     await LiveGoLocalStore.init();
     runApp(
