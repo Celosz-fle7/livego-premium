@@ -31,36 +31,32 @@ class CinemaIdConfig {
 
   static const timeout = Duration(seconds: 15);
 
-  /// Kategori bawaan CinemaID terkelompok rapi:
-  /// 1. Kategori Kurasi & Ranking Inti (Trending, Top 10 Film/Series, Box-Office, dll)
-  /// 2. Platform & Provider OTT (Netflix, Vidio, Vivamax, Amazon Prime, Disney+ Hotstar, dll)
-  /// 3. Universe & Studio Franchise (Marvel, DC)
+  /// Kategori bawaan CinemaID terkelompok rapi sesuai jalur server asli:
+  /// 1. Provider & Platform OTT (Netflix, Disney, Prime Video, Apple TV+, Crunchyroll, MAX, Hulu, Paramount+)
+  /// 2. Kategori Kurasi & Ranking Inti (Trending, JUSTWATCH TOP 100, Populer Movies, Populer Series, Anime)
   static const categories = <String>[
-    // --- Kategori Inti: Kurasi & Ranking ---
-    'Trending',
-    '10 Klik Teratas Film',
-    '10 Klik Teratas Series',
-    'Netflix Top 10',
-    'Amazon Prime Top 10',
-    'Apple Top 10',
-    'Film Indonesia Populer',
-    'Harus Dilihat Bulan Ini',
-    'Box-Office',
-
-    // --- Platform & Provider OTT ---
+    // --- Platform & Provider OTT (Modul Streaming Channel 202) ---
     'Netflix',
-    'Vidio',
-    'Vivamax',
-    'Amazon Prime',
-    'Disney+ Hotstar',
-    'Viu',
-    'iFlix',
+    'Disney',
+    'Prime Video',
     'Apple TV+',
     'Crunchyroll',
+    'MAX',
+    'Hulu',
+    'Paramount+',
+    'AMC+',
+    'Rakuten Viki',
 
-    // --- Franchise & Universe ---
-    'Marvel',
-    'DC',
+    // --- Kategori Inti & Ranking Server ---
+    'Trending Now',
+    'JUSTWATCH TOP 100',
+    'Popular Movies',
+    'Popular TV Shows',
+    'Popular Anime',
+    'New Korean drama series',
+    'Today\'s New Streaming',
+    'Today\'s New Movies',
+    'Today\'s New Series',
   ];
 
   /// Taruh token auth sebagai header DAN query param.

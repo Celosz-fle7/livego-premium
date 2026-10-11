@@ -191,9 +191,9 @@ class CinemaIdClient {
   /// GET /api/topic/change?module_id=.. -> refresh satu modul.
   Future<List<ContentItem>> refreshModule(String moduleId) async {
     final res = await _getJson('/topic/change', {'module_id': moduleId});
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     final items = data is Map
-        ? _asMaps(data['videoList'] ?? data['video_list'] ?? data['list'])
+        ? _asMaps(data['vod_list'] ?? data['videoList'] ?? data['video_list'] ?? data['list'])
         : _asMaps(data);
     return items
         .map((m) => _toContentItem(m, 'refresh'))
@@ -204,8 +204,10 @@ class CinemaIdClient {
   /// GET /api/topic/vod_list?topic_id=.. -> isi satu topik.
   Future<List<ContentItem>> topicVods(String topicId, {String category = ''}) async {
     final res = await _getJson('/topic/vod_list', {'topic_id': topicId});
-    final data = res['data'];
-    final items = data is Map ? _asMaps(data['list'] ?? data['items'] ?? data['videoList']) : _asMaps(data);
+    final data = res['result'] ?? res['data'];
+    final items = data is Map
+        ? _asMaps(data['vod_list'] ?? data['list'] ?? data['items'] ?? data['videoList'])
+        : _asMaps(data);
     return items
         .map((m) => _toContentItem(m, category))
         .where((c) => c.id.isNotEmpty)
@@ -215,7 +217,7 @@ class CinemaIdClient {
   /// GET /api/type/get_list -> daftar tipe/kategori.
   Future<List<Map<String, dynamic>>> typeList() async {
     final res = await _getJson('/type/get_list', const {});
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     final list = data is Map ? _asMaps(data['list'] ?? data['items'] ?? data['types']) : _asMaps(data);
     return list.map((m) => Map<String, dynamic>.from(m)).toList();
   }
@@ -223,7 +225,7 @@ class CinemaIdClient {
   /// GET /api/channel/get_list -> daftar channel/kategori.
   Future<List<Map<String, dynamic>>> channelList() async {
     final res = await _getJson('/channel/get_list', const {});
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     final list = data is Map ? _asMaps(data['list'] ?? data['items'] ?? data['channels']) : _asMaps(data);
     return list.map((m) => Map<String, dynamic>.from(m)).toList();
   }
@@ -231,7 +233,7 @@ class CinemaIdClient {
   /// GET /api/channel/get_info?.. -> info channel.
   Future<Map<String, dynamic>> channelInfo(Map<String, String> query) async {
     final res = await _getJson('/channel/get_info', query);
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
     return const {};
@@ -240,7 +242,7 @@ class CinemaIdClient {
   /// GET /api/search/result?keyword=.. -> hasil pencarian.
   Future<List<ContentItem>> search(String keyword) async {
     final res = await _getJson('/search/result', {'keyword': keyword});
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     final items = data is Map ? _asMaps(data['list'] ?? data['items'] ?? data['result']) : _asMaps(data);
     return items
         .map((m) => _toContentItem(m, 'search'))
