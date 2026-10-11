@@ -264,6 +264,14 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     _jumpToCursor(_cursor);
   }
 
+  String _nextCodec(int delta) {
+    const values = LiveGoSettingsMenuData.codecValues;
+    final current = values.indexOf(LiveGoSettings.codecPreference);
+    final base = current < 0 ? 0 : current;
+    final next = (base + delta) % values.length;
+    return values[next < 0 ? next + values.length : next];
+  }
+
   void _activate(LiveGoSettingId id) {
     if (id == LiveGoSettingId.cacheMaintenance) {
       _runCacheMaintenance();
@@ -298,6 +306,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
           break;
         case LiveGoSettingId.drmMode:
           LiveGoSettings.drmMode = _nextDrm(1);
+          break;
+        case LiveGoSettingId.codecPreference:
+          LiveGoSettings.codecPreference = _nextCodec(1);
           break;
         case LiveGoSettingId.downloadNotice:
           LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly;
@@ -420,6 +431,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (key == LogicalKeyboardKey.arrowLeft) {
       if (item.id == LiveGoSettingId.drmMode) {
         _cycleDrm(-1);
+      } else if (item.id == LiveGoSettingId.codecPreference) {
+        setState(() => LiveGoSettings.codecPreference = _nextCodec(-1));
+        _persistSettings();
       } else if (widget.onMoveToNav != null) {
         _moveToNav();
       } else if (widget.showBackButton) {
@@ -432,6 +446,9 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
     if (key == LogicalKeyboardKey.arrowRight) {
       if (item.id == LiveGoSettingId.drmMode) {
         _cycleDrm(1);
+      } else if (item.id == LiveGoSettingId.codecPreference) {
+        setState(() => LiveGoSettings.codecPreference = _nextCodec(1));
+        _persistSettings();
       } else {
         _activate(item.id);
       }

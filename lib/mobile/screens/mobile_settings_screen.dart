@@ -99,6 +99,30 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
     if (value != null) _applySetting(() => LiveGoSettings.drmMode = value);
   }
 
+  Future<void> _showCodecDialog() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Prioritas Codec'),
+        children: [
+          for (final item in LiveGoSettingsMenuData.codecValues)
+            RadioListTile<String>(
+              value: item,
+              groupValue: LiveGoSettings.codecPreference,
+              activeColor: Colors.teal,
+              title: Text(item),
+              onChanged: (v) => Navigator.pop(context, v),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(onPressed: () => Navigator.pop(context), child: const Text('BATAL')),
+          ),
+        ],
+      ),
+    );
+    if (value != null) _applySetting(() => LiveGoSettings.codecPreference = value);
+  }
+
   void _applySetting(VoidCallback change) {
     setState(change);
     LiveGoLocalStore.saveSettings();
@@ -126,6 +150,9 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
         break;
       case LiveGoSettingId.drmMode:
         _showDrmDialog();
+        break;
+      case LiveGoSettingId.codecPreference:
+        _showCodecDialog();
         break;
       case LiveGoSettingId.downloadNotice:
         _applySetting(() => LiveGoSettings.downloadWifiOnly = !LiveGoSettings.downloadWifiOnly);
@@ -159,7 +186,11 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
     return _tile(
       item.icon,
       item.title,
-      item.id == LiveGoSettingId.drmMode ? 'Mode saat ini: ${LiveGoSettings.drmMode}' : item.subtitle,
+      item.id == LiveGoSettingId.drmMode
+          ? 'Mode saat ini: ${LiveGoSettings.drmMode}'
+          : item.id == LiveGoSettingId.codecPreference
+              ? 'Codec saat ini: ${LiveGoSettings.codecPreference}'
+              : item.subtitle,
       iconColor: item.danger ? Colors.redAccent : null,
       trailing: trailing,
       onTap: () => _activateSetting(item.id),

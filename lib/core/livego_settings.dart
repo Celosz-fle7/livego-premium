@@ -13,6 +13,7 @@ class LiveGoSettings {
   static String quality = 'Auto';
   static String layoutMode = layoutAuto;
   static String drmMode = 'Auto';
+  static String codecPreference = 'Auto';
   static bool subtitlesEnabled = true;
   static bool autoNextEnabled = true;
   static bool downloadWifiOnly = true;
@@ -152,6 +153,7 @@ class LiveGoSettings {
     quality = 'Auto';
     layoutMode = layoutAuto;
     drmMode = 'Auto';
+    codecPreference = 'Auto';
     subtitlesEnabled = true;
     autoNextEnabled = true;
     downloadWifiOnly = true;

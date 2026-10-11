@@ -10,6 +10,7 @@ enum LiveGoSettingId {
   cachePlayback,
   manualRotate,
   drmMode,
+  codecPreference,
   tvPlayerEngine,
   cacheMaintenance,
   downloadNotice,
@@ -99,6 +100,12 @@ class LiveGoSettingsMenuData {
     'Nonaktifkan Paksa L3',
   ];
 
+  static const List<String> codecValues = <String>[
+    'Auto',
+    'H264',
+    'H265',
+  ];
+
   static List<LiveGoSettingSection> build({
     required bool tvLocked,
     bool cacheBusy = false,
@@ -166,6 +173,13 @@ class LiveGoSettingsMenuData {
             title: 'DRM Mode',
             subtitle: 'Mode kompatibilitas Widevine DRM.',
             value: LiveGoSettings.drmMode,
+          ),
+          LiveGoSettingItem.tile(
+            id: LiveGoSettingId.codecPreference,
+            icon: Icons.video_settings_rounded,
+            title: 'Prioritas Codec',
+            subtitle: 'Pilih decoder H264/H265 untuk Melolo.',
+            value: LiveGoSettings.codecPreference,
           ),
           if (includeTvPlayerEngine)
             LiveGoSettingItem.tile(
