@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player_media_kit/video_player_media_kit.dart';
 
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
@@ -14,7 +15,6 @@ import 'tv/tv_app.dart';
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    // media_kit dicabut — pakai ExoPlayer bawaan video_player (1 player untuk mobile+TV)
 
     final now = DateTime.now();
     debugPrint(
@@ -28,6 +28,14 @@ void main() {
     };
 
     final isTvRuntime = await LiveGoRuntimeDetector.isTvRuntime();
+    // TV pakai media_kit (MPV) karena ExoPlayer bermasalah di TV box.
+    // Mobile pakai ExoPlayer bawaan (ringan, responsif).
+    if (isTvRuntime) {
+      VideoPlayerMediaKit.ensureInitialized(android: true);
+      debugPrint('LIVEGO PLAYER: media_kit (MPV) aktif untuk TV');
+    } else {
+      debugPrint('LIVEGO PLAYER: ExoPlayer bawaan untuk mobile');
+    }
     LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: isTvRuntime);
     await LiveGoLocalStore.init();
     runApp(
