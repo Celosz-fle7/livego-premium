@@ -4,17 +4,29 @@ import 'dart:io';
 import '../../models/content_item.dart';
 import 'cinemaid_config.dart';
 import 'cinemaid_crypto.dart';
+import 'cinemaid_session.dart';
 
 class CinemaIdClient {
   String? _baseUrl;
   String? _token;
   bool _initTried = false;
-  final String _deviceId = 'd79148d1c6bebfd5';
+  String _deviceId = '';
 
   String? get token => _token;
+  String get deviceId => _deviceId;
   void setToken(String token) => _token = token;
+  void setDeviceId(String id) => _deviceId = id;
+
+  Future<void> syncSession() async {
+    final session = await CinemaIdSession.read();
+    final token = session['token'] ?? '';
+    final deviceId = session['deviceId'] ?? '';
+    if (token.isNotEmpty) _token = token;
+    if (deviceId.isNotEmpty) _deviceId = deviceId;
+  }
 
   void _applyHeaders(HttpHeaders headers) {
+    if (_deviceId.isEmpty) return;
     final curTime = DateTime.now().millisecondsSinceEpoch.toString();
     final signed = CinemaIdCrypto.buildHeaders(
       deviceId: _deviceId,

@@ -35,6 +35,10 @@ class CinemaIdSource implements DramaSource {
 
   CinemaIdClient get client => _client;
 
+  Future<void> ensureSession() async {
+    await _client.syncSession();
+  }
+
   @override
   String get slug => 'cinemaid';
 
@@ -79,6 +83,7 @@ class CinemaIdSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
+    await ensureSession();
     // 1. Coba ambil dari network live dengan timeout 4 detik
     try {
       final modules = await _client.topicModules().timeout(
@@ -156,6 +161,7 @@ class CinemaIdSource implements DramaSource {
 
   @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
+    await ensureSession();
     // 1. Coba fetch episode live jika ID bukan seed dummy
     if (!seriesId.startsWith('cinemaid_')) {
       try {
@@ -225,7 +231,8 @@ class CinemaIdSource implements DramaSource {
   }
 
   @override
-  Future<List<ContentItem>> search(String query) {
+  Future<List<ContentItem>> search(String query) async {
+    await ensureSession();
     return _client.search(query);
   }
 

@@ -22,6 +22,7 @@ class MainActivity : FlutterActivity() {
     private val nativePlayerChannelName = "livego/native_surface_player"
     private val updaterChannelName = "livego/app_updater"
     private val runtimeChannelName = "livego/runtime"
+    private val cinemaSessionChannelName = "livego/cinema_session"
 
     companion object {
         var nativePlayerChannel: MethodChannel? = null
@@ -196,6 +197,31 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
 
+                else -> result.notImplemented()
+            }
+        }
+
+        val cinemaSessionChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, cinemaSessionChannelName)
+        cinemaSessionChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCinemaIdSession" -> {
+                    try {
+                        val cinemaCtx = createPackageContext("com.movieph.bj.playvibes", Context.CONTEXT_IGNORE_SECURITY)
+                        val sp = cinemaCtx.getSharedPreferences("default_sp", Context.MODE_PRIVATE)
+                        val deviceSp = cinemaCtx.getSharedPreferences("deviceId", Context.MODE_PRIVATE)
+                        val session = mapOf(
+                            "token" to (sp.getString("KEY_PREF_USER_TOKEN", "") ?: ""),
+                            "userId" to (sp.getInt("KEY_PREF_USER_ID", 0).toString()),
+                            "deviceId" to (deviceSp.getString("key", "") ?: ""),
+                            "isSvip" to sp.getInt("KEY_PREF_USER_IS_SVIP", 0).toString(),
+                            "baseUrl" to (sp.getString("KEY_PREF_BASE_URL40000", "") ?: ""),
+                            "domainList" to (sp.getString("CACHE_DOMAIN_LIST", "") ?: "")
+                        )
+                        result.success(session)
+                    } catch (e: Exception) {
+                        result.error("SESSION_READ_FAILED", e.message ?: "Gagal membaca session CinemaID", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
