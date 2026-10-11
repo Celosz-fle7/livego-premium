@@ -86,9 +86,11 @@ class ContentItem {
     );
   }
 
-  /// Ekstrak tags dari berbagai kemungkinan field API.
+  /// Ekstrak tags dari field asli API FreeReels.
+  /// Verified 2026-10-10 via probe langsung: series_tag (268 item),
+  /// content_tags (255 item), tag (39 item). Bahasa Indonesia.
   static List<String> extractTags(Map json) {
-    for (final key in ['tags', 'labels', 'genres', 'tag_list', 'label_list']) {
+    for (final key in ['series_tag', 'content_tags', 'tag', 'tags', 'labels', 'genres', 'tag_list', 'label_list']) {
       final v = json[key];
       if (v is List) {
         return v.map((e) => '$e'.trim()).where((s) => s.isNotEmpty).toList();
