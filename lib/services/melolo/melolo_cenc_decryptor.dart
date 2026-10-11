@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../core/livego_settings.dart';
+
 /// Dekriptor CENC (Common Encryption, cenc AES-128-CTR) untuk MP4 ByteDance/Melolo.
 ///
 /// Bekerja 100% pure Dart tanpa pustaka C eksternal atau daemon Termux:
 /// 1. Dekripsi `spade_a` -> AES-128 key (16 bytes).
 /// 2. Parsing struktur MP4 (moov, trak, stsz, stco, stsc, senc).
 /// 3. In-place dekripsi setiap video/audio sample menggunakan AES-128-CTR.
-/// 4. Ubah FourCC sampel entry: `encv` -> `hvc1` dan `enca` -> `mp4a` agar dipahami ExoPlayer/AVFoundation.
+/// 4. Ubah FourCC sampel entry: `encv` -> `avc1`/`hvc1` (deteksi otomatis atau sesuai setting) dan `enca` -> `mp4a` agar dipahami ExoPlayer/AVFoundation.
 class MeloloCencDecryptor {
   MeloloCencDecryptor._();
 
@@ -374,15 +376,36 @@ class MeloloCencDecryptor {
       }
     }
 
-    // Ubah sample entry encv -> hvc1
+    // Deteksi codec asli dari file: cari box avcC (H264) vs hvcC (H265)
+    // Prioritas: setting user > deteksi file > default hvc1
+    String targetFourCC;
+    final pref = LiveGoSettings.codecPreference;
+    if (pref == 'H264') {
+      targetFourCC = 'avc1';
+    } else if (pref == 'H265') {
+      targetFourCC = 'hvc1';
+    } else {
+      // Auto: deteksi dari box di dalam moov
+      final hasHvcC = _findBox(mp4Bytes, 'hvcC', searchStart, searchEnd) >= 0;
+      final hasAvcC = _findBox(mp4Bytes, 'avcC', searchStart, searchEnd) >= 0;
+      if (hasAvcC && !hasHvcC) {
+        targetFourCC = 'avc1';
+      } else {
+        targetFourCC = 'hvc1'; // default: H265 (atau keduanya ada)
+      }
+      // ignore: avoid_print
+      print('LIVEGO MELOLO DIAG: codec detect hasAvcC=$hasAvcC hasHvcC=$hasHvcC -> $targetFourCC');
+    }
+
+    // Ubah sample entry encv -> avc1 (H264) atau hvc1 (H265)
     var pos = searchStart;
     while (pos < searchEnd - 4) {
       final idx = _findBox(mp4Bytes, 'encv', pos, searchEnd);
       if (idx < 0) break;
-      mp4Bytes[idx] = 0x68;     // 'h'
-      mp4Bytes[idx + 1] = 0x76; // 'v'
-      mp4Bytes[idx + 2] = 0x63; // 'c'
-      mp4Bytes[idx + 3] = 0x31; // '1'
+      mp4Bytes[idx] = targetFourCC.codeUnitAt(0);
+      mp4Bytes[idx + 1] = targetFourCC.codeUnitAt(1);
+      mp4Bytes[idx + 2] = targetFourCC.codeUnitAt(2);
+      mp4Bytes[idx + 3] = targetFourCC.codeUnitAt(3);
       pos = idx + 4;
     }
 
