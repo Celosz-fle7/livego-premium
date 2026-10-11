@@ -29,6 +29,8 @@ class CinemaIdConfig {
       'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 '
       'Chrome/120.0.0.0 Mobile Safari/537.36';
 
+  static const referer = 'https://www.playvibes.example/';
+
   static const timeout = Duration(seconds: 15);
 
   /// Kategori bawaan CinemaID terkelompok rapi sesuai jalur server asli:

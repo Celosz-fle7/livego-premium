@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'cinemaid_client.dart';
 import 'cinemaid_config.dart';
+import 'cinemaid_stream_proxy.dart';
 
 /// Adapter CinemaID sebagai DramaSource.
 ///
@@ -74,11 +78,21 @@ class CinemaIdSource implements DramaSource {
     'today\'s new series': '5349',
   };
 
-  /// Kembalikan URL asli langsung ke player.
-  /// Proxy lokal 127.0.0.1:7000 tidak ada servernya — jangan dipakai.
-  /// Sesuai perilaku APK asli: vod_url langsung ke ExoPlayer.
+  /// Format URL ke proxy lokal CinemaID (127.0.0.1:7000).
+  ///
+  /// App asli memakai proxy libvindictus di port 7000 untuk semua stream.
+  /// Buktinya ada di backup HP root: video_history berisi
+  /// http://127.0.0.1:7000/resource.m3u8?src=<base64(vod_url)>
   String _formatStreamUrl(String rawUrl) {
-    return rawUrl;
+    if (rawUrl.isEmpty) return rawUrl;
+    if (rawUrl.startsWith('http://127.0.0.1:') ||
+        rawUrl.startsWith('http://localhost:')) {
+      return rawUrl;
+    }
+    // Pastikan proxy jalan sebelum URL dipakai player
+    unawaited(CinemaIdStreamProxy.instance.ensureRunning());
+    final b64 = base64Encode(utf8.encode(rawUrl));
+    return '${CinemaIdConfig.localProxyBaseUrl}/resource.m3u8?src=$b64';
   }
 
   @override
