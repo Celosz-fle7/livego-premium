@@ -21,6 +21,7 @@ import '../../services/player/player_preferences.dart';
 import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_contract.dart';
 import '../../services/download/download_service.dart';
+import '../../services/melolo/melolo_stream_proxy.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -427,7 +428,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       widget.onPlayable?.call();
       if (mounted) setState(() => _buffering = false);
     } catch (e) {
-      _error = '$e';
+      // Tambahkan info diagnostik Melolo jika ada
+      final meloloDiag = MeloloStreamProxy.lastDiagnostic;
+      _error = '$e${meloloDiag.isNotEmpty && widget.item.platformSlug == 'melolo' ? '\n\n[DIAG] $meloloDiag' : ''}';
       _buffering = false;
       if (mounted) setState(() {});
       _logStreamUrl('source_error', url, error: e);

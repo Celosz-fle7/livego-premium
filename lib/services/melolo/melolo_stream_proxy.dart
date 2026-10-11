@@ -21,6 +21,9 @@ class MeloloStreamProxy {
   static MeloloStreamProxy? _instance;
   static MeloloStreamProxy get instance => _instance ??= MeloloStreamProxy._();
 
+  /// Diagnostik terakhir untuk ditampilkan di UI saat error
+  static String lastDiagnostic = '';
+
   HttpServer? _server;
   int _port = 0;
   final Map<String, String> _fileRegistry = {}; // token -> filePath
@@ -172,28 +175,39 @@ class MeloloStreamProxy {
     httpClient.close(force: true);
 
     final rawBytes = builder.takeBytes();
-    // ===== DIAGNOSTIK DOWNLOAD (sementara) =====
-    // ignore: avoid_print
-    print('LIVEGO MELOLO DIAG: downloaded ${rawBytes.length} bytes');
-    if (rawBytes.length >= 12) {
-      // ignore: avoid_print
-      final header = String.fromCharCodes(rawBytes.sublist(4, 12));
-      // ignore: avoid_print
-      print('LIVEGO MELOLO DIAG: file header(4-12)="$header" (ftyp=MP4 valid)');
+    // ===== DIAGNOSTIK DOWNLOAD =====
+    final dlSize = rawBytes.length;
+    String fileHeader = 'N/A';
+    if (dlSize >= 12) {
+      fileHeader = String.fromCharCodes(rawBytes.sublist(4, 12));
     }
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: downloaded $dlSize bytes, header="$fileHeader"');
     // ===== END DIAGNOSTIK =====
-    if (rawBytes.length < 1024) {
-      throw Exception('Ukuran video Melolo terlalu kecil (${rawBytes.length} bytes)');
+    if (dlSize < 1024) {
+      lastDiagnostic = 'Download gagal: hanya $dlSize bytes (header: $fileHeader)';
+      throw Exception('Ukuran video Melolo terlalu kecil ($dlSize bytes). $lastDiagnostic');
     }
 
     // Dekripsi CENC in-place menggunakan Pure Dart
     final decryptedBytes = MeloloCencDecryptor.decryptMp4Bytes(rawBytes, aesKey);
-    // ===== DIAGNOSTIK DECRYPT (sementara) =====
+    // ===== DIAGNOSTIK DECRYPT + VALIDASI =====
+    String decHeader = 'N/A';
+    bool hasMoov = false;
+    bool hasMdat = false;
     if (decryptedBytes.length >= 12) {
-      // ignore: avoid_print
-      final decHeader = String.fromCharCodes(decryptedBytes.sublist(4, 12));
-      // ignore: avoid_print
-      print('LIVEGO MELOLO DIAG: decrypted header(4-12)="$decHeader"');
+      decHeader = String.fromCharCodes(decryptedBytes.sublist(4, 12));
+      // Cek box penting: moov dan mdat harus ada
+      final decStr = String.fromCharCodes(decryptedBytes.sublist(0, decryptedBytes.length.clamp(0, 200000)));
+      hasMoov = decStr.contains('moov');
+      hasMdat = decStr.contains('mdat');
+    }
+    lastDiagnostic = 'DL:${dlSize}B hdr:$fileHeader | Dec hdr:$decHeader moov:$hasMoov mdat:$hasMdat';
+    // ignore: avoid_print
+    print('LIVEGO MELOLO DIAG: $lastDiagnostic');
+    if (!hasMoov || !hasMdat) {
+      lastDiagnostic = 'File MP4 rusak setelah decrypt! $lastDiagnostic';
+      throw Exception('Hasil decrypt Melolo tidak valid (moov:$hasMoov mdat:$hasMdat). $lastDiagnostic');
     }
     // ===== END DIAGNOSTIK =====
 
