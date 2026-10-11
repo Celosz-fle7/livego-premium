@@ -73,18 +73,12 @@ class CinemaIdSource implements DramaSource {
     if (rawUrl.startsWith('http://127.0.0.1:') || rawUrl.startsWith('http://localhost:')) {
       return rawUrl;
     }
-    try {
-      final b64 = base64.encode(utf8.encode(rawUrl));
-      return 'http://127.0.0.1:7000/resource.m3u8?src=$b64';
-    } catch (_) {
-      return rawUrl;
-    }
+    return rawUrl;
   }
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
     await ensureSession();
-    // 1. Coba ambil dari network live dengan timeout 4 detik
     try {
       final modules = await _client.topicModules().timeout(
             const Duration(seconds: 4),
@@ -105,38 +99,13 @@ class CinemaIdSource implements DramaSource {
         final out = <ContentItem>[];
         final seen = <String>{};
         for (final m in targets) {
-          final blockList = m['block_list'] ?? m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
-          if (blockList is! List) continue;
-          for (final b in blockList) {
-            if (b is! Map) continue;
-            final subVods = b['vod_list'];
-            if (subVods is List && subVods.isNotEmpty) {
-              for (final v in subVods) {
-                if (v is! Map) continue;
-                final id = '${v['vod_id'] ?? v['id'] ?? ''}';
-                final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
-                final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
-                if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
-                out.add(ContentItem(
-                  id: id,
-                  title: title,
-                  source: 'cinemaid',
-                  category: category,
-                  description: '${v['vod_desc'] ?? v['desc'] ?? v['vod_blurb'] ?? ''}',
-                  posterUrl: pic,
-                  backdropUrl: pic,
-                  rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
-                  episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 0}') ?? 0,
-                  platformSlug: 'cinemaid',
-                ));
-              }
-              continue;
-            }
-
-            final v = (b['vod_info'] is Map ? b['vod_info'] : b) as Map;
-            final id = '${v['vod_id'] ?? v['id'] ?? v['data_id'] ?? ''}';
+          final videoList = m['videoList'] ?? m['video_list'] ?? m['list'] ?? m['block_list'] ?? const [];
+          if (videoList is! List) continue;
+          for (final v in videoList) {
+            if (v is! Map) continue;
+            final id = '${v['vod_id'] ?? v['id'] ?? ''}';
             final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
-            final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? b['banner_pic'] ?? ''}'.trim();
+            final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
             if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
             out.add(ContentItem(
               id: id,

@@ -26,10 +26,10 @@ class CinemaIdClient {
   }
 
   void _applyHeaders(HttpHeaders headers) {
-    if (_deviceId.isEmpty) return;
+    final effectiveDeviceId = _deviceId.isNotEmpty ? _deviceId : 'd79148d1c6bebfd5';
     final curTime = DateTime.now().millisecondsSinceEpoch.toString();
     final signed = CinemaIdCrypto.buildHeaders(
-      deviceId: _deviceId,
+      deviceId: effectiveDeviceId,
       curTime: curTime,
       token: _token ?? '',
     );
