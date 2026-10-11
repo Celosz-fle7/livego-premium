@@ -145,7 +145,10 @@ class LiveGoLocalStore {
   static List<ContentItem> get favorites => List.unmodifiable(_favorites);
   static List<DownloadRecord> get downloads => List.unmodifiable(_downloads);
   static List<WatchProgress> get continueWatching {
-    final rows = _progress.values.toList()
+    final rows = _progress.values
+        // Filter: sembunyikan yang sudah selesai (>95%) biar tidak mengganggu
+        .where((p) => p.ratio < 0.95)
+        .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return List.unmodifiable(rows);
   }

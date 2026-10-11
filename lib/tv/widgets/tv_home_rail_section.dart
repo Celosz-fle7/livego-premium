@@ -187,31 +187,6 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (rows.continueWatching.isNotEmpty) ...[
-              _RailHeader(
-                title: 'Lanjut Menonton',
-                subtitle: '${rows.continueWatching.length} tontonan terakhir',
-                icon: Icons.play_circle_fill_rounded,
-              ),
-              SizedBox(
-                height: 154,
-                child: ListView.separated(
-                  cacheExtent: 220,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: rows.continueWatching.length,
-                  addAutomaticKeepAlives: false,
-                  addSemanticIndexes: false,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, i) => _ContinueCard(
-                    node: _continueNodes[i],
-                    progress: rows.continueWatching[i],
-                    onKey: (node, event) => _continueKey(i, rows.continueWatching[i], event),
-                    onTap: () => widget.onOpen(_tvResumeItemFromProgress(rows.continueWatching[i])),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
             if (rows.myList.isNotEmpty) ...[
               _RailHeader(
                 title: 'My List',
@@ -232,6 +207,32 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
                     item: rows.myList[i],
                     onKey: (node, event) => _myListKey(i, rows.myList[i], event),
                     onTap: () => widget.onOpen(rows.myList[i]),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            // Lanjut Menonton dipindah ke bawah biar tidak mengganggu di atas
+            if (rows.continueWatching.isNotEmpty) ...[
+              _RailHeader(
+                title: 'Lanjut Menonton',
+                subtitle: '${rows.continueWatching.length} tontonan terakhir',
+                icon: Icons.play_circle_fill_rounded,
+              ),
+              SizedBox(
+                height: 154,
+                child: ListView.separated(
+                  cacheExtent: 220,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: rows.continueWatching.length,
+                  addAutomaticKeepAlives: false,
+                  addSemanticIndexes: false,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, i) => _ContinueCard(
+                    node: _continueNodes[i],
+                    progress: rows.continueWatching[i],
+                    onKey: (node, event) => _continueKey(i, rows.continueWatching[i], event),
+                    onTap: () => widget.onOpen(_tvResumeItemFromProgress(rows.continueWatching[i])),
                   ),
                 ),
               ),

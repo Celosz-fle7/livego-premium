@@ -42,11 +42,27 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     final platform = _platform;
 
     try {
-      // Home harus jadi sumber utama. Banner jangan boleh menggagalkan Home.
-      final baseCategories = await LiveGoCatalog.fetchCategoriesFor(platform)
-          .timeout(const Duration(seconds: 6), onTimeout: () => LiveGoCatalog.categoriesFor(platform));
-      if (category >= baseCategories.length) category = 0;
-      final selectedCategory = baseCategories.isEmpty ? 'Populer' : baseCategories[category];
+      // STREAMING: Jangan blokir UI menunggu kategori network.
+      // Pakai kategori default langsung, fetch network di background.
+      final defaultCategories = LiveGoCatalog.categoriesFor(platform);
+      if (category >= defaultCategories.length) category = 0;
+      final selectedCategory = defaultCategories.isEmpty ? 'Populer' : defaultCategories[category];
+
+      // Fetch kategori fresh di background, update UI kalau ada perubahan
+      unawaited(
+        LiveGoCatalog.fetchCategoriesFor(platform)
+            .timeout(const Duration(seconds: 6), onTimeout: () => defaultCategories)
+            .then((fresh) {
+          if (fresh.isNotEmpty && fresh.length != defaultCategories.length && mounted) {
+            setState(() {
+              // Kategori berubah, reload dengan kategori baru
+              _future = _load();
+            });
+          }
+        }),
+      );
+
+      final baseCategories = defaultCategories;
       final List<ContentItem> items;
       final dramaSource = DramaSourceRegistry.forSlug(platform);
       if (dramaSource != null) {
