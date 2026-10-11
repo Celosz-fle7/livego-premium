@@ -80,10 +80,27 @@ class CinemaIdSource implements DramaSource {
   Future<List<ContentItem>> homeByCategory(String category) async {
     await ensureSession();
     try {
-      final modules = await _client.topicModules().timeout(
-            const Duration(seconds: 4),
+      final catLower = category.toLowerCase();
+      String channelId = '202';
+      if (catLower.contains('movie') || catLower.contains('film')) {
+        channelId = '204';
+      } else if (catLower.contains('series') || catLower.contains('tv') || catLower.contains('show')) {
+        channelId = '203';
+      } else if (catLower.contains('anime')) {
+        channelId = '205';
+      }
+
+      var modules = await _client.channelModules(channelId: channelId).timeout(
+            const Duration(seconds: 5),
             onTimeout: () => const <Map<String, dynamic>>[],
           );
+      if (modules.isEmpty && channelId != '202') {
+        modules = await _client.channelModules(channelId: '202').timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => const <Map<String, dynamic>>[],
+            );
+      }
+
       if (modules.isNotEmpty) {
         Map<String, dynamic>? picked;
         final needle = category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
@@ -95,19 +112,60 @@ class CinemaIdSource implements DramaSource {
             break;
           }
         }
-        final targets = picked != null ? [picked] : modules.take(3);
+
+        final targets = picked != null ? [picked, ...modules.where((m) => m != picked)] : modules;
         final out = <ContentItem>[];
         final seen = <String>{};
+
         for (final m in targets) {
-          final moduleId = '${m['module_id'] ?? m['id'] ?? ''}';
-          if (moduleId.isEmpty) continue;
-          try {
-            final vods = await _client.topicVods(moduleId, category: category);
-            for (final v in vods) {
-              if (v.id.isEmpty || !seen.add(v.id)) continue;
-              out.add(v);
+          final blockList = m['block_list'] ?? m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
+          if (blockList is! List) continue;
+          for (final b in blockList) {
+            if (b is! Map) continue;
+            final subVods = b['vod_list'];
+            if (subVods is List && subVods.isNotEmpty) {
+              for (final v in subVods) {
+                if (v is! Map) continue;
+                final id = '${v['vod_id'] ?? v['id'] ?? ''}';
+                final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
+                final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
+                if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
+                out.add(ContentItem(
+                  id: id,
+                  title: title,
+                  source: 'cinemaid',
+                  category: category,
+                  description: '${v['vod_blurb'] ?? v['vod_desc'] ?? v['desc'] ?? ''}',
+                  posterUrl: pic,
+                  backdropUrl: pic,
+                  rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
+                  episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 1}') ?? 1,
+                  platformSlug: 'cinemaid',
+                ));
+              }
+              continue;
             }
-          } catch (_) {}
+
+            if (b['vod_info'] is Map) {
+              final v = b['vod_info'] as Map;
+              final id = '${v['vod_id'] ?? v['id'] ?? ''}';
+              final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
+              final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
+              if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
+              out.add(ContentItem(
+                id: id,
+                title: title,
+                source: 'cinemaid',
+                category: category,
+                description: '${v['vod_blurb'] ?? v['vod_desc'] ?? v['desc'] ?? ''}',
+                posterUrl: pic,
+                backdropUrl: pic,
+                rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
+                episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 1}') ?? 1,
+                platformSlug: 'cinemaid',
+              ));
+            }
+          }
         }
         if (out.isNotEmpty) return out;
       }

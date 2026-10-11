@@ -9,9 +9,9 @@ import 'cinemaid_session.dart';
 
 class CinemaIdClient {
   String? _baseUrl;
-  String? _token;
+  String? _token = CinemaIdConfig.defaultToken;
   bool _initTried = false;
-  String _deviceId = '';
+  String _deviceId = CinemaIdConfig.defaultDeviceId;
   bool _autoLoginTried = false;
 
   String? get token => _token;
@@ -20,39 +20,30 @@ class CinemaIdClient {
   void setDeviceId(String id) => _deviceId = id;
 
   Future<void> ensureSession() async {
-    if (_token != null && _token!.isNotEmpty) return;
-    final session = await CinemaIdSession.read();
-    _token = session['token'] ?? '';
-    _deviceId = session['deviceId'] ?? '';
-    if (_token != null && _token!.isNotEmpty) return;
-    if (_autoLoginTried) return;
-    _autoLoginTried = true;
-    if (_deviceId.isEmpty) {
-      final random = Random.secure();
-      final bytes = List.generate(16, (_) => random.nextInt(256));
-      _deviceId = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    }
+    if (_token != null && _token!.isNotEmpty && _deviceId.isNotEmpty) return;
     try {
-      final token = await register({
-        'username': '${CinemaIdConfig.autoRegisterUsername}_${_deviceId.substring(0, 8)}',
-        'password': CinemaIdConfig.autoRegisterPassword,
-        'device_id': _deviceId,
-      });
-      _token = token;
-      await CinemaIdSession.save(
-        token: token,
-        deviceId: _deviceId,
-      );
+      final session = await CinemaIdSession.read();
+      final sessToken = session['token'];
+      final sessDevId = session['deviceId'];
+      if (sessToken != null && sessToken.isNotEmpty) _token = sessToken;
+      if (sessDevId != null && sessDevId.isNotEmpty) _deviceId = sessDevId;
     } catch (_) {}
+    if (_deviceId.isEmpty) {
+      _deviceId = CinemaIdConfig.defaultDeviceId;
+    }
+    if (_token == null || _token!.isEmpty) {
+      _token = CinemaIdConfig.defaultToken;
+    }
   }
 
   void _applyHeaders(HttpHeaders headers) {
-    final effectiveDeviceId = _deviceId.isNotEmpty ? _deviceId : 'd79148d1c6bebfd5';
+    final effectiveDeviceId = _deviceId.isNotEmpty ? _deviceId : CinemaIdConfig.defaultDeviceId;
     final curTime = DateTime.now().millisecondsSinceEpoch.toString();
+    final effectiveToken = (_token != null && _token!.isNotEmpty) ? _token! : CinemaIdConfig.defaultToken;
     final signed = CinemaIdCrypto.buildHeaders(
       deviceId: effectiveDeviceId,
       curTime: curTime,
-      token: _token ?? '',
+      token: effectiveToken,
     );
     signed.forEach((k, v) {
       headers.set(k, v);
@@ -295,8 +286,8 @@ class CinemaIdClient {
       'vod_id': vodId,
       'collection': collection,
     });
-    final data = res['data'] as Map? ?? {};
-    final info = (data['vod'] ?? data['info'] ?? {}) as Map? ?? {};
+    final data = (res['result'] ?? res['data']) as Map? ?? {};
+    final info = (data['vod'] ?? data['info'] ?? data) as Map? ?? {};
     final episodes = _asMaps(data['vod_collection'] ??
             data['episode_list'] ??
             data['episodes'] ??

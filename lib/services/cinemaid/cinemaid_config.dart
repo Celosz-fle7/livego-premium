@@ -16,6 +16,11 @@ class CinemaIdConfig {
   static const autoRegisterUsername = 'livego_user';
   static const autoRegisterPassword = 'livego_pass_2026';
 
+  /// Active Session Token & Device ID (dari SharedPreferences CinemaID asli)
+  static const defaultDeviceId = 'c47dc57a04dd5a3e';
+  static const defaultToken =
+      'gAAAAABqy7SFYbBIk_lFNUwVrxyi599MRGv8JY7F8nqIm77Q7zvRgytSKrANFp3ti8W9WXNW8VWv1SC6xsiW2tMjesCUHbbgHEzIcWS5YYzZhfKeTgFJi1Et0fIZXHnhz76X8M3rumwBWsDVzRQvUQwS8iKesbBDEFFLe_uTP2kJyQUN0SVQFFhgM2iC8DntLJ7UTWXUtxGiti5t99PfDV6x4-vJNrvsyCCo-UB4tKg2ST6elThyWJR8JI-UEjZUin_do5hWpBFC';
+
   /// Path init (tanpa prefix /api, client yang menambahkan).
   static const initPath = '/public/init';
 
