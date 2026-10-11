@@ -48,8 +48,6 @@ class CinemaIdSource implements DramaSource {
   @override
   List<String> get categories => CinemaIdConfig.categories;
 
-  ];
-
   /// Map kategori ke Topic ID server backend CinemaID yang valid 100%
   static const Map<String, String> _categoryToTopicId = {
     // Platform OTT (Channel 202 - Streaming module)
