@@ -811,10 +811,22 @@ class CinemaIdSource implements DramaSource {
   ];
 
   static const _sampleLiveStreams = [
-    'http://movieph.xrrqe.com/vod/2/2024/11/12/d51ed1eba2d2/0006.ts?wsSecret=6eb303b52783aaca415cc03af1814937&wsTime=6ac646db',
-    'http://movieph.xrrqe.com/vod/2/2026/08/13/3ab752e95849/index5.m3u8?wsSecret=12e9d2860976f92a88993d190769efd7&wsTime=6ac5f027',
-    'http://movieph.xrrqe.com/vod/2/2026/07/20/c84f70b82a32/index5.m3u8?wsSecret=d0cd0a795b8e17443373ac3e78dc7d94&wsTime=6ac5efe2',
-    'http://movieph.xrrqe.com/vod/2/2024/11/12/b2b00a4677f2/index5.m3u8?wsSecret=40f5a94a180642ec318fa4b4494ab0fe&wsTime=6ac5ecbd',
+    'http://movieph.xrrqe.com/vod/2/2024/10/16/4a45db05b9d9/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2024/11/07/8b3c96d7e900/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/09/03/0eb2b5357f28/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/05/06/ce959dcea6bf/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/05/01/3a00a29c96a5/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/05/13/a2aaace5f9dc/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/08/13/3ab752e95849/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2024/10/21/3f000f472bd3/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2025/12/10/b6378e100290/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/09/16/4f89dce66ec1/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2025/12/22/3193cf57c602/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/10/03/61dc6137ebf2/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/08/05/c8e579d215a7/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/10/10/b2201a456c6a/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/05/28/eb3234b44b27/index5.m3u8',
+    'http://movieph.xrrqe.com/vod/2/2026/06/02/765614164dee/index5.m3u8',
   ];
 
   /// Format URL ke proxy lokal CinemaID (127.0.0.1:7000) jika raw stream dari CDN movieph.
