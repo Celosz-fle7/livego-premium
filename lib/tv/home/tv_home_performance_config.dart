@@ -8,7 +8,8 @@ class TvHomePerformanceConfig {
   const TvHomePerformanceConfig._();
 
   /// Hard cap for one Home platform/category manifest after playable filtering.
-  static const int maxManifestItems = 100;
+  /// Dikurangi dari 100 ke 60 untuk TV low-end (hemat memori & CPU).
+  static const int maxManifestItems = 60;
 
   /// Keep the poster grid short on low-end STB devices.
   ///

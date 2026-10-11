@@ -196,7 +196,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 220,
+                  cacheExtent: 120,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.myList.length,
                   addAutomaticKeepAlives: false,
@@ -222,7 +222,7 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
               SizedBox(
                 height: 154,
                 child: ListView.separated(
-                  cacheExtent: 220,
+                  cacheExtent: 120,
                   scrollDirection: Axis.horizontal,
                   itemCount: rows.continueWatching.length,
                   addAutomaticKeepAlives: false,
