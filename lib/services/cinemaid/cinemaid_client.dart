@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import '../../models/content_item.dart';
 import 'cinemaid_config.dart';
 import 'cinemaid_crypto.dart';
@@ -87,12 +88,14 @@ class CinemaIdClient {
       request.write(encodedBody);
       final response = await request.close().timeout(CinemaIdConfig.timeout);
       final rawBody = await response.transform(utf8.decoder).join();
+      debugPrint('CINEMAID CLIENT: status=${response.statusCode} path=${uri.path} bodyLen=${rawBody.length}');
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('CinemaID ${response.statusCode} ${uri.path}: $rawBody');
       }
       if (rawBody.trim().isEmpty) return <String, dynamic>{};
       
       final decrypted = CinemaIdCrypto.decryptResponse(rawBody);
+      debugPrint('CINEMAID CLIENT: decrypted type=${decrypted.runtimeType} isMap=${decrypted is Map}');
       if (decrypted is Map<String, dynamic>) return decrypted;
       if (decrypted is Map) return Map<String, dynamic>.from(decrypted);
       return <String, dynamic>{'success': true, 'data': decrypted};

@@ -113,6 +113,19 @@ class CinemaIdSource implements DramaSource {
             picked = m;
             break;
           }
+          final blockList = m['block_list'];
+          if (blockList is List) {
+            for (final b in blockList) {
+              if (b is Map) {
+                final bName = '${b['block_name'] ?? ''}'.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+                if (bName.isNotEmpty && (bName == needle || bName.contains(needle) || needle.contains(bName))) {
+                  picked = m;
+                  break;
+                }
+              }
+            }
+          }
+          if (picked != null) break;
         }
 
         final targets = picked != null ? [picked, ...modules.where((m) => m != picked)] : modules;
