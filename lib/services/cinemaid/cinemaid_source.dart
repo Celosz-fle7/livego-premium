@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
@@ -49,23 +48,6 @@ class CinemaIdSource implements DramaSource {
   @override
   List<String> get categories => CinemaIdConfig.categories;
 
-  static const _sampleLiveStreams = [
-    'http://movieph.xrrqe.com/vod/2/2024/10/16/4a45db05b9d9/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2024/11/07/8b3c96d7e900/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/09/03/0eb2b5357f28/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/05/06/ce959dcea6bf/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/05/01/3a00a29c96a5/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/05/13/a2aaace5f9dc/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/08/13/3ab752e95849/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2024/10/21/3f000f472bd3/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2025/12/10/b6378e100290/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/09/16/4f89dce66ec1/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2025/12/22/3193cf57c602/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/10/03/61dc6137ebf2/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/08/05/c8e579d215a7/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/10/10/b2201a456c6a/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/05/28/eb3234b44b27/index5.m3u8',
-    'http://movieph.xrrqe.com/vod/2/2026/06/02/765614164dee/index5.m3u8',
   ];
 
   /// Map kategori ke Topic ID server backend CinemaID yang valid 100%
@@ -94,17 +76,10 @@ class CinemaIdSource implements DramaSource {
     'today\'s new series': '5349',
   };
 
-  /// Format URL ke proxy lokal CinemaID (127.0.0.1:7000) jika raw stream dari CDN movieph.
+  /// Kembalikan URL asli langsung ke player.
+  /// Proxy lokal 127.0.0.1:7000 tidak ada servernya — jangan dipakai.
+  /// Sesuai perilaku APK asli: vod_url langsung ke ExoPlayer.
   String _formatStreamUrl(String rawUrl) {
-    if (rawUrl.isEmpty) return rawUrl;
-    if (rawUrl.startsWith('http://127.0.0.1:') || rawUrl.startsWith('http://localhost:')) {
-      return rawUrl;
-    }
-    // Jika URL berasal dari CDN internal CinemaID, lewati proxy port 7000
-    if (rawUrl.contains('movieph.xrrqe.com') || rawUrl.contains('/vod/')) {
-      final b64 = base64.encode(utf8.encode(rawUrl));
-      return '${CinemaIdConfig.localProxyBaseUrl}/resource.m3u8?src=$b64';
-    }
     return rawUrl;
   }
 
@@ -267,23 +242,7 @@ class CinemaIdSource implements DramaSource {
       } catch (_) {}
     }
 
-    // 2. Fallback real stream server CinemaID jika vod/info_new diblokir
-    final parsedId = int.tryParse(seriesId) ?? 1;
-    final totalEpisodes = 1; // Default
-    final out = <LiveGoEpisode>[];
-
-    for (var i = 1; i <= totalEpisodes; i++) {
-      final epId = '$seriesId:$i';
-      final streamIndex = (parsedId + i - 1) % _sampleLiveStreams.length;
-      final rawStream = _sampleLiveStreams[streamIndex];
-      _streamCache['$seriesId:$epId'] = _formatStreamUrl(rawStream);
-      out.add(LiveGoEpisode(
-        id: epId,
-        index: i,
-        title: totalEpisodes > 1 ? 'Episode $i' : 'Full Movie',
-      ));
-    }
-    return out;
+    throw Exception('CinemaID: gagal memuat episode dari server ($seriesId)');
   }
 
   @override
@@ -292,17 +251,14 @@ class CinemaIdSource implements DramaSource {
     required String episodeId,
   }) async {
     final cached = _streamCache['$seriesId:$episodeId'];
-    if (cached != null && cached.isNotEmpty) return _formatStreamUrl(cached);
+    if (cached != null && cached.isNotEmpty) return cached;
 
     // Belum di-cache: ambil ulang episode list lalu ambil kembali
     await episodes(seriesId);
     final retry = _streamCache['$seriesId:$episodeId'];
-    if (retry != null && retry.isNotEmpty) return _formatStreamUrl(retry);
+    if (retry != null && retry.isNotEmpty) return retry;
 
-    // Default stream jika belum ada
-    final parsedId = int.tryParse(seriesId) ?? 1;
-    final fallback = _sampleLiveStreams[parsedId % _sampleLiveStreams.length];
-    return _formatStreamUrl(fallback);
+    throw Exception('CinemaID: URL stream tidak ditemukan ($seriesId/$episodeId)');
   }
 
   /// vod_url = stream langsung per episode (mirip FreeReels, tanpa getplayinfo).

@@ -27,6 +27,7 @@ class MeloloStreamProxy {
   HttpServer? _server;
   int _port = 0;
   final Map<String, String> _fileRegistry = {}; // token -> filePath
+  final Map<String, Completer<void>> _readyCompleters = {}; // token -> siap
   final Completer<void> _initCompleter = Completer<void>();
 
   MeloloStreamProxy._();
@@ -55,6 +56,18 @@ class MeloloStreamProxy {
         request.response.statusCode = HttpStatus.notFound;
         await request.response.close();
         return;
+      }
+
+      // Streaming mode: tunggu file siap (maks 60 detik) agar player tidak timeout
+      final completer = _readyCompleters[token];
+      if (completer != null && !completer.isCompleted) {
+        try {
+          await completer.future.timeout(const Duration(seconds: 60));
+        } catch (_) {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          await request.response.close();
+          return;
+        }
       }
 
       final file = File(filePath);
@@ -136,14 +149,15 @@ class MeloloStreamProxy {
     final sanitizedEp = episodeId.replaceAll(RegExp(r'[^0-9A-Za-z_-]'), '_');
     final sanitizedSeries = seriesId.replaceAll(RegExp(r'[^0-9A-Za-z_-]'), '_');
     final decryptedFile = File('${targetDir.path}/${sanitizedSeries}_$sanitizedEp.mp4');
+    final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
 
     // Jika file sudah didekripsi dan valid (> 100KB), gunakan langsung
     if (await decryptedFile.exists()) {
       final size = await decryptedFile.length();
       if (size > 102400) {
-        final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
         _fileRegistry[token] = decryptedFile.path;
-        return decryptedFile.uri.toString();
+        // Kembalikan URL proxy agar range request ditangani seragam
+        return 'http://127.0.0.1:$_port/$token';
       }
     }
 
@@ -153,6 +167,35 @@ class MeloloStreamProxy {
       debugPrint('LIVEGO MELOLO: gagal mengekstrak kunci AES dari spade_a, fallback ke URL asli');
       return rawVideoUrl;
     }
+
+    // STREAMING MODE: daftarkan token & kembalikan URL proxy LANGSUNG,
+    // download+decrypt jalan di background. Player tidak perlu tunggu.
+    _fileRegistry[token] = decryptedFile.path;
+    final completer = Completer<void>();
+    _readyCompleters[token] = completer;
+    unawaited(_downloadAndDecrypt(
+      seriesId: seriesId,
+      episodeId: episodeId,
+      rawVideoUrl: rawVideoUrl,
+      aesKey: aesKey,
+      decryptedFile: decryptedFile,
+      token: token,
+      completer: completer,
+    ));
+    return 'http://127.0.0.1:$_port/$token';
+  }
+
+  /// Download + decrypt di background untuk streaming mode.
+  Future<void> _downloadAndDecrypt({
+    required String seriesId,
+    required String episodeId,
+    required String rawVideoUrl,
+    required Uint8List aesKey,
+    required File decryptedFile,
+    required String token,
+    required Completer<void> completer,
+  }) async {
+    try {
 
     debugPrint('LIVEGO MELOLO: mendownload & mendekripsi video $seriesId/$episodeId...');
 
@@ -214,10 +257,13 @@ class MeloloStreamProxy {
     // Tulis ke file cache
     await decryptedFile.writeAsBytes(decryptedBytes, flush: true);
 
-    final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
-    _fileRegistry[token] = decryptedFile.path;
-    debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes) -> ${decryptedFile.uri}');
-
-    return decryptedFile.uri.toString();
+    debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes)');
+    if (!completer.isCompleted) completer.complete();
+    } catch (e) {
+      debugPrint('LIVEGO MELOLO background download error: $e');
+      _fileRegistry.remove(token);
+      _readyCompleters.remove(token);
+      if (!completer.isCompleted) completer.completeError(e);
+    }
   }
 }
