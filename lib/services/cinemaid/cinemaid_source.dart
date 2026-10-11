@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
@@ -91,15 +92,16 @@ class CinemaIdSource implements DramaSource {
       }
 
       var modules = await _client.channelModules(channelId: channelId).timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 15),
             onTimeout: () => const <Map<String, dynamic>>[],
           );
       if (modules.isEmpty && channelId != '202') {
         modules = await _client.channelModules(channelId: '202').timeout(
-              const Duration(seconds: 5),
+              const Duration(seconds: 15),
               onTimeout: () => const <Map<String, dynamic>>[],
             );
       }
+      debugPrint('CINEMAID SOURCE: category=$category channelId=$channelId modules=${modules.length}');
 
       if (modules.isNotEmpty) {
         Map<String, dynamic>? picked;
@@ -167,9 +169,12 @@ class CinemaIdSource implements DramaSource {
             }
           }
         }
+        debugPrint('CINEMAID SOURCE: out=${out.length} items parsed');
         if (out.isNotEmpty) return out;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('CINEMAID SOURCE ERROR: $e\n$st');
+    }
 
     return const <ContentItem>[];
   }

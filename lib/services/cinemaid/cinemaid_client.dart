@@ -56,43 +56,12 @@ class CinemaIdClient {
     return {'base': base};
   }
 
-  /// Pastikan base URL sudah di-resolve via /api/public/init dan handshake portal lokal port 7000.
+  /// Pastikan base URL siap langsung tanpa memblokir request.
   Future<String> _base() async {
     await ensureSession();
-    // 1. Coba handshake dengan portal lokal CinemaID di 127.0.0.1:7000 jika aplikasi CinemaID aktif
-    try {
-      final localClient = HttpClient();
-      final localReq = await localClient
-          .getUrl(Uri.parse('${CinemaIdConfig.localProxyBaseUrl}/control?msg=verify&device_id=$_deviceId'))
-          .timeout(const Duration(milliseconds: 500));
-      final localResp = await localReq.close().timeout(const Duration(milliseconds: 500));
-      if (localResp.statusCode == 200) {
-        // Portal lokal aktif
-      }
-      localClient.close(force: true);
-    } catch (_) {}
-
-    if (_baseUrl != null) return _baseUrl!;
-    if (_initTried) return _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
-    _initTried = true;
-
-    var resolved = _normalizeUrl(CinemaIdConfig.fallbackBaseUrl);
-    try {
-      final uri = Uri.parse('$resolved/api${CinemaIdConfig.initPath}');
-      final res = await _rawPost(uri, {});
-      final result = (res['result'] ?? res['data']) as Map?;
-      final sysConf = result?['sys_conf'] as Map?;
-      final apiUrl = '${sysConf?['api_url'] ?? ''}'.trim();
-      if (apiUrl.isNotEmpty) resolved = _normalizeUrl(apiUrl);
-      final apiUrl2 = '${sysConf?['api_url2'] ?? ''}'.trim();
-      if (resolved == _normalizeUrl(CinemaIdConfig.fallbackBaseUrl) && apiUrl2.isNotEmpty) {
-        resolved = _normalizeUrl(apiUrl2);
-      }
-    } catch (_) {
-      // init gagal -> pakai fallback hardcoded, tanpa retry
-    }
-    _baseUrl = resolved;
-    return resolved;
+    if (_baseUrl != null && _baseUrl!.isNotEmpty) return _baseUrl!;
+    _baseUrl = _normalizeUrl(CinemaIdConfig.baseUrl);
+    return _baseUrl!;
   }
 
   String _normalizeUrl(String url) {
