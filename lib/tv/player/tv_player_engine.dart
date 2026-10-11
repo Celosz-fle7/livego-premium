@@ -34,7 +34,7 @@ class TvPlayerEngineConfig {
     defaultValue: '',
   );
 
-  static PlayerEngineType get defaultEngine => PlayerEngineType.nativeExo;
+  static PlayerEngineType get defaultEngine => PlayerEngineType.legacyHybrid;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override}) {
     return override ??
