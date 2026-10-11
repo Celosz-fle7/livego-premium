@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import '../../models/content_item.dart';
 import 'cinemaid_config.dart';
@@ -11,18 +12,38 @@ class CinemaIdClient {
   String? _token;
   bool _initTried = false;
   String _deviceId = '';
+  bool _autoLoginTried = false;
 
   String? get token => _token;
   String get deviceId => _deviceId;
   void setToken(String token) => _token = token;
   void setDeviceId(String id) => _deviceId = id;
 
-  Future<void> syncSession() async {
+  Future<void> ensureSession() async {
+    if (_token != null && _token!.isNotEmpty) return;
     final session = await CinemaIdSession.read();
-    final token = session['token'] ?? '';
-    final deviceId = session['deviceId'] ?? '';
-    if (token.isNotEmpty) _token = token;
-    if (deviceId.isNotEmpty) _deviceId = deviceId;
+    _token = session['token'] ?? '';
+    _deviceId = session['deviceId'] ?? '';
+    if (_token != null && _token!.isNotEmpty) return;
+    if (_autoLoginTried) return;
+    _autoLoginTried = true;
+    if (_deviceId.isEmpty) {
+      final random = Random.secure();
+      final bytes = List.generate(16, (_) => random.nextInt(256));
+      _deviceId = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    }
+    try {
+      final token = await register({
+        'username': '${CinemaIdConfig.autoRegisterUsername}_${_deviceId.substring(0, 8)}',
+        'password': CinemaIdConfig.autoRegisterPassword,
+        'device_id': _deviceId,
+      });
+      _token = token;
+      await CinemaIdSession.save(
+        token: token,
+        deviceId: _deviceId,
+      );
+    } catch (_) {}
   }
 
   void _applyHeaders(HttpHeaders headers) {
@@ -38,8 +59,15 @@ class CinemaIdClient {
     });
   }
 
+  Future<Map<String, dynamic>> _ensureBaseAndAuth() async {
+    await ensureSession();
+    final base = await _base();
+    return {'base': base};
+  }
+
   /// Pastikan base URL sudah di-resolve via /api/public/init dan handshake portal lokal port 7000.
   Future<String> _base() async {
+    await ensureSession();
     // 1. Coba handshake dengan portal lokal CinemaID di 127.0.0.1:7000 jika aplikasi CinemaID aktif
     try {
       final localClient = HttpClient();

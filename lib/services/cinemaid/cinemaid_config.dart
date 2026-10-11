@@ -12,6 +12,10 @@ class CinemaIdConfig {
   static const secretToken = 'gcAIKnfz';
   static const localProxyBaseUrl = 'http://127.0.0.1:7000';
 
+  /// Auto-register credentials (server accepts any unique device_id)
+  static const autoRegisterUsername = 'livego_user';
+  static const autoRegisterPassword = 'livego_pass_2026';
+
   /// Path init (tanpa prefix /api, client yang menambahkan).
   static const initPath = '/public/init';
 

@@ -36,7 +36,7 @@ class CinemaIdSource implements DramaSource {
   CinemaIdClient get client => _client;
 
   Future<void> ensureSession() async {
-    await _client.syncSession();
+    await _client.ensureSession();
   }
 
   @override
