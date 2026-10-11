@@ -67,35 +67,37 @@ class CinemaIdCrypto {
     }
 
     // Eksekusi pipeline dekripsi Lak/a
-    try {
-      // 1. Ekstrak payload (potong prefix SHOK jika ada)
-      String payload = trimmed;
-      if (payload.startsWith('SHOK')) {
-        payload = payload.substring(4);
-      }
+    // Coba dekripsi payload langsung (karena string raw Base64 sering diawali karakter 'SHOK')
+    final candidates = <String>[trimmed];
+    if (trimmed.startsWith('SHOK')) {
+      candidates.add(trimmed.substring(4));
+    }
 
-      // 2. Decode bytes (Base64 atau Hex)
-      Uint8List? cipherBytes;
+    for (final payload in candidates) {
       try {
-        var b64 = payload;
-        final rem = b64.length % 4;
-        if (rem != 0) b64 += '=' * (4 - rem);
-        cipherBytes = base64.decode(b64);
-      } catch (_) {
-        cipherBytes = _hexDecode(payload);
-      }
-
-      if (cipherBytes != null && cipherBytes.isNotEmpty) {
-        final keyBytes = Uint8List.fromList(utf8.encode(aesKeyStr));
-        final ivBytes = Uint8List.fromList(utf8.encode(aesIvStr));
-        final decryptedBytes = _aesCbcDecrypt(cipherBytes, keyBytes, ivBytes);
-        final decryptedText = utf8.decode(decryptedBytes, allowMalformed: true).trim();
-
-        if (decryptedText.startsWith('{') || decryptedText.startsWith('[')) {
-          return jsonDecode(decryptedText);
+        // 2. Decode bytes (Base64 atau Hex)
+        Uint8List? cipherBytes;
+        try {
+          var b64 = payload;
+          final rem = b64.length % 4;
+          if (rem != 0) b64 += '=' * (4 - rem);
+          cipherBytes = base64.decode(b64);
+        } catch (_) {
+          cipherBytes = _hexDecode(payload);
         }
-      }
-    } catch (_) {}
+
+        if (cipherBytes != null && cipherBytes.isNotEmpty && cipherBytes.length % 16 == 0) {
+          final keyBytes = Uint8List.fromList(utf8.encode(aesKeyStr));
+          final ivBytes = Uint8List.fromList(utf8.encode(aesIvStr));
+          final decryptedBytes = _aesCbcDecrypt(cipherBytes, keyBytes, ivBytes);
+          final decryptedText = utf8.decode(decryptedBytes, allowMalformed: true).trim();
+
+          if (decryptedText.startsWith('{') || decryptedText.startsWith('[')) {
+            return jsonDecode(decryptedText);
+          }
+        }
+      } catch (_) {}
+    }
 
     return <String, dynamic>{};
   }

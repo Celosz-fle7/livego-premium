@@ -73,13 +73,13 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
           endpoint: 'home',
           params: {'category': selectedCategory},
         ).timeout(const Duration(seconds: 2), onTimeout: () => null);
-        if (cached != null && cached.isNotEmpty) {
+        if (cached != null && cached.isNotEmpty && !cached.any((i) => i.id.startsWith('cinemaid_'))) {
           items = cached;
         } else {
           final fresh = await dramaSource.homeByCategory(selectedCategory)
-              .timeout(const Duration(seconds: 5), onTimeout: () => <ContentItem>[]);
-          items = fresh;
-          if (fresh.isNotEmpty) {
+              .timeout(const Duration(seconds: 6), onTimeout: () => <ContentItem>[]);
+          items = fresh.isNotEmpty ? fresh : (cached ?? <ContentItem>[]);
+          if (fresh.isNotEmpty && !fresh.any((i) => i.id.startsWith('cinemaid_'))) {
             unawaited(LiveGoContentCache.writeItems(
               platform: platform,
               endpoint: 'home',

@@ -845,11 +845,10 @@ class CinemaIdSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
-    // 1. Coba ambil dari network live dengan timeout sangat singkat (1.2 detik)
-    // agar UI Mobile / TV tidak pernah terkena timeout foreground (8-14 detik).
+    // 1. Coba ambil dari network live dengan timeout 4 detik
     try {
       final modules = await _client.topicModules().timeout(
-            const Duration(milliseconds: 1200),
+            const Duration(seconds: 4),
             onTimeout: () => const <Map<String, dynamic>>[],
           );
       if (modules.isNotEmpty) {
@@ -867,24 +866,51 @@ class CinemaIdSource implements DramaSource {
         final out = <ContentItem>[];
         final seen = <String>{};
         for (final m in targets) {
-          final videos = m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
-          if (videos is! List) continue;
-          for (final v in videos) {
-            if (v is! Map) continue;
-            final item = ContentItem(
-              id: '${v['vod_id'] ?? v['id'] ?? ''}',
-              title: '${v['vod_name'] ?? v['title'] ?? v['name'] ?? 'No title'}',
+          final blockList = m['block_list'] ?? m['videoList'] ?? m['video_list'] ?? m['list'] ?? const [];
+          if (blockList is! List) continue;
+          for (final b in blockList) {
+            if (b is! Map) continue;
+            final subVods = b['vod_list'];
+            if (subVods is List && subVods.isNotEmpty) {
+              for (final v in subVods) {
+                if (v is! Map) continue;
+                final id = '${v['vod_id'] ?? v['id'] ?? ''}';
+                final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
+                final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}'.trim();
+                if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
+                out.add(ContentItem(
+                  id: id,
+                  title: title,
+                  source: 'cinemaid',
+                  category: category,
+                  description: '${v['vod_desc'] ?? v['desc'] ?? v['vod_blurb'] ?? ''}',
+                  posterUrl: pic,
+                  backdropUrl: pic,
+                  rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
+                  episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 0}') ?? 0,
+                  platformSlug: 'cinemaid',
+                ));
+              }
+              continue;
+            }
+
+            final v = (b['vod_info'] is Map ? b['vod_info'] : b) as Map;
+            final id = '${v['vod_id'] ?? v['id'] ?? v['data_id'] ?? ''}';
+            final title = '${v['vod_name'] ?? v['title'] ?? v['name'] ?? ''}'.trim();
+            final pic = '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? b['banner_pic'] ?? ''}'.trim();
+            if (id.isEmpty || title.isEmpty || !seen.add(id)) continue;
+            out.add(ContentItem(
+              id: id,
+              title: title,
               source: 'cinemaid',
               category: category,
-              description: '${v['vod_desc'] ?? v['desc'] ?? ''}',
-              posterUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
-              backdropUrl: '${v['vod_pic'] ?? v['pic'] ?? v['cover'] ?? ''}',
-              rating: double.tryParse('${v['vod_score'] ?? v['rating'] ?? 0}') ?? 0,
-              episodes: int.tryParse('${v['vod_episode'] ?? 0}') ?? 0,
+              description: '${v['vod_desc'] ?? v['desc'] ?? v['vod_blurb'] ?? ''}',
+              posterUrl: pic,
+              backdropUrl: pic,
+              rating: double.tryParse('${v['vod_score'] ?? v['vod_douban_score'] ?? v['rating'] ?? 0}') ?? 0,
+              episodes: int.tryParse('${v['vod_episode'] ?? v['vod_total'] ?? 0}') ?? 0,
               platformSlug: 'cinemaid',
-            );
-            if (item.id.isEmpty || !seen.add(item.id)) continue;
-            out.add(item);
+            ));
           }
         }
         if (out.isNotEmpty) return out;

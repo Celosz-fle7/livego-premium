@@ -49,7 +49,8 @@ class CinemaIdClient {
     try {
       final uri = Uri.parse('$resolved/api${CinemaIdConfig.initPath}');
       final res = await _rawPost(uri, {});
-      final sysConf = (res['data'] as Map?)?['sys_conf'] as Map?;
+      final result = (res['result'] ?? res['data']) as Map?;
+      final sysConf = result?['sys_conf'] as Map?;
       final apiUrl = '${sysConf?['api_url'] ?? ''}'.trim();
       if (apiUrl.isNotEmpty) resolved = _normalizeUrl(apiUrl);
       final apiUrl2 = '${sysConf?['api_url2'] ?? ''}'.trim();
@@ -107,9 +108,9 @@ class CinemaIdClient {
     }
     final res = await _rawPost(uri, params);
     final code = res['code'];
-    const okCodes = {0, 1, 200, '0', '1', '200'};
+    const okCodes = {0, 1, 200, 10000, '0', '1', '200', '10000'};
     final codeOk = code == null || okCodes.contains(code);
-    if (!codeOk && res['data'] == null) {
+    if (!codeOk && res['data'] == null && res['result'] == null) {
       throw Exception('CinemaID code=$code msg=${res['msg'] ?? res['message']} path=$path');
     }
     return res;
@@ -138,8 +139,8 @@ class CinemaIdClient {
       description: '${m['vod_desc'] ?? m['desc'] ?? m['description'] ?? ''}',
       posterUrl: '${m['vod_pic'] ?? m['pic'] ?? m['cover'] ?? m['poster'] ?? ''}',
       backdropUrl: '${m['vod_pic'] ?? m['pic'] ?? m['cover'] ?? ''}',
-      rating: double.tryParse('${m['vod_score'] ?? m['rating'] ?? 0}') ?? 0,
-      episodes: int.tryParse('${m['vod_episode'] ?? m['episode_count'] ?? 0}') ?? 0,
+      rating: double.tryParse('${m['vod_score'] ?? m['vod_douban_score'] ?? m['rating'] ?? 0}') ?? 0,
+      episodes: int.tryParse('${m['vod_episode'] ?? m['vod_total'] ?? m['episode_count'] ?? 0}') ?? 0,
       platformSlug: 'cinemaid',
     );
   }
@@ -151,13 +152,26 @@ class CinemaIdClient {
     return const [];
   }
 
+  /// POST /api/channel/get_info?channel_id=202 -> blok modul live (Trending, Streaming, dll).
+  Future<List<Map<String, dynamic>>> channelModules({String channelId = '202'}) async {
+    final res = await _postJson('/channel/get_info', {'channel_id': channelId});
+    final rawList = (res['result'] ?? res['data']) as List? ?? [];
+    return rawList.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+  }
+
   /// GET /api/topic/list -> block_list[] (module_id, module_name, type, videoList[]).
   /// Return modul mentah untuk dipakai homeByCategory.
   Future<List<Map<String, dynamic>>> topicModules() async {
+    try {
+      final chModules = await channelModules(channelId: '202');
+      if (chModules.isNotEmpty) return chModules;
+    } catch (_) {}
+
     final res = await _getJson('/topic/list', const {});
-    final data = res['data'];
+    final data = res['result'] ?? res['data'];
     final list = data is Map
         ? _asMaps(data['block_list'] ??
+            data['topic_list'] ??
             data['list'] ??
             data['items'] ??
             data['modules'] ??
