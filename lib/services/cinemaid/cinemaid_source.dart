@@ -833,9 +833,13 @@ class CinemaIdSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
-    // 1. Coba ambil dari network live jika backend merespons
+    // 1. Coba ambil dari network live dengan timeout sangat singkat (1.2 detik)
+    // agar UI Mobile / TV tidak pernah terkena timeout foreground (8-14 detik).
     try {
-      final modules = await _client.topicModules();
+      final modules = await _client.topicModules().timeout(
+            const Duration(milliseconds: 1200),
+            onTimeout: () => const <Map<String, dynamic>>[],
+          );
       if (modules.isNotEmpty) {
         Map<String, dynamic>? picked;
         final needle = category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
@@ -875,7 +879,7 @@ class CinemaIdSource implements DramaSource {
       }
     } catch (_) {}
 
-    // 2. Fallback cerdas: Tampilkan katalog multi-provider CinemaID terkelompok
+    // 2. Fallback cerdas: Tampilkan katalog multi-provider CinemaID terkelompok seketika (<5ms)
     final cClean = category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
     if (cClean == 'foryou' || cClean.isEmpty || cClean == 'trending') {
       final trending = _seedCatalog.where((item) {
@@ -887,10 +891,34 @@ class CinemaIdSource implements DramaSource {
 
     final matched = _seedCatalog.where((item) {
       final iClean = item.category.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
-      return iClean == cClean || iClean.contains(cClean) || cClean.contains(iClean);
+      if (iClean == cClean || iClean.contains(cClean) || cClean.contains(iClean)) return true;
+
+      // Alias platform OTT & Kurasi
+      if (cClean.contains('amazon') || cClean.contains('prime')) {
+        return iClean.contains('prime') || iClean.contains('amazon');
+      }
+      if (cClean.contains('hotstar') || cClean.contains('disney')) {
+        return iClean.contains('hotstar') || iClean.contains('disney');
+      }
+      if (cClean.contains('apple')) {
+        return iClean.contains('apple');
+      }
+      if (cClean.contains('netflix')) {
+        return iClean.contains('netflix');
+      }
+      if (cClean.contains('movie') || cClean.contains('film')) {
+        return iClean.contains('movie') || iClean.contains('film') || iClean.contains('boxoffice');
+      }
+      if (cClean.contains('series') || cClean.contains('serial')) {
+        return iClean.contains('series') || iClean.contains('serial');
+      }
+      if (cClean.contains('mustwatch') || cClean.contains('harusdilihat')) {
+        return iClean.contains('mustwatch') || iClean.contains('harusdilihat') || iClean.contains('boxoffice');
+      }
+      return false;
     }).toList();
 
-    return matched.isNotEmpty ? matched : _seedCatalog.take(6).toList();
+    return matched.isNotEmpty ? matched : _seedCatalog.take(8).toList();
   }
 
   @override
