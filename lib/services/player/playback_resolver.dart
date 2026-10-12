@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/livego_settings.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
@@ -253,5 +255,27 @@ class PlaybackResolver {
     final match = RegExp(r'\d+').firstMatch(chapter);
     final parsed = match == null ? null : int.tryParse(match.group(0)!);
     return parsed == null || parsed <= 0 ? 1 : parsed;
+  }
+
+  /// Prefetch / Preload episode berikutnya di background saat episode saat ini sedang diputar.
+  /// Memastikan transisi ke episode selanjutnya berjalan instan (0 detik) tanpa loading.
+  static void preloadNext(ContentItem item, int currentEpisode) {
+    unawaited(_preloadNextEpisode(item, currentEpisode));
+  }
+
+  static Future<void> _preloadNextEpisode(ContentItem item, int currentEpisode) async {
+    final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
+    if (dramaSource == null) return;
+    try {
+      final episodes = await dramaSource.episodes(item.id);
+      final nextEp = currentEpisode + 1;
+      final nextEpisodeId = _pickEpisodeId(episodes, nextEp);
+      if (nextEpisodeId.isNotEmpty) {
+        await dramaSource.streamUrl(
+          seriesId: item.id,
+          episodeId: nextEpisodeId,
+        );
+      }
+    } catch (_) {}
   }
 }

@@ -22,6 +22,7 @@ import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_contract.dart';
 import '../../services/download/download_service.dart';
 import '../../services/melolo/melolo_stream_proxy.dart';
+import '../../services/player/playback_resolver.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
   final ContentItem item;
@@ -178,6 +179,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     _brokenEpisodeSkips = 0;
     _lastBrokenReason = '';
     await ContentHealthService.markPlayable(widget.item);
+    PlaybackResolver.preloadNext(widget.item, episode);
   }
 
   Future<void> _handleBrokenEpisode(String reason) async {
