@@ -23,6 +23,7 @@ import '../../services/player/playback_contract.dart';
 import '../../services/download/download_service.dart';
 import '../../services/melolo/melolo_stream_proxy.dart';
 import '../../services/cinemaid/cinemaid_stream_proxy.dart';
+import '../../services/shorttv/shorttv_stream_proxy.dart';
 import '../../services/player/playback_resolver.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
@@ -420,6 +421,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       }
       if (widget.item.platformSlug == 'melolo') {
         await MeloloStreamProxy.instance.ensureRunning();
+      }
+      if (widget.item.platformSlug == 'shorttv') {
+        await ShortTvStreamProxy.instance.ensureRunning();
       }
       _activeUrl = url;
       _logFreeReelsPlayerUrl('PLAYER_OPEN', url);

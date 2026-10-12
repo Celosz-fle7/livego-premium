@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_player_media_kit/video_player_media_kit.dart';
 
 import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
@@ -29,14 +28,6 @@ void main() {
 
     // Player Engine:
     // Android menggunakan native ExoPlayer (androidx.media3) yang super ringan dan instan.
-    // Platform desktop/lainnya menggunakan media_kit.
-    VideoPlayerMediaKit.ensureInitialized(
-      android: false,
-      iOS: true,
-      windows: true,
-      macOS: true,
-      linux: true,
-    );
     debugPrint('LIVEGO PLAYER: Android native ExoPlayer aktif');
     final isTvRuntime = await LiveGoRuntimeDetector.isTvRuntime();
     LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: isTvRuntime);

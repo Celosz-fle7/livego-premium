@@ -12,8 +12,10 @@ import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
 import '../../../services/player/playback_contract.dart';
 import '../tv_player_engine.dart';
+import '../tv_player_service.dart';
 import '../../../services/melolo/melolo_stream_proxy.dart';
 import '../../../services/cinemaid/cinemaid_stream_proxy.dart';
+import '../../../services/shorttv/shorttv_stream_proxy.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
 import 'widgets/tv_player_explorer3_controls.dart';
@@ -867,6 +869,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       }
       if (widget.item.platformSlug == 'melolo') {
         await MeloloStreamProxy.instance.ensureRunning();
+      }
+      if (widget.item.platformSlug == 'shorttv') {
+        await ShortTvStreamProxy.instance.ensureRunning();
       }
 
       if (widget.preferNativeSurface) {

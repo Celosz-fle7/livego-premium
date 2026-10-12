@@ -30,6 +30,9 @@ class ShortTvStreamProxy {
 
   ShortTvStreamProxy._();
 
+  /// Pastikan server proxy aktif
+  Future<void> ensureRunning() => _ensureServer();
+
   Future<void> _ensureServer() async {
     if (_server != null) return;
     try {
