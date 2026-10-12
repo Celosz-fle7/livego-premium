@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../models/content_item.dart';
-import '../screens/tv_basic_player_screen.dart';
 import 'explorer3/tv_player_explorer3_screen.dart';
 import 'tv_player_engine.dart';
 
@@ -69,17 +68,6 @@ class TvPlayerEntry {
     required PlayerEngineType engine,
   }) {
     switch (engine) {
-      case PlayerEngineType.legacyHybrid:
-        return TvBasicPlayerScreen(
-          item: item,
-          episode: episode,
-          onFallbackToNative: (context, reason) => replaceWithNativeExo(
-            context,
-            item: item,
-            episode: episode,
-            reason: reason,
-          ),
-        );
       case PlayerEngineType.flutterFallback:
         return TvPlayerExplorer3Screen(
           item: item,

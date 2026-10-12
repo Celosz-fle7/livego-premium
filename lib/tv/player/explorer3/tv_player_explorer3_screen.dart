@@ -1922,7 +1922,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                 _videoSurface(),
                 if (!_surfaceReady)
                   const ColoredBox(color: Colors.black),
-                if (_loading || _error.isNotEmpty)
+                if ((_loading && !widget.preferNativeSurface) || _error.isNotEmpty)
                   _statusCenter(
                     title: _error.isEmpty ? _status : 'Gagal membuka video',
                     subtitle: _error.isEmpty ? 'Explorer 3 • EP $_episode' : _error,

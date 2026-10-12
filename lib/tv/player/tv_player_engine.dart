@@ -9,7 +9,6 @@ import '../../models/content_item.dart';
 /// for fast, lightweight, and smooth playback on Android TV chipsets.
 enum PlayerEngineType {
   nativeExo,
-  legacyHybrid,
   flutterFallback,
 }
 
@@ -18,8 +17,6 @@ extension PlayerEngineTypeLabel on PlayerEngineType {
     switch (this) {
       case PlayerEngineType.nativeExo:
         return 'nativeExo';
-      case PlayerEngineType.legacyHybrid:
-        return 'legacyHybrid';
       case PlayerEngineType.flutterFallback:
         return 'flutterFallback';
     }
@@ -34,7 +31,7 @@ class TvPlayerEngineConfig {
     defaultValue: '',
   );
 
-  static PlayerEngineType get defaultEngine => PlayerEngineType.legacyHybrid;
+  static PlayerEngineType get defaultEngine => PlayerEngineType.nativeExo;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override, bool isCenc = false}) {
     if (isCenc) return PlayerEngineType.nativeExo;
@@ -44,8 +41,6 @@ class TvPlayerEngineConfig {
         defaultEngine;
   }
 
-  static bool get legacyEnabled => selectedEngine() == PlayerEngineType.legacyHybrid;
-
   static PlayerEngineType? _fromName(String value) {
     final normalized = value.trim().toLowerCase();
     switch (normalized) {
@@ -54,10 +49,6 @@ class TvPlayerEngineConfig {
       case 'exo':
       case 'exoplayer':
         return PlayerEngineType.nativeExo;
-      case 'legacyhybrid':
-      case 'legacy':
-      case 'hybrid':
-        return PlayerEngineType.legacyHybrid;
       case 'flutterfallback':
       case 'flutter':
       case 'fallback':

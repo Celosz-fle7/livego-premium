@@ -186,9 +186,9 @@ class LiveGoSettingsMenuData {
               id: LiveGoSettingId.tvPlayerEngine,
               icon: Icons.settings_input_component_rounded,
               title: 'TV Player Engine',
-              subtitle: 'Pilih engine player TV (Native / Hybrid / Flutter).',
+              subtitle: 'Pilih engine player TV (Native ExoPlayer / Flutter Fallback).',
               value: LiveGoSettings.tvPlayerEngineOverride.isEmpty
-                  ? 'Default'
+                  ? 'Default (Native Exo)'
                   : LiveGoSettings.tvPlayerEngineOverride,
             ),
         ],
