@@ -5,6 +5,8 @@ import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
+import '../../services/cache/livego_content_cache.dart';
+import '../cache/tv_ram_cache.dart';
 import '../layout/tv_safe_zone.dart';
 import 'tv_source_manager_config.dart';
 
@@ -469,6 +471,10 @@ class _TvSourceManagerScreenState extends State<TvSourceManagerScreen> {
           for (final entry in _draftCategories.entries)
             entry.key: List<String>.from(entry.value),
         });
+
+      // Invalidate Home cache in RAM & Disk so Home immediately loads fresh data
+      TvRamCache.instance.clearAll();
+      await LiveGoContentCache.clearHomeCache();
 
       await LiveGoLocalStore.saveSettings();
       if (mounted) Navigator.of(context).pop();

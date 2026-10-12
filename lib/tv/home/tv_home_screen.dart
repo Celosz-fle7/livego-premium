@@ -141,6 +141,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     super.initState();
     _navListener = _onNavChanged;
     _navService.addListener(_navListener);
+    LiveGoLocalStore.version.addListener(this._refreshIfSettingsChanged);
     this._restoreSavedSelection();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -153,6 +154,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   void _onNavChanged() {
     if (!mounted) return;
     if (_navService.index != TvNavIndex.home) return;
+    this._refreshIfSettingsChanged();
     _homeNavTick.value = _homeNavTick.value + 1;
     if (_navService.navFocused) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -176,6 +178,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   void dispose() {
     _homeSelectionCommitTimer?.cancel();
     _navService.removeListener(_navListener);
+    LiveGoLocalStore.version.removeListener(this._refreshIfSettingsChanged);
     _homeNavTick.dispose();
     _rootNode.dispose();
     _bannerNode.dispose();

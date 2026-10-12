@@ -86,6 +86,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _settingsVersion = current;
     _restoreSavedSelection();
     _gridIndex = 0;
+    if (mounted) setState(() {});
     _loadHome(clearPrevious: true);
   }
 
