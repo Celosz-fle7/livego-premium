@@ -16,9 +16,15 @@ import '../tv_player_service.dart';
 import '../../../services/melolo/melolo_stream_proxy.dart';
 import '../../../services/cinemaid/cinemaid_stream_proxy.dart';
 import '../../../services/shorttv/shorttv_stream_proxy.dart';
+import '../../../data/livego_catalog.dart';
+import '../../core/managers/tv_back_manager.dart';
+import '../../core/managers/tv_remote_manager.dart';
+import '../../core/managers/tv_cache_manager.dart';
+import '../../cache/tv_ram_cache.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
 import 'widgets/tv_player_explorer3_controls.dart';
+import 'widgets/tv_player_recommendations_sheet.dart';
 
 /// TV Player Explorer 3.
 ///
@@ -49,6 +55,7 @@ class TvPlayerExplorer3Screen extends StatefulWidget {
 enum _Explorer3Mode {
   watching,
   controls,
+  recommendations,
   episode,
   quality,
   subtitle,
@@ -93,6 +100,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   int _qualityCursor = 0;
   int _subtitleCursor = 0;
   int _optionCursor = 0;
+  int _recommendationCursor = 0;
+  List<ContentItem> _recommendations = const <ContentItem>[];
+  bool _loadingRecommendations = false;
   int _lastCursorMoveMs = 0;
   int _lastPlayerUiTickMs = 0;
   int _lastProgressSaveMs = 0;
@@ -123,7 +133,42 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       if (!mounted) return;
       _rootFocus.requestFocus();
       unawaited(_load());
+      unawaited(_loadRecommendations());
     });
+  }
+
+  Future<void> _loadRecommendations() async {
+    if (_loadingRecommendations) return;
+    _loadingRecommendations = true;
+    try {
+      final platform = widget.item.platformSlug.trim().isNotEmpty
+          ? widget.item.platformSlug.trim()
+          : 'melolo';
+      final category = widget.item.category.trim().isNotEmpty
+          ? widget.item.category.trim()
+          : 'Home';
+      var rows = await LiveGoCatalog.cachedHomeByCategory(
+        platform: platform,
+        category: category,
+        allowExpired: true,
+      );
+      if (rows.isEmpty) {
+        rows = await LiveGoCatalog.homeByCategory(
+          platform: platform,
+          category: category,
+        );
+      }
+      final filtered = rows.where((r) => r.id != widget.item.id).take(12).toList(growable: false);
+      if (mounted && filtered.isNotEmpty) {
+        setState(() {
+          _recommendations = filtered;
+        });
+      }
+    } catch (e) {
+      debugPrint('TvPlayer: load recommendations error: $e');
+    } finally {
+      _loadingRecommendations = false;
+    }
   }
 
   ContentItem _playableItem() {
@@ -1500,49 +1545,46 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   void _moveControlCursor(int delta) {
-    if (!_allowCursorMove()) return;
+    if (!TvRemoteManager.instance.canNavigate()) return;
     setState(() {
-      _controlCursor = (_controlCursor + delta).clamp(0, 7).toInt();
+      _controlCursor = (_controlCursor + delta).clamp(0, 4).toInt();
       _status = 'CONTROL';
     });
     _scheduleAutoHide();
   }
 
-  void _moveEpisodeCursor(int delta) {
-    if (!_allowCursorMove()) return;
-    final total = _episodeTotal();
+  void _moveRecommendationCursor(int delta) {
+    if (!TvRemoteManager.instance.canNavigate()) return;
+    if (_recommendations.isEmpty) return;
     setState(() {
-      _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt();
-      _status = 'EP $_episodeCursor';
+      _recommendationCursor = (_recommendationCursor + delta).clamp(0, _recommendations.length - 1).toInt();
     });
   }
 
-  void _moveQualityCursor(int delta) {
-    if (!_allowCursorMove()) return;
-    final count = _qualityChoices.length;
-    if (count <= 0) return;
-    setState(() {
-      _qualityCursor = (_qualityCursor + delta).clamp(0, count - 1).toInt();
-      _status = _qualityChoices[_qualityCursor];
-    });
-  }
-
-  void _moveSubtitleCursor(int delta) {
-    if (!_allowCursorMove()) return;
-    final count = _subtitleChoices.length;
-    if (count <= 0) return;
-    setState(() {
-      _subtitleCursor = (_subtitleCursor + delta).clamp(0, count - 1).toInt();
-      _status = _subtitleChoices[_subtitleCursor];
-    });
-  }
-
-  void _moveOptionCursor(int delta) {
-    if (!_allowCursorMove()) return;
-    setState(() => _optionCursor = (_optionCursor + delta).clamp(0, 5).toInt());
+  Future<void> _selectRecommendation() async {
+    if (!TvRemoteManager.instance.canActivate()) return;
+    if (_recommendations.isEmpty) return;
+    final target = _recommendations[_recommendationCursor.clamp(0, _recommendations.length - 1).toInt()];
+    await _saveProgressNow(force: true);
+    if (!mounted) return;
+    // Replace current route with new target player
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder<void>(
+        opaque: true,
+        barrierColor: Colors.black,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, __, ___) => TvPlayerExplorer3Screen(
+          item: target,
+          episode: 1,
+          preferNativeSurface: widget.preferNativeSurface,
+        ),
+      ),
+    );
   }
 
   void _activateControl() {
+    if (!TvRemoteManager.instance.canActivate()) return;
     switch (_controlCursor) {
       case 0:
         unawaited(_changeEpisode(-1));
@@ -1557,15 +1599,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _showPanel(_Explorer3Mode.episode);
         return;
       case 4:
-        _showPanel(_Explorer3Mode.quality);
-        return;
-      case 5:
-        _showPanel(_Explorer3Mode.subtitle);
-        return;
-      case 6:
-        unawaited(_cycleSpeed());
-        return;
-      case 7:
         _showPanel(_Explorer3Mode.options);
         return;
     }
@@ -1596,6 +1629,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   void _handleBackIntent() {
     if (_closing) return;
+    if (!TvBackManager.instance.canHandleBack()) return;
 
     // During loading or error, back should exit immediately.
     if (_loading || _error.isNotEmpty) {
@@ -1620,18 +1654,16 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
-    final repeat = event is KeyRepeatEvent;
-
-    if (repeat && (_isBack(key) || _isSelect(key) || _isMenu(key))) {
+    if (TvRemoteManager.instance.shouldIgnoreRepeat(event)) {
       return KeyEventResult.handled;
     }
 
-    if (_isBack(key)) {
+    if (TvRemoteManager.instance.isBackKey(key)) {
       _handleBackIntent();
       return KeyEventResult.handled;
     }
 
-    final selectPressed = _isSelect(key);
+    final selectPressed = TvRemoteManager.instance.isSelectKey(key);
 
     if (_loading) {
       if (selectPressed) _showStatus('Memuat video...');
@@ -1649,12 +1681,26 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return KeyEventResult.handled;
     }
 
-    if (_isMenu(key)) {
+    if (TvRemoteManager.instance.isMenuKey(key)) {
       _showPanel(_Explorer3Mode.options);
       return KeyEventResult.handled;
     }
 
     switch (_mode) {
+      case _Explorer3Mode.recommendations:
+        if (key == LogicalKeyboardKey.arrowLeft) {
+          _moveRecommendationCursor(-1);
+        } else if (key == LogicalKeyboardKey.arrowRight) {
+          _moveRecommendationCursor(1);
+        } else if (key == LogicalKeyboardKey.arrowUp) {
+          _showControls();
+        } else if (key == LogicalKeyboardKey.arrowDown) {
+          _hideOverlays();
+        } else if (selectPressed) {
+          unawaited(_selectRecommendation());
+        }
+        return KeyEventResult.handled;
+
       case _Explorer3Mode.episode:
         if (key == LogicalKeyboardKey.arrowUp) {
           _moveEpisodeCursor(-1);
@@ -1709,9 +1755,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         } else if (key == LogicalKeyboardKey.arrowRight) {
           _moveControlCursor(1);
         } else if (key == LogicalKeyboardKey.arrowUp) {
-          _showPanel(_Explorer3Mode.options);
+          _hideOverlays();
         } else if (key == LogicalKeyboardKey.arrowDown) {
-          _showPanel(_Explorer3Mode.episode);
+          _showPanel(_Explorer3Mode.recommendations);
         } else if (selectPressed) {
           _activateControl();
         }
@@ -1727,7 +1773,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         } else if (key == LogicalKeyboardKey.arrowUp) {
           _showControls(defaultPlay: true);
         } else if (key == LogicalKeyboardKey.arrowDown) {
-          _showPanel(_Explorer3Mode.episode);
+          _showPanel(_Explorer3Mode.recommendations);
         } else {
           return KeyEventResult.ignored;
         }
@@ -1956,6 +2002,20 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
                         selectedIndex: _controlCursor,
                         isPlaying: c.value.isPlaying,
                         speed: _speed,
+                      ),
+                    ),
+                  ),
+                if (ready && _mode == _Explorer3Mode.recommendations)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: SafeArea(
+                      bottom: true,
+                      child: TvPlayerRecommendationsSheet(
+                        items: _recommendations,
+                        cursor: _recommendationCursor,
+                        currentTitle: widget.item.title,
                       ),
                     ),
                   ),

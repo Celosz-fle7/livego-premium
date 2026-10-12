@@ -30,10 +30,7 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
     _Explorer3ControlItem(Icons.play_arrow_rounded, 'Play'),
     _Explorer3ControlItem(Icons.skip_next_rounded, 'Next'),
     _Explorer3ControlItem(Icons.format_list_numbered_rounded, 'Episode'),
-    _Explorer3ControlItem(Icons.hd_rounded, 'Quality'),
-    _Explorer3ControlItem(Icons.subtitles_rounded, 'Subtitle'),
-    _Explorer3ControlItem(Icons.speed_rounded, 'Speed'),
-    _Explorer3ControlItem(Icons.more_horiz_rounded, 'More'),
+    _Explorer3ControlItem(Icons.tune_rounded, 'Opsi'),
   ];
 
   String _fmt(Duration d) {
@@ -145,9 +142,7 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
                       item: _items[i].copyWith(
                         label: i == 1
                             ? (isPlaying ? 'Pause' : 'Play')
-                            : i == 6
-                                ? 'Speed ${_speedLabel()}'
-                                : _items[i].label,
+                            : _items[i].label,
                         icon: i == 1
                             ? (isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded)
                             : _items[i].icon,
@@ -155,15 +150,15 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
                       selected: i == safeSelected,
                     ),
                   ),
-                  if (i < _items.length - 1) const SizedBox(width: 6),
+                  if (i < _items.length - 1) const SizedBox(width: 8),
                 ],
               ],
             ),
             const SizedBox(height: 9),
             Text(
               status.trim().isEmpty
-                  ? '←/→ kontrol • OK pilih • DOWN episode • UP opsi • BACK sembunyi'
-                  : '$status  •  ←/→ kontrol • OK pilih • DOWN episode • BACK sembunyi',
+                  ? '←/→ navigasi • OK pilih • DOWN rekomendasi • UP sembunyi • BACK tutup'
+                  : '$status  •  ←/→ navigasi • OK pilih • DOWN rekomendasi • BACK tutup',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
