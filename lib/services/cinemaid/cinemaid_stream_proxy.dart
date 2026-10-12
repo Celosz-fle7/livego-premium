@@ -34,7 +34,11 @@ class CinemaIdStreamProxy {
     if (_server != null) return;
     if (_initCompleter.isCompleted) return;
     try {
-      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 7000);
+      _server = await HttpServer.bind(
+        InternetAddress.loopbackIPv4,
+        7000,
+        shared: true,
+      );
       debugPrint('LIVEGO CINEMAID PROXY: running on 127.0.0.1:7000');
       _server!.listen(_handleRequest, onError: (e) {
         debugPrint('LIVEGO CINEMAID PROXY error: $e');
