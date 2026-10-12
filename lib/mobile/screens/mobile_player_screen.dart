@@ -451,7 +451,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       }
       if (autoplay) await controller.play();
       _errorSkipTimer?.cancel();
-      widget.onPlayable?.call();
+      final size = controller.value.size;
+      final isPortrait = size.height > size.width && size.width > 0;
+      if (isPortrait && !_landscape) {
+        _fitCover = true;
+      }
       if (mounted) setState(() => _buffering = false);
     } catch (e) {
       // Tambahkan info diagnostik Melolo jika ada
@@ -1174,21 +1178,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
             double playerH = screenH;
             if (!fullSurface) {
               if (isPortraitVideo) {
-                playerH = screenH * 0.80;
-                playerW = playerH * videoRatio;
-                final maxW = screenW * 0.96;
-                if (playerW > maxW) {
-                  playerW = maxW;
-                  playerH = playerW / videoRatio;
-                }
+                // Video potret di HP langsung mengisi layar penuh secara vertikal
+                playerH = screenH;
+                playerW = screenW;
               } else {
-                playerW = screenW * 0.94;
-                playerH = playerW / videoRatio;
-                final maxH = screenH * 0.72;
-                if (playerH > maxH) {
-                  playerH = maxH;
-                  playerW = playerH * videoRatio;
-                }
+                playerW = screenW;
+                playerH = (screenW / videoRatio).clamp(0.0, screenH * 0.85);
               }
             }
 
