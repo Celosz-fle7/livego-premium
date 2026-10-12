@@ -255,6 +255,9 @@ class MeloloStreamProxy {
     // Tulis ke file cache
     await decryptedFile.writeAsBytes(decryptedBytes, flush: true);
 
+    // LRU Cache eviction: batasi maksimal 8 episode terakhir di HP agar memori tidak membengkak
+    unawaited(_pruneCache(decryptedFile.parent));
+
     debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes)');
     if (!completer.isCompleted) completer.complete();
     } catch (e) {
@@ -262,6 +265,48 @@ class MeloloStreamProxy {
       _fileRegistry.remove(token);
       _readyCompleters.remove(token);
       if (!completer.isCompleted) completer.completeError(e);
+    }
+  }
+
+  /// Rolling LRU Cache Cleanup persis seperti AVMDL ByteDance:
+  /// Membatasi cache maksimal 8 episode terakhir (~70-80 MB).
+  /// Episode terlama otomatis dihapus bergantian agar memori HP tetap lega.
+  static Future<void> _pruneCache(Directory cacheDir, {int maxFiles = 8}) async {
+    try {
+      if (!await cacheDir.exists()) return;
+      final entities = await cacheDir.list().toList();
+      final mp4Files = <File>[];
+      for (final e in entities) {
+        if (e is File && e.path.endsWith('.mp4')) {
+          mp4Files.add(e);
+        }
+      }
+
+      if (mp4Files.length <= maxFiles) return;
+
+      final fileStats = <File, DateTime>{};
+      for (final f in mp4Files) {
+        try {
+          final stat = await f.stat();
+          fileStats[f] = stat.modified;
+        } catch (_) {}
+      }
+
+      mp4Files.sort((a, b) {
+        final timeA = fileStats[a] ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final timeB = fileStats[b] ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return timeA.compareTo(timeB);
+      });
+
+      while (mp4Files.length > maxFiles) {
+        final oldest = mp4Files.removeAt(0);
+        try {
+          await oldest.delete();
+          debugPrint('LIVEGO MELOLO CACHE: LRU evict ${oldest.path.split('/').last}');
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('LIVEGO MELOLO CACHE prune error: $e');
     }
   }
 }
