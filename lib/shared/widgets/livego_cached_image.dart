@@ -14,8 +14,8 @@ class LiveGoImageCacheManager {
   static final CacheManager instance = CacheManager(
     Config(
       key,
-      stalePeriod: const Duration(days: 3),
-      maxNrOfCacheObjects: 240,
+      stalePeriod: const Duration(days: 2),
+      maxNrOfCacheObjects: 120,
       repo: JsonCacheInfoRepository(databaseName: key),
       fileService: HttpFileService(),
     ),

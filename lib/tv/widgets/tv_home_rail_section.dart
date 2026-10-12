@@ -81,14 +81,12 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
   bool get hasFocus => _continueNodes.any((node) => node.hasFocus) || _myListNodes.any((node) => node.hasFocus);
 
   bool focusFirst() {
-    if (_continueNodes.isNotEmpty) return _focusContinue(_continueIndex, throttle: false);
     if (_myListNodes.isNotEmpty) return _focusMyList(_myListIndex, throttle: false);
     return false;
   }
 
   bool focusMyList() {
     if (_myListNodes.isNotEmpty) return _focusMyList(_myListIndex, throttle: false);
-    if (_continueNodes.isNotEmpty) return _focusContinue(_continueIndex, throttle: false);
     return false;
   }
 
@@ -144,11 +142,11 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
     if (tvIsBackKey(key)) {
-      if (!_focusContinue(_continueIndex, throttle: false)) widget.onBackToCategory();
+      widget.onBackToCategory();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusContinue(_continueIndex)) widget.onBackToCategory();
+      widget.onBackToCategory();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowLeft) {
@@ -207,32 +205,6 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
                     item: rows.myList[i],
                     onKey: (node, event) => _myListKey(i, rows.myList[i], event),
                     onTap: () => widget.onOpen(rows.myList[i]),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            // Lanjut Menonton dipindah ke bawah biar tidak mengganggu di atas
-            if (rows.continueWatching.isNotEmpty) ...[
-              _RailHeader(
-                title: 'Lanjut Menonton',
-                subtitle: '${rows.continueWatching.length} tontonan terakhir',
-                icon: Icons.play_circle_fill_rounded,
-              ),
-              SizedBox(
-                height: 154,
-                child: ListView.separated(
-                  cacheExtent: 120,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: rows.continueWatching.length,
-                  addAutomaticKeepAlives: false,
-                  addSemanticIndexes: false,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, i) => _ContinueCard(
-                    node: _continueNodes[i],
-                    progress: rows.continueWatching[i],
-                    onKey: (node, event) => _continueKey(i, rows.continueWatching[i], event),
-                    onTap: () => widget.onOpen(_tvResumeItemFromProgress(rows.continueWatching[i])),
                   ),
                 ),
               ),
