@@ -9,9 +9,15 @@ class MeloloConfig {
   MeloloConfig._();
 
   static const String baseUrl = 'https://api.tmtreader.com';
+  static const List<String> fallbackHosts = [
+    'https://api.tmtreader.com',
+    'https://api-my.tmtreader.com',
+    'https://api22-normal-mya.tmtreader.com',
+  ];
   static const String searchEndpoint = '/i18n_novel/search/page/v1/';
   static const String videoDetailEndpoint = '/novel/player/video_detail/v1/';
   static const String videoModelEndpoint = '/novel/player/video_model/v1/';
+  static const String multiVideoModelEndpoint = '/novel/player/multi_video_model/v1/';
 
   // Header dan Device Identitas ByteDance yang terverifikasi
   // Header dan Device Identitas ByteDance yang autentik dari trafik live APK

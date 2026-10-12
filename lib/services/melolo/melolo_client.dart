@@ -56,32 +56,43 @@ class MeloloClient {
     String path,
     Map<String, String> query,
   ) async {
-    final uri = Uri.parse(MeloloConfig.baseUrl).replace(
-      path: path,
-      queryParameters: {
-        ..._commonParams,
-        ...query,
-      },
-    );
+    Object? lastError;
+    final hosts = MeloloConfig.fallbackHosts.isNotEmpty
+        ? MeloloConfig.fallbackHosts
+        : [MeloloConfig.baseUrl];
 
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(uri).timeout(MeloloConfig.timeout);
-      _applyHeaders(request.headers);
-      final response = await request.close().timeout(MeloloConfig.timeout);
-      final body = await response.transform(utf8.decoder).join();
+    for (final host in hosts) {
+      final uri = Uri.parse(host).replace(
+        path: path,
+        queryParameters: {
+          ..._commonParams,
+          ...query,
+        },
+      );
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Melolo GET ${response.statusCode} $path: $body');
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(uri).timeout(MeloloConfig.timeout);
+        _applyHeaders(request.headers);
+        final response = await request.close().timeout(MeloloConfig.timeout);
+        final body = await response.transform(utf8.decoder).join();
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (body.trim().isEmpty) return <String, dynamic>{};
+          final decoded = jsonDecode(body);
+          if (decoded is Map<String, dynamic>) return decoded;
+          if (decoded is Map) return Map<String, dynamic>.from(decoded);
+          return <String, dynamic>{'data': decoded};
+        }
+        lastError = Exception('Melolo GET ${response.statusCode} $path ($host): $body');
+      } catch (e) {
+        lastError = e;
+      } finally {
+        client.close(force: true);
       }
-      if (body.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(body);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'data': decoded};
-    } finally {
-      client.close(force: true);
     }
+
+    throw Exception('Melolo GET failed on all hosts ($path): $lastError');
   }
 
   Future<Map<String, dynamic>> _postForm(
@@ -89,39 +100,50 @@ class MeloloClient {
     Map<String, String> body, {
     Map<String, String>? extraQuery,
   }) async {
-    final uri = Uri.parse(MeloloConfig.baseUrl).replace(
-      path: path,
-      queryParameters: {
-        ..._commonParams,
-        ...?extraQuery,
-      },
-    );
+    Object? lastError;
+    final hosts = MeloloConfig.fallbackHosts.isNotEmpty
+        ? MeloloConfig.fallbackHosts
+        : [MeloloConfig.baseUrl];
 
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri).timeout(MeloloConfig.timeout);
-      _applyHeaders(request.headers);
-      request.headers.set(
-        'Content-Type',
-        'application/x-www-form-urlencoded; charset=UTF-8',
+    for (final host in hosts) {
+      final uri = Uri.parse(host).replace(
+        path: path,
+        queryParameters: {
+          ..._commonParams,
+          ...?extraQuery,
+        },
       );
-      if (body.isNotEmpty) {
-        request.write(Uri(queryParameters: body).query);
-      }
-      final response = await request.close().timeout(MeloloConfig.timeout);
-      final respBody = await response.transform(utf8.decoder).join();
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Melolo POST ${response.statusCode} $path: $respBody');
+      final client = HttpClient();
+      try {
+        final request = await client.postUrl(uri).timeout(MeloloConfig.timeout);
+        _applyHeaders(request.headers);
+        request.headers.set(
+          'Content-Type',
+          'application/x-www-form-urlencoded; charset=UTF-8',
+        );
+        if (body.isNotEmpty) {
+          request.write(Uri(queryParameters: body).query);
+        }
+        final response = await request.close().timeout(MeloloConfig.timeout);
+        final respBody = await response.transform(utf8.decoder).join();
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          if (respBody.trim().isEmpty) return <String, dynamic>{};
+          final decoded = jsonDecode(respBody);
+          if (decoded is Map<String, dynamic>) return decoded;
+          if (decoded is Map) return Map<String, dynamic>.from(decoded);
+          return <String, dynamic>{'data': decoded};
+        }
+        lastError = Exception('Melolo POST ${response.statusCode} $path ($host): $respBody');
+      } catch (e) {
+        lastError = e;
+      } finally {
+        client.close(force: true);
       }
-      if (respBody.trim().isEmpty) return <String, dynamic>{};
-      final decoded = jsonDecode(respBody);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'data': decoded};
-    } finally {
-      client.close(force: true);
     }
+
+    throw Exception('Melolo POST failed on all hosts ($path): $lastError');
   }
 
   /// Ekstrak daftar ContentItem dari respons search / kategori
@@ -392,5 +414,19 @@ class MeloloClient {
     } catch (_) {
       return '';
     }
+  }
+
+  /// Batch fetch video model untuk beberapa episode sekaligus
+  Future<Map<String, dynamic>> multiVideoModel({
+    required String seriesId,
+    required List<String> episodeIds,
+  }) async {
+    return _postForm(
+      MeloloConfig.multiVideoModelEndpoint,
+      {
+        'series_id': seriesId,
+        'video_id_list': jsonEncode(episodeIds),
+      },
+    );
   }
 }

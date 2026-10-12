@@ -156,7 +156,6 @@ class MeloloStreamProxy {
       final size = await decryptedFile.length();
       if (size > 102400) {
         _fileRegistry[token] = decryptedFile.path;
-        // Kembalikan URL proxy agar range request ditangani seragam
         return 'http://127.0.0.1:$_port/$token';
       }
     }
@@ -240,10 +239,9 @@ class MeloloStreamProxy {
     bool hasMdat = false;
     if (decryptedBytes.length >= 12) {
       decHeader = String.fromCharCodes(decryptedBytes.sublist(4, 12));
-      // Cek box penting: moov dan mdat harus ada
-      final decStr = String.fromCharCodes(decryptedBytes.sublist(0, decryptedBytes.length.clamp(0, 200000)));
-      hasMoov = decStr.contains('moov');
-      hasMdat = decStr.contains('mdat');
+      // Cek box penting: moov dan mdat harus ada di seluruh file MP4
+      hasMoov = MeloloCencDecryptor.findBox(decryptedBytes, 'moov', 0, decryptedBytes.length) >= 0;
+      hasMdat = MeloloCencDecryptor.findBox(decryptedBytes, 'mdat', 0, decryptedBytes.length) >= 0;
     }
     lastDiagnostic = 'DL:${dlSize}B hdr:$fileHeader | Dec hdr:$decHeader moov:$hasMoov mdat:$hasMdat';
     // ignore: avoid_print

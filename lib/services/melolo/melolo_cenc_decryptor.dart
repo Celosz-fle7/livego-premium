@@ -222,7 +222,7 @@ class MeloloCencDecryptor {
 
   // --- 3. MP4 Parsing & CENC Decryption ---
 
-  static int _findBox(Uint8List data, String boxType, int start, int end) {
+  static int findBox(Uint8List data, String boxType, int start, int end) {
     final b0 = boxType.codeUnitAt(0);
     final b1 = boxType.codeUnitAt(1);
     final b2 = boxType.codeUnitAt(2);
@@ -236,6 +236,9 @@ class MeloloCencDecryptor {
     }
     return -1;
   }
+
+  static int _findBox(Uint8List data, String boxType, int start, int end) =>
+      findBox(data, boxType, start, end);
 
   static int _readUint32(Uint8List data, int offset) {
     return (data[offset] << 24) |
