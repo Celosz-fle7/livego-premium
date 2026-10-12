@@ -69,7 +69,7 @@ class FreereelsSource implements DramaSource {
   }
 
   @override
-  Future<String> streamUrl({required String seriesId, required String episodeId}) async {
+  Future<String> streamUrl({required String seriesId, required String episodeId, String? quality}) async {
     final cached = _streamCache['$seriesId:$episodeId'];
     if (cached != null && cached.isNotEmpty) return cached;
 

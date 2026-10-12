@@ -22,6 +22,7 @@ import '../../services/player/playback_timeout_config.dart';
 import '../../services/player/playback_contract.dart';
 import '../../services/download/download_service.dart';
 import '../../services/melolo/melolo_stream_proxy.dart';
+import '../../services/cinemaid/cinemaid_stream_proxy.dart';
 import '../../services/player/playback_resolver.dart';
 
 class MobilePlayerScreen extends StatefulWidget {
@@ -385,6 +386,17 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   String _resolvedInitialUrl() {
+    if (widget.item.platformSlug == 'melolo') {
+      if (_quality.toLowerCase() == 'auto') {
+        // Melolo di Mobile: default resolusi sementara adalah 540p (dapat diubah manual jika internet cepat)
+        final q540 = widget.stream.urlForQuality('540p');
+        if (q540.isNotEmpty && q540 != widget.stream.url) {
+          return q540;
+        }
+        return widget.stream.autoStartUrl;
+      }
+      return widget.stream.urlForQuality(_quality);
+    }
     final url = _quality.toLowerCase() == 'auto'
         ? widget.stream.autoStartUrl
         : widget.stream.urlForQuality(_quality);
@@ -403,6 +415,12 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
 
   Future<void> _openResolvedUrl(String url, {required bool resume, required bool autoplay}) async {
     try {
+      if (url.startsWith('http://127.0.0.1:7055') || widget.item.platformSlug == 'cinemaid') {
+        await CinemaIdStreamProxy.instance.ensureRunning();
+      }
+      if (widget.item.platformSlug == 'melolo') {
+        await MeloloStreamProxy.instance.ensureRunning();
+      }
       _activeUrl = url;
       _logFreeReelsPlayerUrl('PLAYER_OPEN', url);
       _logStreamUrl('open_stream', url);
@@ -469,6 +487,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   void _scheduleAutoQualityUpgrade() {
     _autoQualityTimer?.cancel();
     if (_quality.toLowerCase() != 'auto') return;
+    // Untuk Melolo: pertahankan default 540p kecuali user memilih manual kualitas lain
+    if (widget.item.platformSlug == 'melolo') return;
     final best = widget.stream.autoBestUrl;
     if (best.isEmpty || best == _activeUrl) return;
 

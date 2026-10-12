@@ -41,6 +41,7 @@ class MeloloStreamProxy {
       _server!.listen(_handleRequest, onError: (e) {
         debugPrint('LIVEGO MELOLO PROXY error: $e');
       });
+      unawaited(pruneAllCaches());
       if (!_initCompleter.isCompleted) _initCompleter.complete();
     } catch (e) {
       debugPrint('LIVEGO MELOLO PROXY bind failed: $e');
@@ -130,6 +131,7 @@ class MeloloStreamProxy {
     required String episodeId,
     required String rawVideoUrl,
     required String spadeA,
+    String? quality,
   }) async {
     await _ensureServer();
 
@@ -148,8 +150,11 @@ class MeloloStreamProxy {
 
     final sanitizedEp = episodeId.replaceAll(RegExp(r'[^0-9A-Za-z_-]'), '_');
     final sanitizedSeries = seriesId.replaceAll(RegExp(r'[^0-9A-Za-z_-]'), '_');
-    final decryptedFile = File('${targetDir.path}/${sanitizedSeries}_$sanitizedEp.mp4');
-    final token = 'melolo_${sanitizedSeries}_$sanitizedEp.mp4';
+    final qSuffix = (quality != null && quality.isNotEmpty && quality.toLowerCase() != 'auto')
+        ? '_${quality.toLowerCase()}'
+        : '';
+    final decryptedFile = File('${targetDir.path}/${sanitizedSeries}_${sanitizedEp}$qSuffix.mp4');
+    final token = 'melolo_${sanitizedSeries}_${sanitizedEp}$qSuffix.mp4';
 
     // Jika file sudah didekripsi dan valid (> 100KB), gunakan langsung
     if (await decryptedFile.exists()) {
@@ -255,8 +260,8 @@ class MeloloStreamProxy {
     // Tulis ke file cache
     await decryptedFile.writeAsBytes(decryptedBytes, flush: true);
 
-    // LRU Cache eviction: batasi maksimal 8 episode terakhir di HP agar memori tidak membengkak
-    unawaited(_pruneCache(decryptedFile.parent));
+    // LRU Cache eviction: batasi maksimal 6 episode terakhir di HP/TV agar memori tidak membengkak
+    unawaited(_pruneCache(decryptedFile.parent, maxFiles: 6));
 
     debugPrint('LIVEGO MELOLO: berhasil dekripsi episode $episodeId (${decryptedBytes.length} bytes)');
     if (!completer.isCompleted) completer.complete();
@@ -269,9 +274,9 @@ class MeloloStreamProxy {
   }
 
   /// Rolling LRU Cache Cleanup persis seperti AVMDL ByteDance:
-  /// Membatasi cache maksimal 8 episode terakhir (~70-80 MB).
-  /// Episode terlama otomatis dihapus bergantian agar memori HP tetap lega.
-  static Future<void> _pruneCache(Directory cacheDir, {int maxFiles = 8}) async {
+  /// Membatasi cache maksimal [maxFiles] episode terakhir.
+  /// Episode terlama otomatis dihapus bergantian agar memori HP/TV tetap lega.
+  static Future<void> _pruneCache(Directory cacheDir, {int maxFiles = 6}) async {
     try {
       if (!await cacheDir.exists()) return;
       final entities = await cacheDir.list().toList();
@@ -307,6 +312,43 @@ class MeloloStreamProxy {
       }
     } catch (e) {
       debugPrint('LIVEGO MELOLO CACHE prune error: $e');
+    }
+  }
+
+  /// Pembersihan menyeluruh untuk menjaga penyimpanan:
+  /// 1. Menghapus folder cache Melolo versi terdahulu (v1, v2, v3, playback_cache).
+  /// 2. Merampingkan cache v4 terkini dengan rolling LRU (default max 6 files).
+  /// Jika [maxFiles] bernilai 0, seluruh file sementara di cache v4 ikut dihapus.
+  static Future<void> pruneAllCaches({int maxFiles = 6}) async {
+    try {
+      Directory? cacheDir;
+      try {
+        cacheDir = await getTemporaryDirectory();
+      } catch (_) {
+        cacheDir = Directory.systemTemp;
+      }
+
+      final legacyDirs = [
+        'livego_melolo_cache',
+        'livego_melolo_cache_v2',
+        'livego_melolo_cache_v3',
+        'melolo_playback_cache',
+      ];
+
+      for (final name in legacyDirs) {
+        final dir = Directory('${cacheDir.path}/$name');
+        if (await dir.exists()) {
+          try {
+            await dir.delete(recursive: true);
+            debugPrint('LIVEGO MELOLO CACHE: dihapus direktori usang $name');
+          } catch (_) {}
+        }
+      }
+
+      final targetDir = Directory('${cacheDir.path}/livego_melolo_cache_v4');
+      await _pruneCache(targetDir, maxFiles: maxFiles);
+    } catch (e) {
+      debugPrint('LIVEGO MELOLO pruneAllCaches error: $e');
     }
   }
 }

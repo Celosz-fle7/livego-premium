@@ -12,7 +12,8 @@ import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
 import '../../../services/player/playback_contract.dart';
 import '../tv_player_engine.dart';
-import '../tv_player_service.dart';
+import '../../../services/melolo/melolo_stream_proxy.dart';
+import '../../../services/cinemaid/cinemaid_stream_proxy.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
 import 'widgets/tv_player_explorer3_controls.dart';
@@ -222,6 +223,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   String _safeAutoUrl(StreamInfo stream) {
     final qualities = stream.qualities;
     if (qualities.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
+
+    // Untuk Melolo di TV: default resolusi sementara adalah 360p (atau 480p jika 360p tidak ada)
+    if (widget.item.platformSlug == 'melolo') {
+      final q360 = stream.urlForQuality('360p');
+      if (q360.isNotEmpty && q360 != stream.url) return q360;
+      final q480 = stream.urlForQuality('480p');
+      if (q480.isNotEmpty && q480 != stream.url) return q480;
+    }
 
     final safe = qualities.where((q) => q.url.trim().isNotEmpty && !_looksUnsafeForLowEndTv(q)).toList();
     final pool = safe.isNotEmpty ? safe : qualities.where((q) => q.url.trim().isNotEmpty).toList();
@@ -853,6 +862,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       });
 
       _scheduleEpisodeListWarmup();
+      if (url.startsWith('http://127.0.0.1:7055') || widget.item.platformSlug == 'cinemaid') {
+        await CinemaIdStreamProxy.instance.ensureRunning();
+      }
+      if (widget.item.platformSlug == 'melolo') {
+        await MeloloStreamProxy.instance.ensureRunning();
+      }
+
       if (widget.preferNativeSurface) {
         final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
         if (nativeOpened) {

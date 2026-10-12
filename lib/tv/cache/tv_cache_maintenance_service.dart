@@ -4,6 +4,7 @@ import '../../services/cache/livego_cache_observer.dart';
 import '../../services/cache/livego_content_cache.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../player/cache/tv_player_cache_manager.dart';
+import '../../services/melolo/melolo_stream_proxy.dart';
 import 'tv_ram_cache.dart';
 import 'tv_runtime_cache.dart';
 
@@ -82,6 +83,10 @@ class TvCacheMaintenanceService {
 
     await run('Search cache sementara', 'search', () async {
       await LiveGoContentCache.clearSearchCache();
+    });
+
+    await run('Video stream & proxy disk cache', 'proxy', () async {
+      await MeloloStreamProxy.pruneAllCaches(maxFiles: 0);
     });
 
     LiveGoCacheObserver.log(

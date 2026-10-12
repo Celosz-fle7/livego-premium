@@ -30,6 +30,7 @@ abstract class DramaSource {
   Future<String> streamUrl({
     required String seriesId,
     required String episodeId,
+    String? quality,
   });
 
   /// Cari konten. Default: tidak didukung (return kosong).

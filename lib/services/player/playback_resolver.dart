@@ -96,13 +96,29 @@ class PlaybackResolver {
           qualities = extras.qualities
               .map((q) => StreamQuality(
                     label: q.label,
-                    url: url,
-                    isDefault: q.label == '720p',
+                    url: source.slug == 'melolo'
+                        ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
+                        : url,
+                    isDefault: source.slug == 'melolo' ? q.label == '540p' : q.label == '720p',
                   ))
               .toList();
         }
       } catch (_) {
         // Extras opsional; lanjut tanpa subtitle/kualitas.
+      }
+
+      if (source.slug == 'melolo' && qualities.isEmpty) {
+        qualities = const [
+          DramaQuality(label: '720p', resolution: '720x1280 (HD)'),
+          DramaQuality(label: '540p', resolution: '540x960 (Standar)'),
+          DramaQuality(label: '480p', resolution: '480x854 (Hemat)'),
+          DramaQuality(label: '360p', resolution: '360x640 (Cepat)'),
+          DramaQuality(label: '240p', resolution: '240x426 (Ringan)'),
+        ].map((q) => StreamQuality(
+              label: q.label,
+              url: url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}',
+              isDefault: q.label == '540p',
+            )).toList();
       }
 
       final stream = StreamInfo(

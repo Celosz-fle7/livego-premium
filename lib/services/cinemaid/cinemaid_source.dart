@@ -351,7 +351,9 @@ class CinemaIdSource implements DramaSource {
   Future<String> streamUrl({
     required String seriesId,
     required String episodeId,
+    String? quality,
   }) async {
+    await CinemaIdStreamProxy.instance.ensureRunning();
     final cached = _streamCache['$seriesId:$episodeId'] ??
         _streamCache['$seriesId:1'] ??
         _streamCache['$seriesId:$seriesId'];

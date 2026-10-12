@@ -37,14 +37,16 @@ class MeloloSource implements DramaSource {
   Future<String> streamUrl({
     required String seriesId,
     required String episodeId,
+    String? quality,
   }) async {
-    final cacheKey = '$seriesId:$episodeId';
+    final cacheKey = '$seriesId:$episodeId:${quality ?? 'auto'}';
     final cached = _streamCache[cacheKey];
     if (cached != null && cached.isNotEmpty) return cached;
 
     final url = await _client.streamUrl(
       seriesId: seriesId,
       episodeId: episodeId,
+      quality: quality,
     );
     if (url.isNotEmpty) {
       _streamCache[cacheKey] = url;
