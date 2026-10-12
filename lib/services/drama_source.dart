@@ -1,6 +1,7 @@
 import 'cinemaid/cinemaid_source.dart';
 import 'freereels/freereels_source.dart';
 import 'melolo/melolo_source.dart';
+import 'shorttv/shorttv_source.dart';
 
 import '../models/content_item.dart';
 import '../models/livego_episode.dart';
@@ -92,6 +93,7 @@ class DramaSourceRegistry {
     'freereels': FreereelsSource(),
     'cinemaid': CinemaIdSource(),
     'melolo': MeloloSource(),
+    'shorttv': ShortTvSource(),
   };
 
   static void register(DramaSource source) {

@@ -114,9 +114,37 @@ class LiveGoApiPlatforms {
         'Popular TV Shows',
       ],
     ),
+    LiveGoApiPlatform(
+      slug: 'shorttv',
+      endpointSlug: 'shorttv',
+      name: 'ShortTV',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'keyword',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id', 'en', 'ja', 'es', 'th', 'vi', 'pt'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Semua',
+        'Trending Indonesia',
+        'Global / English',
+        'Jepang',
+        'Spanyol',
+        'Thailand',
+        'Vietnam',
+        'Portugis',
+      ],
+    ),
   ];
 
-  static const List<String> tvStarterSlugs = <String>['freereels', 'cinemaid', 'melolo'];
+  static const List<String> tvStarterSlugs = <String>[
+    'freereels',
+    'cinemaid',
+    'melolo',
+    'shorttv',
+  ];
 
   static List<String> get supportedSlugs =>
       List<String>.unmodifiable(tvStarterSlugs);

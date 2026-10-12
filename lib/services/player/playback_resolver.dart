@@ -96,10 +96,10 @@ class PlaybackResolver {
           qualities = extras.qualities
               .map((q) => StreamQuality(
                     label: q.label,
-                    url: source.slug == 'melolo'
+                    url: (source.slug == 'melolo' || source.slug == 'shorttv')
                         ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
                         : url,
-                    isDefault: source.slug == 'melolo'
+                    isDefault: (source.slug == 'melolo' || source.slug == 'shorttv')
                         ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
                         : q.label == '720p',
                   ))
