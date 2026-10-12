@@ -27,18 +27,17 @@ void main() {
       if (stack != null) debugPrint(stack.toString());
     };
 
-    // Unified Video Player Engine:
-    // media_kit (MPV / libmpv) aktif 100% untuk Mobile dan TV.
-    // Menghandle semua format (TS, MP4, HLS m3u8, CENC/AES, H.264, H.265/HEVC, VP9, AV1)
-    // dengan decoder native ffmpeg/hwdec tanpa tumpang tindih player atau patch terpisah.
+    // Player Engine:
+    // Android menggunakan native ExoPlayer (androidx.media3) yang super ringan dan instan.
+    // Platform desktop/lainnya menggunakan media_kit.
     VideoPlayerMediaKit.ensureInitialized(
-      android: true,
+      android: false,
       iOS: true,
       windows: true,
       macOS: true,
       linux: true,
     );
-    debugPrint('LIVEGO PLAYER: Unified Player Engine media_kit (MPV) aktif 100%');
+    debugPrint('LIVEGO PLAYER: Android native ExoPlayer aktif');
     final isTvRuntime = await LiveGoRuntimeDetector.isTvRuntime();
     LiveGoSettings.applyRuntimeLayoutGuard(isTvRuntime: isTvRuntime);
     await LiveGoLocalStore.init();
