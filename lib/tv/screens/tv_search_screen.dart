@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
+import '../core/managers/tv_back_manager.dart';
+import '../core/managers/tv_remote_manager.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
+import '../player/tv_player_entry.dart';
 import '../providers/tv_search_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
@@ -218,12 +222,16 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   void _openDetail(ContentItem item) {
     if (_openingDetail || !mounted) return;
     _openingDetail = true;
-    TvDetailRoute.open(
+
+    final episode = int.tryParse(item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(item);
+    widget.onPlayerRouteOpen?.call();
+
+    TvPlayerEntry.open(
       context,
       item: item,
-      onPlayerRouteOpen: widget.onPlayerRouteOpen,
-      onPlayerRouteClosed: widget.onPlayerRouteClosed,
+      episode: episode.clamp(1, 999).toInt(),
     ).whenComplete(() {
+      widget.onPlayerRouteClosed?.call();
       _openingDetail = false;
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -238,14 +246,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
 
   KeyEventResult _inputKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    if (TvRemoteManager.instance.shouldIgnoreRepeat(event)) return KeyEventResult.handled;
     final key = event.logicalKey;
 
     // Text edit/IME mode owns LEFT/RIGHT/UP/DOWN while the keyboard is active.
     // Without this guard, LEFT can leak to the TV navbar and make Search feel
     // like it exits the keyboard unexpectedly.
     if (_editingInput || _textNode.hasFocus) {
-      if (tvIsBackKey(key)) {
+      if (TvRemoteManager.instance.isBackKey(key)) {
+        if (!TvBackManager.instance.canHandleBack()) return KeyEventResult.handled;
         _exitTextEdit(refocusBox: true);
         return KeyEventResult.handled;
       }
@@ -253,6 +262,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       if (key == LogicalKeyboardKey.enter ||
           key == LogicalKeyboardKey.numpadEnter ||
           key == LogicalKeyboardKey.select) {
+        if (!TvRemoteManager.instance.canActivate()) return KeyEventResult.handled;
         _exitTextEdit(refocusBox: true);
         if (!ref.read(tvSearchProvider).loading) {
           _submitSearch(_controller.text);

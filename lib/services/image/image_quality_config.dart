@@ -8,7 +8,7 @@ enum LiveGoImageRole {
 class ImageQualityConfig {
   // Ubah angka di file ini saja kalau gambar terasa burik / terlalu berat.
   static const int posterWidth = 360;
-  static const int tvPosterWidth = 280;
+  static const int tvPosterWidth = 240;
   static const int bannerWidth = 960;
   static const int tvBannerWidth = 480;
   static const int detailWidth = 640;
@@ -17,7 +17,7 @@ class ImageQualityConfig {
 
   // Tahap awal: decode/cache ringan dulu supaya list/grid cepat kelihatan.
   static const int posterLowWidth = 180;
-  static const int tvPosterLowWidth = 140;
+  static const int tvPosterLowWidth = 130;
   static const int bannerLowWidth = 480;
   static const int tvBannerLowWidth = 240;
   static const int detailLowWidth = 320;

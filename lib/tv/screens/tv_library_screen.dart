@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
 import '../models/tv_zone.dart';
 import '../navigation/tv_detail_route.dart';
+import '../player/tv_player_entry.dart';
 import '../providers/tv_local_store_provider.dart';
 import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
@@ -110,12 +112,16 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
   void _openDetail(ContentItem item) {
     if (_openingDetail || !mounted) return;
     _openingDetail = true;
-    TvDetailRoute.open(
+
+    final episode = int.tryParse(item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(item);
+    widget.onPlayerRouteOpen?.call();
+
+    TvPlayerEntry.open(
       context,
       item: item,
-      onPlayerRouteOpen: widget.onPlayerRouteOpen,
-      onPlayerRouteClosed: widget.onPlayerRouteClosed,
+      episode: episode.clamp(1, 999).toInt(),
     ).whenComplete(() {
+      widget.onPlayerRouteClosed?.call();
       _openingDetail = false;
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
