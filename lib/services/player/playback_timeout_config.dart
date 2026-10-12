@@ -12,6 +12,6 @@ class PlaybackTimeoutConfig {
   static const Duration episodeListBackground = Duration(seconds: 14);
 
   // Inisialisasi controller boleh sedikit lebih panjang karena ini sudah tahap load video.
-  static const Duration controllerInit = Duration(seconds: 12);
+  static const Duration controllerInit = Duration(seconds: 35);
   static const Duration subtitleFetch = Duration(seconds: 6);
 }

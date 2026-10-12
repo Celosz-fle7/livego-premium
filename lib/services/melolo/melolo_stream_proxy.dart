@@ -141,7 +141,7 @@ class MeloloStreamProxy {
       cacheDir = Directory.systemTemp;
     }
 
-    final targetDir = Directory('${cacheDir.path}/livego_melolo_cache_v3');
+    final targetDir = Directory('${cacheDir.path}/livego_melolo_cache_v4');
     if (!await targetDir.exists()) {
       await targetDir.create(recursive: true);
     }
