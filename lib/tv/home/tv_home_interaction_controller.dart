@@ -790,7 +790,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         return;
       case TvZone.banner:
       default:
-        _requestExit();
+        _moveToNav();
         return;
     }
   }

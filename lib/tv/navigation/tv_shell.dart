@@ -557,12 +557,15 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
     if (_navHasFocus) {
-      _closeNavRestoreContent();
+      if (_navCursorIndex == TvNavIndex.home) {
+        _showExit();
+      } else {
+        _closeNavRestoreContent();
+      }
       return;
     }
     if (_index == TvNavIndex.home) {
-      // Home BACK is an exit intent, not a ladder back to Banner.
-      _showExit();
+      _showNav();
     } else {
       _showNavFromContentBack();
     }
