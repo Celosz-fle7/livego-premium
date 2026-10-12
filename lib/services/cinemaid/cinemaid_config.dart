@@ -37,32 +37,23 @@ class CinemaIdConfig {
 
   static const timeout = Duration(seconds: 15);
 
-  /// Kategori bawaan CinemaID terkelompok rapi sesuai jalur server asli:
-  /// 1. Provider & Platform OTT (Netflix, Disney, Prime Video, Apple TV+, Crunchyroll, MAX, Hulu, Paramount+)
-  /// 2. Kategori Kurasi & Ranking Inti (Trending, JUSTWATCH TOP 100, Populer Movies, Populer Series, Anime)
+  /// Kategori bawaan CinemaID terstruktur sesuai platform OTT/Provider:
+  /// Saat tab dibuka, konten paling atas adalah Top 10 dari provider tersebut,
+  /// disusul oleh katalog lengkap provider tersebut.
   static const categories = <String>[
-    // --- Platform & Provider OTT (Modul Streaming Channel 202) ---
     'Netflix',
-    'Disney',
-    'Prime Video',
+    'Amazon Prime',
     'Apple TV+',
+    'Disney+ Hotstar',
+    'Vidio',
+    'Vivamax',
+    'Viu',
+    'iFlix',
     'Crunchyroll',
-    'MAX',
-    'Hulu',
-    'Paramount+',
-    'AMC+',
-    'Rakuten Viki',
-
-    // --- Kategori Inti & Ranking Server ---
+    '18+',
     'Trending Now',
-    'JUSTWATCH TOP 100',
     'Popular Movies',
     'Popular TV Shows',
-    'Popular Anime',
-    'New Korean drama series',
-    'Today\'s New Streaming',
-    'Today\'s New Movies',
-    'Today\'s New Series',
   ];
 
   /// Taruh token auth sebagai header DAN query param.

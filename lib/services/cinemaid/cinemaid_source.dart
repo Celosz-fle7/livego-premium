@@ -57,9 +57,12 @@ class CinemaIdSource implements DramaSource {
   static const Map<String, String> _categoryToTopicId = {
     // Platform OTT (Channel 202 - Streaming module)
     'netflix': '2209',
-    'disney': '2210',
+    'amazon prime': '2211',
     'prime video': '2211',
     'apple tv+': '2997',
+    'apple tv': '2997',
+    'disney+': '2210',
+    'disney': '2210',
     'crunchyroll': '3000',
     'max': '2999',
     'hulu': '2998',
@@ -424,11 +427,9 @@ class CinemaIdSource implements DramaSource {
     // Subtitle: didukung in-band HLS m3u8 playlist.
     final subtitles = <DramaSubtitle>[];
 
-    // Kualitas video adaptive HLS stream
+    // Kualitas video: HLS single stream bawaan server (720p HD)
     final qualities = const <DramaQuality>[
-      DramaQuality(label: '1080p', resolution: '1080p FHD'),
       DramaQuality(label: '720p', resolution: '720p HD'),
-      DramaQuality(label: '480p', resolution: '480p SD'),
     ];
 
     // Audio multi dari audio_type_option[] (episode atau detail series).
