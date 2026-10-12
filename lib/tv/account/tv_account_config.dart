@@ -13,11 +13,11 @@ class TvAccountConfig {
 
   static const double topPadding = TvSafeZone.accountTop;
   static const double horizontalPadding = TvSafeZone.accountSide;
-  static const double bottomPadding = TvSafeZone.bottomReach + 72;
+  static const double bottomPadding = TvSafeZone.bottomReach;
   static const double headerHeight = 84;
   static const double afterHeader = 14;
   static const int gridColumnCount = 2;
-  static const double cardHeight = 94;
+  static const double cardHeight = 106;
   static const double cardGap = 12;
   static const double footerGap = 14;
   static const double footerHeight = 38;

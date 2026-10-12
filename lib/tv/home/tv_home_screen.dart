@@ -289,15 +289,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           label: 'Platform',
                           hint: LiveGoCatalog.label(_platformSlug),
                           height: 50,
-                          onHeaderTap: this._openPlatformManager,
-                          headerFocusNode: _platformHeaderNode,
-                          headerFocusedOverride: _zone == TvZone.platform &&
-                              _controlFocus == _HomeControlFocus.platformHeader,
-                          onHeaderFocus: () {
-                            setState(() => _controlFocus = _HomeControlFocus.platformHeader);
-                            this._rememberFocus(TvZone.platform, _platformIndex);
-                          },
-                          onHeaderKey: this._platformHeaderKey,
+                          showHeader: false,
                           child: TvChipRow(
                             labels: platforms,
                             selected: _selectedPlatformIndex,
@@ -323,15 +315,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                           label: 'Kategori',
                           hint: categories.isEmpty ? 'Default' : categories[_selectedCategoryIndex],
                           height: 50,
-                          onHeaderTap: this._openCategoryManager,
-                          headerFocusNode: _categoryHeaderNode,
-                          headerFocusedOverride: _zone == TvZone.category &&
-                              _controlFocus == _HomeControlFocus.categoryHeader,
-                          onHeaderFocus: () {
-                            setState(() => _controlFocus = _HomeControlFocus.categoryHeader);
-                            this._rememberFocus(TvZone.category, _categoryIndex);
-                          },
-                          onHeaderKey: this._categoryHeaderKey,
+                          showHeader: false,
                           child: TvChipRow(
                             labels: categories,
                             selected: _selectedCategoryIndex,

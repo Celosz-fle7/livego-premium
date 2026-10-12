@@ -234,9 +234,9 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(
                 TvSafeZone.accountSide,
-                TvSafeZone.accountTop,
+                24,
                 TvSafeZone.accountSide,
-                TvSafeZone.bottomReach,
+                48,
               ),
               children: [
                 const Text(

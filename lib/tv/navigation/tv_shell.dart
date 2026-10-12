@@ -15,6 +15,7 @@ import '../screens/tv_downloads_screen.dart';
 import '../home/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
+import '../theme/tv_focus_style.dart';
 import '../widgets/tv_side_nav.dart';
 import '../widgets/tv_lazy_indexed_stack.dart';
 import '../core/managers/tv_back_manager.dart';

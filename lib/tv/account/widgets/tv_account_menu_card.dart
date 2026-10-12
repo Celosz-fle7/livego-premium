@@ -142,18 +142,18 @@ class TvAccountMenuCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 5),
                     Text(
                       item.subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: AppTheme.textSoft.withOpacity(
-                          focused ? 0.92 : 0.74,
+                          focused ? 0.95 : 0.80,
                         ),
-                        fontSize: 12.6,
-                        height: 1.12,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13.0,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
                         decoration: TextDecoration.none,
                       ),
                     ),

@@ -12,6 +12,7 @@ class TvSectionBox extends StatelessWidget {
   final VoidCallback? onHeaderTap;
   final FocusNode? headerFocusNode;
   final bool? headerFocusedOverride;
+  final bool showHeader;
   final FocusOnKeyEventCallback? onHeaderKey;
   final VoidCallback? onHeaderFocus;
 
@@ -22,6 +23,7 @@ class TvSectionBox extends StatelessWidget {
     required this.hint,
     required this.height,
     required this.child,
+    this.showHeader = true,
     this.onHeaderTap,
     this.headerFocusNode,
     this.headerFocusedOverride,
@@ -48,22 +50,24 @@ class TvSectionBox extends StatelessWidget {
             BoxShadow(color: AppTheme.cyan.withOpacity(0.035), blurRadius: 18),
           ],
         ),
-        child: Row(
-          children: [
-            _SectionHeaderButton(
-              icon: icon,
-              label: label,
-              hint: hint,
-              onTap: onHeaderTap,
-              focusNode: headerFocusNode,
-              focusedOverride: headerFocusedOverride,
-              onKey: onHeaderKey,
-              onFocus: onHeaderFocus,
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: child),
-          ],
-        ),
+        child: showHeader
+            ? Row(
+                children: [
+                  _SectionHeaderButton(
+                    icon: icon,
+                    label: label,
+                    hint: hint,
+                    onTap: onHeaderTap,
+                    focusNode: headerFocusNode,
+                    focusedOverride: headerFocusedOverride,
+                    onKey: onHeaderKey,
+                    onFocus: onHeaderFocus,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: child),
+                ],
+              )
+            : child,
       ),
     );
   }
