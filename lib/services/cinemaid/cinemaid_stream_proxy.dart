@@ -25,14 +25,20 @@ class CinemaIdStreamProxy {
       _instance ??= CinemaIdStreamProxy._();
 
   HttpServer? _server;
-  final Completer<void> _initCompleter = Completer<void>();
+  Completer<void>? _initCompleter;
 
   CinemaIdStreamProxy._();
 
-  /// Pastikan server proxy jalan di 127.0.0.1:7000
+  /// Pastikan server proxy siap di 127.0.0.1:7000.
+  /// Jika port 7000 sudah di-listen oleh engine asli playvibes atau instance lain,
+  /// fungsi ini selesai dengan aman tanpa crash.
   Future<void> ensureRunning() async {
     if (_server != null) return;
-    if (_initCompleter.isCompleted) return;
+    if (_initCompleter != null) return _initCompleter!.future;
+
+    final completer = Completer<void>();
+    _initCompleter = completer;
+
     try {
       _server = await HttpServer.bind(
         InternetAddress.loopbackIPv4,
@@ -43,12 +49,13 @@ class CinemaIdStreamProxy {
       _server!.listen(_handleRequest, onError: (e) {
         debugPrint('LIVEGO CINEMAID PROXY error: $e');
       });
-      _initCompleter.complete();
+      completer.complete();
     } catch (e) {
-      debugPrint('LIVEGO CINEMAID PROXY bind failed: $e');
-      _initCompleter.completeError(e);
+      debugPrint('LIVEGO CINEMAID PROXY bind notice (port 7000 active): $e');
+      // Port sudah aktif (misal di-handle oleh native app atau shared socket)
+      completer.complete();
     }
-    return _initCompleter.future;
+    return completer.future;
   }
 
   void _handleRequest(HttpRequest request) async {

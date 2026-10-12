@@ -112,7 +112,7 @@ class CinemaIdSource implements DramaSource {
         if (vods.isNotEmpty) {
           debugPrint('CINEMAID SOURCE: loaded ${vods.length} items for topic $topicId ($category)');
           final seen = <String>{};
-          final seedItems = cinemaIdSeedCatalog
+          final seedItems = cinemaIdSeedsForCategory(category)
               .where((s) => seen.add(s.id))
               .map((s) => ContentItem(
                     id: s.id,
@@ -231,7 +231,7 @@ class CinemaIdSource implements DramaSource {
         if (out.isNotEmpty) {
           // Sisipkan seed items yang terbukti valid 100% di awal jika belum ada,
           // agar selalu ada konten yang siap putar langsung di home feed
-          final seedItems = cinemaIdSeedCatalog
+          final seedItems = cinemaIdSeedsForCategory(category)
               .where((s) => seen.add(s.id))
               .map((s) => ContentItem(
                     id: s.id,
@@ -253,8 +253,10 @@ class CinemaIdSource implements DramaSource {
       debugPrint('CINEMAID SOURCE ERROR: $e\n$st');
     }
 
-    // Fallback ke catalog seed lokal jika backend offline atau API terenkripsi
-    return cinemaIdSeedCatalog
+    // Fallback ke catalog seed lokal jika backend offline atau API terenkripsi.
+    // Filter berdasarkan kategori yang dipilih agar setiap tab menampilkan
+    // film/serial yang berbeda dan sesuai kategorinya.
+    return cinemaIdSeedsForCategory(category)
         .map((s) => ContentItem(
               id: s.id,
               title: s.title,
