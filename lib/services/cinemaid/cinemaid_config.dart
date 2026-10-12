@@ -10,7 +10,11 @@ class CinemaIdConfig {
   static const fallbackBaseUrl = 'https://freecinenewph.t62nds.com';
   static const cdnBaseUrl = 'http://movieph.xrrqe.com';
   static const secretToken = 'gcAIKnfz';
-  static const localProxyBaseUrl = 'http://127.0.0.1:7000';
+  /// Kunci enkripsi CDN CloudFront Wangsu hasil teardown biner libpp_hls.so
+  static const cdnSecretKey = '00b5f05c40b4f1d91dbc9b3fd8a059ef';
+  /// Port internal mandiri LiveGo (7055) agar 100% mandiri tanpa konflik app lain
+  static const localProxyPort = 7055;
+  static const localProxyBaseUrl = 'http://127.0.0.1:7055';
 
   /// Auto-register credentials (server accepts any unique device_id)
   static const autoRegisterUsername = 'livego_user';

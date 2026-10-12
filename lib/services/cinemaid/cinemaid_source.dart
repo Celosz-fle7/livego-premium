@@ -79,11 +79,8 @@ class CinemaIdSource implements DramaSource {
     'today\'s new series': '5349',
   };
 
-  /// Format URL ke proxy lokal CinemaID (127.0.0.1:7000).
-  ///
-  /// App asli memakai proxy libvindictus di port 7000 untuk semua stream.
-  /// Buktinya ada di backup HP root: video_history berisi
-  /// http://127.0.0.1:7000/resource.m3u8?src=<base64(vod_url)>
+  /// Format URL ke proxy lokal mandiri CinemaID LiveGo (127.0.0.1:7055).
+  /// Menandatangani request dengan kunci enkripsi CDN CloudFront secara otomatis.
   String _formatStreamUrl(String rawUrl) {
     if (rawUrl.isEmpty) return rawUrl;
     if (rawUrl.startsWith('http://127.0.0.1:') ||

@@ -2,23 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'cinemaid_config.dart';
 
-/// Proxy lokal untuk stream CinemaID.
+/// Proxy lokal mandiri untuk stream CinemaID di LiveGo.
 ///
-/// App asli (com.movieph.bj.playvibes) memakai libvindictus.so yang
-/// menjalankan proxy di 127.0.0.1:7000. Semua vod_url dari API
-/// diformat menjadi:
-///   http://127.0.0.1:7000/resource.m3u8?src=<base64(real_url)>
+/// Menggunakan algoritma otentikasi CDN Wangsu / CloudFront (hasil teardown
+/// libpp_hls.so):
+/// - wsTime: timestamp epoch hex lowercase
+/// - wsSecret: md5(cdnSecretKey + uri_path + wsTime)
 ///
-/// Proxy ini mereplika perilaku tersebut di Dart:
-/// 1. Terima request /resource.m3u8?src=<base64>
-/// 2. Decode base64 -> URL asli CDN
-/// 3. Fetch dari CDN dengan header yang benar
-/// 4. Untuk m3u8: rewrite URL segmen agar lewat proxy juga
-/// 5. Serve ke player
+/// Bekerja 100% mandiri di port 7055 tanpa bergantung pada app luar
+/// dan tanpa konflik port 7000.
 class CinemaIdStreamProxy {
   static CinemaIdStreamProxy? _instance;
   static CinemaIdStreamProxy get instance =>
@@ -29,9 +26,31 @@ class CinemaIdStreamProxy {
 
   CinemaIdStreamProxy._();
 
-  /// Pastikan server proxy siap di 127.0.0.1:7000.
-  /// Jika port 7000 sudah di-listen oleh engine asli playvibes atau instance lain,
-  /// fungsi ini selesai dengan aman tanpa crash.
+  /// Tanda tangani URL CDN movieph.xrrqe.com dengan parameter wsSecret & wsTime
+  /// agar langsung lolos proteksi WAF CloudFront/Wangsu.
+  static String signCdnUrl(String rawUrl) {
+    try {
+      final uri = Uri.parse(rawUrl);
+      final path = uri.path;
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final wsTime = nowSec.toRadixString(16).toLowerCase();
+      final signSource = utf8.encode('${CinemaIdConfig.cdnSecretKey}$path$wsTime');
+      final wsSecret = md5.convert(signSource).toString();
+
+      final existingParams = Map<String, String>.from(uri.queryParameters);
+      existingParams.remove('wsSecret');
+      existingParams.remove('wsTime');
+      existingParams['wsSecret'] = wsSecret;
+      existingParams['wsTime'] = wsTime;
+
+      return uri.replace(queryParameters: existingParams).toString();
+    } catch (e) {
+      debugPrint('LIVEGO CINEMAID PROXY sign error: $e');
+      return rawUrl;
+    }
+  }
+
+  /// Pastikan server proxy mandiri aktif di 127.0.0.1:7055.
   Future<void> ensureRunning() async {
     if (_server != null) return;
     if (_initCompleter != null) return _initCompleter!.future;
@@ -42,17 +61,16 @@ class CinemaIdStreamProxy {
     try {
       _server = await HttpServer.bind(
         InternetAddress.loopbackIPv4,
-        7000,
+        CinemaIdConfig.localProxyPort,
         shared: true,
       );
-      debugPrint('LIVEGO CINEMAID PROXY: running on 127.0.0.1:7000');
+      debugPrint('LIVEGO CINEMAID PROXY: running mandiri on 127.0.0.1:${CinemaIdConfig.localProxyPort}');
       _server!.listen(_handleRequest, onError: (e) {
         debugPrint('LIVEGO CINEMAID PROXY error: $e');
       });
       completer.complete();
     } catch (e) {
-      debugPrint('LIVEGO CINEMAID PROXY bind notice (port 7000 active): $e');
-      // Port sudah aktif (misal di-handle oleh native app atau shared socket)
+      debugPrint('LIVEGO CINEMAID PROXY bind notice: $e');
       completer.complete();
     }
     return completer.future;
@@ -79,7 +97,7 @@ class CinemaIdStreamProxy {
     }
   }
 
-  /// Serve resource dari CDN melalui proxy.
+  /// Serve resource dari CDN melalui proxy mandiri LiveGo.
   Future<void> _serveResource(HttpRequest request, String srcB64) async {
     String realUrl;
     try {
@@ -90,31 +108,32 @@ class CinemaIdStreamProxy {
       return;
     }
 
-    debugPrint('LIVEGO CINEMAID PROXY: fetching $realUrl');
+    // Tanda tangani URL dengan kunci otentikasi CDN
+    final signedUrl = signCdnUrl(realUrl);
+    debugPrint('LIVEGO CINEMAID PROXY: fetching signed $signedUrl');
 
     final client = HttpClient();
     try {
-      final req = await client.getUrl(Uri.parse(realUrl));
-      // Header seperti app asli untuk bypass 403 CDN
+      final req = await client.getUrl(Uri.parse(signedUrl));
       req.headers.set('User-Agent', CinemaIdConfig.userAgent);
       req.headers.set('Referer', CinemaIdConfig.referer);
       req.headers.set('Accept', '*/*');
 
-      final res = await req.close();
-
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        debugPrint(
-            'LIVEGO CINEMAID PROXY: CDN returned ${res.statusCode} for $realUrl');
-        request.response.statusCode = HttpStatus.badGateway;
-        await request.response.close();
-        return;
+      // Dukung header Range dari video player
+      final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
+      if (rangeHeader != null && rangeHeader.isNotEmpty) {
+        req.headers.set(HttpHeaders.rangeHeader, rangeHeader);
       }
 
-      final contentType = res.headers.contentType?.mimeType ?? '';
-      final isM3u8 = realUrl.contains('.m3u8') || contentType.contains('mpegurl');
+      final res = await req.close();
 
-      if (isM3u8) {
-        // Baca m3u8, rewrite URL segmen agar lewat proxy
+      request.response.statusCode = res.statusCode;
+
+      final isM3u8 = realUrl.contains('.m3u8') ||
+          (res.headers.contentType?.mimeType.contains('mpegurl') ?? false);
+
+      if (isM3u8 && res.statusCode == HttpStatus.ok) {
+        // Baca m3u8 dan rewrite URL segmen agar lewat proxy mandiri
         final body = await res.transform(utf8.decoder).join();
         final rewritten = _rewriteM3u8(body, realUrl);
         final bytes = utf8.encode(rewritten);
@@ -124,13 +143,16 @@ class CinemaIdStreamProxy {
         request.response.add(bytes);
         await request.response.close();
       } else {
-        // Stream langsung (segmen .ts atau file lain)
-        final length = res.contentLength;
-        if (length > 0) {
-          request.response.headers.contentLength = length;
+        // Stream langsung untuk segmen .ts
+        if (res.contentLength > 0) {
+          request.response.headers.contentLength = res.contentLength;
         }
         if (res.headers.contentType != null) {
           request.response.headers.contentType = res.headers.contentType!;
+        }
+        final contentRange = res.headers.value(HttpHeaders.contentRangeHeader);
+        if (contentRange != null) {
+          request.response.headers.set(HttpHeaders.contentRangeHeader, contentRange);
         }
         await res.pipe(request.response);
       }
@@ -145,7 +167,7 @@ class CinemaIdStreamProxy {
     }
   }
 
-  /// Rewrite URL di dalam m3u8 agar segmen juga lewat proxy.
+  /// Rewrite URL di dalam m3u8 agar seluruh segmen di-serve melalui proxy mandiri.
   String _rewriteM3u8(String m3u8, String baseUrl) {
     final base = Uri.parse(baseUrl);
     final lines = m3u8.split('\n');
@@ -154,14 +176,12 @@ class CinemaIdStreamProxy {
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.isEmpty || trimmed.startsWith('#')) {
-        // Handle EXT-X-KEY URI jika ada
         if (trimmed.startsWith('#EXT-X-KEY')) {
           out.add(_rewriteKeyUri(trimmed, base));
         } else {
           out.add(line);
         }
       } else {
-        // Baris URL segmen -> resolve ke absolute lalu bungkus proxy
         final absolute = base.resolve(trimmed).toString();
         final b64 = base64.encode(utf8.encode(absolute));
         out.add('${CinemaIdConfig.localProxyBaseUrl}/resource.m3u8?src=$b64');
