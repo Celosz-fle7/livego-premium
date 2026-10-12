@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../core/managers/tv_cache_manager.dart';
+import '../core/managers/tv_remote_manager.dart';
+import '../core/managers/tv_back_manager.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
 import '../cache/tv_cache_maintenance_service.dart';
@@ -117,17 +120,11 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   }
 
   bool _backAllowed() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackMs < _backGuardMs) return false;
-    _lastBackMs = now;
-    return true;
+    return TvBackManager.instance.canHandleBack();
   }
 
   bool _selectAllowed() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSelectMs < _selectGuardMs) return false;
-    _lastSelectMs = now;
-    return true;
+    return TvRemoteManager.instance.canActivate(cooldownMs: _selectGuardMs);
   }
 
   void _backToNav() {
@@ -292,7 +289,7 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       },
     ).whenComplete(() => progressOpen = false));
 
-    final result = await TvCacheMaintenanceService.clearAll();
+    final result = await TvCacheManager.instance.cleanTemporaryCache();
     if (!mounted) return;
     if (progressOpen) {
       Navigator.of(context).pop();

@@ -7,6 +7,9 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
+import '../core/managers/tv_cache_manager.dart';
+import '../core/managers/tv_remote_manager.dart';
+import '../core/managers/tv_back_manager.dart';
 import '../cache/tv_cache_maintenance_service.dart';
 import '../../shared/settings/livego_setting_models.dart';
 import 'tv_settings_config.dart';
@@ -115,10 +118,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
   }
 
   bool _ignoreRepeatedBack() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastBackHandledMs < TvSettingsConfig.backGuardMs) return true;
-    _lastBackHandledMs = now;
-    return false;
+    return !TvBackManager.instance.canHandleBack();
   }
 
   void _moveToNav() {
@@ -350,7 +350,7 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
       },
     ).whenComplete(() => progressOpen = false));
 
-    final result = await TvCacheMaintenanceService.clearAll();
+    final result = await TvCacheManager.instance.cleanTemporaryCache();
     if (!mounted) return;
     if (progressOpen) {
       Navigator.of(context).pop();

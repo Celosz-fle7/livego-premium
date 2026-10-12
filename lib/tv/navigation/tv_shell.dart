@@ -15,9 +15,9 @@ import '../screens/tv_downloads_screen.dart';
 import '../home/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
-import '../theme/tv_focus_style.dart';
 import '../widgets/tv_side_nav.dart';
 import '../widgets/tv_lazy_indexed_stack.dart';
+import '../core/managers/tv_back_manager.dart';
 import 'tv_nav_index.dart';
 import 'tv_navigation_service.dart';
 
@@ -136,9 +136,7 @@ class _TvShellState extends ConsumerState<TvShell> {
   bool _backAllowed() {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now < _suppressBackUntilMs) return false;
-    if (now - _backGuardMs < 420) return false;
-    _backGuardMs = now;
-    return true;
+    return TvBackManager.instance.canHandleBack();
   }
 
   void _suppressBack([int ms = 650]) {
