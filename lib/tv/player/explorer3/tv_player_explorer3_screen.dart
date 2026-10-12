@@ -224,13 +224,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final qualities = stream.qualities;
     if (qualities.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
 
-    // Untuk Melolo di TV: default resolusi sementara adalah 360p (atau 480p jika 360p tidak ada)
-    if (widget.item.platformSlug == 'melolo') {
-      final q360 = stream.urlForQuality('360p');
-      if (q360.isNotEmpty && q360 != stream.url) return q360;
-      final q480 = stream.urlForQuality('480p');
-      if (q480.isNotEmpty && q480 != stream.url) return q480;
-    }
+    // Default standar pasar TV (360p, lalu fallback 480p): respon cepat di TV paling rendah
+    final q360 = stream.urlForQuality('360p');
+    if (q360.isNotEmpty && q360 != stream.url) return q360;
+    final q480 = stream.urlForQuality('480p');
+    if (q480.isNotEmpty && q480 != stream.url) return q480;
 
     final safe = qualities.where((q) => q.url.trim().isNotEmpty && !_looksUnsafeForLowEndTv(q)).toList();
     final pool = safe.isNotEmpty ? safe : qualities.where((q) => q.url.trim().isNotEmpty).toList();
@@ -839,8 +837,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       final stream = resolved.stream;
       _streamInfo = stream;
 
-      // Always start TV playback with a safe Auto stream.
-      // Saved/high quality can be re-applied manually from the Quality panel.
+      await PlayerPreferences.load();
+      if (_activeQuality == 'Auto' && PlayerPreferences.quality.isNotEmpty && PlayerPreferences.quality.toLowerCase() != 'auto') {
+        _activeQuality = PlayerPreferences.quality;
+      }
       final url = _safeUrlForQuality(stream, _activeQuality).trim();
       if (url.isEmpty) throw StateError('Stream kosong');
       _setStreamDiagnostic(stream, url);
@@ -1398,6 +1398,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _status = 'Quality $label';
       _mode = _Explorer3Mode.controls;
     });
+    await PlayerPreferences.setQuality(label);
     unawaited(LiveGoLocalStore.saveSettings());
     try {
       await _load();

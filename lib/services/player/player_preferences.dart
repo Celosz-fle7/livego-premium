@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/livego_settings.dart';
+
 class PlayerPreferences {
   static const _qualityKey = 'player.quality';
   static const _subtitleEnabledKey = 'player.subtitle.enabled';
@@ -8,7 +10,13 @@ class PlayerPreferences {
   static const _speedKey = 'player.speed';
   static const _fitCoverKey = 'player.fit.cover';
 
-  static String quality = 'Auto';
+  /// Default standar instalasi LiveGo:
+  /// - TV: 360p (standar pasar TV box low-end, respon cepat & stabil)
+  /// - Mobile / HP: 480p
+  static String get defaultInitialQuality =>
+      LiveGoSettings.runtimeLockedToTv ? '360p' : '480p';
+
+  static String quality = '480p';
   static bool subtitleEnabled = true;
   static String subtitleLanguage = 'Auto';
   static String audioTrack = 'Source';
@@ -20,7 +28,10 @@ class PlayerPreferences {
   static Future<void> load() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
-    quality = prefs.getString(_qualityKey) ?? quality;
+    final savedQuality = prefs.getString(_qualityKey);
+    quality = (savedQuality != null && savedQuality.isNotEmpty)
+        ? savedQuality
+        : defaultInitialQuality;
     subtitleEnabled = prefs.getBool(_subtitleEnabledKey) ?? subtitleEnabled;
     subtitleLanguage = prefs.getString(_subtitleLanguageKey) ?? subtitleLanguage;
     audioTrack = prefs.getString(_audioTrackKey) ?? audioTrack;
@@ -33,6 +44,7 @@ class PlayerPreferences {
     quality = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_qualityKey, value);
+    LiveGoSettings.quality = value;
   }
 
   static Future<void> setSubtitle({required bool enabled, String? language}) async {

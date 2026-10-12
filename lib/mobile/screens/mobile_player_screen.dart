@@ -386,22 +386,22 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   String _resolvedInitialUrl() {
-    if (widget.item.platformSlug == 'melolo') {
-      if (_quality.toLowerCase() == 'auto') {
-        // Melolo di Mobile: default resolusi sementara adalah 540p (dapat diubah manual jika internet cepat)
-        final q540 = widget.stream.urlForQuality('540p');
-        if (q540.isNotEmpty && q540 != widget.stream.url) {
-          return q540;
-        }
-        return widget.stream.autoStartUrl;
+    final effectiveQuality = _quality.trim();
+    if (effectiveQuality.isEmpty || effectiveQuality.toLowerCase() == 'auto') {
+      // Default instalasi awal HP adalah 480p (cepat & hemat), fallback ke autoStartUrl
+      final q480 = widget.stream.urlForQuality('480p');
+      if (q480.isNotEmpty && q480 != widget.stream.url) {
+        return q480;
       }
-      return widget.stream.urlForQuality(_quality);
+      return widget.stream.autoStartUrl;
     }
-    final url = _quality.toLowerCase() == 'auto'
-        ? widget.stream.autoStartUrl
-        : widget.stream.urlForQuality(_quality);
-    _logFreeReelsPlayerUrl('PLAYER_URL_RESOLVED', url);
-    return url;
+
+    // Gunakan aturan kualitas yang disimpan oleh user jika tersedia
+    final direct = widget.stream.urlForQuality(effectiveQuality);
+    if (direct.isNotEmpty) {
+      return direct;
+    }
+    return widget.stream.autoStartUrl;
   }
 
   void _logFreeReelsPlayerUrl(String stage, String url) {
@@ -761,9 +761,10 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       });
       LiveGoSettings.quality = picked;
       await PlayerPreferences.setQuality(picked);
+      await LiveGoLocalStore.saveSettings();
 
       final url = picked.toLowerCase() == 'auto'
-          ? widget.stream.autoStartUrl
+          ? _resolvedInitialUrl()
           : widget.stream.urlForQuality(picked);
       if (url.isNotEmpty && url != _activeUrl) {
         final c = _controller;

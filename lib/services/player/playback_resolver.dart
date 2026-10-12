@@ -99,7 +99,9 @@ class PlaybackResolver {
                     url: source.slug == 'melolo'
                         ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
                         : url,
-                    isDefault: source.slug == 'melolo' ? q.label == '540p' : q.label == '720p',
+                    isDefault: source.slug == 'melolo'
+                        ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
+                        : q.label == '720p',
                   ))
               .toList();
         }
@@ -117,7 +119,7 @@ class PlaybackResolver {
         ].map((q) => StreamQuality(
               label: q.label,
               url: url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}',
-              isDefault: q.label == '540p',
+              isDefault: q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase(),
             )).toList();
       }
 

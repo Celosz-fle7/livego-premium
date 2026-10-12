@@ -10,7 +10,7 @@ class LiveGoSettings {
 
   static String language = 'id';
   static String defaultPlatform = 'freereels';
-  static String quality = 'Auto';
+  static String quality = '480p';
   static String layoutMode = layoutAuto;
   static String drmMode = 'Auto';
   static String codecPreference = 'Auto';
@@ -150,7 +150,7 @@ class LiveGoSettings {
   static void reset() {
     language = 'id';
     defaultPlatform = 'freereels';
-    quality = 'Auto';
+    quality = runtimeLockedToTv ? '360p' : '480p';
     layoutMode = layoutAuto;
     drmMode = 'Auto';
     codecPreference = 'Auto';
