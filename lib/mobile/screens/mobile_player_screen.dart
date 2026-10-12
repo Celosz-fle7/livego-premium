@@ -1576,8 +1576,6 @@ class _BottomOverlay extends StatelessWidget {
                     _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
                     _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
                     _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
-                    _Shortcut(icon: Icons.audiotrack_rounded, label: 'Audio', onTap: onAudio),
-                    _Shortcut(icon: Icons.speed_rounded, label: 'Speed', onTap: onSpeed),
                     _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
                   ],
                 ),
