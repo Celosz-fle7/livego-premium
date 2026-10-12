@@ -94,8 +94,15 @@ class PlaybackContractRules {
       );
     }
 
+    final isHls = cleanUrl.contains('.m3u8') ||
+        cleanUrl.contains('/m3u8') ||
+        cleanUrl.contains(':7055') ||
+        cleanUrl.contains(':7056') ||
+        cleanUrl.contains('hls');
+
     return VideoPlayerController.networkUrl(
       Uri.parse(cleanUrl),
+      formatHint: isHls ? VideoFormat.hls : null,
       httpHeaders: headers ?? const {},
       videoPlayerOptions: videoPlayerOptions,
     );

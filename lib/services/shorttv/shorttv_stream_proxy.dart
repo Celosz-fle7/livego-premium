@@ -78,7 +78,7 @@ class ShortTvStreamProxy {
       }
 
       final path = request.uri.path;
-      if (path == '/m3u8') {
+      if (path == '/m3u8' || path == '/live.m3u8' || path == '/playlist.m3u8') {
         final targetUrl = request.uri.queryParameters['url'];
         if (targetUrl == null || targetUrl.isEmpty) {
           request.response.statusCode = HttpStatus.badRequest;
@@ -98,7 +98,7 @@ class ShortTvStreamProxy {
             return;
           }
 
-          final m3u8Content = await res.transform(const SystemEncoding().decoder).join();
+          final m3u8Content = await res.transform(utf8.decoder).join();
           final baseUri = Uri.parse(targetUrl);
 
           // Rewriting segment URLs
@@ -111,9 +111,12 @@ class ShortTvStreamProxy {
               modifiedLines.add(line);
             } else {
               // Ini adalah path atau URL segmen TS
-              final segmentUri = baseUri.resolve(trimmed);
+              var segmentUri = baseUri.resolve(trimmed);
+              if (baseUri.hasQuery && !segmentUri.hasQuery) {
+                segmentUri = segmentUri.replace(query: baseUri.query);
+              }
               final proxySegmentUrl =
-                  'http://127.0.0.1:$_port/ts?url=${Uri.encodeComponent(segmentUri.toString())}';
+                  'http://127.0.0.1:$_port/segment.ts?url=${Uri.encodeComponent(segmentUri.toString())}';
               modifiedLines.add(proxySegmentUrl);
             }
           }
@@ -125,7 +128,7 @@ class ShortTvStreamProxy {
         } finally {
           client.close(force: true);
         }
-      } else if (path == '/ts') {
+      } else if (path == '/ts' || path == '/segment.ts') {
         final targetUrl = request.uri.queryParameters['url'];
         if (targetUrl == null || targetUrl.isEmpty) {
           request.response.statusCode = HttpStatus.badRequest;
@@ -226,10 +229,10 @@ class ShortTvStreamProxy {
     }
   }
 
-  /// Ubah URL m3u8 asli menjadi URL loopback lokal proxy LiveGo
+  /// Ubah URL m3u8 asli menjadi URL loopback lokal proxy LiveGo (.m3u8 extension)
   Future<String> wrapM3u8Url(String originalM3u8Url) async {
     await _ensureServer();
-    return 'http://127.0.0.1:$_port/m3u8?url=${Uri.encodeComponent(originalM3u8Url)}';
+    return 'http://127.0.0.1:$_port/live.m3u8?url=${Uri.encodeComponent(originalM3u8Url)}';
   }
 
   /// Bersihkan cache segmen TS saat ganti episode atau keluar player

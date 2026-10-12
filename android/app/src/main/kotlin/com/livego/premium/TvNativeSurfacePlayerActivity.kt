@@ -462,6 +462,10 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun buildMediaItem(url: String): MediaItem {
         val builder = MediaItem.Builder().setUri(Uri.parse(url))
+        val lowerUrl = url.lowercase(Locale.US)
+        if (lowerUrl.contains(".m3u8") || lowerUrl.contains("/m3u8") || lowerUrl.contains("hls") || lowerUrl.contains(":7055") || lowerUrl.contains(":7056")) {
+            builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+        }
         val sub = subtitles.getOrNull(subtitleCursor)
         if (sub != null && sub.url.isNotBlank()) {
             val mime = when (sub.format.lowercase(Locale.US)) {
