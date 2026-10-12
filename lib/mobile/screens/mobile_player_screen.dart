@@ -422,7 +422,9 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       if (widget.item.platformSlug == 'melolo') {
         await MeloloStreamProxy.instance.ensureRunning();
       }
-      if (widget.item.platformSlug == 'shorttv') {
+      if (url.startsWith('http://127.0.0.1:7056') ||
+          widget.item.platformSlug == 'shorttv' ||
+          widget.item.platformSlug == 'shortmax') {
         await ShortTvStreamProxy.instance.ensureRunning();
       }
       _activeUrl = url;

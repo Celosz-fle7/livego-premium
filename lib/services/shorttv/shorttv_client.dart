@@ -20,7 +20,8 @@ class ShortTvClient {
 
   ShortTvClient._();
 
-  String _token = ShortTvConfig.defaultToken;
+  String _token = '';
+  String _rc4Key = ShortTvConfig.defaultRc4Key;
   DateTime? _tokenExpiry;
 
   /// Generate UUID v4 sederhana
@@ -33,16 +34,27 @@ class ShortTvClient {
     return '${hexChars.substring(0, 8)}-${hexChars.substring(8, 12)}-${hexChars.substring(12, 16)}-${hexChars.substring(16, 20)}-${hexChars.substring(20, 32)}';
   }
 
-  /// Pastikan token aktif. Jika belum ada atau mendekati expired (> 24 jam), panggil initLogin.
-  Future<String> _ensureToken() async {
-    if (_token.isNotEmpty && _tokenExpiry != null && DateTime.now().isBefore(_tokenExpiry!)) {
+  /// Generate kunci acak alphanumeric (32 karakter)
+  String _randomAlphanumeric(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rnd = Random();
+    return List.generate(length, (_) => chars[rnd.nextInt(chars.length)]).join();
+  }
+
+  /// Pastikan token aktif. Jika belum ada, mendekati expired, atau dipaksa refresh, panggil initLogin.
+  Future<String> _ensureToken({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _token.isNotEmpty &&
+        _tokenExpiry != null &&
+        DateTime.now().isBefore(_tokenExpiry!)) {
       return _token;
     }
 
     try {
       final seq = _randomUuid();
       final deviceId = ShortTvConfig.defaultDeviceId;
-      final secretKey = ShortTvConfig.defaultRc4RsaKey;
+      final newRc4Key = _randomAlphanumeric(32);
+      final secretKey = ShortTvCrypto.rsaEncryptPkcs1(newRc4Key);
 
       final bodyMap = {
         'deviceCode': deviceId,
@@ -51,17 +63,17 @@ class ShortTvClient {
       };
       final bodyStr = jsonEncode(bodyMap);
 
-      // Hitung traceParam: RC4(MD5(deviceId + seq + secretKey + "34"))
+      // Hitung TraceParam: RC4(MD5(deviceId + seq + secretKey + "34"), newRc4Key)
       final concat = '$deviceId$seq${secretKey}34';
       final md5Hash = md5.convert(utf8.encode(concat)).toString();
-      final traceParam = ShortTvCrypto.rc4EncryptHex(md5Hash, ShortTvConfig.defaultRc4Key);
+      final traceParam = ShortTvCrypto.rc4EncryptHex(md5Hash, newRc4Key);
 
       final headers = {
         'isEncrypt': 'false',
         'channel': 'googleplay',
         'deviceId': deviceId,
         'clientPlatform': 'android',
-        'TraceId': _randomUuid(),
+        'TraceId': seq,
         'TraceParam': traceParam,
         'language': 'id',
         'locale': 'id_ID',
@@ -97,6 +109,7 @@ class ShortTvClient {
           final json = jsonDecode(respBody);
           if (json is Map && json['data'] is Map && json['data']['token'] != null) {
             _token = '${json['data']['token']}';
+            _rc4Key = newRc4Key;
             _tokenExpiry = DateTime.now().add(const Duration(hours: 12));
             return _token;
           }
@@ -105,7 +118,11 @@ class ShortTvClient {
         client.close(force: true);
       }
     } catch (_) {
-      // Fallback ke token bawaan
+      // Fallback ke token bawaan jika jaringan offline
+      if (_token.isEmpty) {
+        _token = ShortTvConfig.defaultToken;
+        _rc4Key = ShortTvConfig.defaultRc4Key;
+      }
     }
 
     return _token;
@@ -118,12 +135,13 @@ class ShortTvClient {
     String lang = 'id',
     String locale = 'id_ID',
     String country = 'ID',
+    bool retryOnTokenError = true,
   }) async {
     final token = await _ensureToken();
     final deviceId = ShortTvConfig.defaultDeviceId;
-    final rc4Key = ShortTvConfig.defaultRc4Key;
+    final currentRc4Key = _rc4Key;
 
-    final encBodyHex = ShortTvCrypto.rc4EncryptHex(jsonEncode(body), rc4Key);
+    final encBodyHex = ShortTvCrypto.rc4EncryptHex(jsonEncode(body), currentRc4Key);
 
     final headers = {
       'isEncrypt': 'true',
@@ -169,20 +187,33 @@ class ShortTvClient {
         final respBody = await resp.transform(utf8.decoder).join();
 
         if (resp.statusCode == 200 && respBody.isNotEmpty) {
-          final isEnc = resp.headers.value('isEncrypt') == 'true';
-          if (isEnc) {
-            final jsonResp = jsonDecode(respBody);
-            final encResult = jsonResp['result'] ?? '';
+          final jsonResp = jsonDecode(respBody);
+          if (jsonResp is Map) {
+            // Cek apakah server mengembalikan token expired / error
+            final status = jsonResp['status'];
+            final message = '${jsonResp['message'] ?? ''}'.toLowerCase();
+            if ((status == 20002 || message.contains('token')) && retryOnTokenError) {
+              await _ensureToken(forceRefresh: true);
+              return _postEncrypted(
+                path,
+                body,
+                lang: lang,
+                locale: locale,
+                country: country,
+                retryOnTokenError: false,
+              );
+            }
+
+            final encResult = jsonResp['result'];
             if (encResult is String && encResult.isNotEmpty) {
-              final decStr = ShortTvCrypto.rc4DecryptHex(encResult, rc4Key);
+              final decStr = ShortTvCrypto.rc4DecryptHex(encResult, currentRc4Key);
               final decoded = jsonDecode(decStr);
               if (decoded is Map<String, dynamic>) return decoded;
               if (decoded is Map) return Map<String, dynamic>.from(decoded);
             }
-          } else {
-            final decoded = jsonDecode(respBody);
-            if (decoded is Map<String, dynamic>) return decoded;
-            if (decoded is Map) return Map<String, dynamic>.from(decoded);
+
+            if (jsonResp is Map<String, dynamic>) return jsonResp;
+            return Map<String, dynamic>.from(jsonResp);
           }
         }
         lastError = Exception('ShortTV HTTP ${resp.statusCode}: $respBody');

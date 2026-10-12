@@ -94,15 +94,24 @@ class DramaSourceRegistry {
     'cinemaid': CinemaIdSource(),
     'melolo': MeloloSource(),
     'shorttv': ShortTvSource(),
+    'shortmax': ShortTvSource(),
   };
 
   static void register(DramaSource source) {
     _sources[source.slug] = source;
   }
 
-  static bool handles(String slug) => _sources.containsKey(slug);
+  static bool handles(String slug) {
+    final s = slug.trim().toLowerCase();
+    if (s == 'shortmax') return _sources.containsKey('shorttv') || _sources.containsKey('shortmax');
+    return _sources.containsKey(s);
+  }
 
-  static DramaSource? forSlug(String slug) => _sources[slug];
+  static DramaSource? forSlug(String slug) {
+    final s = slug.trim().toLowerCase();
+    if (s == 'shortmax') return _sources['shorttv'] ?? _sources['shortmax'];
+    return _sources[s];
+  }
 
   static List<String> get slugs => _sources.keys.toList(growable: false);
 }

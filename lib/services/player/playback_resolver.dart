@@ -96,10 +96,10 @@ class PlaybackResolver {
           qualities = extras.qualities
               .map((q) => StreamQuality(
                     label: q.label,
-                    url: (source.slug == 'melolo' || source.slug == 'shorttv')
+                    url: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
                         ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
                         : url,
-                    isDefault: (source.slug == 'melolo' || source.slug == 'shorttv')
+                    isDefault: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
                         ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
                         : q.label == '720p',
                   ))
@@ -149,7 +149,9 @@ class PlaybackResolver {
             PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
         selectedAudioTrack: PlayerPreferences.audioTrack,
       );
-    } catch (e) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('LIVEGO PlaybackResolver error on ${source.slug}: $e\n$st');
       return PlaybackSource.empty(
         platform: source.slug,
         dramaId: item.id,
@@ -182,7 +184,9 @@ class PlaybackResolver {
     // (TV pakai jalur fast ini; tanpa branch ini FreeReels di TV gagal.)
     final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
     if (dramaSource != null) {
-      final effectiveTimeout = dramaSource.slug == 'melolo'
+      final effectiveTimeout = (dramaSource.slug == 'melolo' ||
+              dramaSource.slug == 'shorttv' ||
+              dramaSource.slug == 'shortmax')
           ? const Duration(seconds: 15)
           : timeout;
       final videoType = dramaSource.slug == 'melolo'

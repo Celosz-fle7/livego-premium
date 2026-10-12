@@ -184,8 +184,11 @@ class LiveGoApiPlatforms {
     return null;
   }
 
-  static String normalizeSlug(String platform) =>
-      platform.trim().toLowerCase();
+  static String normalizeSlug(String platform) {
+    final clean = platform.trim().toLowerCase();
+    if (clean == 'shortmax') return 'shorttv';
+    return clean;
+  }
 
   static String endpointSlug(String platform) => bySlug(platform).apiSlug;
 

@@ -870,7 +870,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       if (widget.item.platformSlug == 'melolo') {
         await MeloloStreamProxy.instance.ensureRunning();
       }
-      if (widget.item.platformSlug == 'shorttv') {
+      if (url.startsWith('http://127.0.0.1:7056') ||
+          widget.item.platformSlug == 'shorttv' ||
+          widget.item.platformSlug == 'shortmax') {
         await ShortTvStreamProxy.instance.ensureRunning();
       }
 

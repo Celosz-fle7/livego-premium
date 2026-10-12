@@ -25,6 +25,9 @@ class ShortTvConfig {
   /// Timeout jaringan
   static const Duration timeout = Duration(seconds: 15);
 
+  /// Port proxy streaming mandiri lokal LiveGo untuk ShortTV
+  static const int localProxyPort = 7056;
+
   /// Kategori bawaan ShortTV
   static const List<String> categories = [
     'Semua',

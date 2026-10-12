@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
+import 'shorttv_config.dart';
 import 'shorttv_crypto.dart';
 
 /// Embedded Local Streaming Server & MPEG-TS Decryption Proxy untuk ShortTV di LiveGo.
@@ -21,7 +21,7 @@ class ShortTvStreamProxy {
 
   HttpServer? _server;
   int _port = 0;
-  final Completer<void> _initCompleter = Completer<void>();
+  Completer<void>? _initCompleter;
 
   // In-memory LRU cache untuk segmen TS terdekripsi (menghindari download ulang saat seek/loop)
   final Map<String, Uint8List> _tsCache = {};
@@ -35,22 +35,48 @@ class ShortTvStreamProxy {
 
   Future<void> _ensureServer() async {
     if (_server != null) return;
+    if (_initCompleter != null) return _initCompleter!.future;
+
+    final completer = Completer<void>();
+    _initCompleter = completer;
+
     try {
-      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      try {
+        _server = await HttpServer.bind(
+          InternetAddress.loopbackIPv4,
+          ShortTvConfig.localProxyPort,
+          shared: true,
+        );
+      } catch (_) {
+        // Fallback jika port default bentrok
+        _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      }
       _port = _server!.port;
       debugPrint('LIVEGO SHORTTV PROXY: running on 127.0.0.1:$_port');
       _server!.listen(_handleRequest, onError: (e) {
         debugPrint('LIVEGO SHORTTV PROXY error: $e');
       });
-      if (!_initCompleter.isCompleted) _initCompleter.complete();
+      completer.complete();
     } catch (e) {
       debugPrint('LIVEGO SHORTTV PROXY bind failed: $e');
-      if (!_initCompleter.isCompleted) _initCompleter.completeError(e);
+      completer.complete();
     }
+    return completer.future;
   }
 
   void _handleRequest(HttpRequest request) async {
     try {
+      // Izinkan cross-origin untuk native ExoPlayer & web player
+      request.response.headers.set('Access-Control-Allow-Origin', '*');
+      request.response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      request.response.headers.set('Access-Control-Allow-Headers', '*');
+
+      if (request.method == 'OPTIONS') {
+        request.response.statusCode = HttpStatus.ok;
+        await request.response.close();
+        return;
+      }
+
       final path = request.uri.path;
       if (path == '/m3u8') {
         final targetUrl = request.uri.queryParameters['url'];
@@ -149,6 +175,41 @@ class ShortTvStreamProxy {
 
         request.response.headers.contentType = ContentType('video', 'mp2t');
         request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+
+        // Dukung HTTP 206 Partial Content jika diminta oleh ExoPlayer (Media3)
+        final rangeHeader = request.headers.value(HttpHeaders.rangeHeader);
+        if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
+          final rangeParts = rangeHeader.substring(6).split('-');
+          int start = int.tryParse(rangeParts[0]) ?? 0;
+          int end = (rangeParts.length > 1 && rangeParts[1].isNotEmpty)
+              ? (int.tryParse(rangeParts[1]) ?? cleanData.length - 1)
+              : cleanData.length - 1;
+
+          if (start >= cleanData.length) {
+            request.response.statusCode = HttpStatus.requestedRangeNotSatisfiable;
+            request.response.headers.set(
+              HttpHeaders.contentRangeHeader,
+              'bytes */${cleanData.length}',
+            );
+            await request.response.close();
+            return;
+          }
+
+          end = end.clamp(start, cleanData.length - 1);
+          final slice = cleanData.sublist(start, end + 1);
+
+          request.response.statusCode = HttpStatus.partialContent;
+          request.response.headers.set(
+            HttpHeaders.contentRangeHeader,
+            'bytes $start-$end/${cleanData.length}',
+          );
+          request.response.headers.contentLength = slice.length;
+          request.response.add(slice);
+          await request.response.close();
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.ok;
         request.response.headers.contentLength = cleanData.length;
         request.response.add(cleanData);
         await request.response.close();

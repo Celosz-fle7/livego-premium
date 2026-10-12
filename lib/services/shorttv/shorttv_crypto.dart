@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 /// Utilitas Kriptografi ShortTV (RC4 & AES-128-CBC) untuk LiveGo Mandiri.
@@ -8,6 +9,54 @@ class ShortTvCrypto {
 
   /// IV tetap untuk segmen MPEG-TS ShortTV
   static const String tsAesIv = 'shortmax00000000';
+
+  /// Modulus N RSA resmi ShortTV (1024-bit)
+  static final BigInt _rsaModN = BigInt.parse(
+    'd037cc0912f75ca64964bb7bb0c4b6b3ebb3ad3f71a900ad801d463ff8f5af8a'
+    '33d52814910970fac22afe24a250ef3731eec127031522fc2333c119fe0662a8'
+    '988bd0a73214ccbb9a0318aee5133404090a59703129272c8fc9d8def95b0a13'
+    '9dc38202c6aad23b741931e0f1cf234b5ca9d79bb385041ff0e71962e735210d',
+    radix: 16,
+  );
+
+  /// Public Exponent e (65537)
+  static final BigInt _rsaExpE = BigInt.from(65537);
+
+  /// Enkripsi RSA PKCS#1 v1.5 dengan public key resmi ShortTV
+  /// Digunakan saat handshake/login (initLogin) untuk mengirimkan kunci RC4 sesi baru
+  static String rsaEncryptPkcs1(String text) {
+    final msgBytes = utf8.encode(text);
+    // Buffer blok 128-byte untuk RSA 1024-bit
+    final buffer = Uint8List(128);
+    buffer[0] = 0x00;
+    buffer[1] = 0x02; // PKCS#1 v1.5 block type 2 (encryption)
+    final psLen = 128 - 3 - msgBytes.length;
+    final rnd = math.Random();
+    for (int i = 0; i < psLen; i++) {
+      int b = rnd.nextInt(255) + 1; // Non-zero random padding bytes
+      buffer[2 + i] = b;
+    }
+    buffer[2 + psLen] = 0x00;
+    buffer.setRange(3 + psLen, 128, msgBytes);
+
+    // Konversi buffer byte ke BigInt
+    BigInt m = BigInt.zero;
+    for (int i = 0; i < 128; i++) {
+      m = (m << 8) | BigInt.from(buffer[i]);
+    }
+
+    // Modular exponentiation: C = M^e mod N
+    final c = m.modPow(_rsaExpE, _rsaModN);
+
+    // Konversi hasil ciphertext ke Uint8List (128 bytes)
+    final out = Uint8List(128);
+    var temp = c;
+    for (int i = 127; i >= 0; i--) {
+      out[i] = (temp & BigInt.from(0xff)).toInt();
+      temp >>= 8;
+    }
+    return base64.encode(out);
+  }
 
   /// RC4 KSA & PRGA stream cipher
   static Uint8List rc4Crypt(Uint8List data, String key) {
