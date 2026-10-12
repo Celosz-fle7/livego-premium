@@ -21,7 +21,7 @@ class TvBackManager {
   TvBackManager._();
   static final TvBackManager instance = TvBackManager._();
 
-  static const int backDebounceMs = 350;
+  static const int backDebounceMs = 280;
   int _lastBackHandledMs = 0;
 
   /// Prevents accidental double-back events caused by remote signal bouncing.

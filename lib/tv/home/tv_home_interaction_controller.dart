@@ -1198,9 +1198,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _handleBack() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastHomeBackMs < 260) return;
-    _lastHomeBackMs = now;
+    if (!TvBackManager.instance.canHandleBack()) return;
     _homeManualBack();
   }
 

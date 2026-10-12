@@ -11,6 +11,7 @@ import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
+import '../core/managers/tv_back_manager.dart';
 import '../models/tv_zone.dart';
 import '../player/tv_player_entry.dart';
 import '../navigation/tv_nav_index.dart';
