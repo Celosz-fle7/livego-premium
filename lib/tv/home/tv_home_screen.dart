@@ -121,7 +121,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
-    if (platforms.isEmpty) return 'shortmax';
+    if (platforms.isEmpty) return 'melolo';
     _selectedPlatformIndex = _selectedPlatformIndex.clamp(0, platforms.length - 1).toInt();
     return platforms[_selectedPlatformIndex];
   }

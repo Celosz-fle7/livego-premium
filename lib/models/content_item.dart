@@ -25,7 +25,7 @@ class ContentItem {
     required this.rating,
     required this.episodes,
     this.updated = false,
-    this.platformSlug = 'shortmax',
+    this.platformSlug = 'melolo',
     this.chapterId = '1',
     this.lang = 'id',
     this.tags = const [],

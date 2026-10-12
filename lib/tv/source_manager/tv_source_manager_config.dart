@@ -36,29 +36,9 @@ class TvSourceManagerConfig {
       'Source Beranda TV. Pilih platform aktif. Kategori diatur dari shortcut Kategori Home.';
 
   static const Map<String, int> sourceOrder = <String, int>{
-    'melolo': 0,
-    'dramabox': 1,
-    'moviebox': 2,
-    'mydrama': 3,
-    'dramanova': 4,
-    'shorten': 5,
-    'dramahub': 6,
-    'flickshort': 7,
-    'loklok': 8,
-    'radreel': 9,
-    'reelflix': 10,
-    'shortflix': 11,
-    'viu': 12,
-    'dotdrama': 13,
-    'dramarush': 14,
-    'layarkaca': 15,
-    'netshort': 16,
-    'shortreels': 17,
-    'bittv': 18,
-    'fizzo': 19,
-    'shortmax': 20,
-    'freereels': 21,
-    'dramawave': 22,
+    'freereels': 0,
+    'cinemaid': 1,
+    'melolo': 2,
   };
 
   static int sourcePriority(String slug) {

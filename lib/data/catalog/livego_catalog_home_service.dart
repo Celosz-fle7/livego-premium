@@ -55,12 +55,19 @@ class LiveGoCatalogHomeService {
         return cached;
       }
 
-      final rows = await LiveGoApiManager.fetchItems(
-        platform: candidate,
-        operation: '$operation:fallback:$candidate',
-        timeout: ApiTimeoutPolicy.home,
-        request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
-      );
+      final candidateDrama = DramaSourceRegistry.forSlug(candidate);
+      final List<ContentItem> rows;
+      if (candidateDrama != null) {
+        final cat = candidateDrama.categories.isNotEmpty ? candidateDrama.categories.first : 'Home';
+        rows = await candidateDrama.homeByCategory(cat);
+      } else {
+        rows = await LiveGoApiManager.fetchItems(
+          platform: candidate,
+          operation: '$operation:fallback:$candidate',
+          timeout: ApiTimeoutPolicy.home,
+          request: () => LiveGoApiGateway.home(platform: candidate, lang: lang),
+        );
+      }
       if (rows.isNotEmpty) {
         print('LIVEGO API FALLBACK $operation $preferredPlatform -> $candidate network=${rows.length}');
         await LiveGoContentCache.writeItems(

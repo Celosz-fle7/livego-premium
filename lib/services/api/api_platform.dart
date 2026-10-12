@@ -30,7 +30,7 @@ class LiveGoApiPlatform {
     required this.supportedLangs,
     required this.categories,
     this.endpointSlug = '',
-    this.backend = LiveGoApiBackend.nobuzero,
+    this.backend = LiveGoApiBackend.direct,
     this.enabledByDefault = false,
     this.supportsSubtitle = false,
     this.streamFromAllEpisodes = false,
@@ -39,8 +39,8 @@ class LiveGoApiPlatform {
   String get apiSlug => endpointSlug.isEmpty ? slug : endpointSlug;
   bool get isEncrypted => videoType == LiveGoVideoType.encrypted;
   bool get isHls => videoType == LiveGoVideoType.hls;
-  bool get isDobda => backend == LiveGoApiBackend.nobuzero;
-  bool get isNobuzero => backend == LiveGoApiBackend.nobuzero;
+  bool get isDobda => false;
+  bool get isNobuzero => false;
 }
 
 class LiveGoApiPlatforms {
@@ -49,7 +49,7 @@ class LiveGoApiPlatforms {
       slug: 'freereels',
       endpointSlug: 'freereels',
       name: 'FreeReels',
-      backend: LiveGoApiBackend.nobuzero,
+      backend: LiveGoApiBackend.direct,
       defaultLang: 'id',
       searchParam: 'q',
       videoType: LiveGoVideoType.hls,
@@ -63,7 +63,7 @@ class LiveGoApiPlatforms {
       slug: 'melolo',
       endpointSlug: 'melolo',
       name: 'Melolo',
-      backend: LiveGoApiBackend.nobuzero,
+      backend: LiveGoApiBackend.direct,
       defaultLang: 'id',
       searchParam: 'query',
       videoType: LiveGoVideoType.mp4,
@@ -84,6 +84,33 @@ class LiveGoApiPlatforms {
         'Teen Fic',
         'Modern Love',
         'CEO',
+      ],
+    ),
+    LiveGoApiPlatform(
+      slug: 'cinemaid',
+      endpointSlug: 'cinemaid',
+      name: 'CinemaID',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'keyword',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Netflix',
+        'Disney',
+        'Prime Video',
+        'Apple TV+',
+        'Crunchyroll',
+        'MAX',
+        'Hulu',
+        'Paramount+',
+        'Trending Now',
+        'Popular Movies',
+        'Popular TV Shows',
+        'Popular Anime',
       ],
     ),
   ];

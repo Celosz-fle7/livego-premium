@@ -1,9 +1,9 @@
 enum LiveGoApiBackend {
-  nobuzero,
+  direct,
 }
 
 extension LiveGoApiBackendX on LiveGoApiBackend {
-  String get label => 'NOBUZERO';
+  String get label => 'DIRECT';
 
-  String get key => 'nobuzero';
+  String get key => 'direct';
 }

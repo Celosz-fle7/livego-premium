@@ -519,17 +519,11 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
 
   String _sourceDescription(String slug) {
     final map = <String, String>{
-      'shortmax': 'Anichin • MP4 multi-quality. Bahasa ID/EN.',
-      'netshort': 'Anichin • Direct CDN + subtitle VTT. Bahasa default IN.',
-      'pinedrama': 'Anichin • Direct MP4. Kategori genre dari API.',
-      'dramabox': 'Anichin • HLS signed + subtitle. Ada Terbaru, VIP, Dub Indo.',
-      'flickreels': 'Anichin • HLS signed. Banyak bahasa termasuk ID.',
-      'melolo': 'Anichin • Catalog jalan. Video CENC belum dipasang native.',
+      'freereels': 'FreeReels • Direct HLS. Bahasa default ID.',
+      'cinemaid': 'CinemaID • Movies & TV Series. Multi-kategori OTT & Ranking.',
+      'melolo': 'Melolo • Drama HLS/MP4. Multi-resolusi (240p-720p).',
     };
-    if (LiveGoCatalog.isDobdaPlatform(slug)) {
-      return 'Nobuzero • Beranda/Jelajah/Search/Detail/Video HMAC. Subtitle ikut response video.';
-    }
-    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke API.';
+    return map[slug] ?? 'Source LiveGo siap dikoneksikan ke player.';
   }
 }
 

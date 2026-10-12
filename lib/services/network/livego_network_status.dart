@@ -21,11 +21,11 @@ class LiveGoNetworkStatus {
     _lastCheckedAt = now;
 
     try {
-      final result = await InternetAddress.lookup('nobuzero.my.id').timeout(timeout);
+      final result = await InternetAddress.lookup('google.com').timeout(timeout);
       _lastOnline = result.isNotEmpty && result.first.rawAddress.isNotEmpty;
     } catch (_) {
       try {
-        final result = await InternetAddress.lookup('google.com').timeout(timeout);
+        final result = await InternetAddress.lookup('1.1.1.1').timeout(timeout);
         _lastOnline = result.isNotEmpty && result.first.rawAddress.isNotEmpty;
       } catch (_) {
         _lastOnline = false;

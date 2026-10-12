@@ -230,8 +230,9 @@ class _TvFirstSourceSetupState extends State<TvFirstSourceSetup> {
 
   String _description(String slug) {
     final config = LiveGoApiPlatforms.bySlug(slug);
-    if (config.isDobda) return 'Nobuzero source. Bisa dipakai, tapi jangan aktifkan terlalu banyak.';
-    if (config.isEncrypted) return 'Eksperimental. DRM/audio belum final.';
+    if (slug == 'cinemaid') return 'Movies & TV Series. Multi-kategori OTT & Ranking.';
+    if (slug == 'freereels') return 'Direct HLS source. Sangat responsif untuk TV.';
+    if (slug == 'melolo') return 'Drama source. Pilihan resolusi lengkap.';
     if (config.isHls) return 'HLS source. Cocok untuk TV player.';
     return 'Direct source. Ringan untuk TV.';
   }
