@@ -18,6 +18,15 @@ class LiveGoCatalogDetailPlayerService {
       if (resolvedCached.id.isNotEmpty) return resolvedCached;
     }
 
+    // Sumber drama eksternal (multi-APK seperti melolo, cinemaid, freereels)
+    // tidak memiliki endpoint detail terpisah di gateway nobuzero. Langsung
+    // gunakan item tanpa menembak backend gateway yang menyebabkan error SSL.
+    final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
+    if (dramaSource != null) {
+      await LiveGoContentCache.writeDetail(item);
+      return item;
+    }
+
     final detail = await LiveGoApiManager.fetchDetail(
       item: item,
       request: () => LiveGoApiProviderRegistry.providerFor(item.platformSlug).detail(item),
