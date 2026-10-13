@@ -186,9 +186,12 @@ class CinemaIdSource implements DramaSource {
       }
 
       // 1. Jalur Utama: topic_id server (hardcoded atau hasil discovery)
+      // Paginasi penuh ala FreeReels agar konten per tab maksimal dan variatif.
       if (topicId != null && topicId.isNotEmpty) {
-        final vods = await _client.topicVods(topicId, category: category).timeout(
-              const Duration(seconds: 15),
+        final vods = await _client
+            .allVodsFromTopic(topicId, category: category, maxPages: 10)
+            .timeout(
+              const Duration(seconds: 60),
               onTimeout: () => const <ContentItem>[],
             );
         if (vods.isNotEmpty) {
@@ -199,7 +202,7 @@ class CinemaIdSource implements DramaSource {
             vods.where((v) => seen.add(v.id)).toList(),
             catKey,
           );
-          return [...seedItems, ...otherVods];
+          return [...otherVods, ...seedItems];
         }
       }
 
@@ -304,7 +307,7 @@ class CinemaIdSource implements DramaSource {
           // agar selalu ada konten yang siap putar langsung di home feed
           final seedItems = _seedItems(category, seen: seen);
           final verified = _verifyPlatform(out, catKey);
-          return [...seedItems, ...verified];
+          return [...verified, ...seedItems];
         }
       }
     } catch (e, st) {

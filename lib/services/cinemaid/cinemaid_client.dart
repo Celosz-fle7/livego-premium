@@ -239,7 +239,12 @@ class CinemaIdClient {
   }
 
   /// GET /api/topic/vod_list?topic_id=.. -> isi satu topik.
-  Future<List<ContentItem>> topicVods(String topicId, {String category = ''}) async {    final res = await _getJson('/topic/vod_list', {'topic_id': topicId});
+  /// Dukung paginasi via [page] (0-based).
+  Future<List<ContentItem>> topicVods(String topicId,
+      {String category = '', int page = 0}) async {
+    final params = <String, String>{'topic_id': topicId};
+    if (page > 0) params['page'] = '$page';
+    final res = await _getJson('/topic/vod_list', params);
     final data = res['result'] ?? res['data'];
     final items = data is Map
         ? _asMaps(data['vod_list'] ?? data['list'] ?? data['items'] ?? data['videoList'])
@@ -248,6 +253,36 @@ class CinemaIdClient {
         .map((m) => _toContentItem(m, category))
         .where((c) => c.id.isNotEmpty)
         .toList();
+  }
+
+  /// Ambil semua halaman vod_list satu topik (ala FreeReels: paginasi penuh
+  /// agar konten per tab maksimal dan tidak itu-itu saja).
+  Future<List<ContentItem>> allVodsFromTopic(String topicId,
+      {String category = '', int maxPages = 10}) async {
+    final seen = <String>{};
+    final all = <ContentItem>[];
+    for (var page = 0; page < maxPages; page++) {
+      List<ContentItem> batch;
+      try {
+        batch = await topicVods(topicId, category: category, page: page).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => const <ContentItem>[],
+        );
+      } catch (_) {
+        break;
+      }
+      if (batch.isEmpty) break;
+      var added = 0;
+      for (final item in batch) {
+        if (seen.add(item.id)) {
+          all.add(item);
+          added++;
+        }
+      }
+      if (added == 0) break;
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    return all;
   }
 
   /// GET /api/type/get_list -> daftar tipe/kategori.
