@@ -287,33 +287,57 @@ class ShortTvClient {
   }
 
   /// Ambil feed konten berdasarkan kategori
-  Future<List<ContentItem>> feedForCategory(String category) async {
-    final mapping = ShortTvConfig.categoryMapping[category] ??
-        ShortTvConfig.categoryMapping['Semua']!;
+  /// Satu halaman feed kategori (pagination ikut server).
+  /// Lempar error kalau request gagal (pemanggil membedakan error vs
+  /// halaman kosong). hasMore = server mengembalikan satu halaman penuh.
+  Future<({List<ContentItem> items, bool hasMore})> feedPage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final items = await _fetchFeed(category, page: page, pageSize: pageSize);
+    return (items: items, hasMore: items.length >= pageSize);
+  }
 
+  Future<List<ContentItem>> feedForCategory(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
     try {
-      final res = await _postEncrypted(
-        'app/search/searchRankingV2',
-        {
-          'pageNum': 1,
-          'pageSize': 30,
-          'experimentKey': '',
-          'experimentParam': '',
-        },
-        lang: mapping.lang,
-        locale: mapping.locale,
-        country: mapping.country,
-      );
-
-      final data = res['data'] as Map?;
-      final topList = data?['topResponseList'] as List? ?? [];
-      final hotList = data?['hotResponseList'] as List? ?? [];
-      final allRaw = [...topList, ...hotList];
-
-      return _extractItems(allRaw, category);
+      return await _fetchFeed(category, page: page, pageSize: pageSize);
     } catch (_) {
       return const [];
     }
+  }
+
+  Future<List<ContentItem>> _fetchFeed(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final mapping = ShortTvConfig.categoryMapping[category] ??
+        ShortTvConfig.categoryMapping['Semua']!;
+
+    final res = await _postEncrypted(
+      'app/search/searchRankingV2',
+      {
+        'pageNum': page,
+        'pageSize': pageSize,
+        'experimentKey': '',
+        'experimentParam': '',
+      },
+      lang: mapping.lang,
+      locale: mapping.locale,
+      country: mapping.country,
+    );
+
+    final data = res['data'] as Map?;
+    final topList = data?['topResponseList'] as List? ?? [];
+    final hotList = data?['hotResponseList'] as List? ?? [];
+    final allRaw = [...topList, ...hotList];
+
+    return _extractItems(allRaw, category);
   }
 
   /// Cari drama berdasarkan keyword

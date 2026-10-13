@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/livego_settings.dart';
+import '../../../services/drama_source.dart';
 import 'tv_home_content_state.dart';
 import 'tv_home_repository.dart';
 
@@ -30,6 +32,10 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   String? get requestedKey => _requestedKey;
   String? get displayedKey => _displayedKey;
   String get loadingMode => _loadingMode;
+
+  /// Ukuran request satu halaman TV: 1 baris (jumlah kolom grid).
+  /// Server boleh mengembalikan lebih/sedikit — diterima apa adanya.
+  int get _pageSize => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
 
   Future<void> load({
     required String platform,
@@ -62,22 +68,39 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
         refreshing: true,
         hasError: false,
         offline: false,
+        page: 1,
+        hasMore: true,
+        loadingMore: false,
       );
     } else if (clearPrevious) {
       _loadingMode = 'firstLoad';
       state = const TvHomeContentState(loading: true);
     } else if (state.items.isEmpty) {
       _loadingMode = 'firstLoad';
-      state = state.copyWith(loading: true, refreshing: false, hasError: false, offline: false);
+      state = state.copyWith(
+        loading: true,
+        refreshing: false,
+        hasError: false,
+        offline: false,
+        page: 1,
+        hasMore: true,
+        loadingMore: false,
+      );
     } else {
       _loadingMode = 'refreshingOldData';
-      state = state.copyWith(refreshing: true, hasError: false, offline: false);
+      state = state.copyWith(
+        refreshing: true,
+        hasError: false,
+        offline: false,
+        loadingMore: false,
+      );
     }
 
     try {
       final cached = await _repository.loadCached(
         platform: platform,
         selectedCategory: selectedCategory,
+        pageSize: _pageSize,
       );
       if (!_active(token, requestKey)) return;
       if (cached != null && cached.items.isNotEmpty) {
@@ -95,6 +118,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       final network = await _repository.loadNetwork(
         platform: platform,
         selectedCategory: selectedCategory,
+        pageSize: _pageSize,
       );
       if (!_active(token, requestKey)) return;
       if (network != null && network.items.isNotEmpty) {
@@ -112,6 +136,7 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       final fallback = await _repository.loadFallbackCache(
         platform: platform,
         selectedCategory: selectedCategory,
+        pageSize: _pageSize,
       );
       if (!_active(token, requestKey)) return;
       if (fallback != null && fallback.items.isNotEmpty) {
@@ -134,6 +159,46 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
       selectedCategory: _lastCategory,
       clearPrevious: false,
     );
+  }
+
+  /// Append halaman berikutnya (dipicu scroll masuk zona lookahead).
+  /// Guard: tidak ada request ganda, berhenti kalau server bilang habis.
+  /// Gagal -> loadingMore dimatikan, hasMore dipertahankan supaya trigger
+  /// berikutnya bisa retry. Fokus tidak terganggu: item lama tidak
+  /// berubah posisi (merge append + key stabil di grid).
+  Future<void> loadMore() async {
+    if (state.loading || state.loadingMore || !state.hasMore) return;
+    final platform = _lastPlatform;
+    final category = _lastCategory;
+    final nextPage = state.page + 1;
+    state = state.copyWith(loadingMore: true);
+    try {
+      final res = await _repository.loadNetworkPage(
+        platform: platform,
+        category: category,
+        page: nextPage,
+        pageSize: _pageSize,
+      );
+      if (!mounted) return;
+      if (platform != _lastPlatform || category != _lastCategory) return;
+      if (res == null) {
+        state = state.copyWith(loadingMore: false);
+        return;
+      }
+      final merged = mergePagedItems(state.items, res.items);
+      _repository.markOnline();
+      state = state.copyWith(
+        items: merged,
+        page: nextPage,
+        hasMore: res.hasMore,
+        loadingMore: false,
+        hasError: false,
+      );
+      if (_requestedKey != null) _remember(_requestedKey!, state);
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(loadingMore: false);
+    }
   }
 
   bool _active(int token, String requestKey) {
@@ -188,7 +253,11 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
     int token,
   ) async {
     try {
-      final fresh = await _repository.refresh(platform, selectedCategory);
+      final fresh = await _repository.refresh(
+        platform,
+        selectedCategory,
+        pageSize: _pageSize,
+      );
       if (!_active(token, requestKey)) return;
 
       if (fresh == null || fresh.items.isEmpty) {

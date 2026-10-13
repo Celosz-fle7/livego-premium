@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/livego_local_store.dart';
 import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
@@ -23,12 +24,26 @@ class MobileHomeScreen extends StatefulWidget {
 class _MobileHomeScreenState extends State<MobileHomeScreen> {
   int source = 0;
   int category = 0;
-  late Future<_HomeState> _future;
 
-  /// Generasi load terakhir. Background refresh hanya boleh mengganti UI
-  /// kalau generasinya masih sama — pindah kategori/platform bikin load
-  /// baru dan membatalkan refresh basi.
+  /// State eksplisit (bukan FutureBuilder) supaya halaman berikutnya bisa
+  /// di-append tanpa reload ulang: konten bertahap, ikut server.
+  List<ContentItem> _items = const [];
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _loadMoreError = false;
+  bool _hasMore = true;
+  int _page = 1;
+
+  final ScrollController _scroll = ScrollController();
+
+  /// Generasi load terakhir. Load baru (pindah provider/kategori/refresh)
+  /// membatalkan hasil fetch basi dari load sebelumnya.
   int _loadGen = 0;
+
+  /// Ukuran request satu halaman: 3 baris (2 baris terlihat + 1 baris
+  /// lookahead). Grid 3 kolom -> 9 item, persis contoh alur bertahap.
+  /// Server boleh mengembalikan lebih/sedikit — diterima apa adanya.
+  int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 3;
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms.take(6).toList();
@@ -40,242 +55,295 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    // Buka kategori terakhir yang tersimpan untuk provider ini (bukan
+    // selalu tab pertama). Sama seperti TV (tvLastHomeCategories).
+    category = LiveGoSettings.tvLastHomeCategories[_platform] ?? 0;
+    _scroll.addListener(_onScroll);
+    _loadInitial();
   }
 
-  Future<_HomeState> _load() async {
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Trigger halaman berikutnya saat scroll masuk zona lookahead
+  /// (~1 baris sebelum ujung). Tab lain hibernasi: tidak ada fetch
+  /// untuk provider/kategori yang tidak aktif.
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.pixels >= pos.maxScrollExtent - 300) {
+      unawaited(_loadMore());
+    }
+  }
+
+  void _rememberCategory() {
+    LiveGoSettings.tvLastHomeCategories[_platform] = category;
+    unawaited(LiveGoLocalStore.saveSettings());
+  }
+
+  Future<({List<ContentItem> items, bool hasMore})> _fetchPage(
+    String platform,
+    String categoryLabel,
+    int page,
+  ) async {
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      return dramaSource
+          .homePage(categoryLabel, page: page, pageSize: _pageSize)
+          .timeout(const Duration(seconds: 15));
+    }
+    final items = await LiveGoCatalog.homeByCategory(
+      platform: platform,
+      category: categoryLabel,
+    ).timeout(const Duration(seconds: 14));
+    return (items: items, hasMore: false);
+  }
+
+  /// Load awal / pindah provider / pindah kategori / pull-to-refresh.
+  /// Stale-while-revalidate: cache tampil instan, lalu halaman 1 fresh
+  /// dari server menggantikannya. Hanya kategori aktif yang di-load.
+  Future<void> _loadInitial({bool freshOnly = false}) async {
     final gen = ++_loadGen;
     final platform = _platform;
 
-    try {
-      // STREAMING: Jangan blokir UI menunggu kategori network.
-      // Pakai kategori default langsung, fetch network di background.
-      final defaultCategories = LiveGoCatalog.categoriesFor(platform);
-      if (category >= defaultCategories.length) category = 0;
-      final selectedCategory = defaultCategories.isEmpty ? 'Populer' : defaultCategories[category];
+    final defaultCategories = LiveGoCatalog.categoriesFor(platform);
+    if (category >= defaultCategories.length) category = 0;
+    final selectedCategory =
+        defaultCategories.isEmpty ? 'Populer' : defaultCategories[category];
 
-      // Fetch kategori fresh di background, update UI kalau ada perubahan
-      unawaited(
-        LiveGoCatalog.fetchCategoriesFor(platform)
-            .timeout(const Duration(seconds: 6), onTimeout: () => defaultCategories)
-            .then((fresh) {
-          if (fresh.isNotEmpty && fresh.length != defaultCategories.length && mounted) {
-            setState(() {
-              // Kategori berubah, reload dengan kategori baru
-              _future = _load();
-            });
-          }
-        }),
-      );
+    _page = 1;
+    _hasMore = true;
+    _loadingMore = false;
+    _loadMoreError = false;
 
-      final baseCategories = defaultCategories;
-      final List<ContentItem> items;
-      final dramaSource = DramaSourceRegistry.forSlug(platform);
-      if (dramaSource != null) {
-        // Stale-while-revalidate (samakan TV): cache tampil langsung biar
-        // instan, tapi server TETAP ditanya di background tiap pindah
-        // kategori. Cache bukan sumber kebenaran — hanya placeholder +
-        // fallback kalau network gagal.
+    // Fetch kategori fresh di background, reload kalau ada perubahan.
+    unawaited(
+      LiveGoCatalog.fetchCategoriesFor(platform)
+          .timeout(const Duration(seconds: 6), onTimeout: () => defaultCategories)
+          .then((fresh) {
+        if (fresh.isNotEmpty &&
+            fresh.length != defaultCategories.length &&
+            mounted &&
+            _platform == platform) {
+          _loadInitial();
+        }
+      }),
+    );
+
+    if (!freshOnly) {
+      try {
         final cached = await LiveGoContentCache.readItems(
           platform: platform,
           endpoint: 'home',
           params: {'category': selectedCategory},
         ).timeout(const Duration(seconds: 2), onTimeout: () => null);
-        if (cached != null && cached.isNotEmpty && !cached.any((i) => i.id.startsWith('cinemaid_'))) {
-          unawaited(_refreshHomeInBackground(
-            platform: platform,
-            categoryLabel: selectedCategory,
-            categoryIndex: category,
-            categories: baseCategories,
-            cached: cached,
-            gen: gen,
-          ));
-          items = cached;
-        } else {
-          final fresh = await dramaSource.homeByCategory(selectedCategory)
-              .timeout(const Duration(seconds: 15), onTimeout: () => <ContentItem>[]);
-          items = fresh.isNotEmpty ? fresh : (cached ?? <ContentItem>[]);
-          if (fresh.isNotEmpty && !fresh.any((i) => i.id.startsWith('cinemaid_'))) {
-            unawaited(LiveGoContentCache.writeItems(
-              platform: platform,
-              endpoint: 'home',
-              params: {'category': selectedCategory},
-              items: fresh,
-            ));
+        if (cached != null &&
+            cached.isNotEmpty &&
+            !cached.any((i) => i.id.startsWith('cinemaid_'))) {
+          if (gen == _loadGen && mounted) {
+            setState(() {
+              _items = cached;
+              _loading = false;
+            });
           }
         }
-      } else {
-        items = await LiveGoCatalog.homeByCategory(platform: platform, category: selectedCategory)
-            .timeout(const Duration(seconds: 14), onTimeout: () => <ContentItem>[]);
+      } catch (_) {}
+    } else if (gen == _loadGen && mounted) {
+      setState(() {
+        _items = const [];
+        _loading = true;
+      });
+    }
+
+    try {
+      final res = await _fetchPage(platform, selectedCategory, 1);
+      if (gen != _loadGen || !mounted) return;
+      setState(() {
+        _items = res.items;
+        _hasMore = res.hasMore;
+        _loading = false;
+      });
+      if (res.items.isNotEmpty &&
+          !res.items.any((i) => i.id.startsWith('cinemaid_'))) {
+        unawaited(LiveGoContentCache.writeItems(
+          platform: platform,
+          endpoint: 'home',
+          params: {'category': selectedCategory},
+          items: res.items,
+        ));
       }
-
-      final categories = baseCategories;
-      final fallbackBanners = items.take(5).toList();
-
-      if (items.isEmpty) {
-        return _HomeState(
-          banners: const <ContentItem>[],
-          items: const <ContentItem>[],
-          categories: categories,
-        );
-      }
-
-      // Banner dibuat dari item Home supaya Home HP tidak blank kalau endpoint banner lambat/error.
-      return _HomeState(
-        banners: fallbackBanners,
-        items: items,
-        categories: categories,
-      );
     } catch (e) {
+      if (gen != _loadGen || !mounted) return;
       print('LIVEGO HOME ERROR: $e');
-      return _HomeState(
-        banners: const <ContentItem>[],
-        items: const <ContentItem>[],
-        categories: LiveGoCatalog.categoriesFor(platform),
-      );
+      // Gagal: kalau cache tampil, biarkan; kalau kosong, empty state.
+      setState(() => _loading = false);
     }
   }
 
-  /// Fetch server di background setelah cache ditampilkan. Kalau data fresh
-  /// datang dan user masih di platform/kategori yang sama, ganti UI.
-  /// Network gagal -> cache tetap tampil, tidak ada error palsu.
-  Future<void> _refreshHomeInBackground({
-    required String platform,
-    required String categoryLabel,
-    required int categoryIndex,
-    required List<String> categories,
-    required List<ContentItem> cached,
-    required int gen,
-  }) async {
-    final dramaSource = DramaSourceRegistry.forSlug(platform);
-    if (dramaSource == null) return;
+  /// Append halaman berikutnya. Guard: tidak ada request ganda,
+  /// berhenti kalau server bilang habis. Error -> footer retry,
+  /// hasMore tetap true supaya bisa dicoba lagi.
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore || _items.isEmpty) return;
+    final gen = _loadGen;
+    final platform = _platform;
+    final categories = LiveGoCatalog.categoriesFor(platform);
+    if (category >= categories.length) return;
+    final selectedCategory = categories[category];
+    if (DramaSourceRegistry.forSlug(platform) == null) return;
+
+    setState(() => _loadingMore = true);
     try {
-      final fresh = await dramaSource
-          .homeByCategory(categoryLabel)
-          .timeout(const Duration(seconds: 15), onTimeout: () => <ContentItem>[]);
-      if (!mounted || fresh.isEmpty) return;
-      if (gen != _loadGen) return; // Sudah ada load baru (pindah kategori/platform).
-      if (_platform != platform || category != categoryIndex) return;
-      unawaited(LiveGoContentCache.writeItems(
-        platform: platform,
-        endpoint: 'home',
-        params: {'category': categoryLabel},
-        items: fresh,
-      ));
-      if (_sameIds(cached, fresh)) return; // Isi sama, tidak perlu rebuild.
+      final res = await _fetchPage(platform, selectedCategory, _page + 1);
+      if (!mounted || gen != _loadGen || _platform != platform) return;
+      final merged = mergePagedItems(_items, res.items);
+      setState(() {
+        _items = merged;
+        _page += 1;
+        _hasMore = res.hasMore;
+        _loadingMore = false;
+        _loadMoreError = false;
+      });
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _future = Future.value(_HomeState(
-          banners: fresh.take(5).toList(),
-          items: fresh,
-          categories: categories,
-        ));
+        _loadingMore = false;
+        _loadMoreError = true;
       });
-    } catch (_) {}
-  }
-
-  bool _sameIds(List<ContentItem> a, List<ContentItem> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id) return false;
     }
-    return true;
   }
-
-  void _reload() => setState(() => _future = _load());
 
   Future<void> _open(ContentItem item) async {
     await MobilePlayerEntry.open(context, item: item);
   }
 
-  List<ContentItem> _filtered(List<ContentItem> items, List<String> categories) {
-    return items;
+  @override
+  Widget build(BuildContext context) {
+    final categories = LiveGoCatalog.categoriesFor(_platform);
+    if (category >= categories.length) category = 0;
+    final items = _items;
+    final platforms = LiveGoCatalog.platforms.take(6).toList();
+    final labels = LiveGoCatalog.labelsFor(platforms);
+    final grid = LiveGoSettings.mobileHomeGrid.clamp(2, 6);
+    final posterHeight = grid <= 3 ? 250.0 : (grid == 4 ? 212.0 : 184.0);
+    final loading = _loading && items.isEmpty;
+
+    return RefreshIndicator(
+      onRefresh: () => _loadInitial(freshOnly: true),
+      child: ListView(
+        controller: _scroll,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
+        children: [
+          _HeroCarousel(
+            items: items.take(5).toList(),
+            loading: loading,
+            onTap: _open,
+          ),
+          const SizedBox(height: 12),
+          _OneLineSelector(
+            title: 'Platform',
+            items: labels,
+            selected: source,
+            onSelected: (v) {
+              setState(() {
+                source = v;
+                // Provider baru -> buka kategori terakhirnya yang tersimpan.
+                category = LiveGoSettings.tvLastHomeCategories[_platform] ?? 0;
+              });
+              _loadInitial();
+            },
+          ),
+          const SizedBox(height: 9),
+          _OneLineSelector(
+            title: 'Kategori',
+            items: categories,
+            selected: category,
+            onSelected: (v) {
+              setState(() => category = v);
+              _rememberCategory();
+              _loadInitial();
+            },
+          ),
+          const SizedBox(height: 16),
+          if (loading)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: grid * 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: grid,
+                mainAxisExtent: posterHeight,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 14,
+              ),
+              itemBuilder: (_, __) => const _Skeleton(radius: 16),
+            )
+          else if (items.isEmpty)
+            const _EmptyState()
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: items.length + (_hasMore ? 1 : 0),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: grid,
+                mainAxisExtent: posterHeight,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 14,
+              ),
+              itemBuilder: (_, i) {
+                if (i >= items.length) {
+                  return _LoadMoreFooter(
+                    loading: _loadingMore,
+                    error: _loadMoreError,
+                    onRetry: _loadMore,
+                  );
+                }
+                return PosterCard(item: items[i], onTap: () => _open(items[i]));
+              },
+            ),
+        ],
+      ),
+    );
   }
+}
+
+/// Sel terakhir grid: spinner saat halaman berikutnya di-load, tombol
+/// retry kalau gagal, ruang kosong kalau belum loading. Tidak pernah
+/// menumpuk — hanya satu sel ini yang menandakan "masih ada / lagi muat".
+class _LoadMoreFooter extends StatelessWidget {
+  final bool loading;
+  final bool error;
+  final VoidCallback onRetry;
+  const _LoadMoreFooter({
+    required this.loading,
+    required this.error,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_HomeState>(
-      future: _future,
-      builder: (context, snap) {
-        final loading = snap.connectionState != ConnectionState.done;
-        final state = snap.data;
-        final categories = state?.categories ?? LiveGoCatalog.categoriesFor(_platform);
-        if (category >= categories.length) category = 0;
-        final items = _filtered(state?.items ?? const <ContentItem>[], categories);
-        final platforms = LiveGoCatalog.platforms.take(6).toList();
-        final labels = LiveGoCatalog.labelsFor(platforms);
-        final grid = LiveGoSettings.mobileHomeGrid.clamp(2, 6);
-        final posterHeight = grid <= 3 ? 250.0 : (grid == 4 ? 212.0 : 184.0);
-
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
-            children: [
-              _HeroCarousel(
-                items: state?.banners ?? const <ContentItem>[],
-                loading: loading,
-                onTap: _open,
-              ),
-              const SizedBox(height: 12),
-              _OneLineSelector(
-                title: 'Platform',
-                items: labels,
-                selected: source,
-                onSelected: (v) {
-                  setState(() {
-                    source = v;
-                    category = 0;
-                    _future = _load();
-                  });
-                },
-              ),
-              const SizedBox(height: 9),
-              _OneLineSelector(
-                title: 'Kategori',
-                items: categories,
-                selected: category,
-                onSelected: (v) {
-                  setState(() {
-                    category = v;
-                    _future = _load();
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              if (loading)
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: grid * 2,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: grid,
-                    mainAxisExtent: posterHeight,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 14,
-                  ),
-                  itemBuilder: (_, __) => const _Skeleton(radius: 16),
-                )
-              else if (items.isEmpty)
-                const _EmptyState()
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: grid,
-                    mainAxisExtent: posterHeight,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 14,
-                  ),
-                  itemBuilder: (_, i) => PosterCard(item: items[i], onTap: () => _open(items[i])),
-                ),
-            ],
-          ),
-        );
-      },
-    );
+    if (error) {
+      return Center(
+        child: TextButton(
+          onPressed: onRetry,
+          child: const Text('Muat lagi', style: TextStyle(fontWeight: FontWeight.w900)),
+        ),
+      );
+    }
+    if (loading) {
+      return const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      );
+    }
+    return const SizedBox(height: 40);
   }
 }
 
@@ -485,13 +553,6 @@ class _EmptyState extends StatelessWidget {
       child: const Text('Belum ada konten. Coba ganti platform/kategori atau ping source di Pengaturan.', style: TextStyle(color: AppTheme.textSoft, height: 1.4)),
     );
   }
-}
-
-class _HomeState {
-  final List<ContentItem> banners;
-  final List<ContentItem> items;
-  final List<String> categories;
-  const _HomeState({required this.banners, required this.items, required this.categories});
 }
 
 class _Skeleton extends StatelessWidget {

@@ -308,6 +308,24 @@ class MeloloClient {
     return allItems;
   }
 
+  /// Satu halaman feed kategori (pagination ikut server).
+  /// offset = (page-1)*pageSize, limit = pageSize. Lempar error kalau
+  /// request gagal (pemanggil membedakan error vs halaman kosong).
+  Future<({List<ContentItem> items, bool hasMore})> feedPage(
+    String category, {
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final queryTerm = MeloloConfig.categoryQueryMap[category] ?? category;
+    final res = await _getJson(MeloloConfig.searchEndpoint, {
+      'query': queryTerm,
+      'offset': '${(page - 1) * pageSize}',
+      'limit': '$pageSize',
+    });
+    final batch = _extractBooks(res, category);
+    return (items: batch, hasMore: batch.length >= pageSize);
+  }
+
   /// Pencarian konten Melolo
   Future<List<ContentItem>> search(String keyword) async {
     if (keyword.trim().isEmpty) return const [];

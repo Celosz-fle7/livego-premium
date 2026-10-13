@@ -43,6 +43,21 @@ abstract class DramaSource {
   /// berikutnya memakai identitas baru (auto-register / handshake ulang).
   Future<void> signOut() async {}
 
+  /// Satu halaman konten kategori (pagination bertahap, ikut server).
+  /// Default: homeByCategory sekaligus (provider lama / tanpa paginasi).
+  /// [page] 1-based. [pageSize] hanya permintaan — server boleh
+  /// mengembalikan jumlah berapapun; pemanggil jangan mengasumsikan
+  /// pageSize. Return: (items, hasMore). hasMore=false kalau server
+  /// bilang habis (halaman kosong / lebih sedikit dari yang diminta).
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final items = await homeByCategory(category);
+    return (items: items, hasMore: false);
+  }
+
   /// Info ekstra satu episode (subtitle, kualitas, status unlock).
   /// Default: tidak ada (return null).
   Future<DramaEpisodeExtras?> episodeExtras(
@@ -50,6 +65,24 @@ abstract class DramaSource {
     String episodeId,
   ) async =>
       null;
+}
+
+/// Gabung halaman baru ke list lama tanpa duplikat (by platformSlug:id).
+/// Urutan lama dipertahankan, item baru ditambahkan di belakang.
+/// Dipakai mobile + TV saat append halaman berikutnya.
+List<ContentItem> mergePagedItems(
+  List<ContentItem> existing,
+  List<ContentItem> fresh,
+) {
+  if (fresh.isEmpty) return existing;
+  final seen = existing.map((e) => '${e.platformSlug}:${e.id}').toSet();
+  final merged = List<ContentItem>.of(existing);
+  for (final item in fresh) {
+    if (seen.add('${item.platformSlug}:${item.id}')) {
+      merged.add(item);
+    }
+  }
+  return merged;
 }
 
 /// Info ekstra satu episode untuk player.

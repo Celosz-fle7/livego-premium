@@ -118,12 +118,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   List<ContentItem> _gridItems = const <ContentItem>[];
 
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
-  int get _homeGridLimit {
-    final visibleGridLimit = _gridColumns * TvHomePerformanceConfig.maxVisibleGridRows;
-    return visibleGridLimit < TvHomePerformanceConfig.maxManifestItems
-        ? visibleGridLimit
-        : TvHomePerformanceConfig.maxManifestItems;
-  }
 
   String get _platformSlug {
     final platforms = LiveGoCatalog.platforms;
@@ -147,6 +141,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _navListener = _onNavChanged;
     _navService.addListener(_navListener);
     LiveGoLocalStore.version.addListener(this._refreshIfSettingsChanged);
+    _scroll.addListener(_onScrollNearBottom);
     this._restoreSavedSelection();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -164,6 +159,16 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) this._restoreZoneFocus(throttle: false);
     });
+  }
+
+  /// Scroll masuk zona lookahead (~2 baris sebelum ujung) -> halaman
+  /// berikutnya. Guard ganda di controller (loadingMore / hasMore).
+  void _onScrollNearBottom() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.pixels >= pos.maxScrollExtent - 400) {
+      ref.read(tvHomeContentProvider.notifier).loadMore();
+    }
   }
 
   @override
@@ -207,9 +212,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     final platforms = LiveGoCatalog.platformLabels;
     final categories = _categories;
     final rawItems = home.items;
-    final gridItems = rawItems.length > _homeGridLimit
-        ? rawItems.take(_homeGridLimit).toList(growable: false)
-        : rawItems;
+    // TIDAK ada cap lagi — grid menampilkan semua halaman yang sudah
+    // dimuat (builder virtualized + key stabil, fokus tidak terganggu
+    // saat halaman baru di-append).
+    final gridItems = rawItems;
     _gridItems = gridItems;
 
     if (_platformNodes.length != platforms.length) {
@@ -435,6 +441,19 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     this._openGridItem(i, item);
                   },
                   onKey: (i, item, node, event) => this._homeRootKey(home.hero, event),
+                ),
+              if (home.loadingMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                    ),
+                  ),
                 ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
             ],

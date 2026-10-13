@@ -19,6 +19,11 @@ class FreereelsSource implements DramaSource {
   /// Format key: "$seriesId:$episodeId".
   final Map<String, Map<String, dynamic>> _episodeCache = {};
 
+  /// ID yang sudah dikembalikan homePage per kategori (reset tiap page 1).
+  /// Dipakai mendeteksi halaman habis: server balikin duplikat semua =
+  /// tidak ada konten baru lagi (pola yang sama dipakai allSeriesFromTab).
+  final Map<String, Set<String>> _pageSeen = {};
+
   @override
   String get slug => 'freereels';
 
@@ -47,6 +52,31 @@ class FreereelsSource implements DramaSource {
       } catch (_) {}
     }
     return items;
+  }
+
+  @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    // SATU tabFeed per halaman (bukan allSeriesFromTab + searchAll yang
+    // bikin load berat). position_index melangkah 10 — pola yang sudah
+    // terbukti di allSeriesFromTab; jumlah per halaman ikut server.
+    final tabKey =
+        FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
+    if (page <= 1) _pageSeen[category] = <String>{};
+    final seen = _pageSeen.putIfAbsent(category, () => <String>{});
+    final batch = await _client.tabFeed(
+      tabKey: tabKey,
+      positionIndex: (page - 1) * 10,
+      category: category,
+    );
+    final fresh = <ContentItem>[];
+    for (final item in batch) {
+      if (seen.add(item.id)) fresh.add(item);
+    }
+    return (items: fresh, hasMore: batch.isNotEmpty && fresh.isNotEmpty);
   }
 
   @override

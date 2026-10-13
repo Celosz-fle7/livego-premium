@@ -29,6 +29,15 @@ class MeloloSource implements DramaSource {
   }
 
   @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) {
+    return _client.feedPage(category, page: page, pageSize: pageSize);
+  }
+
+  @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) {
     return _client.episodeList(seriesId);
   }

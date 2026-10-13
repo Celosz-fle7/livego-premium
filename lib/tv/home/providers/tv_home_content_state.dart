@@ -9,6 +9,13 @@ class TvHomeContentState {
   final bool fromCache;
   final bool offline;
 
+  /// Pagination bertahap: halaman terakhir yang sudah dimuat (1-based),
+  /// apakah server masih punya halaman berikutnya, dan apakah halaman
+  /// berikutnya sedang di-fetch (dipakai loadMore / footer loading).
+  final int page;
+  final bool hasMore;
+  final bool loadingMore;
+
   const TvHomeContentState({
     this.hero,
     this.items = const <ContentItem>[],
@@ -17,6 +24,9 @@ class TvHomeContentState {
     this.hasError = false,
     this.fromCache = false,
     this.offline = false,
+    this.page = 1,
+    this.hasMore = true,
+    this.loadingMore = false,
   });
 
   TvHomeContentState copyWith({
@@ -27,6 +37,9 @@ class TvHomeContentState {
     bool? hasError,
     bool? fromCache,
     bool? offline,
+    int? page,
+    bool? hasMore,
+    bool? loadingMore,
   }) {
     return TvHomeContentState(
       hero: hero ?? this.hero,
@@ -36,6 +49,9 @@ class TvHomeContentState {
       hasError: hasError ?? this.hasError,
       fromCache: fromCache ?? this.fromCache,
       offline: offline ?? this.offline,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      loadingMore: loadingMore ?? this.loadingMore,
     );
   }
 }

@@ -19,8 +19,6 @@ import 'tv_home_content_state.dart';
 class TvHomeRepository {
   const TvHomeRepository();
 
-  static const int maxTvHomeItems = TvHomePerformanceConfig.maxManifestItems;
-
   String homeContentKey({
     required String platform,
     required String category,
@@ -35,10 +33,10 @@ class TvHomeRepository {
     ]);
   }
 
+  /// Hanya filter konten playable. TIDAK ada cap jumlah lagi — cap 28 lama
+  /// diganti pagination bertahap (halaman per halaman, ikut server).
   List<ContentItem> _prepareItems(List<ContentItem> rows) {
-    return ContentHealthService.filterPlayable(rows)
-        .take(maxTvHomeItems)
-        .toList(growable: false);
+    return ContentHealthService.filterPlayable(rows).toList(growable: false);
   }
 
   TvHomeContentState? readRam(String cacheKey) {
@@ -73,6 +71,7 @@ class TvHomeRepository {
   Future<TvHomeContentState?> loadCached({
     required String platform,
     required String selectedCategory,
+    required int pageSize,
   }) async {
     final List<ContentItem> cached;
     if (DramaSourceRegistry.handles(platform)) {
@@ -99,27 +98,38 @@ class TvHomeRepository {
     final prepared = _prepareItems(cached);
     if (prepared.isEmpty) return null;
 
+    // Disk cache hanya menyimpan halaman 1. Heuristik hasMore: halaman
+    // penuh -> kemungkinan masih ada; halaman parsial -> habis.
     return TvHomeContentState(
       hero: prepared.first,
       items: prepared,
       loading: false,
       refreshing: true,
       fromCache: true,
+      page: 1,
+      hasMore: prepared.length >= pageSize,
     );
   }
 
+  /// Halaman 1 dari server (ikut server, bukan load semua).
   Future<TvHomeContentState?> loadNetwork({
     required String platform,
     required String selectedCategory,
+    required int pageSize,
   }) async {
     final List<ContentItem> items;
+    final bool hasMore;
     final dramaSource = DramaSourceRegistry.forSlug(platform);
     if (dramaSource != null) {
-      // Sumber drama eksternal (multi-APK): lewat registry, meniru perilaku APK.
-      items = await dramaSource.homeByCategory(selectedCategory).timeout(
-        TvHomePerformanceConfig.foregroundNetworkTimeout,
-        onTimeout: () => const <ContentItem>[],
-      );
+      // Sumber drama eksternal (multi-APK): satu halaman via registry.
+      final res = await dramaSource
+          .homePage(selectedCategory, page: 1, pageSize: pageSize)
+          .timeout(
+            TvHomePerformanceConfig.foregroundNetworkTimeout,
+            onTimeout: () => (items: const <ContentItem>[], hasMore: false),
+          );
+      items = res.items;
+      hasMore = res.hasMore;
       // Tulis disk cache biar tidak request ulang terus (ala Netflix/MovieBox).
       if (items.isNotEmpty) {
         unawaited(
@@ -139,6 +149,7 @@ class TvHomeRepository {
         TvHomePerformanceConfig.foregroundNetworkTimeout,
         onTimeout: () => const <ContentItem>[],
       );
+      hasMore = false;
     }
 
     final prepared = _prepareItems(items);
@@ -148,12 +159,50 @@ class TvHomeRepository {
       hero: prepared.first,
       items: prepared,
       loading: false,
+      page: 1,
+      hasMore: hasMore,
     );
+  }
+
+  /// Halaman berikutnya (dipicu scroll masuk zona lookahead).
+  /// Return null kalau request gagal — pemanggil mempertahankan hasMore
+  /// supaya bisa retry di trigger berikutnya.
+  Future<({List<ContentItem> items, bool hasMore})?> loadNetworkPage({
+    required String platform,
+    required String category,
+    required int page,
+    required int pageSize,
+  }) async {
+    try {
+      final dramaSource = DramaSourceRegistry.forSlug(platform);
+      if (dramaSource != null) {
+        final res = await dramaSource
+            .homePage(category, page: page, pageSize: pageSize)
+            .timeout(TvHomePerformanceConfig.foregroundNetworkTimeout);
+        final prepared = _prepareItems(res.items);
+        return (items: prepared, hasMore: res.hasMore);
+      }
+      final all = await LiveGoCatalog.homeByCategory(
+        platform: platform,
+        category: category,
+      ).timeout(TvHomePerformanceConfig.foregroundNetworkTimeout);
+      final prepared = _prepareItems(all);
+      final start = (page - 1) * pageSize;
+      if (start >= prepared.length) return (items: const <ContentItem>[], hasMore: false);
+      final end = (start + pageSize).clamp(0, prepared.length);
+      return (
+        items: prepared.sublist(start, end),
+        hasMore: end < prepared.length,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<TvHomeContentState?> loadFallbackCache({
     required String platform,
     required String selectedCategory,
+    required int pageSize,
   }) async {
     final fallback = await LiveGoCatalog.cachedHomeByCategory(
       platform: platform,
@@ -173,17 +222,39 @@ class TvHomeRepository {
       loading: false,
       hasError: true,
       fromCache: true,
+      page: 1,
+      hasMore: prepared.length >= pageSize,
     );
   }
 
-  Future<TvHomeContentState?> refresh(String platform, String selectedCategory) async {
-    final fresh = await LiveGoCatalog.homeByCategory(
-      platform: platform,
-      category: selectedCategory,
-    ).timeout(
-      TvHomePerformanceConfig.backgroundRefreshTimeout,
-      onTimeout: () => const <ContentItem>[],
-    );
+  /// Refresh halaman 1 di background (SWR): ganti state dengan data fresh.
+  Future<TvHomeContentState?> refresh(
+    String platform,
+    String selectedCategory, {
+    required int pageSize,
+  }) async {
+    final List<ContentItem> fresh;
+    final bool hasMore;
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource != null) {
+      final res = await dramaSource
+          .homePage(selectedCategory, page: 1, pageSize: pageSize)
+          .timeout(
+            TvHomePerformanceConfig.backgroundRefreshTimeout,
+            onTimeout: () => (items: const <ContentItem>[], hasMore: false),
+          );
+      fresh = res.items;
+      hasMore = res.hasMore;
+    } else {
+      fresh = await LiveGoCatalog.homeByCategory(
+        platform: platform,
+        category: selectedCategory,
+      ).timeout(
+        TvHomePerformanceConfig.backgroundRefreshTimeout,
+        onTimeout: () => const <ContentItem>[],
+      );
+      hasMore = false;
+    }
 
     final prepared = _prepareItems(fresh);
     if (prepared.isEmpty) {
@@ -195,6 +266,8 @@ class TvHomeRepository {
       hero: prepared.first,
       items: prepared,
       loading: false,
+      page: 1,
+      hasMore: hasMore,
     );
   }
 }

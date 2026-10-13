@@ -90,6 +90,11 @@ class CinemaIdSource implements DramaSource {
   /// Cache hasil discovery topic_id per kategori (hindari fetch berulang).
   final Map<String, String> _discoveredTopicIds = {};
 
+  /// ID yang sudah dikembalikan homePage per kategori (reset tiap page 1).
+  /// Dipakai mendeteksi halaman habis: server balikin duplikat semua =
+  /// tidak ada konten baru lagi.
+  final Map<String, Set<String>> _pageSeen = {};
+
   /// Keluarga platform per kategori: tag seed yang dinormalisasi milik platform ini.
   /// Dipakai untuk verifikasi bahwa item server benar-benar dari platform tersebut.
   static const Map<String, Set<String>> _platformFamilies = {
@@ -324,6 +329,60 @@ class CinemaIdSource implements DramaSource {
     // Filter berdasarkan kategori yang dipilih agar setiap tab menampilkan
     // film/serial yang berbeda dan sesuai kategorinya.
     return _seedItems(category);
+  }
+
+  @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    await ensureSession();
+    final catKey = category.toLowerCase().trim();
+
+    // 18+ selalu seed-only (konten dewasa tidak diambil dari server).
+    if (catKey == '18+') {
+      if (page > 1) return (items: const <ContentItem>[], hasMore: false);
+      return (items: _seedItems(category, isAdultTab: true), hasMore: false);
+    }
+
+    // Resolusi topicId (sama seperti homeByCategory): hardcoded / discovery.
+    String? topicId = _categoryToTopicId[catKey];
+    if (topicId == null && _discoverableCategories.contains(catKey)) {
+      topicId = _discoveredTopicIds[catKey];
+      if (topicId == null) {
+        final found = await _client.discoverTopicId(category).timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => '',
+            );
+        topicId = found.isEmpty ? null : found;
+        if (topicId != null) {
+          _discoveredTopicIds[catKey] = topicId;
+        }
+      }
+    }
+
+    if (topicId == null || topicId.isEmpty) {
+      // Tanpa topic: fallback jalur lama sekali saja (tanpa paginasi).
+      if (page > 1) return (items: const <ContentItem>[], hasMore: false);
+      final items = await homeByCategory(category);
+      return (items: items, hasMore: false);
+    }
+
+    // SATU topicVods per halaman (bukan allVodsFromTopic 10 halaman).
+    // topicVods pakai page 0-based; jumlah per halaman ikut server.
+    if (page <= 1) _pageSeen[category] = <String>{};
+    final seen = _pageSeen.putIfAbsent(category, () => <String>{});
+    final batch = await _client.topicVods(
+      topicId,
+      category: category,
+      page: page - 1,
+    );
+    final fresh = <ContentItem>[];
+    for (final item in batch) {
+      if (seen.add(item.id)) fresh.add(item);
+    }
+    return (items: fresh, hasMore: batch.isNotEmpty && fresh.isNotEmpty);
   }
 
   /// Bangun ContentItem dari seed lokal untuk satu kategori.

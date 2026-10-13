@@ -52,6 +52,14 @@ class _FakeQualitySource implements DramaSource {
   Future<List<ContentItem>> search(String query) async => const [];
 
   @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async =>
+      (items: const <ContentItem>[], hasMore: false);
+
+  @override
   Future<void> signOut() async {}
 
   @override
