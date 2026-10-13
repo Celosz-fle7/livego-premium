@@ -24,6 +24,15 @@ class FreereelsSource implements DramaSource {
   /// tidak ada konten baru lagi (pola yang sama dipakai allSeriesFromTab).
   final Map<String, Set<String>> _pageSeen = {};
 
+  /// Token search per kategori untuk paginasi Sulih Suara.
+  /// tokens[i] = pageToken untuk halaman i+1; tokens[0] = '' (halaman 1).
+  /// Pagination jalan sekuensial (1 -> 2 -> 3); kalau loncat, token
+  /// diisi dengan jalan dari token terakhir yang dikenal.
+  final Map<String, List<String>> _searchTokens = {};
+
+  /// Kategori yang search-nya sudah habis (nextToken kosong).
+  final Set<String> _searchExhausted = {};
+
   @override
   String get slug => 'freereels';
 
@@ -40,9 +49,9 @@ class FreereelsSource implements DramaSource {
     // Ambil semua halaman (paginasi) agar konten maksimal per tab.
     final items = await _client.allSeriesFromTab(tabKey: tabKey, category: category);
 
-    // Workaround: tab Dubbing di API cuma sedikit item.
+    // Workaround: tab Sulih Suara di API cuma sedikit item.
     // Tambah hasil search "sulih suara" dengan paginasi penuh (ratusan judul).
-    if (category == 'Dubbing') {
+    if (category == 'Sulih Suara') {
       try {
         final searchItems = await _client.searchAll('sulih suara', maxPages: 20);
         final seen = items.map((e) => e.id).toSet();
@@ -65,7 +74,11 @@ class FreereelsSource implements DramaSource {
     // terbukti di allSeriesFromTab; jumlah per halaman ikut server.
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
-    if (page <= 1) _pageSeen[category] = <String>{};
+    if (page <= 1) {
+      _pageSeen[category] = <String>{};
+      _searchTokens.remove(category);
+      _searchExhausted.remove(category);
+    }
     final seen = _pageSeen.putIfAbsent(category, () => <String>{});
     final batch = await _client.tabFeed(
       tabKey: tabKey,
@@ -76,7 +89,48 @@ class FreereelsSource implements DramaSource {
     for (final item in batch) {
       if (seen.add(item.id)) fresh.add(item);
     }
-    return (items: fresh, hasMore: batch.isNotEmpty && fresh.isNotEmpty);
+    var hasMore = batch.isNotEmpty && fresh.isNotEmpty;
+
+    // Sulih Suara = konten trending/Indonesia: tab 514 saja cuma sedikit
+    // item. Gabung satu halaman search "sulih suara" (ratusan judul) agar
+    // SEMUA konten sulih suara ketarik — di jalur paged juga, bukan cuma
+    // homeByCategory (legacy).
+    if (category == 'Sulih Suara' && !_searchExhausted.contains(category)) {
+      try {
+        final tokens =
+            _searchTokens.putIfAbsent(category, () => <String>['']);
+        // Pastikan token halaman ini ada (pagination sekuensial).
+        while (tokens.length < page) {
+          final probe = await _client.searchPage(
+            'sulih suara',
+            pageToken: tokens.last,
+            category: category,
+          );
+          tokens.add(probe.nextToken);
+          if (probe.nextToken.isEmpty) {
+            _searchExhausted.add(category);
+            break;
+          }
+        }
+        if (page <= tokens.length) {
+          final res = await _client.searchPage(
+            'sulih suara',
+            pageToken: tokens[page - 1],
+            category: category,
+          );
+          for (final item in res.items) {
+            if (seen.add(item.id)) fresh.add(item);
+          }
+          if (tokens.length == page) tokens.add(res.nextToken);
+          if (res.nextToken.isEmpty) {
+            _searchExhausted.add(category);
+          } else {
+            hasMore = true;
+          }
+        }
+      } catch (_) {}
+    }
+    return (items: fresh, hasMore: hasMore);
   }
 
   @override

@@ -184,11 +184,13 @@ class FreereelsClient {
     return all;
   }
 
-  /// Cari drama: POST /frv2-api/search/drama body {"keyword": q}
+  /// Cari drama satu halaman: POST /frv2-api/search/drama body {"keyword": q}.
   /// Response: data.items[] (id, name, cover, ...), page_info.next untuk paging.
-  Future<List<ContentItem>> search(
+  /// Mengembalikan item + nextToken ('' kalau habis).
+  Future<({List<ContentItem> items, String nextToken})> searchPage(
     String keyword, {
     String pageToken = '',
+    String category = 'search',
   }) async {
     final body = <String, dynamic>{'keyword': keyword};
     if (pageToken.isNotEmpty) {
@@ -216,7 +218,7 @@ class FreereelsClient {
         id: id,
         title: '${m['name'] ?? m['title'] ?? 'No title'}',
         source: 'freereels',
-        category: 'search',
+        category: category,
         description: '${m['desc'] ?? ''}',
         posterUrl: '${m['cover'] ?? ''}',
         backdropUrl: '${m['cover'] ?? ''}',
@@ -226,51 +228,41 @@ class FreereelsClient {
         tags: ContentItem.extractTags(m),
       ));
     }
-    return out;
+    final next = '${(data['page_info'] as Map?)?['next'] ?? ''}';
+    return (items: out, nextToken: next);
+  }
+
+  /// Cari drama: POST /frv2-api/search/drama body {"keyword": q}
+  /// Response: data.items[] (id, name, cover, ...), page_info.next untuk paging.
+  Future<List<ContentItem>> search(
+    String keyword, {
+    String pageToken = '',
+  }) async {
+    final res = await searchPage(keyword, pageToken: pageToken);
+    return res.items;
   }
 
   /// Cari drama dengan paginasi penuh (ikuti page_info.next sampai habis).
-  /// Dipakai untuk kategori Dubbing ("sulih suara") yang isinya ratusan judul.
+  /// Dipakai untuk kategori Sulih Suara yang isinya ratusan judul.
   Future<List<ContentItem>> searchAll(String keyword, {int maxPages = 20}) async {
     final seen = <String>{};
     final all = <ContentItem>[];
     var pageToken = '';
     for (var page = 0; page < maxPages; page++) {
-      final body = <String, dynamic>{'keyword': keyword};
-      if (pageToken.isNotEmpty) {
-        for (final part in pageToken.split('&')) {
-          final kv = part.split('=');
-          if (kv.length == 2) body[kv[0]] = kv[1];
+      final res = await searchPage(
+        keyword,
+        pageToken: pageToken,
+        category: 'Sulih Suara',
+      );
+      var added = 0;
+      for (final item in res.items) {
+        if (seen.add(item.id)) {
+          added++;
+          all.add(item);
         }
       }
-      final res = await _postJson('/search/drama', body);
-      final code = res['code'];
-      if (code != 200 && code != 0) break;
-
-      final data = res['data'] as Map? ?? {};
-      final items = data['items'] as List? ?? [];
-      var added = 0;
-      for (final item in items) {
-        final m = item as Map;
-        final id = '${m['id'] ?? m['key'] ?? ''}';
-        if (id.isEmpty || !seen.add(id)) continue;
-        added++;
-        all.add(ContentItem(
-          id: id,
-          title: '${m['name'] ?? m['title'] ?? 'No title'}',
-          source: 'freereels',
-          category: 'Dubbing',
-          description: '${m['desc'] ?? ''}',
-          posterUrl: '${m['cover'] ?? ''}',
-          backdropUrl: '${m['cover'] ?? ''}',
-          rating: 0.0,
-          episodes: int.tryParse('${m['episode_count'] ?? 0}') ?? 0,
-          platformSlug: 'freereels',
-          tags: ContentItem.extractTags(m),
-        ));
-      }
       if (added == 0) break;
-      final next = '${(data['page_info'] as Map?)?['next'] ?? ''}';
+      final next = res.nextToken;
       if (next.isEmpty || next == pageToken) break;
       pageToken = next;
       await Future.delayed(const Duration(milliseconds: 300));

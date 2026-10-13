@@ -121,6 +121,13 @@ yang tampil di layar, remote-first.**
 
 ## Aturan provider (checklist tambah provider baru)
 
+- **FreeReels**: kategori = tab APK: Popular (503), Coming Soon (622),
+  Sulih Suara (514), Anime (547). New (505), Female (504), Male (506)
+  DIHAPUS. Label Indonesia ("Sulih Suara", bukan "Dubbing").
+  Sulih Suara = konten trending/Indonesia — tarik SEMUA konten sulih
+  suara: tab 514 + halaman search "sulih suara" (token cache), di jalur
+  `homePage` (paged) maupun `homeByCategory` (legacy).
+
 Tiru pola provider yang sudah ada. Urutan kerja:
 
 1. **Adapter**: class `XSource implements DramaSource`, daftarkan SATU baris
