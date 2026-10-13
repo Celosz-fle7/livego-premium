@@ -78,9 +78,43 @@ class TvUpdateService {
     );
   }
 
+  /// Download APK dengan proteksi macet + retry otomatis.
+  ///
+  /// - Stall timeout 20 detik: kalau tidak ada data masuk selama 20 detik,
+  ///   download dibatalkan (sebelumnya `await for` bisa gantung selamanya,
+  ///   UI stag di progress terakhir, mis. 3%).
+  /// - Retry otomatis maks 3x dengan backoff (2s, 4s).
+  /// - Bisa dibatalkan via [isCancelled] (tombol BACK di layar update).
   Future<TvUpdateDownloadResult> downloadApk(
     TvUpdateInfo update, {
     required void Function(double progress) onProgress,
+    bool Function()? isCancelled,
+    int maxAttempts = 3,
+  }) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await _downloadOnce(
+          update,
+          onProgress: onProgress,
+          isCancelled: isCancelled,
+        );
+      } catch (e) {
+        lastError = e;
+        if (isCancelled?.call() == true) rethrow;
+        if (e is _DownloadCancelled) rethrow;
+        if (attempt < maxAttempts) {
+          await Future.delayed(Duration(seconds: 2 * attempt));
+        }
+      }
+    }
+    throw lastError ?? StateError('Download gagal.');
+  }
+
+  Future<TvUpdateDownloadResult> _downloadOnce(
+    TvUpdateInfo update, {
+    required void Function(double progress) onProgress,
+    bool Function()? isCancelled,
   }) async {
     if (!update.hasApk) {
       throw StateError('URL APK update belum valid.');
@@ -112,16 +146,35 @@ class TvUpdateService {
       var received = 0;
       final sink = tempFile.openWrite();
 
-      await for (final chunk in response) {
-        received += chunk.length;
-        sink.add(chunk);
-        if (total > 0) {
-          onProgress((received / total).clamp(0.0, 1.0).toDouble());
+      // Stall detection: stream timeout reset tiap chunk masuk.
+      // Kalau 20 detik tidak ada data, lempar TimeoutException -> retry.
+      final stream = response.timeout(
+        const Duration(seconds: 20),
+        onTimeout: (EventSink<List<int>> sink) {
+          sink.addError(TimeoutException('Download macet: tidak ada data 20 detik'));
+        },
+      );
+
+      try {
+        await for (final chunk in stream) {
+          if (isCancelled?.call() == true) {
+            throw const _DownloadCancelled();
+          }
+          received += chunk.length;
+          sink.add(chunk);
+          if (total > 0) {
+            onProgress((received / total).clamp(0.0, 1.0).toDouble());
+          }
         }
+      } finally {
+        await sink.flush();
+        await sink.close();
       }
 
-      await sink.flush();
-      await sink.close();
+      if (isCancelled?.call() == true) {
+        await tempFile.delete();
+        throw const _DownloadCancelled();
+      }
 
       if (update.sha256.isNotEmpty) {
         final actual = await _sha256Of(tempFile);
@@ -171,4 +224,12 @@ class TvUpdateService {
     final digest = await sha256.bind(file.openRead()).first;
     return digest.toString();
   }
+}
+
+/// Download dibatalkan user (BACK saat download). Tidak di-retry.
+class _DownloadCancelled implements Exception {
+  const _DownloadCancelled();
+
+  @override
+  String toString() => 'Download dibatalkan.';
 }

@@ -37,6 +37,8 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
   double _progress = 0.0;
   int _cursor = 0;
   bool _busy = false;
+  bool _cancelRequested = false;
+  bool _downloadFailed = false;
 
   @override
   void initState() {
@@ -76,6 +78,12 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
     }
 
     if (_isBack(key) || key == LogicalKeyboardKey.arrowLeft) {
+      // BACK saat download = batalkan download (tidak lagi kejebak).
+      if (_status == _UpdateStatus.downloading) {
+        _cancelRequested = true;
+        setState(() => _message = 'Membatalkan download...');
+        return KeyEventResult.handled;
+      }
       if (!_busy) Navigator.of(context).maybePop();
       return KeyEventResult.handled;
     }
@@ -129,6 +137,8 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
 
     setState(() {
       _busy = true;
+      _cancelRequested = false;
+      _downloadFailed = false;
       _status = _UpdateStatus.downloading;
       _message = 'Mengunduh APK update...';
       _progress = 0;
@@ -142,6 +152,7 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
           if (!mounted) return;
           setState(() => _progress = value);
         },
+        isCancelled: () => _cancelRequested,
       );
       if (!mounted) return;
       setState(() {
@@ -153,10 +164,15 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
       });
     } catch (error) {
       if (!mounted) return;
+      final cancelled = _cancelRequested || '$error'.contains('dibatalkan');
       setState(() {
         _status = _UpdateStatus.error;
-        _message = 'Gagal download update: $error';
+        _message = cancelled
+            ? 'Download dibatalkan. Tekan Coba Lagi untuk mengulang.'
+            : 'Gagal download update: $error';
         _busy = false;
+        _downloadFailed = !cancelled;
+        _cancelRequested = false;
       });
     }
   }
@@ -194,7 +210,12 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
       case _UpdateStatus.idle:
       case _UpdateStatus.noUpdate:
       case _UpdateStatus.error:
-        unawaited(_checkUpdate());
+        // Sesudah download gagal: Coba Lagi langsung download ulang.
+        if (_downloadFailed && _latest != null) {
+          unawaited(_downloadAndInstall());
+        } else {
+          unawaited(_checkUpdate());
+        }
         break;
     }
   }
@@ -209,8 +230,10 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
         return 'Mengecek...';
       case _UpdateStatus.downloading:
         return 'Download ${(100 * _progress).clamp(0, 100).round()}%';
-      case _UpdateStatus.noUpdate:
       case _UpdateStatus.error:
+        // Sesudah download gagal: tombol jadi Coba Lagi (langsung retry).
+        return _downloadFailed ? 'Coba Lagi' : 'Cek Lagi';
+      case _UpdateStatus.noUpdate:
       case _UpdateStatus.idle:
         return 'Cek Lagi';
     }
@@ -222,7 +245,13 @@ class _TvUpdateScreenState extends State<TvUpdateScreen> {
     final latest = _latest;
 
     return PopScope(
-      canPop: !_busy,
+      // BACK selalu diizinkan: saat download, BACK = batalkan (ditangani _handleKey).
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (didPop && _status == _UpdateStatus.downloading) {
+          _cancelRequested = true;
+        }
+      },
       child: Scaffold(
         backgroundColor: AppTheme.bg,
         body: SafeArea(
