@@ -584,6 +584,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'freereels': 'FreeReels • Direct HLS. Bahasa default ID.',
       'cinemaid': 'CinemaID • Movies & TV Series. Multi-kategori OTT & Ranking.',
       'melolo': 'Melolo • Drama HLS/MP4. Multi-resolusi (240p-720p).',
+      'shorttv': 'ShortTV • Drama pendek vertikal multi-bahasa.',
+      'moviebox': 'MovieBox • Ribuan Short TV, Drama & Movies direct CDN.',
     };
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke player.';
   }

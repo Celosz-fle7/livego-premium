@@ -134,6 +134,35 @@ class LiveGoApiPlatforms {
         'Portugis',
       ],
     ),
+    LiveGoApiPlatform(
+      slug: 'moviebox',
+      endpointSlug: 'moviebox',
+      name: 'MovieBox',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'keyword',
+      videoType: LiveGoVideoType.mp4,
+      supportedLangs: ['id', 'en'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      streamFromAllEpisodes: true,
+      categories: [
+        '🔥Hot Short TV',
+        'Trending Drama🔥',
+        'Trending Indonesian Drama💗',
+        'Trending Indonesian Movies',
+        'Trending Movies',
+        'K-Drama: New Release',
+        'Indonesian Horror Stories 💀',
+        'Free Now 🎉',
+        'Into Animeverse🌟',
+        'Thai-Drama',
+        'Trending Indo Dubbed',
+        'Action & Crime 👊',
+        '100% LOVE 💗',
+        'Family Time🏡',
+      ],
+    ),
   ];
 
   static const List<String> tvStarterSlugs = <String>[
@@ -141,6 +170,7 @@ class LiveGoApiPlatforms {
     'cinemaid',
     'melolo',
     'shorttv',
+    'moviebox',
   ];
 
   static List<String> get supportedSlugs =>
