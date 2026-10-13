@@ -33,6 +33,22 @@ class FreereelsSource implements DramaSource {
   /// Kategori yang search-nya sudah habis (nextToken kosong).
   final Set<String> _searchExhausted = {};
 
+  /// Kata dub (dub/dubbed/dubbing) sebagai kata utuh — "dubai" tidak kena.
+  static final _dubWord = RegExp(r'\b(dub|dubbed|dubbing)\b');
+
+  /// Item "dubbed" yang BUKAN sulih suara: metadata menyebut dub/dubbed/
+  /// dubbing tapi tanpa penanda Indonesia. Item seperti ini dibuang dari
+  /// tab Dubbing (isinya sulih suara). Item tanpa kata dub tidak disentuh,
+  /// dan item "Indonesian Dubbed" (ada penanda Indonesia) tetap dipertahankan.
+  static bool _isNonIndonesianDubbed(ContentItem item) {
+    final hay =
+        '${item.tags.join(' ')} ${item.title} ${item.description}'.toLowerCase();
+    if (!_dubWord.hasMatch(hay)) return false;
+    return !hay.contains('indonesia') &&
+        !hay.contains('sulih suara') &&
+        !hay.contains('bahasa');
+  }
+
   @override
   String get slug => 'freereels';
 
@@ -59,6 +75,8 @@ class FreereelsSource implements DramaSource {
           if (seen.add(s.id)) items.add(s);
         }
       } catch (_) {}
+      // Buang item "dubbed" yang bukan sulih suara (Indonesia).
+      items.removeWhere(_isNonIndonesianDubbed);
     }
     return items;
   }
@@ -80,16 +98,40 @@ class FreereelsSource implements DramaSource {
       _searchExhausted.remove(category);
     }
     final seen = _pageSeen.putIfAbsent(category, () => <String>{});
-    final batch = await _client.tabFeed(
-      tabKey: tabKey,
-      positionIndex: (page - 1) * 10,
-      category: category,
-    );
     final fresh = <ContentItem>[];
-    for (final item in batch) {
-      if (seen.add(item.id)) fresh.add(item);
+    var hasMore = false;
+    if (category == 'Dubbing') {
+      // Tab Dubbing: buang item "dubbed" yang bukan sulih suara. Ulangi
+      // fetch raw (maks 3x) kalau satu halaman raw habis terbuang — biar
+      // halaman tidak kosong padahal server masih punya konten.
+      var pos = (page - 1) * 10;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        final batch = await _client.tabFeed(
+          tabKey: tabKey,
+          positionIndex: pos,
+          category: category,
+        );
+        var anyNew = false;
+        for (final item in batch) {
+          if (!seen.add(item.id)) continue;
+          anyNew = true;
+          if (!_isNonIndonesianDubbed(item)) fresh.add(item);
+        }
+        hasMore = batch.isNotEmpty && anyNew;
+        if (fresh.isNotEmpty || !hasMore) break;
+        pos += 10;
+      }
+    } else {
+      final batch = await _client.tabFeed(
+        tabKey: tabKey,
+        positionIndex: (page - 1) * 10,
+        category: category,
+      );
+      for (final item in batch) {
+        if (seen.add(item.id)) fresh.add(item);
+      }
+      hasMore = batch.isNotEmpty && fresh.isNotEmpty;
     }
-    var hasMore = batch.isNotEmpty && fresh.isNotEmpty;
 
     // Dubbing = konten sulih suara, all genre: tab 514 saja cuma sedikit
     // item. Gabung satu halaman search "sulih suara" (ratusan judul) agar
@@ -119,7 +161,8 @@ class FreereelsSource implements DramaSource {
             category: category,
           );
           for (final item in res.items) {
-            if (seen.add(item.id)) fresh.add(item);
+            if (!seen.add(item.id)) continue;
+            if (!_isNonIndonesianDubbed(item)) fresh.add(item);
           }
           if (tokens.length == page) tokens.add(res.nextToken);
           if (res.nextToken.isEmpty) {
