@@ -41,7 +41,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   void _syncNodes(List<FocusNode> nodes, int count, String label) {
     while (nodes.length < count) {
-      nodes.add(FocusNode(skipTraversal: true, debugLabel: '$label-${nodes.length}'));
+      nodes.add(
+          FocusNode(skipTraversal: true, debugLabel: '$label-${nodes.length}'));
     }
     while (nodes.length > count) {
       nodes.removeLast().dispose();
@@ -62,9 +63,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final savedPlatformIndex = platforms.indexOf(savedPlatform);
     _selectedPlatformIndex = savedPlatformIndex >= 0 ? savedPlatformIndex : 0;
     _platformIndex = _selectedPlatformIndex;
-    final categories = LiveGoCatalog.categoriesFor(platforms[_selectedPlatformIndex]);
-    final savedCategory = LiveGoSettings.tvLastHomeCategories[platforms[_selectedPlatformIndex]] ?? 0;
-    _selectedCategoryIndex = categories.isEmpty ? 0 : savedCategory.clamp(0, categories.length - 1).toInt();
+    final categories =
+        LiveGoCatalog.categoriesFor(platforms[_selectedPlatformIndex]);
+    final savedCategory = LiveGoSettings
+            .tvLastHomeCategories[platforms[_selectedPlatformIndex]] ??
+        0;
+    _selectedCategoryIndex = categories.isEmpty
+        ? 0
+        : savedCategory.clamp(0, categories.length - 1).toInt();
     _categoryIndex = _selectedCategoryIndex;
   }
 
@@ -73,7 +79,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     LiveGoSettings.defaultPlatform = platform;
     final categories = _categories;
     if (categories.isNotEmpty) {
-      LiveGoSettings.tvLastHomeCategories[platform] = _selectedCategoryIndex.clamp(0, categories.length - 1).toInt();
+      LiveGoSettings.tvLastHomeCategories[platform] =
+          _selectedCategoryIndex.clamp(0, categories.length - 1).toInt();
     }
     unawaited(LiveGoLocalStore.saveSettings().then((_) {
       if (mounted) _settingsVersion = LiveGoLocalStore.version.value;
@@ -108,8 +115,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     // refresh bisa mengurutkan ulang/menyisipkan kategori tanpa menghapus pilihan.
     final selectedLabel = _categoryLabel;
     final before = LiveGoCatalog.categoriesFor(platform).join('|');
-    final refreshed = await LiveGoCatalog.fetchCategoriesFor(platform)
-        .timeout(const Duration(seconds: 7), onTimeout: () => LiveGoCatalog.categoriesFor(platform));
+    final refreshed = await LiveGoCatalog.fetchCategoriesFor(platform).timeout(
+        const Duration(seconds: 7),
+        onTimeout: () => LiveGoCatalog.categoriesFor(platform));
     if (!mounted || platform != _platformSlug) return;
     if (refreshed.join('|') == before) return;
     final newIndex = refreshed.indexOf(selectedLabel);
@@ -142,7 +150,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_isLoadedHomeSelection(platform, category)) return;
 
     _cancelHomeSelectionCommit();
-    _homeSelectionCommitTimer = Timer(TvHomePerformanceConfig.selectionCommitDelay, () {
+    _homeSelectionCommitTimer =
+        Timer(TvHomePerformanceConfig.selectionCommitDelay, () {
       if (!mounted) return;
       // Guard: hanya commit kalau user MASIH di zone chip yang sama.
       // Kalau sudah pindah ke grid/search/banner, jangan yank fokus / reload.
@@ -198,7 +207,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusPlatformHeader({bool throttle = true}) {
     if (_platformHeaderNode.context == null) return false;
     _controlFocus = _HomeControlFocus.platformHeader;
-    final ok = tvFocus(_platformHeaderNode, alignment: 0.08, throttle: throttle);
+    final ok =
+        tvFocus(_platformHeaderNode, alignment: 0.08, throttle: throttle);
     if (ok) {
       _homeDebugLog('home_focus_platform_header');
       _rememberFocus(TvZone.platform, _platformIndex);
@@ -209,7 +219,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   bool _focusCategoryHeader({bool throttle = true}) {
     if (_categoryHeaderNode.context == null) return false;
     _controlFocus = _HomeControlFocus.categoryHeader;
-    final ok = tvFocus(_categoryHeaderNode, alignment: 0.12, throttle: throttle);
+    final ok =
+        tvFocus(_categoryHeaderNode, alignment: 0.12, throttle: throttle);
     if (ok) {
       _homeDebugLog('home_focus_category_header');
       _rememberFocus(TvZone.category, _categoryIndex);
@@ -221,7 +232,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_platformNodes.isEmpty) return false;
     final target = _safe(index, _platformNodes.length);
     _controlFocus = _HomeControlFocus.platformChip;
-    final ok = tvFocus(_platformNodes[target], alignment: 0.08, throttle: throttle);
+    final ok =
+        tvFocus(_platformNodes[target], alignment: 0.08, throttle: throttle);
     if (ok) {
       _platformIndex = target;
       _rememberFocus(TvZone.platform, target);
@@ -233,7 +245,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (_categoryNodes.isEmpty) return false;
     final target = _safe(index, _categoryNodes.length);
     _controlFocus = _HomeControlFocus.categoryChip;
-    final ok = tvFocus(_categoryNodes[target], alignment: 0.12, throttle: throttle);
+    final ok =
+        tvFocus(_categoryNodes[target], alignment: 0.12, throttle: throttle);
     if (ok) {
       _categoryIndex = target;
       _rememberFocus(TvZone.category, target);
@@ -388,13 +401,16 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     final position = _scroll.position;
     final viewport = position.viewportDimension;
-    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns).clamp(1, 999).toInt();
+    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns)
+        .clamp(1, 999)
+        .toInt();
     final visibleRows = _visibleGridRows(viewport, totalRows, rowStride);
     final maxTopRow = (totalRows - visibleRows).clamp(0, totalRows).toInt();
     final maxComfortScroll = _homeGridScrollForTopRow(maxTopRow, position);
-    final comfortWindow = (viewport - TvSafeZone.gridTop - TvSafeZone.gridBottom)
-        .clamp(rowStride, rowStride * 2.0)
-        .toDouble();
+    final comfortWindow =
+        (viewport - TvSafeZone.gridTop - TvSafeZone.gridBottom)
+            .clamp(rowStride, rowStride * 2.0)
+            .toDouble();
     final maxStep = comfortWindow;
     final requestedStep = rowStride * deltaRows;
     final safeStep = requestedStep.clamp(-maxStep, maxStep).toDouble();
@@ -456,7 +472,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     });
   }
 
-  void _scheduleEmptyFocusIfNeeded(TvHomeContentState home, List<ContentItem> gridItems) {
+  void _scheduleEmptyFocusIfNeeded(
+      TvHomeContentState home, List<ContentItem> gridItems) {
     if (!mounted) return;
     if (home.loading || home.refreshing) return;
     if (gridItems.isNotEmpty) return;
@@ -492,9 +509,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     widget.onRequestExit?.call();
   }
 
-
   KeyEventResult _homeRootKey(ContentItem? hero, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+      return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
 
     final navState = ref.read(tvNavigationProvider);
@@ -590,8 +607,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       _scheduleHomeSelectionCommit(zone);
     }
 
-    final headerFocused = targetControlFocus == _HomeControlFocus.platformHeader ||
-        targetControlFocus == _HomeControlFocus.categoryHeader;
+    final headerFocused =
+        targetControlFocus == _HomeControlFocus.platformHeader ||
+            targetControlFocus == _HomeControlFocus.categoryHeader;
     if (headerFocused) {
       final node = targetControlFocus == _HomeControlFocus.platformHeader
           ? _platformHeaderNode
@@ -647,9 +665,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final position = _scroll.position;
     final safeIndex = _safe(index, _gridNodes.length);
     final row = safeIndex ~/ _gridColumns;
-    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns).clamp(1, 999).toInt();
+    final totalRows = ((_gridNodes.length + _gridColumns - 1) ~/ _gridColumns)
+        .clamp(1, 999)
+        .toInt();
 
-    final visibleRows = _visibleGridRows(position.viewportDimension, totalRows, rowStride);
+    final visibleRows =
+        _visibleGridRows(position.viewportDimension, totalRows, rowStride);
     final anchoredRow = row.clamp(0, totalRows - visibleRows).toInt();
     final target = _homeGridScrollForTopRow(anchoredRow, position);
     if ((target - position.pixels).abs() < 1) return;
@@ -663,7 +684,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
   double _homeGridScrollForTopRow(int topRow, ScrollPosition position) {
     final target = TvSafeZone.homeGridEntryOffset + (topRow * 204.0);
-    return target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
+    return target
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
   }
 
   void _homeManualUp() {
@@ -764,8 +787,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         }
         return;
       case TvZone.search:
-        // LEFT dari search bar -> Akun (alur baru tanpa rail).
-        _moveToNav();
+        // LEFT dari ikon cari -> kembali ke chip kategori yang diingat.
+        _setManualZone(
+          TvZone.category,
+          _categoryIndex,
+          scroll: false,
+          controlFocus: _HomeControlFocus.categoryChip,
+        );
         return;
       case TvZone.platform:
         if (_platformIndex == 0) {
@@ -807,6 +835,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       case TvZone.category:
         if (_categoryIndex < _categoryNodes.length - 1) {
           _setManualZone(TvZone.category, _categoryIndex + 1, scroll: false);
+        } else {
+          // RIGHT dari chip kategori terakhir -> ikon cari (pojok kanan).
+          _setManualZone(
+            TvZone.search,
+            0,
+            scroll: false,
+            controlFocus: _HomeControlFocus.searchBar,
+          );
         }
         return;
       case TvZone.banner:
@@ -1018,7 +1054,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     _scrollHomeToGridEntry();
 
-    final ok = throttle ? _focusGrid(target, throttle: throttle) : _requestGridNode(node);
+    final ok = throttle
+        ? _focusGrid(target, throttle: throttle)
+        : _requestGridNode(node);
     if (ok) {
       _gridIndex = target;
       _rememberFocus(TvZone.grid, target);
@@ -1027,7 +1065,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final retryNode = _gridNodes.isEmpty ? null : _gridNodes[_safe(target, _gridNodes.length)];
+      final retryNode = _gridNodes.isEmpty
+          ? null
+          : _gridNodes[_safe(target, _gridNodes.length)];
       if (retryNode == null) return;
       if (_requestGridNode(retryNode)) {
         _gridIndex = target;
@@ -1151,7 +1191,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final returnPlatform = _platformIndex;
     final returnCategory = _categoryIndex;
     final returnGrid = forceReturnGrid ?? _gridIndex;
-    final episode = int.tryParse(item.chapterId.trim()) ?? LiveGoLocalStore.continueEpisode(item);
+    final episode = int.tryParse(item.chapterId.trim()) ??
+        LiveGoLocalStore.continueEpisode(item);
     final playerItem = _playerItem(item);
 
     widget.onPlayerRouteOpen?.call();
@@ -1190,7 +1231,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
           _categoryIndex = returnCategory;
           _gridIndex = returnGrid;
           if (returnZone == TvZone.grid) {
-            if (!_focusGrid(returnGrid, throttle: false, anchorRow: true, anchorAlignment: 0.58)) {
+            if (!_focusGrid(returnGrid,
+                throttle: false, anchorRow: true, anchorAlignment: 0.58)) {
               _scheduleFocusEntry(preferBanner: false);
             }
           } else {
@@ -1228,8 +1270,11 @@ extension TvHomeInteractionController on _TvHomeScreenState {
 
     final selectedPlatform = platforms[target];
     final categories = LiveGoCatalog.categoriesFor(selectedPlatform);
-    final rememberedCategory = LiveGoSettings.tvLastHomeCategories[selectedPlatform] ?? 0;
-    final selectedCategory = categories.isEmpty ? 0 : rememberedCategory.clamp(0, categories.length - 1).toInt();
+    final rememberedCategory =
+        LiveGoSettings.tvLastHomeCategories[selectedPlatform] ?? 0;
+    final selectedCategory = categories.isEmpty
+        ? 0
+        : rememberedCategory.clamp(0, categories.length - 1).toInt();
     setState(() {
       _selectedPlatformIndex = target;
       _selectedCategoryIndex = selectedCategory;
@@ -1287,7 +1332,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   KeyEventResult _platformKey(int index, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+      return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _platformIndex = _safe(index, _platformNodes.length);
     _controlFocus = _HomeControlFocus.platformChip;
@@ -1296,7 +1342,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   KeyEventResult _categoryKey(int index, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+      return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _categoryIndex = _safe(index, _categoryNodes.length);
     _controlFocus = _HomeControlFocus.categoryChip;
@@ -1305,7 +1352,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   KeyEventResult _searchKey(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+      return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _controlFocus = _HomeControlFocus.searchBar;
     _rememberFocus(TvZone.search, 0);
@@ -1313,7 +1361,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   KeyEventResult _emptyKey(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+      return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     final navState = ref.read(tvNavigationProvider);
     if (navState.navFocused || navState.owner == TvRemoteOwner.navbar) {
