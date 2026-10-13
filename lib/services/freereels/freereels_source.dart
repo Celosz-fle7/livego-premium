@@ -35,11 +35,11 @@ class FreereelsSource implements DramaSource {
     // Ambil semua halaman (paginasi) agar konten maksimal per tab.
     final items = await _client.allSeriesFromTab(tabKey: tabKey, category: category);
 
-    // Workaround: tab Dubbing & New di API cuma 10 item unik.
-    // Tambah hasil search agar lebih banyak.
+    // Workaround: tab Dubbing di API cuma sedikit item.
+    // Tambah hasil search "sulih suara" dengan paginasi penuh (ratusan judul).
     if (category == 'Dubbing') {
       try {
-        final searchItems = await _client.search('sulih suara');
+        final searchItems = await _client.searchAll('sulih suara', maxPages: 20);
         final seen = items.map((e) => e.id).toSet();
         for (final s in searchItems) {
           if (seen.add(s.id)) items.add(s);

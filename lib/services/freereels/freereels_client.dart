@@ -229,6 +229,55 @@ class FreereelsClient {
     return out;
   }
 
+  /// Cari drama dengan paginasi penuh (ikuti page_info.next sampai habis).
+  /// Dipakai untuk kategori Dubbing ("sulih suara") yang isinya ratusan judul.
+  Future<List<ContentItem>> searchAll(String keyword, {int maxPages = 20}) async {
+    final seen = <String>{};
+    final all = <ContentItem>[];
+    var pageToken = '';
+    for (var page = 0; page < maxPages; page++) {
+      final body = <String, dynamic>{'keyword': keyword};
+      if (pageToken.isNotEmpty) {
+        for (final part in pageToken.split('&')) {
+          final kv = part.split('=');
+          if (kv.length == 2) body[kv[0]] = kv[1];
+        }
+      }
+      final res = await _postJson('/search/drama', body);
+      final code = res['code'];
+      if (code != 200 && code != 0) break;
+
+      final data = res['data'] as Map? ?? {};
+      final items = data['items'] as List? ?? [];
+      var added = 0;
+      for (final item in items) {
+        final m = item as Map;
+        final id = '${m['id'] ?? m['key'] ?? ''}';
+        if (id.isEmpty || !seen.add(id)) continue;
+        added++;
+        all.add(ContentItem(
+          id: id,
+          title: '${m['name'] ?? m['title'] ?? 'No title'}',
+          source: 'freereels',
+          category: 'Dubbing',
+          description: '${m['desc'] ?? ''}',
+          posterUrl: '${m['cover'] ?? ''}',
+          backdropUrl: '${m['cover'] ?? ''}',
+          rating: 0.0,
+          episodes: int.tryParse('${m['episode_count'] ?? 0}') ?? 0,
+          platformSlug: 'freereels',
+          tags: ContentItem.extractTags(m),
+        ));
+      }
+      if (added == 0) break;
+      final next = '${(data['page_info'] as Map?)?['next'] ?? ''}';
+      if (next.isEmpty || next == pageToken) break;
+      pageToken = next;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    return all;
+  }
+
   /// Detail series: GET /frv2-api/drama/info_v2?series_id={key}
   /// Mengembalikan list episode mentah (data.info.episode_list).
   /// Tiap episode: id, index, name, cover, duration,
