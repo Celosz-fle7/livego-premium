@@ -20,19 +20,32 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
   bool loading = false;
   List<ContentItem> results = [];
 
-  /// Filter genre: kosong = "Semua" (tanpa filter). Genre BUKAN untuk
-  /// mencari — genre memfilter hasil yang sudah ada (contoh: ketik
-  /// "sulih suara" source FreeReels, lalu filter genre).
+  /// Filter milik provider yang dipilih (null = Semua Source = tanpa filter).
+  /// Kosong = "Semua" (tanpa filter). Filter BUKAN untuk mencari —
+  /// genre memfilter hasil yang sudah ada.
   final Set<String> _selectedGenres = {};
 
-  /// Hasil yang tampil = results difilter yang dipilih.
+  /// Slug provider yang dipilih, null kalau "Semua Source".
+  String? get _selectedSlug =>
+      platform < 0 ? null : LiveGoCatalog.platforms[platform];
+
+  /// Hasil yang tampil = results difilter milik provider yang dipilih.
   List<ContentItem> get _displayed =>
-      SearchFilter.filter(results, _selectedGenres);
+      SearchFilter.filter(_selectedSlug, results, _selectedGenres);
 
   void _toggleGenre(String label) {
     setState(() {
       if (!_selectedGenres.remove(label)) _selectedGenres.add(label);
     });
+  }
+
+  void _selectPlatform(int next) {
+    setState(() {
+      platform = next;
+      // Label filter ganti per provider -> seleksi lama tidak berlaku.
+      _selectedGenres.clear();
+    });
+    if (query.isNotEmpty) _search(query);
   }
 
   Future<void> _search(String value) async {
@@ -103,10 +116,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
                 child: ChoiceChip(
                   selected: platform < 0,
                   label: const Text('Semua Source'),
-                  onSelected: (_) {
-                    setState(() => platform = -1);
-                    if (query.isNotEmpty) _search(query);
-                  },
+                  onSelected: (_) => _selectPlatform(-1),
                 ),
               ),
               ...List.generate(LiveGoCatalog.platformLabels.length, (i) {
@@ -116,10 +126,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
                   child: ChoiceChip(
                     selected: selected,
                     label: Text(LiveGoCatalog.platformLabels[i]),
-                    onSelected: (_) {
-                      setState(() => platform = i);
-                      if (query.isNotEmpty) _search(query);
-                    },
+                    onSelected: (_) => _selectPlatform(i),
                   ),
                 );
               }),
@@ -127,34 +134,37 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        // Filter hasil — genre FreeReels + kata kunci & genre MovieBox.
+        // Filter milik provider yang dipilih (FreeReels / MovieBox).
+        // Provider lain & Semua Source tidak punya filter -> row disembunyikan.
         // Memfilter hasil, BUKAN mencari. "Semua" = tanpa filter.
         // Tap = pilih manual (multi-select).
-        const Align(
-          alignment: Alignment.centerLeft,
-          child: Text('Filter', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilterChip(
-              label: const Text('Semua', style: TextStyle(fontSize: 12)),
-              selected: _selectedGenres.isEmpty,
-              onSelected: (_) => setState(() => _selectedGenres.clear()),
-            ),
-            ...SearchFilter.allLabels.map((label) {
-              final selected = _selectedGenres.contains(label);
-              return FilterChip(
-                label: Text(label, style: const TextStyle(fontSize: 12)),
-                selected: selected,
-                onSelected: (_) => _toggleGenre(label),
-              );
-            }),
-          ],
-        ),
-        const SizedBox(height: 20),
+        if (SearchFilter.labelsFor(_selectedSlug).isNotEmpty) ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Filter', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('Semua', style: TextStyle(fontSize: 12)),
+                selected: _selectedGenres.isEmpty,
+                onSelected: (_) => setState(() => _selectedGenres.clear()),
+              ),
+              ...SearchFilter.labelsFor(_selectedSlug).map((label) {
+                final selected = _selectedGenres.contains(label);
+                return FilterChip(
+                  label: Text(label, style: const TextStyle(fontSize: 12)),
+                  selected: selected,
+                  onSelected: (_) => _toggleGenre(label),
+                );
+              }),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
         if (loading)
           const Padding(
             padding: EdgeInsets.only(top: 70),

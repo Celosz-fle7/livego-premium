@@ -2,32 +2,48 @@ import '../models/content_item.dart';
 import 'freereels/freereels_config.dart';
 import 'moviebox/moviebox_filters.dart';
 
-/// Filter hasil pencarian — satu row chip untuk semua provider.
-/// Label = gabungan genre FreeReels + kata kunci & genre MovieBox
-/// (dedupe, FreeReels dulu lalu MovieBox).
-/// Item lolos kalau cocok dengan matcher salah satu provider — jadi
-/// label "Balas Dendam" memfilter item FreeReels MAUPUN MovieBox.
+/// Filter hasil pencarian — MASING-MASING PROVIDER PUNYA FILTER SENDIRI,
+/// tidak dicampur. FreeReels pakai genre FreeReels, MovieBox pakai kata
+/// kunci + genre MovieBox, provider lain tanpa filter (row disembunyikan).
+/// Filter memfilter hasil yang sudah ada, BUKAN mencari.
 class SearchFilter {
-  static List<String> get allLabels {
-    final seen = <String>{};
-    final out = <String>[];
-    for (final label in [...FreereelsConfig.genreTags.keys, ...MovieBoxFilters.allLabels]) {
-      if (seen.add(label.toLowerCase())) out.add(label);
+  /// Label filter milik satu provider. Kosong = provider tidak punya filter.
+  /// [platformSlug] null = Semua Source (tidak ada satu provider).
+  static List<String> labelsFor(String? platformSlug) {
+    switch (platformSlug) {
+      case 'freereels':
+        return FreereelsConfig.genreTags.keys.toList();
+      case 'moviebox':
+        return MovieBoxFilters.allLabels.toList();
+      default:
+        return const [];
     }
-    return out;
   }
 
-  static bool matches(ContentItem item, Set<String> selectedLabels) {
+  static bool matches(
+    String? platformSlug,
+    ContentItem item,
+    Set<String> selectedLabels,
+  ) {
     if (selectedLabels.isEmpty) return true;
-    return MovieBoxFilters.matches(item, selectedLabels) ||
-        FreereelsConfig.matchesGenres(item, selectedLabels);
+    switch (platformSlug) {
+      case 'freereels':
+        return FreereelsConfig.matchesGenres(item, selectedLabels);
+      case 'moviebox':
+        return MovieBoxFilters.matches(item, selectedLabels);
+      default:
+        return true;
+    }
   }
 
   static List<ContentItem> filter(
+    String? platformSlug,
     List<ContentItem> items,
     Set<String> selectedLabels,
   ) {
     if (selectedLabels.isEmpty) return items;
-    return items.where((item) => matches(item, selectedLabels)).toList();
+    return items
+        .where((item) => matches(platformSlug, item, selectedLabels))
+        .toList();
   }
 }

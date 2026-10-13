@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
+import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../core/managers/tv_back_manager.dart';
 import '../core/managers/tv_remote_manager.dart';
@@ -57,24 +58,42 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _editingInput = false;
   int _lastSearchSubmitMs = 0;
 
-  /// Filter genre: kosong = "Semua" (tanpa filter). Genre BUKAN untuk
-  /// mencari — genre memfilter hasil yang sudah ada (contoh: ketik
-  /// "sulih suara" source FreeReels, lalu filter genre).
+  /// Provider yang dipilih: index 0 = Semua Source, sisanya urutan
+  /// LiveGoCatalog.platforms. Filter mengikuti provider ini
+  /// (masing-masing sendiri, tidak dicampur).
+  final List<FocusNode> _providerNodes = <FocusNode>[];
+  int _providerIndex = 0;
+  bool _providerFocused = false;
+
+  /// Filter milik provider yang dipilih: kosong = "Semua" (tanpa filter).
+  /// Filter BUKAN untuk mencari — memfilter hasil yang sudah ada.
   final Set<String> _selectedGenres = {};
   final List<FocusNode> _genreNodes = <FocusNode>[];
   int _genreIndex = 0;
   bool _genreFocused = false;
 
-  /// Label row filter: "Semua" + genre FreeReels + kata kunci/genre MovieBox.
-  /// Index 0 = Semua.
-  List<String> get _genreLabels =>
-      ['Semua', ...SearchFilter.allLabels];
+  List<String> get _providerLabels =>
+      ['Semua Source', ...LiveGoCatalog.platformLabels];
 
-  /// Index chip genre yang aktif (untuk TvChipRow multi-select).
+  /// Slug provider yang dipilih, null kalau "Semua Source".
+  String? get _providerSlug => _providerIndex <= 0
+      ? null
+      : LiveGoCatalog.platforms[_providerIndex - 1];
+
+  /// Provider yang dipilih punya filter atau tidak.
+  bool get _hasFilter => SearchFilter.labelsFor(_providerSlug).isNotEmpty;
+
+  /// Label row filter: "Semua" + label milik provider yang dipilih.
+  /// Index 0 = Semua. Kosong kalau provider tidak punya filter.
+  List<String> get _genreLabels => _hasFilter
+      ? ['Semua', ...SearchFilter.labelsFor(_providerSlug)]
+      : const [];
+
+  /// Index chip filter yang aktif (untuk TvChipRow multi-select).
   Set<int> get _selectedGenreIndices {
     if (_selectedGenres.isEmpty) return {0};
     final out = <int>{};
-    final labels = SearchFilter.allLabels.toList();
+    final labels = SearchFilter.labelsFor(_providerSlug);
     for (var i = 0; i < labels.length; i++) {
       if (_selectedGenres.contains(labels[i])) out.add(i + 1);
     }
@@ -86,10 +105,23 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       setState(() => _selectedGenres.clear());
       return;
     }
-    final label = SearchFilter.allLabels.toList()[index - 1];
+    final labels = SearchFilter.labelsFor(_providerSlug);
+    if (index - 1 >= labels.length) return;
+    final label = labels[index - 1];
     setState(() {
       if (!_selectedGenres.remove(label)) _selectedGenres.add(label);
     });
+  }
+
+  Future<void> _selectProviderIndex(int index) async {
+    final slug = index <= 0 ? null : LiveGoCatalog.platforms[index - 1];
+    setState(() {
+      _providerIndex = index;
+      // Label filter ganti per provider -> seleksi lama tidak berlaku.
+      _selectedGenres.clear();
+      _genreIndex = 0;
+    });
+    await ref.read(tvSearchProvider.notifier).setPlatform(slug);
   }
 
   @override
@@ -114,6 +146,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     for (final node in _resultNodes) {
       node.dispose();
     }
+    for (final node in _providerNodes) {
+      node.dispose();
+    }
     for (final node in _genreNodes) {
       node.dispose();
     }
@@ -128,6 +163,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     while (_resultNodes.length > count) {
       _resultNodes.removeLast().dispose();
+    }
+  }
+
+  void _syncProviderNodes(int count) {
+    while (_providerNodes.length < count) {
+      _providerNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-search-provider-${_providerNodes.length}'));
+    }
+    while (_providerNodes.length > count) {
+      _providerNodes.removeLast().dispose();
     }
   }
 
@@ -169,10 +213,38 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     );
     if (ok) {
       _genreFocused = true;
+      _providerFocused = false;
       _genreIndex = target;
       _zone = TvZone.list;
     }
     return ok;
+  }
+
+  bool _focusProvider(int index, {bool throttle = true}) {
+    if (_providerNodes.isEmpty) return false;
+    final target = index.clamp(0, _providerNodes.length - 1).toInt();
+    final ok = tvFocusComfort(
+      _providerNodes[target],
+      topMargin: TvSearchConfig.gridTopMargin,
+      bottomMargin: TvSearchConfig.listBottomMargin,
+      throttle: throttle,
+    );
+    if (ok) {
+      _providerFocused = true;
+      _genreFocused = false;
+      _providerIndex = target;
+      _zone = TvZone.list;
+    }
+    return ok;
+  }
+
+  /// Fokus ke row filter kalau ada, kalau tidak ke row provider.
+  void _focusFilterOrProvider() {
+    if (_hasFilter) {
+      _focusGenre(_genreIndex);
+    } else {
+      _focusProvider(_providerIndex);
+    }
   }
 
   void _focusDownToResults() {
@@ -252,6 +324,10 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       _exitTextEdit(refocusBox: true);
       return;
     }
+    if (_providerFocused) {
+      _focusInput(throttle: false);
+      return;
+    }
     if (_genreFocused) {
       _focusInput(throttle: false);
       return;
@@ -284,7 +360,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusInput(throttle: false);
+      _focusProvider(_providerIndex);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
@@ -293,6 +369,45 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     if (tvIsSelectKey(key)) {
       _toggleGenreIndex(index);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _providerKey(int index, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (index == 0) {
+        widget.onMoveToNav?.call();
+      } else {
+        _focusProvider(index - 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (index < _providerNodes.length - 1) _focusProvider(index + 1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _focusInput(throttle: false);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      if (_hasFilter) {
+        _focusGenre(_genreIndex);
+      } else {
+        _focusDownToResults();
+      }
+      return KeyEventResult.handled;
+    }
+    if (tvIsSelectKey(key)) {
+      _selectProviderIndex(index);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -393,7 +508,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
         if (ref.read(tvSearchProvider).loading) {
           _focusInput(throttle: false);
         } else {
-          _focusGenre(_genreIndex);
+          _focusProvider(_providerIndex);
         }
         return KeyEventResult.handled;
       }
@@ -420,7 +535,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       if (search.loading) {
         _focusInput(throttle: false);
       } else {
-        _focusGenre(_genreIndex);
+        _focusProvider(_providerIndex);
       }
       return KeyEventResult.handled;
     }
@@ -444,7 +559,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusGenre(_genreIndex);
+      _focusFilterOrProvider();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
@@ -482,7 +597,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        _focusGenre(_genreIndex);
+        _focusFilterOrProvider();
       } else {
         _focusGrid(current - columns);
       }
@@ -504,12 +619,16 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Widget build(BuildContext context) {
     final search = ref.watch(tvSearchProvider);
     final results = search.results;
-    // Genre memfilter hasil (bukan mencari): "Semua" = tanpa filter.
+    // Filter milik provider yang dipilih (FreeReels / MovieBox).
+    // Provider lain & Semua Source tidak punya filter.
     final visibleResults = search.loading
         ? const <ContentItem>[]
-        : SearchFilter.filter(results, _selectedGenres);
+        : SearchFilter.filter(search.platform, results, _selectedGenres);
     if (_resultNodes.length != visibleResults.length) {
       _syncNodes(visibleResults.length);
+    }
+    if (_providerNodes.length != _providerLabels.length) {
+      _syncProviderNodes(_providerLabels.length);
     }
     if (_genreNodes.length != _genreLabels.length) {
       _syncGenreNodes(_genreLabels.length);
@@ -615,32 +734,60 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                         const SizedBox(height: TvSearchConfig.keyboardGap),
                         const TvSearchKeyboardPanel(),
                         const SizedBox(height: TvSearchConfig.afterKeyboardGap),
-                        // Filter genre: memfilter hasil, BUKAN mencari.
-                        // "Semua" = tanpa filter. OK di chip = pilih manual.
+                        // Pilih provider — filter di bawah mengikuti provider
+                        // ini (masing-masing sendiri, tidak dicampur).
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'GENRE',
+                              'PROVIDER',
                               style: TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none),
                             ),
                             const SizedBox(height: 6),
                             TvChipRow(
-                              labels: _genreLabels,
-                              selected: -1,
-                              selectedSet: _selectedGenreIndices,
-                              focusedIndex: _genreFocused ? _genreIndex : null,
-                              nodes: _genreNodes,
-                              onTap: _toggleGenreIndex,
+                              labels: _providerLabels,
+                              selected: _providerIndex,
+                              focusedIndex: _providerFocused ? _providerIndex : null,
+                              nodes: _providerNodes,
+                              onTap: _selectProviderIndex,
                               onFocus: (i) {
-                                _genreIndex = i;
-                                _genreFocused = true;
+                                _providerIndex = i;
+                                _providerFocused = true;
                               },
-                              onKey: (i, event) => _genreKey(i, event),
+                              onKey: (i, event) => _providerKey(i, event),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // Filter milik provider yang dipilih: memfilter hasil,
+                        // BUKAN mencari. "Semua" = tanpa filter.
+                        // OK di chip = pilih manual. Row disembunyikan kalau
+                        // provider tidak punya filter.
+                        if (_hasFilter)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'FILTER',
+                                style: TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none),
+                              ),
+                              const SizedBox(height: 6),
+                              TvChipRow(
+                                labels: _genreLabels,
+                                selected: -1,
+                                selectedSet: _selectedGenreIndices,
+                                focusedIndex: _genreFocused ? _genreIndex : null,
+                                nodes: _genreNodes,
+                                onTap: _toggleGenreIndex,
+                                onFocus: (i) {
+                                  _genreIndex = i;
+                                  _genreFocused = true;
+                                },
+                                onKey: (i, event) => _genreKey(i, event),
+                              ),
+                            ],
+                          ),
+                        if (_hasFilter) const SizedBox(height: 12),
                         if (search.loading)
                           Padding(
                             padding: const EdgeInsets.only(top: TvSearchConfig.loadingTopPadding),

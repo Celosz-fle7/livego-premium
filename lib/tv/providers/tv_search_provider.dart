@@ -11,19 +11,24 @@ class TvSearchState {
   final bool loading;
   final bool hasError;
 
+  /// Slug provider yang dipilih, null = Semua Source.
+  final String? platform;
+
   const TvSearchState({
     this.query = '',
     this.results = const <ContentItem>[],
     this.loading = false,
     this.hasError = false,
+    this.platform,
   });
 
-  TvSearchState copyWith({String? query, List<ContentItem>? results, bool? loading, bool? hasError}) {
+  TvSearchState copyWith({String? query, List<ContentItem>? results, bool? loading, bool? hasError, String? platform, bool clearPlatform = false}) {
     return TvSearchState(
       query: query ?? this.query,
       results: results ?? this.results,
       loading: loading ?? this.loading,
       hasError: hasError ?? this.hasError,
+      platform: clearPlatform ? null : (platform ?? this.platform),
     );
   }
 }
@@ -39,15 +44,29 @@ class TvSearchController extends StateNotifier<TvSearchState> {
     state = state.copyWith(query: value.trim(), hasError: false);
   }
 
+  /// Ganti provider. Kalau ada query, cari ulang di provider itu.
+  /// Filter di layar mengikuti provider ini (masing-masing sendiri).
+  Future<void> setPlatform(String? slug) async {
+    if (state.platform == slug) return;
+    state = state.copyWith(platform: slug, clearPlatform: slug == null);
+    if (state.query.isNotEmpty) {
+      await search(state.query);
+    } else {
+      state = state.copyWith(results: const <ContentItem>[]);
+    }
+  }
+
   Future<void> search(String value) async {
     final clean = value.trim();
     final ticket = ++_ticket;
     if (clean.isEmpty) {
-      state = const TvSearchState();
+      // Clear hasil saja — pilihan provider tetap.
+      state = state.copyWith(query: '', results: const <ContentItem>[], loading: false, hasError: false);
       return;
     }
 
-    final cacheKey = TvRamCache.key('search', [clean]);
+    final platform = state.platform;
+    final cacheKey = TvRamCache.key('search', [clean, platform ?? 'all']);
     final cached = TvRamCache.instance.read<List<ContentItem>>(cacheKey);
     if (cached != null) {
       state = TvSearchState(
@@ -55,6 +74,7 @@ class TvSearchController extends StateNotifier<TvSearchState> {
         loading: false,
         hasError: false,
         results: cached,
+        platform: platform,
       );
       return;
     }
@@ -65,7 +85,9 @@ class TvSearchController extends StateNotifier<TvSearchState> {
     List<ContentItem> rows = const <ContentItem>[];
     var hasError = false;
     try {
-      rows = await LiveGoCatalog.searchAll(clean).timeout(_searchTimeout);
+      rows = platform == null
+          ? await LiveGoCatalog.searchAll(clean).timeout(_searchTimeout)
+          : await LiveGoCatalog.search(clean, platform: platform).timeout(_searchTimeout);
     } catch (_) {
       hasError = true;
       rows = const <ContentItem>[];
@@ -80,6 +102,7 @@ class TvSearchController extends StateNotifier<TvSearchState> {
       loading: false,
       hasError: hasError,
       results: cleanRows,
+      platform: platform,
     );
   }
 }
