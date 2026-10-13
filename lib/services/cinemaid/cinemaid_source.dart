@@ -82,6 +82,65 @@ class CinemaIdSource implements DramaSource {
     '18+',
   };
 
+  /// Keluarga platform per kategori: tag seed yang dinormalisasi milik platform ini.
+  /// Dipakai untuk verifikasi bahwa item server benar-benar dari platform tersebut.
+  static const Map<String, Set<String>> _platformFamilies = {
+    'netflix': {'netflix', 'netflixtop10'},
+    'amazon prime': {'amazonprime', 'primevideo', 'amazonprimetop10'},
+    'apple tv+': {'appletv', 'appletvplus', 'appletop10'},
+    'disney+ hotstar': {'disneyhotstar', 'disney', 'disneyplus', 'disneyplustop10'},
+    'vidio': {'vidio', 'vidiotop10', 'indonesiandrama'},
+    'vivamax': {'vivamax', 'vivamaxtop10'},
+    'viu': {'viu', 'viutop10', 'newkoreandramaseries'},
+    'iflix': {'iflix', 'iflixtop10'},
+    'crunchyroll': {'crunchyroll', 'crunchyrolltop10', 'popularanime'},
+    '18+': {'18', '18top10'},
+  };
+
+  /// Map ID seed -> tag platform ternormalisasi (ground truth dari storage app asli).
+  static Map<String, Set<String>>? _seedPlatformsCache;
+  static Map<String, Set<String>> get _seedPlatforms {
+    return _seedPlatformsCache ??= {
+      for (final s in cinemaIdSeedCatalog)
+        s.id: {
+          for (final c in s.categories)
+            c.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''),
+        },
+    };
+  }
+
+  /// Filter item server: buang yang TERBUKTI milik platform lain
+  /// (ID-nya ada di seed dengan tag platform berbeda).
+  /// Item yang tidak ada di seed tetap lolos (tidak bisa diverifikasi).
+  /// Khusus tab 18+: hanya item yang terbukti 18+ yang lolos.
+  List<ContentItem> _verifyPlatform(List<ContentItem> items, String catKey) {
+    final family = _platformFamilies[catKey];
+    if (family == null) return items;
+    final isAdultTab = catKey == '18+';
+    final out = <ContentItem>[];
+    var dropped = 0;
+    for (final item in items) {
+      final known = _seedPlatforms[item.id];
+      if (known == null) {
+        if (isAdultTab) {
+          dropped++; // tab dewasa: hanya yang terbukti 18+
+          continue;
+        }
+        out.add(item);
+        continue;
+      }
+      if (known.any(family.contains)) {
+        out.add(item);
+      } else {
+        dropped++;
+      }
+    }
+    if (dropped > 0) {
+      debugPrint('CINEMAID SOURCE: filtered $dropped cross-platform items from $catKey');
+    }
+    return out;
+  }
+
   /// Format URL ke proxy lokal mandiri CinemaID LiveGo (127.0.0.1:7055).
   /// Menandatangani request dengan kunci enkripsi CDN CloudFront secara otomatis.
   String _formatStreamUrl(String rawUrl) {
@@ -120,7 +179,10 @@ class CinemaIdSource implements DramaSource {
           debugPrint('CINEMAID SOURCE: loaded ${vods.length} items for topic $topicId ($category)');
           final seen = <String>{};
           final seedItems = _seedItems(category, seen: seen, isAdultTab: isAdultTab);
-          final otherVods = vods.where((v) => seen.add(v.id)).toList();
+          final otherVods = _verifyPlatform(
+            vods.where((v) => seen.add(v.id)).toList(),
+            catKey,
+          );
           return [...seedItems, ...otherVods];
         }
       }
@@ -225,7 +287,8 @@ class CinemaIdSource implements DramaSource {
           // Sisipkan seed items yang terbukti valid 100% di awal jika belum ada,
           // agar selalu ada konten yang siap putar langsung di home feed
           final seedItems = _seedItems(category, seen: seen);
-          return [...seedItems, ...out];
+          final verified = _verifyPlatform(out, catKey);
+          return [...seedItems, ...verified];
         }
       }
     } catch (e, st) {
