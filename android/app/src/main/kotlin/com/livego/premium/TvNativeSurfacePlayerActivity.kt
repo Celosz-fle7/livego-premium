@@ -401,7 +401,11 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private fun createPlayer(url: String, keepPositionMs: Long, playWhenReady: Boolean) {
         val old = player
         old?.pause()
-        resetNativeVideoSurface()
+        // Hanya detach surface saat MENGGANTI player lama (ganti episode/kualitas).
+        // Pada pembuatan pertama (old == null) PlayerView masih fresh & hitam —
+        // detach di sini balapan dengan attach surface pertama dan bisa bikin
+        // video tidak pernah dapat surface (audio jalan, gambar diem/hitam).
+        if (old != null) resetNativeVideoSurface()
         old?.release()
         player = null
 
