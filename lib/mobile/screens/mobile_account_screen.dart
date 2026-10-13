@@ -14,12 +14,12 @@ class MobileAccountScreen extends StatelessWidget {
   Widget _stat(String value, String label) {
     return Expanded(
       child: GlowContainer(
-        padding: const EdgeInsets.symmetric(vertical: 15),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: .4)),
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 3),
+            Text(label, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .4)),
           ],
         ),
       ),
@@ -28,8 +28,8 @@ class MobileAccountScreen extends StatelessWidget {
 
   Widget _section(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 24, 2, 12),
-      child: Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 12)),
+      padding: const EdgeInsets.fromLTRB(2, 18, 2, 10),
+      child: Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 11)),
     );
   }
 
@@ -38,27 +38,27 @@ class MobileAccountScreen extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: const Color(0xFF132135),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFF2B4058)),
               ),
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                   const SizedBox(height: 4),
-                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 13, height: 1.25)),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.25)),
                 ],
               ),
             ),
@@ -71,7 +71,7 @@ class MobileAccountScreen extends StatelessWidget {
 
   Widget _menuGroup(BuildContext context, List<Widget> children) {
     return GlowContainer(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Column(
         children: [
           for (int i = 0; i < children.length; i++) ...[
@@ -89,31 +89,31 @@ class MobileAccountScreen extends StatelessWidget {
       valueListenable: LiveGoLocalStore.version,
       builder: (context, _, __) {
         return ListView(
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 120),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
           children: [
             GlowContainer(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
                   Container(
-                    width: 86,
-                    height: 86,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(20),
                       gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
                       boxShadow: [BoxShadow(color: AppTheme.purple.withOpacity(0.3), blurRadius: 24)],
                     ),
-                    child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 52),
+                    child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 40),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('RUANG PRIBADI', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: .8)),
-                        SizedBox(height: 8),
-                        Text('Penggemar LiveGo', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
                         SizedBox(height: 6),
+                        Text('Penggemar LiveGo', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                        SizedBox(height: 4),
                         Text('Masuk cepat ke riwayat, favorit, pengaturan, dan update.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
                       ],
                     ),
@@ -121,12 +121,12 @@ class MobileAccountScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Row(children: [
               _stat('${LiveGoLocalStore.history.length}', 'HISTORI'),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _stat('${LiveGoLocalStore.favorites.length}', 'FAVORIT'),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               _stat('${LiveGoLocalStore.downloads.length}', 'DOWNLOAD'),
             ]),
             _section('Koleksi Cepat'),

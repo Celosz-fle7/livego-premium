@@ -235,7 +235,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       onRefresh: () => _loadInitial(freshOnly: true),
       child: ListView(
         controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 84),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 74),
         children: [
           _HeroCarousel(
             items: items.take(5).toList(),
@@ -464,35 +464,40 @@ class _OneLineSelector extends StatelessWidget {
     final shown = items.toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
       decoration: BoxDecoration(
         color: const Color(0xFF101826).withOpacity(0.82),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(11),
         border: Border.all(color: const Color(0xFF22354D)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-          const SizedBox(height: 5),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(shown.length, (i) {
+          Text(title.toUpperCase(), textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSoft, fontSize: 8.5, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+          const SizedBox(height: 4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(shown.length, (i) {
                 final active = i == selected;
                 return Padding(
-                  padding: EdgeInsets.only(right: i == shown.length - 1 ? 0 : 5),
+                  padding: EdgeInsets.only(right: i == shown.length - 1 ? 0 : 4),
                   child: GestureDetector(
                     onTap: () => onSelected(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      height: 28,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      height: 24,
+                      padding: const EdgeInsets.symmetric(horizontal: 9),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
                         color: active ? null : const Color(0xFF172131),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: active ? Colors.transparent : const Color(0xFF2C405A)),
                       ),
                       child: Text(
@@ -500,13 +505,16 @@ class _OneLineSelector extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 9),
+                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 8.5),
                       ),
                     ),
                   ),
                 );
               }),
-            ),
+                    ),
+                  ),
+                );
+            },
           ),
         ],
       ),
