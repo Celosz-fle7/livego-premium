@@ -23,6 +23,7 @@ class ShortTvClient {
   String _token = '';
   String _rc4Key = ShortTvConfig.defaultRc4Key;
   DateTime? _tokenExpiry;
+  final Map<String, ({bool isLocked, int price})> _episodeLockCache = {};
 
   /// Generate UUID v4 sederhana
   String _randomUuid() {
@@ -349,6 +350,10 @@ class ShortTvClient {
         final epNum = int.tryParse('${ep['episodeNum'] ?? i + 1}') ?? (i + 1);
 
         if (dreamId.isNotEmpty) {
+          final isLocked = ep['lock'] == 1 || ep['alreadyLock'] == 2;
+          final price = int.tryParse('${ep['price'] ?? 0}') ?? 0;
+          _episodeLockCache['$spId:$dreamId'] = (isLocked: isLocked, price: price);
+
           episodes.add(LiveGoEpisode(
             id: dreamId,
             index: epNum,
@@ -390,9 +395,11 @@ class ShortTvClient {
       throw Exception('ShortTV: currentEpisodesReponse kosong ($seriesId/$episodeId)');
     }
 
+    final isLock = cur['lock'] == 1 || cur['alreadyLock'] == 2;
     final rawVideoUrl = '${cur['videoUrl'] ?? ''}';
-    if (rawVideoUrl.isEmpty) {
-      throw Exception('ShortTV: videoUrl kosong ($seriesId/$episodeId)');
+    if (isLock || rawVideoUrl.isEmpty) {
+      final price = cur['price'] ?? 50;
+      throw Exception('Episode ini terkunci ($price koin di ShortTV)');
     }
 
     Map<String, dynamic> videoMap = {};
@@ -439,14 +446,19 @@ class ShortTvClient {
     String seriesId,
     String episodeId,
   ) async {
-    return const DramaEpisodeExtras(
-      qualities: [
+    final lockInfo = _episodeLockCache['$seriesId:$episodeId'];
+    final isUnlocked = lockInfo != null ? !lockInfo.isLocked : true;
+    final price = lockInfo?.price ?? 0;
+
+    return DramaEpisodeExtras(
+      qualities: const [
         DramaQuality(label: '1080p', resolution: '1080x1920 (FHD)'),
         DramaQuality(label: '720p', resolution: '720x1280 (HD)'),
         DramaQuality(label: '480p', resolution: '480x854 (Standar)'),
         DramaQuality(label: '360p', resolution: '360x640 (Cepat)'),
       ],
-      unlocked: true,
+      unlocked: isUnlocked,
+      episodePrice: price,
     );
   }
 }

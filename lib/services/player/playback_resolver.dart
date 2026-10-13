@@ -57,6 +57,19 @@ class PlaybackResolver {
     try {
       final episodes = await source.episodes(item.id);
       final episodeId = _pickEpisodeId(episodes, ep);
+
+      // Cek status unlock / extras sebelum request stream
+      DramaEpisodeExtras? extras;
+      try {
+        extras = await source.episodeExtras(item.id, episodeId);
+        if (extras != null && !extras.unlocked) {
+          final price = extras.episodePrice > 0 ? ' (${extras.episodePrice} koin)' : '';
+          throw Exception('Episode $ep terkunci VIP/berbayar$price');
+        }
+      } catch (e) {
+        if ('$e'.contains('terkunci')) rethrow;
+      }
+
       final url = await source.streamUrl(
         seriesId: item.id,
         episodeId: episodeId,
@@ -71,43 +84,30 @@ class PlaybackResolver {
       }
       final nextIdx = episodes.indexWhere((e) => e.id == episodeId);
 
-      // Extras: subtitle, kualitas, status unlock (jika provider mendukung).
+      // Extras: subtitle, kualitas
       List<SubtitleTrack> subtitles = const [];
       List<StreamQuality> qualities = const [];
-      try {
-        final extras = await source.episodeExtras(item.id, episodeId);
-        if (extras != null) {
-          if (!extras.unlocked) {
-            // Episode terkunci: kembalikan source kosong dengan info harga.
-            return PlaybackSource.empty(
-              platform: source.slug,
-              dramaId: item.id,
-              episodeNumber: ep,
-              videoType: LiveGoVideoType.mp4,
-            );
-          }
-          subtitles = extras.subtitles
-              .map((s) => SubtitleTrack(
-                    language: s.language,
-                    format: 'vtt',
-                    url: s.url,
-                  ))
-              .toList();
-          qualities = extras.qualities
-              .map((q) => StreamQuality(
-                    label: q.label,
-                    url: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
-                        ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
-                        : url,
-                    isDefault: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
-                        ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
-                        : q.label == '720p',
-                  ))
-              .toList();
-        }
-      } catch (_) {
-        // Extras opsional; lanjut tanpa subtitle/kualitas.
+      if (extras != null) {
+        subtitles = extras.subtitles
+            .map((s) => SubtitleTrack(
+                  language: s.language,
+                  format: 'vtt',
+                  url: s.url,
+                ))
+            .toList();
+        qualities = extras.qualities
+            .map((q) => StreamQuality(
+                  label: q.label,
+                  url: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
+                      ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
+                      : url,
+                  isDefault: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
+                      ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
+                      : q.label == '720p',
+                ))
+            .toList();
       }
+
 
       if (source.slug == 'melolo' && qualities.isEmpty) {
         qualities = const [
