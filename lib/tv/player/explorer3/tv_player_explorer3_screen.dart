@@ -94,7 +94,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   String _lastQualityLabels = '-';
   String _activeQuality = 'Auto';
 
-  int _controlCursor = 1;
+  int _controlCursor = 2;
   int _episodeCursor = 1;
   int _episodeListTotal = 0;
   int _qualityCursor = 0;
@@ -1243,7 +1243,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!mounted) return;
     setState(() {
       _mode = _Explorer3Mode.controls;
-      if (defaultPlay) _controlCursor = 1;
+      if (defaultPlay) _controlCursor = 2;
       _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE';
     });
     _rootFocus.requestFocus();
@@ -1621,16 +1621,16 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!TvRemoteManager.instance.canActivate()) return;
     switch (_controlCursor) {
       case 0:
-        unawaited(_changeEpisode(-1));
+        _showPanel(_Explorer3Mode.episode);
         return;
       case 1:
-        unawaited(_togglePlay());
+        unawaited(_changeEpisode(-1));
         return;
       case 2:
-        unawaited(_changeEpisode(1));
+        unawaited(_togglePlay());
         return;
       case 3:
-        _showPanel(_Explorer3Mode.episode);
+        unawaited(_changeEpisode(1));
         return;
       case 4:
         _showPanel(_Explorer3Mode.options);

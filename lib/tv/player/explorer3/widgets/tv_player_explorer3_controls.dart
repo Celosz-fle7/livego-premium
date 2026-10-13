@@ -26,11 +26,11 @@ class TvPlayerExplorer3Controls extends StatelessWidget {
   });
 
   static const List<_Explorer3ControlItem> _items = [
+    _Explorer3ControlItem(Icons.format_list_numbered_rounded, 'Episode'),
     _Explorer3ControlItem(Icons.skip_previous_rounded, 'Prev'),
     _Explorer3ControlItem(Icons.play_arrow_rounded, 'Play'),
     _Explorer3ControlItem(Icons.skip_next_rounded, 'Next'),
-    _Explorer3ControlItem(Icons.format_list_numbered_rounded, 'Episode'),
-    _Explorer3ControlItem(Icons.tune_rounded, 'Opsi'),
+    _Explorer3ControlItem(Icons.tune_rounded, 'More'),
   ];
 
   String _fmt(Duration d) {

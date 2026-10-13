@@ -74,7 +74,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var playbackKey = ""
     private var episode = 1
     private var totalEpisodes = 0
-    private var selectedControl = 1
+    private var selectedControl = 2
     private var episodeCursor = 1
     private var qualityCursor = 0
     private var subtitleCursor = 0
@@ -309,19 +309,20 @@ class TvNativeSurfacePlayerActivity : Activity() {
         controlLp.setMargins(0, dp(18), 0, 0)
         bottomDock.addView(controlRow, controlLp)
 
-        repeat(10) { index ->
+        repeat(5) { index ->
             val width = when (index) {
-                1 -> dp(72)
-                4 -> dp(106)
-                6 -> dp(86)
-                8 -> dp(84)
-                else -> dp(64)
+                0 -> dp(86) // Episode
+                1 -> dp(72) // Prev
+                2 -> dp(78) // Play / Pause
+                3 -> dp(72) // Next
+                4 -> dp(86) // More
+                else -> dp(74)
             }
             val button = label("", 12f, Color.WHITE, true)
             button.gravity = Gravity.CENTER
             button.maxLines = 2
             val lp = LinearLayout.LayoutParams(width, -1)
-            if (index > 0) lp.leftMargin = dp(7)
+            if (index > 0) lp.leftMargin = dp(10)
             controlRow.addView(button, lp)
             controlButtons.add(button)
         }
@@ -822,30 +823,20 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     private fun updateDock() {
-        if (controlButtons.size < 10) return
-        val speed = speeds[speedIndex]
-        val speedText = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
+        if (controlButtons.size < 5) return
         val labels = listOf(
+            "☰\nEpisode",
             "‹‹\nPrev",
             if (player?.isPlaying == true) "⏸\nPause" else "▶\nPlay",
             "Next\n››",
-            "↻\n$speedText",
-            qualities.getOrNull(qualityCursor)?.label ?: "Auto",
-            "⛶\n${if (fitCover) "Cover" else "Fit"}",
-            "Auto\n${if (autoNext) "ON" else "OFF"}",
-            "♪\nAudio",
-            "CC\nSub",
-            "☰\nEpisode"
+            "⚙\nMore"
         )
         for (i in controlButtons.indices) {
             val b = controlButtons[i]
             b.text = labels[i]
             b.textSize = when (i) {
-                1 -> 14.5f
-                3 -> 13.0f
-                4 -> 14.0f
-                8 -> 12.5f
-                else -> 12.0f
+                2 -> 14.5f
+                else -> 12.5f
             }
             val selected = mode == Mode.DOCK && i == selectedControl
             b.background = if (selected) selectedBg() else normalBg()
@@ -962,7 +953,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun moveDock(delta: Int) {
         if (!allowMove()) return
-        selectedControl = (selectedControl + delta).coerceIn(0, 9)
+        selectedControl = (selectedControl + delta).coerceIn(0, 4)
         setMode(Mode.DOCK)
     }
 
@@ -1076,16 +1067,11 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun activateDock() {
         when (selectedControl) {
-            0 -> requestEpisode(episode - 1)
-            1 -> togglePlay()
-            2 -> requestEpisode(episode + 1)
-            3 -> changeSpeed()
-            4 -> setMode(Mode.QUALITY)
-            5 -> toggleFit()
-            6 -> toggleAutoNext()
-            7 -> setMode(Mode.AUDIO)
-            8 -> setMode(Mode.SUBTITLE)
-            9 -> setMode(Mode.EPISODE)
+            0 -> setMode(Mode.EPISODE)
+            1 -> requestEpisode(episode - 1)
+            2 -> togglePlay()
+            3 -> requestEpisode(episode + 1)
+            4 -> setMode(Mode.OPTIONS)
         }
     }
 
