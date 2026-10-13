@@ -2,18 +2,14 @@ import 'package:flutter/foundation.dart';
 
 /// Central BACK Logic Manager for Android TV.
 ///
-/// Implements a predictable BACK Ladder across all TV screens:
+/// BACK ladder (tanpa sidebar rail — rail sudah dihapus total):
 /// 1. Close Open Dialog / Modal
-/// 2. Subscreen / Detail -> Return to Section Header / Parent
-/// 3. In-page Content / Grid -> Return to Category / Tabs
-/// 4. Category / Tabs -> Open & Focus Left Sidebar
-/// 5. Left Sidebar (at Home) -> Open Exit App Confirmation Dialog
+/// 2. Non-Home tab -> kembali ke Home di posisi terakhir
+/// 3. Home -> Open Exit App Confirmation Dialog
 enum TvBackStep {
   none,
   closeModal,
   returnToParent,
-  returnToCategory,
-  openSidebar,
   showExitDialog,
 }
 
@@ -38,20 +34,16 @@ class TvBackManager {
   /// Resolve what BACK button should do in the TV Shell root level.
   TvBackStep resolveShellBack({
     required bool isExitDialogOpen,
-    required bool isSidebarFocused,
     required int currentTabIndex,
   }) {
     if (isExitDialogOpen) {
       return TvBackStep.closeModal;
     }
-    if (!isSidebarFocused) {
-      return TvBackStep.openSidebar;
-    }
     if (currentTabIndex != 0) {
-      // If at non-home tab on sidebar, return to home tab first
+      // Di tab non-Home -> kembali ke Home posisi terakhir.
       return TvBackStep.returnToParent;
     }
-    // At Home tab on sidebar -> confirm exit
+    // Di Home -> konfirmasi keluar.
     return TvBackStep.showExitDialog;
   }
 }

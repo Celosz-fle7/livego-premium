@@ -286,6 +286,15 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return _requestControlNode(_categoryNodes[target]);
   }
 
+  bool _focusSearchAtControlAnchor() {
+    _controlFocus = _HomeControlFocus.searchBar;
+    _rememberFocus(TvZone.search, 0);
+    if (!_fullGridMode) {
+      _scrollHomeToGridEntry();
+    }
+    return _requestControlNode(_searchNode);
+  }
+
   bool _requestControlNode(FocusNode node) {
     // Full-grid ladder focuses pinned Platform/Kategori controls without
     // ensureVisible, otherwise the Banner can reveal too early.
@@ -401,6 +410,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return _bannerNode.hasFocus ||
         _platformHeaderNode.hasFocus ||
         _categoryHeaderNode.hasFocus ||
+        _searchNode.hasFocus ||
         _platformNodes.any((node) => node.hasFocus) ||
         _categoryNodes.any((node) => node.hasFocus) ||
         _gridNodes.any((node) => node.hasFocus) ||
@@ -548,6 +558,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         switch (zone) {
           TvZone.platform => _HomeControlFocus.platformChip,
           TvZone.category => _HomeControlFocus.categoryChip,
+          TvZone.search => _HomeControlFocus.searchBar,
           _ => _controlFocus,
         };
     setState(() {
@@ -645,10 +656,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         if (_gridColumns <= 0) return;
         final row = _gridIndex ~/ _gridColumns;
         if (row == 0) {
-          _setManualZone(TvZone.category, _categoryIndex);
+          _setManualZone(TvZone.search, 0);
         } else {
           _setManualZone(TvZone.grid, _gridIndex - _gridColumns);
         }
+        return;
+      case TvZone.search:
+        _setManualZone(TvZone.category, _categoryIndex);
         return;
       case TvZone.category:
         _setManualZone(
@@ -695,6 +709,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         );
         return;
       case TvZone.category:
+        _setManualZone(
+          TvZone.search,
+          0,
+          scroll: false,
+          controlFocus: _HomeControlFocus.searchBar,
+        );
+        return;
+      case TvZone.search:
         if (_gridNodes.isNotEmpty) {
           _setManualZone(TvZone.grid, _gridIndex);
         } else {
@@ -722,6 +744,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         } else {
           _setManualZone(TvZone.grid, _gridIndex - 1, scroll: false);
         }
+        return;
+      case TvZone.search:
+        // LEFT dari search bar -> Akun (alur baru tanpa rail).
+        _moveToNav();
         return;
       case TvZone.platform:
         if (_platformIndex == 0) {
@@ -781,6 +807,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     switch (_zone) {
       case TvZone.grid:
       case TvZone.placeholder:
+        _returnToSearchAnchor();
+        return;
+      case TvZone.search:
         _returnToCategoryAnchor();
         return;
       case TvZone.category:
@@ -791,7 +820,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         return;
       case TvZone.banner:
       default:
-        _moveToNav();
+        // BACK dari Home banner -> dialog exit (tanpa rail perantara).
+        _requestExit();
         return;
     }
   }
@@ -818,6 +848,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         } else {
           _selectCategory(_categoryIndex);
         }
+        return;
+      case TvZone.search:
+        if (!_selectActivationAllowed()) return;
+        widget.onOpenSearch?.call();
         return;
       case TvZone.grid:
         if (_gridItems.isNotEmpty) {
@@ -868,6 +902,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
         } else {
           _requestHomeRootFocus();
         }
+        break;
+      case TvZone.search:
+        _scrollManualZone(TvZone.search, 0);
+        _requestHomeRootFocus();
         break;
       case TvZone.grid:
         _requestHomeRootFocus();
@@ -979,6 +1017,21 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     });
 
     return true;
+  }
+
+  void _returnToSearchAnchor() {
+    _cancelHomeSelectionCommit();
+    if (!_fullGridMode || _zone != TvZone.search) {
+      setState(() {
+        _fullGridMode = true;
+        _zone = TvZone.search;
+      });
+    }
+    _scrollHomeToGridEntry();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusSearchAtControlAnchor();
+    });
   }
 
   void _returnToCategoryAnchor() {
@@ -1244,6 +1297,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return _reduceHomeKey(null, event.logicalKey);
   }
 
+  KeyEventResult _searchKey(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    _controlFocus = _HomeControlFocus.searchBar;
+    _rememberFocus(TvZone.search, 0);
+    return _reduceHomeKey(null, event.logicalKey);
+  }
+
   KeyEventResult _gridKey(int index, ContentItem item, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
@@ -1269,8 +1330,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
-        _focusPlatformAtControlAnchor(_platformIndex);
+      if (!_focusSearchAtControlAnchor()) {
+        if (!_focusCategoryAtControlAnchor(_categoryIndex)) {
+          _focusPlatformAtControlAnchor(_platformIndex);
+        }
       }
       return KeyEventResult.handled;
     }

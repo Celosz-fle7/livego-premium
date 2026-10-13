@@ -71,6 +71,7 @@ class TvHomeFocusStateController extends StateNotifier<TvHomeUiState> {
       case TvZone.settings:
       case TvZone.placeholder:
       case TvZone.player:
+      case TvZone.search:
         state = state.copyWith(zone: zone);
         return;
     }

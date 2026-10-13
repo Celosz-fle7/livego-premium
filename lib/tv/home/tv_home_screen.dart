@@ -25,6 +25,7 @@ import 'focus/tv_home_focus_state.dart';
 import '../providers/tv_remote_owner.dart';
 import '../source_manager/tv_source_manager_screen.dart';
 import '../widgets/tv_chip_row.dart';
+import '../widgets/tv_home_search_bar.dart';
 import '../widgets/tv_hero_banner_focus.dart';
 import '../widgets/tv_home_feedback.dart';
 import '../widgets/tv_home_rail_section.dart';
@@ -40,6 +41,7 @@ enum _HomeControlFocus {
   platformChip,
   categoryHeader,
   categoryChip,
+  searchBar,
 }
 
 /// ARCHITECTURE LOCK:
@@ -52,6 +54,7 @@ enum _HomeControlFocus {
 /// Zone/index memory stays in `focus/tv_home_focus_state.dart`.
 class TvHomeScreen extends ConsumerStatefulWidget {
   final VoidCallback? onMoveToNav;
+  final VoidCallback? onOpenSearch;
   final VoidCallback? onRequestExit;
   final VoidCallback? onPlayerRouteOpen;
   final VoidCallback? onPlayerRouteClosed;
@@ -61,6 +64,7 @@ class TvHomeScreen extends ConsumerStatefulWidget {
   const TvHomeScreen({
     super.key,
     this.onMoveToNav,
+    this.onOpenSearch,
     this.onRequestExit,
     this.onPlayerRouteOpen,
     this.onPlayerRouteClosed,
@@ -82,6 +86,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   final FocusNode _bannerNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-banner');
   final FocusNode _platformHeaderNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-platform-header');
   final FocusNode _categoryHeaderNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-category-header');
+  final FocusNode _searchNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-search');
   final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-home-empty-retry');
   final List<FocusNode> _platformNodes = <FocusNode>[];
   final List<FocusNode> _categoryNodes = <FocusNode>[];
@@ -156,7 +161,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     if (_navService.index != TvNavIndex.home) return;
     this._refreshIfSettingsChanged();
     _homeNavTick.value = _homeNavTick.value + 1;
-    if (_navService.navFocused) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) this._restoreZoneFocus(throttle: false);
     });
@@ -184,6 +188,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
     _bannerNode.dispose();
     _platformHeaderNode.dispose();
     _categoryHeaderNode.dispose();
+    _searchNode.dispose();
     _emptyNode.dispose();
     this._disposeNodes(_platformNodes);
     this._disposeNodes(_categoryNodes);
@@ -283,7 +288,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _HomeStickySourceHeaderDelegate(
-                  height: 110,
+                  height: 150,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 6),
                     child: Column(
@@ -338,6 +343,19 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                             },
                             onKey: (i, event) => this._categoryKey(i, event),
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        TvHomeSearchBar(
+                          focusNode: _searchNode,
+                          focusedOverride: _zone == TvZone.search ? true : null,
+                          onTap: () => widget.onOpenSearch?.call(),
+                          onFocus: () {
+                            setState(() {
+                              _controlFocus = _HomeControlFocus.searchBar;
+                            });
+                            this._rememberFocus(TvZone.search, 0);
+                          },
+                          onKey: (node, event) => this._searchKey(event),
                         ),
                       ],
                     ),

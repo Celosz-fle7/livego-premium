@@ -113,6 +113,7 @@ class _TvAccountBadge extends StatelessWidget {
       case TvAccountAction.feedback:
       case TvAccountAction.about:
       case TvAccountAction.update:
+      case TvAccountAction.search:
         return fallback;
     }
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../navigation/tv_nav_index.dart';
 import '../core/managers/tv_cache_manager.dart';
 import '../core/managers/tv_remote_manager.dart';
 import '../core/managers/tv_back_manager.dart';
@@ -130,8 +131,8 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
   void _backToNav() {
     if (!_backAllowed()) return;
 
-    // Account is a navbar page. BACK/LEFT from Account content must return to
-    // navbar Akun first, not to Home and not to the profile/header image.
+    // Tanpa sidebar rail: BACK/LEFT dari Akun kembali ke Home di posisi
+    // terakhir (via onBackToNav yang dihubungkan shell ke _returnToHomeV2).
     if (widget.onBackToNav != null) {
       widget.onBackToNav?.call();
       return;
@@ -336,13 +337,16 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         _push(const TvUpdateScreen());
         break;
       case TvAccountAction.history:
-        widget.onOpenNavIndex?.call(2);
+        widget.onOpenNavIndex?.call(TvNavIndex.history);
         break;
       case TvAccountAction.favorite:
-        widget.onOpenNavIndex?.call(3);
+        widget.onOpenNavIndex?.call(TvNavIndex.favorite);
         break;
       case TvAccountAction.download:
-        widget.onOpenNavIndex?.call(1);
+        widget.onOpenNavIndex?.call(TvNavIndex.download);
+        break;
+      case TvAccountAction.search:
+        widget.onOpenNavIndex?.call(TvNavIndex.search);
         break;
     }
   }

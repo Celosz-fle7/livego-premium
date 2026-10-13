@@ -16,7 +16,6 @@ import '../home/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_search_screen.dart';
 import '../theme/tv_focus_style.dart';
-import '../widgets/tv_side_nav.dart';
 import '../widgets/tv_lazy_indexed_stack.dart';
 import '../core/managers/tv_back_manager.dart';
 import 'tv_nav_index.dart';
@@ -24,10 +23,14 @@ import 'tv_navigation_service.dart';
 
 /// ARCHITECTURE LOCK:
 /// TvShell owns only app-level TV navigation:
-/// - left nav visibility
 /// - active screen index
 /// - bootstrap recovery when focus is lost
 /// - player route open/close preparation
+///
+/// NAVIGASI TV (tanpa sidebar rail — rail dihapus total):
+/// - LEFT di ujung kiri konten -> langsung buka Akun.
+/// - BACK dari tab non-Home -> kembali ke Home di posisi terakhir.
+/// - BACK dari Home -> dialog exit.
 ///
 /// Heavy screens are created through TvLazyIndexedStack. KeepAlive must stay
 /// small. Home is kept warm because it owns the main TV focus/scroll memory.
@@ -42,9 +45,6 @@ class TvShell extends ConsumerStatefulWidget {
 
 class _TvShellState extends ConsumerState<TvShell> {
   int _index = TvNavIndex.home;
-  int _navCursorIndex = TvNavIndex.home;
-  TvSideNavMode _navMode = TvSideNavMode.hidden;
-  bool _navCloseFocused = false;
   int _homeTicket = 0;
   int _homeBannerTicket = 0;
   int _contentTicket = 0;
@@ -60,9 +60,10 @@ class _TvShellState extends ConsumerState<TvShell> {
   // Downloads are disposable so inactive screens do not keep running.
   Set<int> get _keptAliveScreens => const <int>{TvNavIndex.home};
 
+  /// Jumlah tab sesuai TvNavIndex (0..5).
+  static const int _tabCount = 6;
 
   late final FocusNode _rootFocusNode;
-  late final List<FocusNode> _navNodes;
   late final FocusNode _exitCancelNode;
   late final FocusNode _exitConfirmNode;
   int _lastBootstrapMs = 0;
@@ -72,7 +73,6 @@ class _TvShellState extends ConsumerState<TvShell> {
   void initState() {
     super.initState();
     _rootFocusNode = FocusNode(skipTraversal: true, debugLabel: 'tv-shell-root');
-    _navNodes = List.generate(TvSideNav.items.length, (i) => FocusNode(skipTraversal: true, debugLabel: 'tv-nav-$i'));
     _exitCancelNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-cancel');
     _exitConfirmNode = FocusNode(skipTraversal: true, debugLabel: 'tv-exit-confirm');
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -87,16 +87,12 @@ class _TvShellState extends ConsumerState<TvShell> {
   @override
   void dispose() {
     _rootFocusNode.dispose();
-    for (final node in _navNodes) {
-      node.dispose();
-    }
     _exitCancelNode.dispose();
     _exitConfirmNode.dispose();
     super.dispose();
   }
 
-  int _safeNav(int index) => index.clamp(0, _navNodes.length - 1).toInt();
-  bool get _navHasFocus => _navMode == TvSideNavMode.focused;
+  int _safeNav(int index) => index.clamp(0, _tabCount - 1).toInt();
 
   TvRemoteOwner _ownerFor(int index) {
     switch (index) {
@@ -115,22 +111,14 @@ class _TvShellState extends ConsumerState<TvShell> {
     }
   }
 
-  void _syncOwner({bool navFocused = false}) {
-    final visibleIndex = navFocused ? _navCursorIndex : _index;
-    final owner = navFocused ? TvRemoteOwner.navbar : _ownerFor(_index);
+  void _syncOwner() {
     final nav = ref.read(tvNavigationProvider.notifier);
-    if (navFocused) {
-      nav.selectNav(visibleIndex);
-    } else {
-      nav.enterContent(_index);
-    }
-    nav.setOwner(owner);
-    ref.read(tvFocusProvider.notifier).setOwner(owner);
+    nav.enterContent(_index);
+    nav.setOwner(_ownerFor(_index));
+    ref.read(tvFocusProvider.notifier).setOwner(_ownerFor(_index));
     _navService.update(
-      index: visibleIndex,
-      navFocused: navFocused,
-      owner: owner.name,
-      navMode: _navMode.name,
+      index: _index,
+      owner: _ownerFor(_index).name,
     );
   }
 
@@ -168,7 +156,7 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   void _returnToHomeV2() {
     // Single Home V2 return contract for every route:
-    // - navbar BACK from any item
+    // - BACK from any non-Home tab
     // - onBackToHome from content screens
     // - Account shortcuts that return Home
     //
@@ -178,137 +166,36 @@ class _TvShellState extends ConsumerState<TvShell> {
     _holdRootFocusDuringBackHandoff();
     setState(() {
       _index = TvNavIndex.home;
-      _navCursorIndex = TvNavIndex.home;
-      _navMode = TvSideNavMode.hidden;
-      _navCloseFocused = false;
     });
     _syncOwner();
     _restoreActiveContentAfterBack(banner: false);
   }
 
-  void _focusNav(int index) {
-    final safe = _safeNav(index);
-    _navCursorIndex = safe;
-    _navCloseFocused = false;
-
-    // Deterministic navbar: Shell root owns remote input while navbar is active.
-    // SideNav is visual only, so no item FocusNode/requestFocus is used here.
-    if (_rootFocusNode.canRequestFocus) {
-      _rootFocusNode.requestFocus();
-    }
-    _syncOwner(navFocused: true);
-  }
-
-  void _showNav() {
-    setState(() {
-      _navMode = TvSideNavMode.focused;
-      _navCloseFocused = false;
-      _navCursorIndex = _index;
-    });
-    if (_rootFocusNode.canRequestFocus) {
-      _rootFocusNode.requestFocus();
-    }
-    _syncOwner(navFocused: true);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _navMode != TvSideNavMode.focused) return;
-      _focusNav(_navCursorIndex);
-    });
-  }
-
-  void _showNavFromBack() {
-    // Content -> navbar handoff. Keep cursor on the active navbar item.
-    // Do not return Home here.
-    _suppressBack(180);
-    _showNav();
-  }
-
-  void _returnToHomeFromNavbar() {
-    // Exact navbar BACK ladder:
-    //
-    // Home last zone -> LEFT navbar -> choose Download/History/Favorite/Account/Search
-    // -> BACK from content returns to that navbar icon
-    // -> BACK from navbar returns to Home last remembered zone.
-    _suppressBack(180);
-    _holdRootFocusDuringBackHandoff();
-    setState(() {
-      _index = TvNavIndex.home;
-      _navCursorIndex = TvNavIndex.home;
-      _navMode = TvSideNavMode.hidden;
-      _navCloseFocused = false;
-    });
-    _syncOwner();
-    _restoreActiveContentAfterBack(banner: false);
-  }
-
-  void _moveNavCursor(int navIndex) {
-    final safe = _safeNav(navIndex);
-    if (_navMode != TvSideNavMode.focused || _navCursorIndex != safe) {
-      setState(() {
-        _navMode = TvSideNavMode.focused;
-        _navCloseFocused = false;
-        _navCursorIndex = safe;
-      });
-    }
-    _focusNav(safe);
-  }
-
-  void _hideNav() {
-    if (_navMode != TvSideNavMode.hidden || _navCloseFocused) {
-      setState(() {
-        _navMode = TvSideNavMode.hidden;
-        _navCloseFocused = false;
-      });
-    }
-    _syncOwner();
-  }
-
-  void _enterContent(int navIndex) {
-    final safe = _safeNav(navIndex);
+  /// Buka satu tab langsung (tanpa rail). Dipakai LEFT->Akun, search bar,
+  /// dan shortcut dari menu Akun.
+  void _openTab(int tabIndex) {
+    final safe = _safeNav(tabIndex);
     if (safe == TvNavIndex.home) {
       _returnToHomeV2();
       return;
     }
+    if (safe == _index) return;
     setState(() {
       _index = safe;
-      _navCursorIndex = safe;
-      _navMode = TvSideNavMode.hidden;
-      _navCloseFocused = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _bumpFocusForCurrent();
     });
   }
 
-  void _openNavIndex(int navIndex) {
-    final safe = _safeNav(navIndex);
-    if (safe == TvNavIndex.home) {
-      _returnToHomeV2();
-      return;
-    }
-    setState(() {
-      _index = safe;
-      _navCursorIndex = safe;
-      _navMode = TvSideNavMode.focused;
-      _navCloseFocused = false;
-    });
-    _focusNav(safe);
+  /// LEFT di ujung kiri konten -> langsung buka Akun.
+  void _openAccount() {
+    _openTab(TvNavIndex.account);
   }
 
+  /// Shortcut dari menu Akun (Histori/Favorit/Unduhan/Cari).
   void _openFromAccount(int navIndex) {
-    final safe = _safeNav(navIndex);
-    if (safe == TvNavIndex.account) return;
-    if (safe == TvNavIndex.home) {
-      _returnToHomeV2();
-      return;
-    }
-    setState(() {
-      _index = safe;
-      _navCursorIndex = safe;
-      _navMode = TvSideNavMode.hidden;
-      _navCloseFocused = false;
-    });
-    _bumpFocusForCurrent();
+    _openTab(navIndex);
   }
 
   void _bumpFocusForCurrent({bool banner = false}) {
@@ -328,24 +215,8 @@ class _TvShellState extends ConsumerState<TvShell> {
     });
 
     if (!_exitOpen) {
-      if (_navMode == TvSideNavMode.focused || _navHasFocus) {
-        _syncOwner(navFocused: true);
-      } else {
-        _syncOwner();
-      }
+      _syncOwner();
     }
-  }
-
-  void _showNavFromContentBack() {
-    // BACK from any non-Home content page opens the navbar on that same item:
-    // Unduhan -> navbar Unduhan
-    // Histori -> navbar Histori
-    // Favorit -> navbar Favorit
-    // Akun -> navbar Akun
-    // Cari -> navbar Cari
-    //
-    // The next BACK is handled by _navHasFocus and returns to Home last zone.
-    _showNav();
   }
 
   void _preparePlayerRoute() {
@@ -353,7 +224,6 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (!_playerBlackGuard) {
       setState(() => _playerBlackGuard = true);
     }
-    _hideNav();
   }
 
   void _restorePlayerRoute() {
@@ -361,10 +231,8 @@ class _TvShellState extends ConsumerState<TvShell> {
     if (_playerBlackGuard) {
       setState(() => _playerBlackGuard = false);
     }
-    _hideNav();
     _bumpFocusForCurrent();
   }
-
 
   bool _isDpadOrActivation(LogicalKeyboardKey key) {
     return key == LogicalKeyboardKey.arrowUp ||
@@ -373,68 +241,6 @@ class _TvShellState extends ConsumerState<TvShell> {
         key == LogicalKeyboardKey.arrowRight ||
         tvIsSelectKey(key) ||
         tvIsMenuKey(key);
-  }
-
-  void _focusNavClose() {
-    setState(() {
-      _navMode = TvSideNavMode.focused;
-      _navCloseFocused = true;
-    });
-    _holdRootFocusDuringBackHandoff();
-    _syncOwner(navFocused: true);
-  }
-
-  void _closeNavRestoreContent() {
-    _suppressBack(180);
-    _holdRootFocusDuringBackHandoff();
-    setState(() {
-      _navMode = TvSideNavMode.hidden;
-      _navCloseFocused = false;
-    });
-    _syncOwner();
-    _restoreActiveContentAfterBack(banner: false);
-  }
-
-  bool _handleDeterministicNavKey(LogicalKeyboardKey key) {
-    if (_navMode != TvSideNavMode.focused) return false;
-
-    if (_navCloseFocused) {
-      if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.arrowRight) {
-        _focusNav(_navCursorIndex);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowLeft) {
-        return true;
-      }
-      if (tvIsSelectKey(key)) {
-        _closeNavRestoreContent();
-        return true;
-      }
-      return false;
-    }
-
-    if (key == LogicalKeyboardKey.arrowUp) {
-      if (_navCursorIndex == TvNavIndex.home) {
-        _focusNavClose();
-      } else {
-        _moveNavCursor(_navCursorIndex - 1);
-      }
-      return true;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      _moveNavCursor(_navCursorIndex + 1);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
-      _enterContent(_navCursorIndex);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft || tvIsMenuKey(key)) {
-      _focusNavClose();
-      return true;
-    }
-
-    return false;
   }
 
   bool _primaryFocusMissing() {
@@ -458,7 +264,7 @@ class _TvShellState extends ConsumerState<TvShell> {
         allowRetry: false,
       );
       if (_primaryFocusMissing() && attempt < 1) {
-        _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: attempt + 1);
+        _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
       }
     });
   }
@@ -485,11 +291,6 @@ class _TvShellState extends ConsumerState<TvShell> {
       return;
     }
 
-    if (_navMode == TvSideNavMode.focused || _navHasFocus) {
-      _focusNav(_navCursorIndex);
-      return;
-    }
-
     if (_primaryFocusMissing()) {
       _bumpFocusForCurrent(banner: _index == TvNavIndex.home && forceBanner);
       if (allowRetry) _scheduleBootstrapRetry(forceBanner: forceBanner, attempt: 1);
@@ -505,10 +306,6 @@ class _TvShellState extends ConsumerState<TvShell> {
     final key = event.logicalKey;
     if (tvIsBackKey(key)) {
       _handleBack();
-      return KeyEventResult.handled;
-    }
-
-    if (_handleDeterministicNavKey(key)) {
       return KeyEventResult.handled;
     }
 
@@ -544,8 +341,9 @@ class _TvShellState extends ConsumerState<TvShell> {
       // Closing exit popup returns to Home's last focus. Do not force Banner.
       _restoreActiveContentAfterBack();
     } else {
+      // Keluar dari dialog di tab non-Home -> kembali ke Home posisi terakhir.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showNav();
+        if (mounted) _returnToHomeV2();
       });
     }
   }
@@ -556,18 +354,11 @@ class _TvShellState extends ConsumerState<TvShell> {
       _closeExit();
       return;
     }
-    if (_navHasFocus) {
-      if (_navCursorIndex == TvNavIndex.home) {
-        _showExit();
-      } else {
-        _closeNavRestoreContent();
-      }
-      return;
-    }
     if (_index == TvNavIndex.home) {
-      _showNav();
+      _showExit();
     } else {
-      _showNavFromContentBack();
+      // BACK dari tab non-Home -> Home posisi terakhir (tanpa rail).
+      _returnToHomeV2();
     }
   }
 
@@ -600,15 +391,16 @@ class _TvShellState extends ConsumerState<TvShell> {
       (_) => TvHomeScreen(
             focusTicket: _index == TvNavIndex.home ? _homeTicket : 0,
             bannerFocusTicket: _index == TvNavIndex.home ? _homeBannerTicket : 0,
-            onMoveToNav: _showNav,
+            onMoveToNav: _openAccount,
+            onOpenSearch: () => _openTab(TvNavIndex.search),
             onRequestExit: _showExit,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
       (_) => TvDownloadsScreen(
             focusTicket: _index == TvNavIndex.download ? _contentTicket : 0,
-            onMoveToNav: _showNav,
-            onBackToNav: _showNavFromContentBack,
+            onMoveToNav: _openAccount,
+            onBackToNav: _returnToHomeV2,
             onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -618,8 +410,8 @@ class _TvShellState extends ConsumerState<TvShell> {
             icon: Icons.history_rounded,
             favorites: false,
             focusTicket: _index == TvNavIndex.history ? _contentTicket : 0,
-            onMoveToNav: _showNav,
-            onBackToNav: _showNavFromContentBack,
+            onMoveToNav: _openAccount,
+            onBackToNav: _returnToHomeV2,
             onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -629,23 +421,23 @@ class _TvShellState extends ConsumerState<TvShell> {
             icon: Icons.favorite_rounded,
             favorites: true,
             focusTicket: _index == TvNavIndex.favorite ? _contentTicket : 0,
-            onMoveToNav: _showNav,
-            onBackToNav: _showNavFromContentBack,
+            onMoveToNav: _openAccount,
+            onBackToNav: _returnToHomeV2,
             onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
           ),
       (_) => TvAccountScreen(
             focusTicket: _index == TvNavIndex.account ? _accountTicket : 0,
-            onMoveToNav: _showNav,
-            onBackToNav: _showNavFromContentBack,
+            onMoveToNav: _openAccount,
+            onBackToNav: _returnToHomeV2,
             onBackToHome: _returnToHomeV2,
             onOpenNavIndex: _openFromAccount,
           ),
       (_) => TvSearchScreen(
             focusTicket: _index == TvNavIndex.search ? _contentTicket : 0,
-            onMoveToNav: _showNav,
-            onBackToNav: _showNavFromContentBack,
+            onMoveToNav: _openAccount,
+            onBackToNav: _returnToHomeV2,
             onBackToHome: _returnToHomeV2,
             onPlayerRouteOpen: _preparePlayerRoute,
             onPlayerRouteClosed: _restorePlayerRoute,
@@ -725,26 +517,10 @@ class _TvShellState extends ConsumerState<TvShell> {
                 },
                 child: Stack(
                   children: [
-                    Row(
-                      children: [
-                        TvSideNav(
-                          index: _navMode == TvSideNavMode.focused ? _navCursorIndex : _index,
-                          mode: _navMode,
-                          focusNodes: _navNodes,
-                          closeFocused: _navCloseFocused,
-                          onChanged: _moveNavCursor,
-                          onOpenContent: _enterContent,
-                          onClose: _closeNavRestoreContent,
-                        ),
-                        AnimatedContainer(duration: TvFocusStyle.normal, width: _navMode == TvSideNavMode.hidden ? 0 : 1, margin: const EdgeInsets.symmetric(vertical: 30), color: Colors.white.withOpacity(0.035)),
-                        Expanded(
-                          child: TvLazyIndexedStack(
-                            index: _index,
-                            builders: _pageBuilders(),
-                            keepAliveIndexes: _keptAliveScreens,
-                          ),
-                        ),
-                      ],
+                    TvLazyIndexedStack(
+                      index: _index,
+                      builders: _pageBuilders(),
+                      keepAliveIndexes: _keptAliveScreens,
                     ),
                     if (_playerBlackGuard)
                       const Positioned.fill(

@@ -3,6 +3,7 @@ enum TvZone {
   banner,
   platform,
   category,
+  search,
   grid,
   list,
   settings,

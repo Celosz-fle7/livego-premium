@@ -5,6 +5,7 @@ enum TvAccountAction {
   history,
   favorite,
   download,
+  search,
   displaySettings,
   cacheMaintenance,
   help,
@@ -54,6 +55,13 @@ class TvAccountMenuData {
         subtitle: 'Akses daftar unduhan yang tersimpan untuk ditonton.',
         badge: 'OFFLINE',
         action: TvAccountAction.download,
+      ),
+      TvAccountMenuItem(
+        icon: Icons.search_rounded,
+        title: 'Cari',
+        subtitle: 'Cari film, serial, dan drama dari semua provider.',
+        badge: 'CARI',
+        action: TvAccountAction.search,
       ),
       TvAccountMenuItem(
         icon: Icons.tune_rounded,
