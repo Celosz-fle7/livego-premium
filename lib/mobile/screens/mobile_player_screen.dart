@@ -340,10 +340,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Future<void> _loadPreferences() async {
     await PlayerPreferences.load();
     if (!mounted) return;
+    final slug = widget.item.platformSlug;
     setState(() {
-      _quality = PlayerPreferences.quality;
-      _subtitleEnabled = PlayerPreferences.subtitleEnabled;
-      _subtitleLanguage = PlayerPreferences.subtitleLanguage;
+      _quality = PlayerPreferences.qualityFor(slug);
+      _subtitleEnabled = PlayerPreferences.subtitleEnabledFor(slug);
+      _subtitleLanguage = PlayerPreferences.subtitleLanguageFor(slug);
       _audioTrack = PlayerPreferences.audioTrack.toLowerCase() == 'mute' ? 'Source' : PlayerPreferences.audioTrack;
       _muted = PlayerPreferences.audioTrack.toLowerCase() == 'mute';
       _speed = PlayerPreferences.speed;
@@ -770,7 +771,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         _buffering = true;
       });
       LiveGoSettings.quality = picked;
-      await PlayerPreferences.setQuality(picked);
+      await PlayerPreferences.setQualityFor(widget.item.platformSlug, picked);
       await LiveGoLocalStore.saveSettings();
 
       var url = picked.toLowerCase() == 'auto'
@@ -893,7 +894,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
         _subtitleStatus = 'OFF';
         LiveGoSettings.subtitlesEnabled = false;
       });
-      await PlayerPreferences.setSubtitle(enabled: false, language: 'OFF');
+      await PlayerPreferences.setSubtitleFor(
+        widget.item.platformSlug,
+        enabled: false,
+        language: 'OFF',
+      );
       return;
     }
 
@@ -912,7 +917,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _subtitleStatus = 'Memuat ${track.language}...';
       LiveGoSettings.subtitlesEnabled = true;
     });
-    await PlayerPreferences.setSubtitle(enabled: true, language: track.language);
+    await PlayerPreferences.setSubtitleFor(
+      widget.item.platformSlug,
+      enabled: true,
+      language: track.language,
+    );
 
     try {
       final raw = await _fetchSubtitleText(track.url).timeout(PlaybackTimeoutConfig.subtitleFetch);

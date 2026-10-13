@@ -9,6 +9,7 @@ import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
+import '../../../services/player/playback_resolver.dart';
 import '../tv_player_engine.dart';
 import '../tv_player_service.dart';
 import '../../../services/melolo/melolo_stream_proxy.dart';
@@ -770,12 +771,16 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         LiveGoSettings.quality = text;
         _activeQuality = text;
         _qualityCursor = _qualityIndexFor(text);
-        await PlayerPreferences.setQuality(text);
+        await PlayerPreferences.setQualityFor(widget.item.platformSlug, text);
         break;
       case 'subtitle':
         final off = text.toLowerCase() == 'off' || text.toLowerCase() == 'matikan';
         LiveGoSettings.subtitlesEnabled = !off;
-        await PlayerPreferences.setSubtitle(enabled: !off, language: off ? 'OFF' : text);
+        await PlayerPreferences.setSubtitleFor(
+          widget.item.platformSlug,
+          enabled: !off,
+          language: off ? 'OFF' : text,
+        );
         break;
       case 'audio':
         await PlayerPreferences.setAudioTrack(text);
@@ -872,8 +877,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _streamInfo = stream;
 
       await PlayerPreferences.load();
-      if (_activeQuality == 'Auto' && PlayerPreferences.quality.isNotEmpty && PlayerPreferences.quality.toLowerCase() != 'auto') {
-        _activeQuality = PlayerPreferences.quality;
+      final slugQuality = PlayerPreferences.qualityFor(widget.item.platformSlug);
+      if (_activeQuality == 'Auto' && slugQuality.isNotEmpty && slugQuality.toLowerCase() != 'auto') {
+        _activeQuality = slugQuality;
       }
       final url = _safeUrlForQuality(stream, _activeQuality).trim();
       if (url.isEmpty) throw StateError('Stream kosong');
@@ -908,6 +914,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       if (!nativeOpened) {
         throw StateError('Native ExoPlayer gagal dibuka');
       }
+      // Episode jalan -> prefetch stream episode berikutnya (kualitas
+      // per provider yang sama) supaya pindah episode terasa instan.
+      // Sama seperti mobile (_markPlayable -> preloadNext).
+      PlaybackResolver.preloadNext(item, _episode);
       _scheduleLightPrefetch();
       return;
     } catch (error) {
@@ -1120,7 +1130,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _status = 'Quality $label';
       _mode = _Explorer3Mode.controls;
     });
-    await PlayerPreferences.setQuality(label);
+    await PlayerPreferences.setQualityFor(widget.item.platformSlug, label);
     unawaited(LiveGoLocalStore.saveSettings());
     try {
       await _load();
@@ -1142,6 +1152,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _status = 'Subtitle OFF';
         _mode = _Explorer3Mode.controls;
       });
+      unawaited(PlayerPreferences.setSubtitleFor(
+        widget.item.platformSlug,
+        enabled: false,
+        language: 'OFF',
+      ));
       unawaited(LiveGoLocalStore.saveSettings());
       _scheduleAutoHide();
       return;
@@ -1162,6 +1177,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       _status = 'Subtitle $label';
       _mode = _Explorer3Mode.controls;
     });
+    unawaited(PlayerPreferences.setSubtitleFor(
+      widget.item.platformSlug,
+      enabled: true,
+      language: label,
+    ));
     unawaited(LiveGoLocalStore.saveSettings());
     _scheduleAutoHide();
   }

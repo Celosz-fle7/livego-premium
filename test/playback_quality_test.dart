@@ -14,12 +14,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeQualitySource implements DramaSource {
   final List<String?> receivedQualities = [];
+  final String _slug;
+
+  _FakeQualitySource(this._slug);
 
   @override
-  String get slug => 'melolo';
+  String get slug => _slug;
 
   @override
-  String get label => 'FakeMelolo';
+  String get label => 'Fake$_slug';
 
   @override
   List<String> get categories => const ['Test'];
@@ -62,55 +65,58 @@ class _FakeQualitySource implements DramaSource {
 
 void main() {
   group('PlaybackResolver quality', () {
-    late DramaSource? original;
-    late _FakeQualitySource fake;
+    late DramaSource? originalMelolo;
+    late DramaSource? originalShortTv;
+    late _FakeQualitySource fakeMelolo;
+    late _FakeQualitySource fakeShortTv;
+
+    ContentItem itemFor(String slug, {String chapterId = '1'}) => ContentItem(
+          id: 'series-1',
+          title: 'Test',
+          source: 'fake',
+          category: 'Test',
+          description: '',
+          posterUrl: '',
+          backdropUrl: '',
+          rating: 0,
+          episodes: 2,
+          platformSlug: slug,
+          chapterId: chapterId,
+        );
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({'player.quality': '480p'});
-      original = DramaSourceRegistry.forSlug('melolo');
-      fake = _FakeQualitySource();
-      DramaSourceRegistry.register(fake);
+      PlayerPreferences.quality = '480p';
+      PlayerPreferences.subtitleEnabled = true;
+      PlayerPreferences.subtitleLanguage = 'Auto';
+      // Normalisasi state per-provider: tiap test mulai dari nol,
+      // tidak bergantung urutan eksekusi.
+      await PlayerPreferences.setQualityFor('melolo', '480p');
+      await PlayerPreferences.setQualityFor('shorttv', '480p');
+      await PlayerPreferences.setSubtitleFor('melolo', enabled: true, language: 'Auto');
+      await PlayerPreferences.setSubtitleFor('shorttv', enabled: true, language: 'Auto');
+      originalMelolo = DramaSourceRegistry.forSlug('melolo');
+      originalShortTv = DramaSourceRegistry.forSlug('shorttv');
+      fakeMelolo = _FakeQualitySource('melolo');
+      fakeShortTv = _FakeQualitySource('shorttv');
+      DramaSourceRegistry.register(fakeMelolo);
+      DramaSourceRegistry.register(fakeShortTv);
     });
 
     tearDown(() {
-      if (original != null) DramaSourceRegistry.register(original!);
+      if (originalMelolo != null) DramaSourceRegistry.register(originalMelolo!);
+      if (originalShortTv != null) DramaSourceRegistry.register(originalShortTv!);
     });
 
     test('resolve awal memakai preferensi kualitas user', () async {
-      const item = ContentItem(
-        id: 'series-1',
-        title: 'Test',
-        source: 'fake',
-        category: 'Test',
-        description: '',
-        posterUrl: '',
-        backdropUrl: '',
-        rating: 0,
-        episodes: 2,
-        platformSlug: 'melolo',
-        chapterId: '1',
-      );
-      final source = await PlaybackResolver.resolve(item);
-      expect(fake.receivedQualities, ['480p']);
+      final source = await PlaybackResolver.resolve(itemFor('melolo'));
+      expect(fakeMelolo.receivedQualities, ['480p']);
       expect(source.toStreamInfo().url, contains('_480p'));
       expect(source.toStreamInfo().episodeId, 'ep-1');
     });
 
     test('URL kualitas tidak mengandung fabrikasi ?q=', () async {
-      const item = ContentItem(
-        id: 'series-1',
-        title: 'Test',
-        source: 'fake',
-        category: 'Test',
-        description: '',
-        posterUrl: '',
-        backdropUrl: '',
-        rating: 0,
-        episodes: 2,
-        platformSlug: 'melolo',
-        chapterId: '1',
-      );
-      final info = await PlaybackResolver.resolveStreamInfo(item);
+      final info = await PlaybackResolver.resolveStreamInfo(itemFor('melolo'));
       expect(info.qualities.length, 3);
       for (final q in info.qualities) {
         expect(q.url, isNot(contains('?q=')));
@@ -122,42 +128,57 @@ void main() {
     });
 
     test('streamUrlForQuality re-resolve dengan kualitas yang dipilih', () async {
-      const item = ContentItem(
-        id: 'series-1',
-        title: 'Test',
-        source: 'fake',
-        category: 'Test',
-        description: '',
-        posterUrl: '',
-        backdropUrl: '',
-        rating: 0,
-        episodes: 2,
-        platformSlug: 'melolo',
-        chapterId: '1',
-      );
       final url720 = await PlaybackResolver.streamUrlForQuality(
-        item,
+        itemFor('melolo'),
         episodeId: 'ep-1',
         quality: '720p',
       );
       expect(url720, contains('_720p'));
-      expect(fake.receivedQualities.last, '720p');
+      expect(fakeMelolo.receivedQualities.last, '720p');
 
       final url360 = await PlaybackResolver.streamUrlForQuality(
-        item,
+        itemFor('melolo'),
         episodeId: 'ep-1',
         quality: '360p',
       );
       expect(url360, contains('_360p'));
       expect(url360, isNot(equals(url720)));
     });
+
+    test('setingan kualitas per provider saling terisolasi', () async {
+      await PlayerPreferences.setQualityFor('melolo', '720p');
+      await PlayerPreferences.setQualityFor('shorttv', '360p');
+
+      await PlaybackResolver.resolve(itemFor('melolo'));
+      expect(fakeMelolo.receivedQualities.last, '720p');
+
+      await PlaybackResolver.resolve(itemFor('shorttv'));
+      expect(fakeShortTv.receivedQualities.last, '360p');
+
+      // Provider yang belum diatur -> fallback kualitas global (480p).
+      expect(PlayerPreferences.qualityFor('freereels'), '480p');
+      expect(PlayerPreferences.qualityFor('melolo'), '720p');
+      expect(PlayerPreferences.qualityFor('shorttv'), '360p');
+    });
+
+    test('setingan subtitle per provider saling terisolasi', () async {
+      await PlayerPreferences.setSubtitleFor('melolo', enabled: false, language: 'OFF');
+      await PlayerPreferences.setSubtitleFor('shorttv', enabled: true, language: 'en');
+
+      final melolo = await PlaybackResolver.resolve(itemFor('melolo'));
+      expect(melolo.selectedSubtitle, 'OFF');
+
+      final shorttv = await PlaybackResolver.resolve(itemFor('shorttv'));
+      expect(shorttv.selectedSubtitle, 'en');
+
+      // Provider belum diatur -> fallback global (enabled=true, Auto).
+      expect(PlayerPreferences.subtitleEnabledFor('freereels'), isTrue);
+    });
   });
 
-  // PlayerPreferences.load() membaca mock di atas; reset flag antar test
-  // tidak diperlukan karena setiap test set mock baru + load() sekali jalan.
-  // (PlayerPreferences._loaded statis; setUpAll di bawah memaksa reload.)
+  // PlayerPreferences.load() membaca mock di atas; nilai global di-set
+  // langsung per test agar tidak bergantung urutan test.
   setUpAll(() {
-    // Pastikan PlayerPreferences.quality ikut mock ('480p'), bukan sisa test lain.
     PlayerPreferences.quality = '480p';
   });
 }

@@ -18,7 +18,7 @@ class PlaybackResolver {
     String? chapterId,
   }) async {
     await PlayerPreferences.load();
-    _syncPlayerSettings();
+    _syncPlayerSettings(item.platformSlug);
 
     // Sumber drama eksternal (multi-APK): resolve via registry, meniru APK.
     final dramaSource = DramaSourceRegistry.forSlug(item.platformSlug);
@@ -73,10 +73,10 @@ class PlaybackResolver {
       final url = await source.streamUrl(
         seriesId: item.id,
         episodeId: episodeId,
-        // Hormati preferensi kualitas user (TV 360p / HP 480p / pilihan manual).
-        // FreeReels & CinemaID mengabaikan param ini; Melolo & ShortTV
-        // memilih definisi video sesuai kualitas.
-        quality: PlayerPreferences.quality,
+        // Kualitas per provider (fallback global: TV 360p / HP 480p /
+        // pilihan terakhir). FreeReels & CinemaID mengabaikan param ini;
+        // Melolo & ShortTV memilih definisi video sesuai kualitas.
+        quality: PlayerPreferences.qualityFor(source.slug),
       );
       if (url.trim().isEmpty) {
         return PlaybackSource.empty(
@@ -109,7 +109,7 @@ class PlaybackResolver {
                   label: q.label,
                   url: url,
                   isDefault: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
-                      ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
+                      ? (q.label.toLowerCase() == PlayerPreferences.qualityFor(source.slug).toLowerCase())
                       : q.label == '720p',
                 ))
             .toList();
@@ -126,7 +126,7 @@ class PlaybackResolver {
         ].map((q) => StreamQuality(
               label: q.label,
               url: url,
-              isDefault: q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase(),
+              isDefault: q.label.toLowerCase() == PlayerPreferences.qualityFor(source.slug).toLowerCase(),
             )).toList();
       }
 
@@ -152,9 +152,9 @@ class PlaybackResolver {
         dramaId: item.id,
         episodeNumber: ep,
         videoType: videoType,
-        selectedQuality: PlayerPreferences.quality,
+        selectedQuality: PlayerPreferences.qualityFor(source.slug),
         selectedSubtitle:
-            PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
+            PlayerPreferences.subtitleEnabledFor(source.slug) ? PlayerPreferences.subtitleLanguageFor(source.slug) : 'OFF',
         selectedAudioTrack: PlayerPreferences.audioTrack,
       );
     } catch (e, st) {
@@ -208,7 +208,7 @@ class PlaybackResolver {
     Duration timeout = const Duration(seconds: 7),
   }) async {
     await PlayerPreferences.load();
-    _syncPlayerSettings();
+    _syncPlayerSettings(item.platformSlug);
 
     // Sumber drama eksternal (multi-APK): resolve via registry, meniru APK.
     // (TV pakai jalur fast ini; tanpa branch ini FreeReels di TV gagal.)
@@ -290,15 +290,17 @@ class PlaybackResolver {
       dramaId: item.id,
       episodeNumber: ep,
       videoType: platform.videoType,
-      selectedQuality: PlayerPreferences.quality,
-      selectedSubtitle: PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
+      selectedQuality: PlayerPreferences.qualityFor(platform.slug),
+      selectedSubtitle: PlayerPreferences.subtitleEnabledFor(platform.slug)
+          ? PlayerPreferences.subtitleLanguageFor(platform.slug)
+          : 'OFF',
       selectedAudioTrack: PlayerPreferences.audioTrack,
     );
   }
 
-  static void _syncPlayerSettings() {
-    LiveGoSettings.quality = PlayerPreferences.quality;
-    LiveGoSettings.subtitlesEnabled = PlayerPreferences.subtitleEnabled;
+  static void _syncPlayerSettings(String slug) {
+    LiveGoSettings.quality = PlayerPreferences.qualityFor(slug);
+    LiveGoSettings.subtitlesEnabled = PlayerPreferences.subtitleEnabledFor(slug);
   }
 
   static int _episodeNumber(String chapter) {
@@ -326,6 +328,10 @@ class PlaybackResolver {
         await dramaSource.streamUrl(
           seriesId: item.id,
           episodeId: nextEpisodeId,
+          // Prefetch dengan kualitas per provider yang sama, supaya
+          // cache yang terisi adalah yang benar-benar dipakai saat
+          // user pindah episode (bukan 'auto').
+          quality: PlayerPreferences.qualityFor(item.platformSlug),
         );
       }
     } catch (_) {}

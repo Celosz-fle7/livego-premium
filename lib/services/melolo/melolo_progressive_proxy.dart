@@ -68,6 +68,15 @@ class MeloloProgressiveProxy {
 
     final session = _ProgressiveSession(rawVideoUrl: rawVideoUrl, aesKey: aesKey);
     _sessions[token] = session;
+    // Batasi sesi: prefetch episode berikutnya menambah sesi terus.
+    // Buang yang paling lama (bukan yang baru dibuat) agar memori tidak
+    // menumpuk selama binge-watching. Episode yang sedang diputar selalu
+    // paling baru -> tidak pernah kena eviksi.
+    while (_sessions.length > 8) {
+      final oldest = _sessions.keys.first;
+      if (oldest == token) break;
+      _sessions.remove(oldest)?.dispose();
+    }
     try {
       await session.ensureMoov().timeout(const Duration(seconds: 12));
     } catch (e) {
