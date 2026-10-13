@@ -105,10 +105,8 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   _HomeControlFocus _controlFocus = _HomeControlFocus.platformChip;
   bool _openingDetail = false;
   bool _fullGridMode = false;
-  int _focusBootstrapTicket = 0;
   int _lastFocusEntryMs = 0;
   int _lastEmptyFocusMs = 0;
-  int _lastHomeBackMs = 0;
   int _lastHomeSelectMs = 0;
   int _focusEntryToken = 0;
   int _settingsVersion = LiveGoLocalStore.version.value;

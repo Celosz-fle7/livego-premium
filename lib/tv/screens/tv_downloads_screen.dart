@@ -6,7 +6,6 @@ import '../../core/livego_local_store.dart';
 import '../../services/download/download_service.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
-import '../models/tv_zone.dart';
 import '../theme/tv_focus_style.dart';
 import '../focus/tv_focus_utils.dart';
 import '../focus/tv_reachability.dart';
@@ -39,7 +38,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   final List<FocusNode> _rowNodes = [];
   late final FocusNode _emptyNode;
 
-  TvZone _zone = TvZone.list;
   int _lastRow = 0;
   int _lastSelectMs = 0;
   bool _entryPending = false;
@@ -93,7 +91,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   }
 
   void _moveToNav() {
-    _zone = TvZone.nav;
     if (widget.onMoveToNav != null) {
       widget.onMoveToNav?.call();
     } else if (Navigator.of(context).canPop()) {
@@ -102,7 +99,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   }
 
   void _backToNav() {
-    _zone = TvZone.nav;
     if (widget.onBackToNav != null) {
       widget.onBackToNav?.call();
     } else {
@@ -111,7 +107,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
   }
 
   void _backToHome() {
-    _zone = TvZone.banner;
     if (widget.onBackToHome != null) {
       widget.onBackToHome?.call();
     } else if (Navigator.of(context).canPop()) {
@@ -149,7 +144,6 @@ class _TvDownloadsScreenState extends State<TvDownloadsScreen> {
 
   void _focusRow(int index) {
     if (_rowNodes.isEmpty) return;
-    _zone = TvZone.list;
     _lastRow = _safe(index);
     tvFocusComfort(_rowNodes[_lastRow], topMargin: 110, bottomMargin: 180);
   }

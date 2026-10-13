@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/app_theme.dart';
 import '../theme/tv_focus_style.dart';
 
 class TvFocusedBorder extends StatelessWidget {

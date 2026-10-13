@@ -48,9 +48,7 @@ class CinemaIdClient {
   /// benar-benar jalan: sesi tersimpan -> auto-register -> default.
   /// Default hardcoded hanya cadangan terakhir kalau dua jalur di atas gagal.
   String? _token;
-  bool _initTried = false;
   String _deviceId = '';
-  bool _autoLoginTried = false;
 
   /// Pengaman re-entrancy: ensureSession() -> _autoRegister() memanggil
   /// _rawPost yang tidak boleh memicu ensureSession lagi.
@@ -167,7 +165,6 @@ class CinemaIdClient {
     } catch (_) {}
     _token = null;
     _deviceId = '';
-    _autoLoginTried = false;
   }
 
   void _applyHeaders(HttpHeaders headers) {
@@ -182,12 +179,6 @@ class CinemaIdClient {
     signed.forEach((k, v) {
       headers.set(k, v);
     });
-  }
-
-  Future<Map<String, dynamic>> _ensureBaseAndAuth() async {
-    await ensureSession();
-    final base = await _base();
-    return {'base': base};
   }
 
   /// Pastikan base URL siap langsung tanpa memblokir request.

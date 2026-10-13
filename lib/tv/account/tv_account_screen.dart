@@ -11,7 +11,6 @@ import '../core/managers/tv_remote_manager.dart';
 import '../core/managers/tv_back_manager.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_source_manager_screen.dart';
-import '../cache/tv_cache_maintenance_service.dart';
 import '../update/tv_update_screen.dart';
 import '../help/tv_help_screen.dart';
 import '../feedback/tv_feedback_screen.dart';
@@ -46,7 +45,6 @@ class TvAccountScreen extends StatefulWidget {
 }
 
 class _TvAccountScreenState extends State<TvAccountScreen> {
-  static const int _backGuardMs = TvAccountConfig.backGuardMs;
   static const int _selectGuardMs = TvAccountConfig.selectGuardMs;
 
   static const double _topPadding = TvAccountConfig.topPadding;
@@ -67,8 +65,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
 
   _AccountZone _zone = _AccountZone.header;
   int _cursor = 0;
-  int _lastBackMs = 0;
-  int _lastSelectMs = 0;
   bool _openingSubscreen = false;
   bool _cacheMaintenanceBusy = false;
 
@@ -259,7 +255,6 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
       if (!mounted) return;
 
       // Return exactly to the item that opened the subscreen.
-      _lastBackMs = DateTime.now().millisecondsSinceEpoch;
       _scheduleEntry(header: false);
     });
   }

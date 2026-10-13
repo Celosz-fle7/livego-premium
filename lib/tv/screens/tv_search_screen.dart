@@ -10,7 +10,6 @@ import '../core/managers/tv_remote_manager.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
 import '../models/tv_zone.dart';
-import '../navigation/tv_detail_route.dart';
 import '../player/tv_player_entry.dart';
 import '../providers/tv_search_provider.dart';
 import '../widgets/tv_empty_panel.dart';

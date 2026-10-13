@@ -6,13 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
-import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../../services/image/image_quality_config.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../focus/tv_focus_utils.dart';
-import '../focus/tv_reachability.dart';
 import '../providers/tv_detail_provider.dart';
 import '../theme/tv_focus_style.dart';
 import '../player/tv_player_entry.dart';
@@ -576,41 +574,6 @@ class _DetailDegradedNotice extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailEpisodeFallbackHint extends StatelessWidget {
-  const _DetailEpisodeFallbackHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.72),
-        borderRadius: BorderRadius.circular(TvContentDetailConfig.episodeChipRadius),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: AppTheme.cyan, size: 20),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              TvContentDetailConfig.episodeFallbackText,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppTheme.textSoft,
-                fontSize: 13,
                 fontWeight: FontWeight.w800,
                 decoration: TextDecoration.none,
               ),

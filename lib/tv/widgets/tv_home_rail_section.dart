@@ -10,26 +10,6 @@ import '../focus/tv_focus_utils.dart';
 import '../providers/tv_home_rows_provider.dart';
 import '../theme/tv_focus_style.dart';
 
-ContentItem _tvResumeItemFromProgress(WatchProgress progress) {
-  final item = progress.item;
-  return ContentItem(
-    id: item.id,
-    title: item.title,
-    source: item.source,
-    category: item.category,
-    description: item.description,
-    posterUrl: item.posterUrl,
-    backdropUrl: item.backdropUrl,
-    rating: item.rating,
-    episodes: item.episodes,
-    updated: item.updated,
-    platformSlug: item.platformSlug,
-    chapterId: '${progress.episode <= 0 ? 1 : progress.episode}',
-    lang: item.lang,
-  );
-}
-
-
 class TvHomeProfessionalRows extends StatefulWidget {
   final ValueChanged<ContentItem> onOpen;
   final VoidCallback onMoveToNav;
@@ -51,7 +31,6 @@ class TvHomeProfessionalRows extends StatefulWidget {
 class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
   final List<FocusNode> _continueNodes = <FocusNode>[];
   final List<FocusNode> _myListNodes = <FocusNode>[];
-  int _continueIndex = 0;
   int _myListIndex = 0;
 
   @override
@@ -90,51 +69,12 @@ class TvHomeProfessionalRowsState extends State<TvHomeProfessionalRows> {
     return false;
   }
 
-  bool _focusContinue(int index, {bool throttle = true}) {
-    if (_continueNodes.isEmpty) return false;
-    final target = index.clamp(0, _continueNodes.length - 1).toInt();
-    final ok = tvFocusComfort(_continueNodes[target], topMargin: 96, bottomMargin: 190, throttle: throttle);
-    if (ok) _continueIndex = target;
-    return ok;
-  }
-
   bool _focusMyList(int index, {bool throttle = true}) {
     if (_myListNodes.isEmpty) return false;
     final target = index.clamp(0, _myListNodes.length - 1).toInt();
     final ok = tvFocusComfort(_myListNodes[target], topMargin: 96, bottomMargin: 190, throttle: throttle);
     if (ok) _myListIndex = target;
     return ok;
-  }
-
-  KeyEventResult _continueKey(int index, WatchProgress progress, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    final key = event.logicalKey;
-    if (tvIsBackKey(key) || key == LogicalKeyboardKey.arrowUp) {
-      widget.onBackToCategory();
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      if (index == 0) {
-        widget.onMoveToNav();
-      } else {
-        _focusContinue(index - 1);
-      }
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      if (index < _continueNodes.length - 1) _focusContinue(index + 1);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowDown) {
-      if (!_focusMyList(_myListIndex)) widget.onMoveToGrid();
-      return KeyEventResult.handled;
-    }
-    if (tvIsSelectKey(key)) {
-      widget.onOpen(_tvResumeItemFromProgress(progress));
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 
   KeyEventResult _myListKey(int index, ContentItem item, KeyEvent event) {
@@ -235,52 +175,6 @@ class _RailHeader extends StatelessWidget {
           Text(title, style: const TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
           const SizedBox(width: 10),
           Text(subtitle, style: TextStyle(color: AppTheme.textSoft.withOpacity(0.72), fontSize: 11.5, fontWeight: FontWeight.w800, decoration: TextDecoration.none)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContinueCard extends StatelessWidget {
-  final FocusNode node;
-  final WatchProgress progress;
-  final FocusOnKeyEventCallback onKey;
-  final VoidCallback onTap;
-
-  const _ContinueCard({required this.node, required this.progress, required this.onKey, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return _RailCardShell(
-      node: node,
-      onKey: onKey,
-      onTap: onTap,
-      width: 310,
-      childBuilder: (focused) => Row(
-        children: [
-          _RailPoster(url: progress.item.posterUrl),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(progress.item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                const SizedBox(height: 7),
-                Text('Episode ${progress.episode} • ${(progress.ratio * 100).clamp(0, 99).toInt()}%', style: const TextStyle(color: AppTheme.cyan, fontSize: 11.5, fontWeight: FontWeight.w900, decoration: TextDecoration.none)),
-                const SizedBox(height: 9),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: progress.ratio <= 0 ? null : progress.ratio,
-                    minHeight: 5,
-                    backgroundColor: Colors.white12,
-                    color: AppTheme.cyan,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

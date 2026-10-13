@@ -451,18 +451,16 @@ class _OneLineSelector extends StatelessWidget {
   final List<String> items;
   final int selected;
   final ValueChanged<int> onSelected;
-  final int maxVisible;
   const _OneLineSelector({
     required this.title,
     required this.items,
     required this.selected,
     required this.onSelected,
-    this.maxVisible = 6,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Tampilkan SEMUA kategori dengan horizontal scroll (tidak dibatasi maxVisible).
+    // Tampilkan SEMUA kategori dengan horizontal scroll.
     final shown = items.toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(

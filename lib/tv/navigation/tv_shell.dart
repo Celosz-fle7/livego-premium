@@ -49,7 +49,6 @@ class _TvShellState extends ConsumerState<TvShell> {
   int _homeBannerTicket = 0;
   int _contentTicket = 0;
   int _accountTicket = 0;
-  int _backGuardMs = 0;
   int _suppressBackUntilMs = 0;
   bool _exitOpen = false;
   bool _playerBlackGuard = false;
@@ -130,7 +129,6 @@ class _TvShellState extends ConsumerState<TvShell> {
 
   void _suppressBack([int ms = 650]) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    _backGuardMs = now;
     final until = now + ms;
     if (until > _suppressBackUntilMs) _suppressBackUntilMs = until;
   }

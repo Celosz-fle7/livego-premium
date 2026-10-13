@@ -8,7 +8,6 @@ import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../models/tv_zone.dart';
 import '../core/managers/tv_cache_manager.dart';
-import '../core/managers/tv_remote_manager.dart';
 import '../core/managers/tv_back_manager.dart';
 import '../cache/tv_cache_maintenance_service.dart';
 import '../../shared/settings/livego_setting_models.dart';
@@ -53,7 +52,6 @@ class _TvSettingsScreenState extends State<TvSettingsScreen> {
 
   TvZone _zone = TvZone.settings;
   int _cursor = 0;
-  int _lastBackHandledMs = 0;
   bool _entryPending = false;
   bool _cacheMaintenanceBusy = false;
 

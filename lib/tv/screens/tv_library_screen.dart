@@ -7,8 +7,6 @@ import '../../core/livego_local_store.dart';
 import '../../models/content_item.dart';
 import '../focus/tv_focus_utils.dart';
 import '../layout/tv_safe_zone.dart';
-import '../models/tv_zone.dart';
-import '../navigation/tv_detail_route.dart';
 import '../player/tv_player_entry.dart';
 import '../providers/tv_local_store_provider.dart';
 import '../widgets/tv_empty_panel.dart';
@@ -47,7 +45,6 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
   final ScrollController _scroll = ScrollController();
   final List<FocusNode> _nodes = <FocusNode>[];
   final FocusNode _emptyNode = FocusNode(skipTraversal: true, debugLabel: 'tv-library-empty');
-  TvZone _zone = TvZone.grid;
   int _gridIndex = 0;
   bool _openingDetail = false;
 
@@ -94,7 +91,6 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
     final target = _safe(index);
     final ok = tvFocusGrid(_nodes[target], throttle: throttle);
     if (ok) {
-      _zone = TvZone.grid;
       _gridIndex = target;
     }
     return ok;
@@ -136,7 +132,6 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
   }
 
   void _backToNav() {
-    _zone = TvZone.nav;
     widget.onBackToNav?.call();
   }
 
@@ -276,7 +271,6 @@ class _TvLibraryScreenState extends ConsumerState<TvLibraryScreen> {
                       padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.bottomReach),
                       mainAxisExtent: 224,
                       onFocus: (i) {
-                        _zone = TvZone.grid;
                         _gridIndex = i;
                       },
                       onTap: (i, item) {

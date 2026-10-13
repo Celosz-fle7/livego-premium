@@ -407,12 +407,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     position.jumpTo(target);
   }
 
-  bool _focusRows({bool preferMyList = false}) {
-    final rows = _rowsKey.currentState;
-    if (rows == null) return false;
-    return preferMyList ? rows.focusMyList() : rows.focusFirst();
-  }
-
   bool _focusEmpty({bool throttle = true}) {
     if (_emptyNode.context == null) return false;
     final ok = tvFocusComfort(_emptyNode, throttle: throttle);
@@ -439,7 +433,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (attempt == 0) _lastFocusEntryMs = now;
 
     final token = ++_focusEntryToken;
-    _focusBootstrapTicket = token;
     final delay = attempt == 0
         ? Duration.zero
         : attempt == 1
@@ -1293,29 +1286,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _homeManualBack();
   }
 
-  KeyEventResult _bannerKey(ContentItem? hero, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    _rememberFocus(TvZone.banner, 0);
-    return _reduceHomeKey(hero, event.logicalKey);
-  }
-
-  KeyEventResult _platformHeaderKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    _controlFocus = _HomeControlFocus.platformHeader;
-    _rememberFocus(TvZone.platform, _platformIndex);
-    return _reduceHomeKey(null, event.logicalKey);
-  }
-
-  KeyEventResult _categoryHeaderKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    _controlFocus = _HomeControlFocus.categoryHeader;
-    _rememberFocus(TvZone.category, _categoryIndex);
-    return _reduceHomeKey(null, event.logicalKey);
-  }
-
   KeyEventResult _platformKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
@@ -1339,14 +1309,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
     _controlFocus = _HomeControlFocus.searchBar;
     _rememberFocus(TvZone.search, 0);
-    return _reduceHomeKey(null, event.logicalKey);
-  }
-
-  KeyEventResult _gridKey(int index, ContentItem item, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
-    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
-    _gridIndex = _safe(index, _gridNodes.length);
-    _rememberFocus(TvZone.grid, _gridIndex);
     return _reduceHomeKey(null, event.logicalKey);
   }
 

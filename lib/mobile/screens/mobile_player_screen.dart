@@ -12,7 +12,6 @@ import '../../core/livego_settings.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
 import '../../models/stream_info.dart';
-import '../../models/livego_episode.dart';
 import '../../shared/widgets/livego_cached_image.dart';
 import '../../services/api/api_platform.dart';
 import '../../services/content/content_health_service.dart';
@@ -1057,31 +1056,6 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     _showControls();
   }
 
-  Future<void> _drmMenu() async {
-    final values = const ['Auto', 'Paksa L3', 'Nonaktifkan Paksa L3'];
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF0D1117),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Mode Widevine DRM', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 14),
-              for (final v in values) _OptionTile(label: v, selected: LiveGoSettings.drmMode == v, onTap: () => Navigator.pop(context, v)),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (picked != null) setState(() => LiveGoSettings.drmMode = picked);
-    _showControls();
-  }
-
   void _speedMenu() async {
     final values = [1.0, 1.25, 1.5, 2.0];
     final next = values[(values.indexOf(_speed) + 1) % values.length];
@@ -1399,71 +1373,6 @@ class _LockButton extends StatelessWidget {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.38), blurRadius: 18, offset: const Offset(0, 8))],
         ),
         child: Icon(locked ? Icons.lock_rounded : Icons.lock_open_rounded, color: locked ? AppTheme.cyan : Colors.white, size: 26),
-      ),
-    );
-  }
-}
-
-class _BottomInfoPanel extends StatelessWidget {
-  final ContentItem item;
-  final StreamInfo stream;
-  final int episode;
-  final ValueChanged<int> onEpisode;
-  const _BottomInfoPanel({required this.item, required this.stream, required this.episode, required this.onEpisode});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppTheme.bg,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 26),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-              ),
-              ValueListenableBuilder<int>(
-                valueListenable: LiveGoLocalStore.version,
-                builder: (_, __, ___) {
-                  final fav = LiveGoLocalStore.isFavorite(item);
-                  return IconButton(onPressed: () => LiveGoLocalStore.toggleFavorite(item), icon: Icon(fav ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: fav ? AppTheme.cyan : Colors.white));
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text('${item.source} • Episode $episode / ${item.episodes} • ${item.category}', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          Text(item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.42)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 46,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: item.episodes.clamp(1, 999).toInt(),
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final ep = i + 1;
-                final active = ep == episode;
-                return GestureDetector(
-                  onTap: () => onEpisode(ep),
-                  child: Container(
-                    width: 58,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
-                      color: active ? null : AppTheme.surface2,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: active ? Colors.transparent : const Color(0xFF2D405C)),
-                    ),
-                    child: Text('$ep', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

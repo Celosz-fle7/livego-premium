@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/livego_local_store.dart';
-import '../../models/content_item.dart';
 import '../../shared/widgets/poster_card.dart';
 import '../mobile_player_entry.dart';
 
