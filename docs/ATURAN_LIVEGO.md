@@ -99,9 +99,11 @@ yang tampil di layar, remote-first.**
 ## Alur Mobile — Home, Akun, Player
 
 - Home (`mobile_home_screen.dart`): state eksplisit + infinite scroll.
-  Halaman 1 = 3 baris (2 terlihat + 1 lookahead; grid 3 kolom -> 9 item).
-  Scroll masuk zona lookahead (~300px) -> halaman berikut. Footer
-  spinner / tombol retry kalau gagal. Pull-to-refresh = halaman 1 fresh.
+  Halaman 1 = 2 baris (grid 3 kolom -> 6 item, layar pertama penuh
+  2 baris). Layout ramping: hero 170, border provider/kategori
+  (chip 28, padding 8/6), navbar bawah 62. Scroll masuk zona
+  lookahead (~300px) -> halaman berikut. Footer spinner / tombol
+  retry kalau gagal. Pull-to-refresh = halaman 1 fresh.
 - Kategori terakhir per provider tersimpan di map yang sama dengan TV
   (`tvLastHomeCategories`, persist di settings) dan dipulihkan saat masuk
   provider. Hanya kategori aktif yang di-load.
@@ -174,7 +176,7 @@ Tiru pola provider yang sudah ada. Urutan kerja:
   Melolo identitas perangkat TETAP (kredensial kerja jangan dihapus),
   penolakan dilempar `MeloloAuthException`.
 - **Pagination + infinite scroll**: `homePage`, `mergePagedItems`,
-  viewport + lookahead (mobile 3 baris, TV 2 baris), trigger di zona
+  viewport + lookahead (mobile 2 baris, TV 2 baris), trigger di zona
   lookahead, footer retry.
 - **Pilih provider/kategori TV = OK-only.** Hover/lewat chip (fokus
   pindah) HANYA menggerakkan kursor — `selected` tidak ikut, tidak ada

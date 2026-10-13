@@ -40,10 +40,10 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   /// membatalkan hasil fetch basi dari load sebelumnya.
   int _loadGen = 0;
 
-  /// Ukuran request satu halaman: 3 baris (2 baris terlihat + 1 baris
-  /// lookahead). Grid 3 kolom -> 9 item, persis contoh alur bertahap.
-  /// Server boleh mengembalikan lebih/sedikit — diterima apa adanya.
-  int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 3;
+  /// Ukuran request satu halaman: 2 baris (2 baris terlihat penuh di
+  /// layar pertama). Grid 3 kolom -> 6 item. Server boleh mengembalikan
+  /// lebih/sedikit — diterima apa adanya.
+  int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 2;
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms.take(6).toList();
@@ -228,21 +228,21 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     final platforms = LiveGoCatalog.platforms.take(6).toList();
     final labels = LiveGoCatalog.labelsFor(platforms);
     final grid = LiveGoSettings.mobileHomeGrid.clamp(2, 6);
-    final posterHeight = grid <= 3 ? 250.0 : (grid == 4 ? 212.0 : 184.0);
+    final posterHeight = grid <= 3 ? 210.0 : (grid == 4 ? 212.0 : 184.0);
     final loading = _loading && items.isEmpty;
 
     return RefreshIndicator(
       onRefresh: () => _loadInitial(freshOnly: true),
       child: ListView(
         controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 84),
         children: [
           _HeroCarousel(
             items: items.take(5).toList(),
             loading: loading,
             onTap: _open,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _OneLineSelector(
             title: 'Platform',
             items: labels,
@@ -256,7 +256,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
               _loadInitial();
             },
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 6),
           _OneLineSelector(
             title: 'Kategori',
             items: categories,
@@ -267,7 +267,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
               _loadInitial();
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           if (loading)
             GridView.builder(
               shrinkWrap: true,
@@ -277,7 +277,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                 crossAxisCount: grid,
                 mainAxisExtent: posterHeight,
                 crossAxisSpacing: 10,
-                mainAxisSpacing: 14,
+                mainAxisSpacing: 12,
               ),
               itemBuilder: (_, __) => const _Skeleton(radius: 16),
             )
@@ -292,7 +292,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
                 crossAxisCount: grid,
                 mainAxisExtent: posterHeight,
                 crossAxisSpacing: 10,
-                mainAxisSpacing: 14,
+                mainAxisSpacing: 12,
               ),
               itemBuilder: (_, i) {
                 if (i >= items.length) {
@@ -400,11 +400,11 @@ class _HeroCarouselState extends State<_HeroCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.loading && widget.items.isEmpty) return const _Skeleton(height: 320, radius: 34);
+    if (widget.loading && widget.items.isEmpty) return const _Skeleton(height: 170, radius: 20);
     final items = widget.items;
     if (items.isEmpty) return const _EmptyHero();
     return SizedBox(
-      height: 320,
+      height: 170,
       child: Stack(
         children: [
           PageView.builder(
@@ -464,17 +464,17 @@ class _OneLineSelector extends StatelessWidget {
     final shown = items.toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       decoration: BoxDecoration(
         color: const Color(0xFF101826).withOpacity(0.82),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF22354D)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-          const SizedBox(height: 8),
+          Text(title.toUpperCase(), style: const TextStyle(color: AppTheme.textSoft, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
+          const SizedBox(height: 5),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -486,13 +486,13 @@ class _OneLineSelector extends StatelessWidget {
                     onTap: () => onSelected(i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      height: 34,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: active ? const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]) : null,
                         color: active ? null : const Color(0xFF172131),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: active ? Colors.transparent : const Color(0xFF2C405A)),
                       ),
                       child: Text(
@@ -500,7 +500,7 @@ class _OneLineSelector extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 9.5),
+                        style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontWeight: FontWeight.w900, fontSize: 9),
                       ),
                     ),
                   ),
@@ -520,11 +520,11 @@ class _EmptyHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 320,
+      height: 170,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(34),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF243A54)),
       ),
       child: const Text(

@@ -18,12 +18,12 @@ class MobileBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(22, 0, 22, 14),
+      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
-        height: 86,
+        height: 62,
         decoration: BoxDecoration(
           color: AppTheme.surface.withOpacity(0.96),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: const Color(0xFF24344A)),
           boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 20)],
         ),
@@ -36,18 +36,18 @@ class MobileBottomNav extends StatelessWidget {
                 onTap: () => onChanged(i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.all(9),
+                  margin: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: active ? const Color(0xFF183455) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(18),
                     border: active ? Border.all(color: const Color(0xFF275F8C)) : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(tab.$1, color: active ? Colors.white : AppTheme.textSoft, size: 24),
-                      const SizedBox(height: 5),
-                      Text(tab.$2, style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontSize: 11, fontWeight: FontWeight.w900)),
+                      Icon(tab.$1, color: active ? Colors.white : AppTheme.textSoft, size: 20),
+                      const SizedBox(height: 3),
+                      Text(tab.$2, style: TextStyle(color: active ? Colors.white : AppTheme.textSoft, fontSize: 9.5, fontWeight: FontWeight.w900)),
                     ],
                   ),
                 ),
