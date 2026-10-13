@@ -12,6 +12,10 @@ class StreamInfo {
   final List<SubtitleTrack> subtitles;
   final List<StreamQuality> qualities;
 
+  /// Bahasa audio yang tersedia (kode dari provider, mis. ID-ID, EN-US).
+  /// Dipakai menu Audio Track. Kosong kalau provider tidak mengirim.
+  final List<String> audioLanguages;
+
   const StreamInfo({
     required this.url,
     required this.episodeIndex,
@@ -22,6 +26,7 @@ class StreamInfo {
     required this.headers,
     required this.subtitles,
     this.qualities = const <StreamQuality>[],
+    this.audioLanguages = const <String>[],
   });
 
   static const empty = StreamInfo(
@@ -33,6 +38,7 @@ class StreamInfo {
     headers: <String, String>{},
     subtitles: <SubtitleTrack>[],
     qualities: <StreamQuality>[],
+    audioLanguages: <String>[],
   );
 
   factory StreamInfo.fromApi(Map<String, dynamic> json) {
@@ -73,13 +79,24 @@ class StreamInfo {
         if (row is Map) {
           final url = '${row['url'] ?? ''}';
           if (url.isNotEmpty) {
+            final lang = '${row['language'] ?? row['lang'] ?? 'id'}';
             subtitles.add(SubtitleTrack(
-              language: '${row['language'] ?? row['lang'] ?? 'id'}',
+              language: lang,
+              displayName: '${row['displayName'] ?? lang}',
               format: '${row['format'] ?? 'srt'}',
               url: url,
             ));
           }
         }
+      }
+    }
+
+    final audioRaw = data['audioLanguages'];
+    final audioLanguages = <String>[];
+    if (audioRaw is List) {
+      for (final a in audioRaw) {
+        final v = '$a'.trim();
+        if (v.isNotEmpty) audioLanguages.add(v);
       }
     }
 
@@ -95,6 +112,7 @@ class StreamInfo {
       headers: headers,
       subtitles: subtitles,
       qualities: qualities,
+      audioLanguages: audioLanguages,
     );
   }
 
@@ -148,12 +166,17 @@ class StreamQuality {
 }
 
 class SubtitleTrack {
+  /// Kode bahasa dari provider (mis. ID-ID, EN-US).
   final String language;
+
+  /// Nama tampil (mis. Bahasa Indonesia). Kosong = pakai [language].
+  final String displayName;
   final String format;
   final String url;
 
   const SubtitleTrack({
     required this.language,
+    this.displayName = '',
     required this.format,
     required this.url,
   });

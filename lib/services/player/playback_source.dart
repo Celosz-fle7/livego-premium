@@ -32,11 +32,13 @@ class PlaybackQuality {
 
 class PlaybackSubtitle {
   final String language;
+  final String displayName;
   final String format;
   final String url;
 
   const PlaybackSubtitle({
     required this.language,
+    this.displayName = '',
     required this.format,
     required this.url,
   });
@@ -44,13 +46,14 @@ class PlaybackSubtitle {
   factory PlaybackSubtitle.fromSubtitleTrack(SubtitleTrack track) {
     return PlaybackSubtitle(
       language: track.language,
+      displayName: track.displayName,
       format: track.format,
       url: track.url,
     );
   }
 
   SubtitleTrack toSubtitleTrack() {
-    return SubtitleTrack(language: language, format: format, url: url);
+    return SubtitleTrack(language: language, displayName: displayName, format: format, url: url);
   }
 }
 

@@ -96,14 +96,17 @@ class PlaybackResolver {
       // beneran lewat streamUrlForQuality() (re-resolve per kualitas).
       List<SubtitleTrack> subtitles = const [];
       List<StreamQuality> qualities = const [];
+      List<String> audioLanguages = const [];
       if (extras != null) {
         subtitles = extras.subtitles
             .map((s) => SubtitleTrack(
                   language: s.language,
+                  displayName: s.displayName.isNotEmpty ? s.displayName : s.language,
                   format: 'vtt',
                   url: s.url,
                 ))
             .toList();
+        audioLanguages = extras.audioLanguages;
         qualities = extras.qualities
             .map((q) => StreamQuality(
                   label: q.label,
@@ -142,6 +145,7 @@ class PlaybackResolver {
         headers: const {},
         subtitles: subtitles,
         qualities: qualities,
+        audioLanguages: audioLanguages,
       );
       final videoType = source.slug == 'melolo'
           ? (url.toLowerCase().contains('.m3u8') ? LiveGoVideoType.hls : LiveGoVideoType.cenc)

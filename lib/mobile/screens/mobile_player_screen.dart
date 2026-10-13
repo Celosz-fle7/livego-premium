@@ -345,6 +345,14 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       _subtitleEnabled = PlayerPreferences.subtitleEnabledFor(slug);
       _subtitleLanguage = PlayerPreferences.subtitleLanguageFor(slug);
       _audioTrack = PlayerPreferences.audioTrack.toLowerCase() == 'mute' ? 'Source' : PlayerPreferences.audioTrack;
+      if (_audioTrack == 'Source') {
+        // Default audio = Indonesia kalau tersedia (sama seperti subtitle).
+        final indo = widget.stream.audioLanguages.firstWhere(
+          (e) => _canonicalLang(e) == 'indonesia',
+          orElse: () => '',
+        );
+        if (indo.isNotEmpty) _audioTrack = indo;
+      }
       _muted = PlayerPreferences.audioTrack.toLowerCase() == 'mute';
       _speed = PlayerPreferences.speed;
     });
@@ -847,8 +855,8 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                   )
                 else
                   ...subtitles.map((e) => _OptionTile(
-                        label: e.language.toUpperCase(),
-                        selected: _subtitleEnabled && _subtitleLanguage.toLowerCase() == e.language.toLowerCase(),
+                        label: (e.displayName.isNotEmpty ? e.displayName : e.language).toUpperCase(),
+                        selected: _subtitleEnabled && _canonicalLang(_subtitleLanguage) == _canonicalLang(e.language),
                         onTap: () => Navigator.pop(context, e.language),
                       )),
               ],
@@ -882,9 +890,17 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     }
 
     var index = 0;
-    final preferred = _subtitleLanguage.toLowerCase();
+    final preferred = _canonicalLang(_subtitleLanguage);
     if (preferred.isNotEmpty && preferred != 'auto') {
-      final found = subtitles.indexWhere((e) => e.language.toLowerCase().contains(preferred));
+      // Cocokkan kode bahasa apa pun yang dikirim provider: "ID-ID",
+      // "id", "Bahasa Indonesia", "Indonesian" -> semua "indonesia".
+      var found = subtitles.indexWhere((e) =>
+          _canonicalLang(e.language) == preferred ||
+          _canonicalLang(e.displayName) == preferred);
+      if (found < 0) {
+        found = subtitles.indexWhere(
+            (e) => e.language.toLowerCase().contains(_subtitleLanguage.toLowerCase()));
+      }
       if (found >= 0) index = found;
     }
     await _applySubtitle(index);
@@ -1033,6 +1049,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   }
 
   Future<void> _audioMenu() async {
+    final tracks = widget.stream.audioLanguages;
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -1050,6 +1067,11 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
                 const Text('Pilih Audio Track', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
                 _OptionTile(label: 'Source / Default', selected: _audioTrack == 'Source', onTap: () => Navigator.pop(context, 'Source')),
+                ...tracks.map((code) => _OptionTile(
+                      label: _audioDisplayName(code),
+                      selected: _audioTrack != 'Source' && _canonicalLang(_audioTrack) == _canonicalLang(code),
+                      onTap: () => Navigator.pop(context, code),
+                    )),
                 const Padding(
                   padding: EdgeInsets.only(top: 10),
                   child: Text('Mute ada di menu Volume. Audio Track khusus untuk bahasa suara video seperti Indonesia, English, Mandarin kalau provider mengirim track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
@@ -1460,6 +1482,36 @@ class _TopPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Samakan kode bahasa subtitle/audio: "ID-ID", "id", "in", "Bahasa
+/// Indonesia", "Indonesian" -> "indonesia". Dipakai mencocokkan default
+/// Indonesia dengan label apa pun yang dikirim provider.
+String _canonicalLang(String raw) {
+  final s = raw.trim().toLowerCase().replaceAll('_', '-');
+  if (s == 'id' ||
+      s == 'id-id' ||
+      s == 'in' ||
+      s == 'in-id' ||
+      s == 'indonesia' ||
+      s == 'indonesian' ||
+      s == 'bahasa' ||
+      s == 'bahasa-indonesia' ||
+      s == 'bahasa indonesia') {
+    return 'indonesia';
+  }
+  if (s == 'en' || s == 'en-us' || s == 'en-gb' || s == 'english') {
+    return 'english';
+  }
+  return s;
+}
+
+/// Nama tampil untuk kode bahasa audio (ID-ID -> Bahasa Indonesia).
+String _audioDisplayName(String code) {
+  final c = _canonicalLang(code);
+  if (c == 'indonesia') return 'Bahasa Indonesia';
+  if (c == 'english') return 'English';
+  return code.toUpperCase();
 }
 
 class _BottomOverlay extends StatelessWidget {
