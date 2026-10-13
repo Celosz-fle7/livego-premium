@@ -82,16 +82,21 @@ Uint8List _buildTrak({
   return _box('trak', (BytesBuilder()..add(_box('tkhd', _zeros(20)))..add(mdia)).toBytes());
 }
 
-Uint8List _buildMoov(int videoChunkOff, int audioChunkOff) {
+Uint8List _buildMoov(int videoChunkOff, int audioChunkOff, {int freeBytes = 0}) {
   final trakV = _buildTrak(entryType: 'encv', sizes: _videoSizes, chunkOffset: videoChunkOff, ivs: _videoIvs);
   final trakA = _buildTrak(entryType: 'enca', sizes: _audioSizes, chunkOffset: audioChunkOff, ivs: _audioIvs);
-  return _box('moov', (BytesBuilder()..add(_box('mvhd', _zeros(100)))..add(trakV)..add(trakA)).toBytes());
+  final builder = BytesBuilder()
+    ..add(_box('mvhd', _zeros(100)))
+    ..add(trakV)
+    ..add(trakA);
+  if (freeBytes > 0) builder.add(_box('free', _zeros(freeBytes)));
+  return _box('moov', builder.toBytes());
 }
 
 /// File plaintext: ftyp + moov + mdat (moov depan) atau ftyp + mdat + moov.
-Uint8List _buildPlaintext({required bool moovFirst}) {
+Uint8List _buildPlaintext({required bool moovFirst, int freeBytesInMoov = 0}) {
   // Ukuran moov tidak bergantung nilai stco -> bangun sekali untuk ukur.
-  final moovProbe = _buildMoov(0, 0);
+  final moovProbe = _buildMoov(0, 0, freeBytes: freeBytesInMoov);
   final ftyp = _box('ftyp', (BytesBuilder()..add(ascii.encode('isom'))..add(_u32(0))..add(ascii.encode('isom'))..add(ascii.encode('iso2'))).toBytes());
 
   final videoTotal = _videoSizes.reduce((a, b) => a + b);
@@ -108,7 +113,7 @@ Uint8List _buildPlaintext({required bool moovFirst}) {
   }
   audioChunkOff = videoChunkOff + videoTotal;
 
-  final moov = _buildMoov(videoChunkOff, audioChunkOff);
+  final moov = _buildMoov(videoChunkOff, audioChunkOff, freeBytes: freeBytesInMoov);
   final mdat = _box('mdat', sampleData);
   final out = BytesBuilder();
   out.add(ftyp);
@@ -348,6 +353,35 @@ void main() {
         );
         expect(await _httpGet(proxyUrl, range: 'bytes=0-99'), expected.sublist(0, 100));
         expect(await _httpGet(proxyUrl, range: 'bytes=700-800'), expected.sublist(700, 801));
+        expect(await _httpGet(proxyUrl), expected);
+      } finally {
+        await origin.close(force: true);
+      }
+    });
+    test('progressive proxy e2e: moov besar kepotong head (fetch exact)', () async {
+      // Moov 600KB > head 512KB -> proxy harus fetch exact range moov.
+      final plain = _buildPlaintext(moovFirst: true, freeBytesInMoov: 600 * 1024);
+      final bounds = _moovBounds(plain);
+      expect(bounds.size, greaterThan(512 * 1024));
+      final info = MeloloCencDecryptor.parseMoov(
+        plain.sublist(bounds.start, bounds.start + bounds.size),
+        bounds.start,
+      );
+      expect(info, isNotNull);
+      final roundKeys = MeloloCencDecryptor.roundKeysFor(_testKey);
+      final encrypted = Uint8List.fromList(plain);
+      MeloloCencDecryptor.decryptRangeInPlace(encrypted, 0, info!.samples, roundKeys);
+      final expected = MeloloCencDecryptor.decryptMp4Bytes(Uint8List.fromList(encrypted), _testKey);
+
+      final origin = await _serveWithRange(encrypted);
+      try {
+        final proxyUrl = await MeloloProgressiveProxy.instance.prepareProgressiveUrl(
+          seriesId: 'test',
+          episodeId: 'e3',
+          rawVideoUrl: 'http://127.0.0.1:${origin.port}/video.mp4',
+          spadeA: _craftSpadeA(_testKey),
+        );
+        expect(await _httpGet(proxyUrl, range: 'bytes=0-99'), expected.sublist(0, 100));
         expect(await _httpGet(proxyUrl), expected);
       } finally {
         await origin.close(force: true);

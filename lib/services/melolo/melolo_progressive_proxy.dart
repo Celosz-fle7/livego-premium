@@ -146,7 +146,10 @@ class MeloloProgressiveProxy {
 
 /// Satu episode: moov yang sudah diparse + koneksi ke source.
 class _ProgressiveSession {
-  static const int _headSize = 2 * 1024 * 1024;
+  /// Head awal 512KB (moov drama pendek biasanya < 512KB) agar prefetch
+  /// cepat di fast path TV/mobile (timeout 15s). Diperbesar ke 2MB hanya
+  /// kalau moov belum ketemu / kepotong di head pertama.
+  static const List<int> _headSizes = [512 * 1024, 2 * 1024 * 1024];
   static const int _chunkSize = 512 * 1024;
   static const List<int> _tailSizes = [
     2 * 1024 * 1024,
@@ -179,46 +182,16 @@ class _ProgressiveSession {
   // --- Moov loading ---
 
   Future<void> _loadMoov() async {
-    final head = await _fetchRange(0, _headSize - 1);
-    final headBytes = head.bytes;
-    if (head.totalLength != null) _totalLength = head.totalLength;
+    // Head adaptif: 512KB dulu, 2MB kalau moov belum ketemu/kepotong.
+    for (final headSize in _headSizes) {
+      final head = await _fetchRange(0, headSize - 1);
+      final headBytes = head.bytes;
+      if (head.totalLength != null) _totalLength = head.totalLength;
 
-    // Parse box berurutan dari awal: cari moov, atau mdat (tanda moov di akhir).
-    var off = 0;
-    var moovAtEnd = false;
-    while (off + 8 <= headBytes.length) {
-      var size = _readUint32(headBytes, off);
-      final type = String.fromCharCodes(headBytes.sublist(off + 4, off + 8));
-      var headerSize = 8;
-      if (size == 1) {
-        if (off + 16 > headBytes.length) break;
-        size = _readUint64(headBytes, off + 8);
-        headerSize = 16;
-      } else if (size == 0) {
-        size = headBytes.length - off;
-      }
-      if (size < headerSize) break;
-      if (type == 'moov') {
-        if (off + size <= headBytes.length) {
-          _setMoov(headBytes.sublist(off, off + size), off);
-          return;
-        }
-        // Moov terpotong head -> fetch persis [off, off+size).
-        final full = await _fetchRange(off, off + size - 1);
-        _setMoov(full.bytes, off);
-        return;
-      }
-      if (type == 'mdat') {
-        moovAtEnd = true;
-        break;
-      }
-      off += size;
-    }
-
-    if (!moovAtEnd) {
-      // Moov tidak ketemu di head (mis. setelah box free/wide besar):
-      // coba tail juga sebelum menyerah.
-      moovAtEnd = true;
+      final scan = await _scanHead(headBytes);
+      if (scan == _HeadScan.moov) return;
+      if (scan == _HeadScan.mdat) break; // moov di akhir -> jalur tail
+      // _HeadScan.incomplete: head habis sebelum moov/mdat -> coba head lebih besar.
     }
 
     // Moov di akhir file: cari via tail yang membesar.
@@ -235,6 +208,39 @@ class _ProgressiveSession {
       if (tailStart == 0) break;
     }
     throw Exception('Melolo progressive: moov tidak ditemukan di tail file');
+  }
+
+  /// Scan head untuk moov. Return moov kalau ketemu (dan _setMoov dipanggil),
+  /// mdat kalau ketemu mdat dulu (moov di akhir), incomplete kalau head habis
+  /// sebelum salah satunya ketemu.
+  Future<_HeadScan> _scanHead(Uint8List headBytes) async {
+    var off = 0;
+    while (off + 8 <= headBytes.length) {
+      var size = _readUint32(headBytes, off);
+      final type = String.fromCharCodes(headBytes.sublist(off + 4, off + 8));
+      var headerSize = 8;
+      if (size == 1) {
+        if (off + 16 > headBytes.length) return _HeadScan.incomplete;
+        size = _readUint64(headBytes, off + 8);
+        headerSize = 16;
+      } else if (size == 0) {
+        size = headBytes.length - off;
+      }
+      if (size < headerSize) return _HeadScan.incomplete;
+      if (type == 'moov') {
+        if (off + size <= headBytes.length) {
+          _setMoov(headBytes.sublist(off, off + size), off);
+          return _HeadScan.moov;
+        }
+        // Moov terpotong head -> fetch persis [off, off+size).
+        final full = await _fetchRange(off, off + size - 1);
+        _setMoov(full.bytes, off);
+        return _HeadScan.moov;
+      }
+      if (type == 'mdat') return _HeadScan.mdat;
+      off += size;
+    }
+    return _HeadScan.incomplete;
   }
 
   void _setMoov(Uint8List moovBytes, int moovStart) {
@@ -389,4 +395,16 @@ class _NoRangeSupport implements Exception {
 
   @override
   String toString() => 'Server tidak mendukung HTTP Range';
+}
+
+/// Hasil scan head saat cari moov.
+enum _HeadScan {
+  /// Moov ketemu (sudah di-set via _setMoov).
+  moov,
+
+  /// Mdat ketemu dulu -> moov di akhir file.
+  mdat,
+
+  /// Head habis sebelum moov/mdat ketemu -> coba head lebih besar / tail.
+  incomplete,
 }
