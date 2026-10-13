@@ -27,7 +27,10 @@ class PlayerPreferences {
 
   static String quality = '480p';
   static bool subtitleEnabled = true;
-  static String subtitleLanguage = 'Auto';
+
+  /// Default subtitle = Indonesia. "Auto" lama (subtitle pertama di list,
+  /// biasanya English) dimigrasi ke Indonesia saat load.
+  static String subtitleLanguage = 'Indonesia';
   static String audioTrack = 'Source';
   static double speed = 1.0;
   static bool fitCover = false;
@@ -43,6 +46,10 @@ class PlayerPreferences {
         : defaultInitialQuality;
     subtitleEnabled = prefs.getBool(_subtitleEnabledKey) ?? subtitleEnabled;
     subtitleLanguage = prefs.getString(_subtitleLanguageKey) ?? subtitleLanguage;
+    if (subtitleLanguage.toLowerCase() == 'auto') {
+      // Migrasi default lama "Auto" (subtitle pertama, biasanya English).
+      subtitleLanguage = 'Indonesia';
+    }
     audioTrack = prefs.getString(_audioTrackKey) ?? audioTrack;
     speed = prefs.getDouble(_speedKey) ?? speed;
     fitCover = prefs.getBool(_fitCoverKey) ?? fitCover;
@@ -83,7 +90,9 @@ class PlayerPreferences {
 
   static String subtitleLanguageFor(String slug) {
     final v = _byProvider[slug.trim().toLowerCase()]?['subtitleLanguage'];
-    return (v is String && v.isNotEmpty) ? v : subtitleLanguage;
+    // "Auto" lama per provider ikut migrasi ke default global (Indonesia).
+    if (v is String && v.isNotEmpty && v.toLowerCase() != 'auto') return v;
+    return subtitleLanguage;
   }
 
   static Future<void> setSubtitleFor(

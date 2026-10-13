@@ -734,32 +734,36 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Future<void> _qualityMenu() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF0D1117),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Wrap(
-            runSpacing: 12,
-            spacing: 10,
-            children: [
-              const SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Kualitas Video',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Wrap(
+              runSpacing: 12,
+              spacing: 10,
+              children: [
+                const SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    'Kualitas Video',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
                 ),
-              ),
-              const SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Mode Auto mulai dari kualitas ringan agar cepat play, lalu naik otomatis ke kualitas terbaik saat buffer sudah stabil. Manual 480p/720p/1080p memakai stream provider kalau tersedia.',
-                  style: TextStyle(color: Colors.white60, height: 1.35),
+                const SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    'Mode Auto mulai dari kualitas ringan agar cepat play, lalu naik otomatis ke kualitas terbaik saat buffer sudah stabil. Manual 480p/720p/1080p memakai stream provider kalau tersedia.',
+                    style: TextStyle(color: Colors.white60, height: 1.35),
+                  ),
                 ),
-              ),
-              for (final label in _qualityLabels())
-                _QualityChip(label: label, current: _quality, onPick: (v) => Navigator.pop(context, v)),
-            ],
+                for (final label in _qualityLabels())
+                  _QualityChip(label: label, current: _quality, onPick: (v) => Navigator.pop(context, v)),
+              ],
+            ),
           ),
         ),
       ),
@@ -821,30 +825,34 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
     final subtitles = widget.stream.subtitles;
     final picked = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF0D1117),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Pilih Subtitle', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 14),
-              _OptionTile(label: 'Matikan', selected: !_subtitleEnabled, onTap: () => Navigator.pop(context, 'OFF')),
-              if (subtitles.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Text('Subtitle belum tersedia dari source ini.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
-                )
-              else
-                ...subtitles.map((e) => _OptionTile(
-                      label: e.language.toUpperCase(),
-                      selected: _subtitleEnabled && _subtitleLanguage.toLowerCase() == e.language.toLowerCase(),
-                      onTap: () => Navigator.pop(context, e.language),
-                    )),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Pilih Subtitle', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 14),
+                _OptionTile(label: 'Matikan', selected: !_subtitleEnabled, onTap: () => Navigator.pop(context, 'OFF')),
+                if (subtitles.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: Text('Subtitle belum tersedia dari source ini.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+                  )
+                else
+                  ...subtitles.map((e) => _OptionTile(
+                        label: e.language.toUpperCase(),
+                        selected: _subtitleEnabled && _subtitleLanguage.toLowerCase() == e.language.toLowerCase(),
+                        onTap: () => Navigator.pop(context, e.language),
+                      )),
+              ],
+            ),
           ),
         ),
       ),
@@ -1027,23 +1035,27 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
   Future<void> _audioMenu() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF0D1117),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
       builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Pilih Audio Track', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 14),
-              _OptionTile(label: 'Source / Default', selected: _audioTrack == 'Source', onTap: () => Navigator.pop(context, 'Source')),
-              const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text('Mute ada di menu Volume. Audio Track khusus untuk bahasa suara video seperti Indonesia, English, Mandarin kalau provider mengirim track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
-              ),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Pilih Audio Track', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 14),
+                _OptionTile(label: 'Source / Default', selected: _audioTrack == 'Source', onTap: () => Navigator.pop(context, 'Source')),
+                const Padding(
+                  padding: EdgeInsets.only(top: 10),
+                  child: Text('Mute ada di menu Volume. Audio Track khusus untuk bahasa suara video seperti Indonesia, English, Mandarin kalau provider mengirim track terpisah.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1499,15 +1511,28 @@ class _BottomOverlay extends StatelessWidget {
               const SizedBox(height: 8),
               SizedBox(
                 height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
-                    _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
-                    _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
-                    _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: Row(
+                          // Tombol melebar sampai pas batas samping kiri-kanan
+                          // (spaceBetween); kalau tombol melebihi lebar, row
+                          // bisa di-scroll (tidak overflow).
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _Shortcut(icon: Icons.video_library_rounded, label: 'Episode', onTap: onEpisodes),
+                            _Shortcut(icon: Icons.high_quality_rounded, label: quality, onTap: onQuality),
+                            _Shortcut(icon: Icons.subtitles_rounded, label: 'Subtitle', onTap: onSubtitle),
+                            _Shortcut(icon: Icons.tune_rounded, label: 'More', onTap: onSettings),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -1534,19 +1559,19 @@ class _Shortcut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white24)),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: Colors.white, size: 18),
+              Icon(icon, color: Colors.white, size: 17),
               const SizedBox(width: 6),
-              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
+              Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
             ],
           ),
         ),
