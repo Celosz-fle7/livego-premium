@@ -61,6 +61,7 @@ class CinemaIdSource implements DramaSource {
     'prime video': '2211',
     'apple tv+': '2997',
     'apple tv': '2997',
+    'disney+ hotstar': '2210',
     'disney+': '2210',
     'disney': '2210',
     'crunchyroll': '3000',
@@ -69,17 +70,16 @@ class CinemaIdSource implements DramaSource {
     'paramount+': '3005',
     'amc+': '3001',
     'rakuten viki': '3004',
-    // Ranking & Koleksi Utama
-    'trending now': '2517',
-    'trending': '2517',
-    'justwatch top 100': '7950',
-    'popular movies': '2193',
-    'popular tv shows': '2184',
-    'popular anime': '7948',
-    'new korean drama series': '7953',
-    'today\'s new streaming': '5214',
-    'today\'s new movies': '5342',
-    'today\'s new series': '5349',
+  };
+
+  /// Kategori tanpa topic_id server -> pakai seed lokal langsung
+  /// (hindari channel module yang mencampur konten antar platform).
+  static const Set<String> _seedOnlyCategories = {
+    'vidio',
+    'vivamax',
+    'viu',
+    'iflix',
+    '18+',
   };
 
   /// Format URL ke proxy lokal mandiri CinemaID LiveGo (127.0.0.1:7055).
@@ -101,6 +101,13 @@ class CinemaIdSource implements DramaSource {
     await ensureSession();
     try {
       final catKey = category.toLowerCase().trim();
+      final isAdultTab = catKey == '18+';
+
+      // 0. Kategori seed-only (tanpa topic_id): langsung dari seed lokal
+      // agar tidak tercampur konten antar platform via channel module.
+      if (_seedOnlyCategories.contains(catKey)) {
+        return _seedItems(category, isAdultTab: isAdultTab);
+      }
 
       // 1. Jalur Utama: Jika kategori memiliki topic_id server langsung
       final topicId = _categoryToTopicId[catKey];
@@ -112,21 +119,7 @@ class CinemaIdSource implements DramaSource {
         if (vods.isNotEmpty) {
           debugPrint('CINEMAID SOURCE: loaded ${vods.length} items for topic $topicId ($category)');
           final seen = <String>{};
-          final seedItems = cinemaIdSeedsForCategory(category)
-              .where((s) => seen.add(s.id))
-              .map((s) => ContentItem(
-                    id: s.id,
-                    title: s.title,
-                    source: 'cinemaid',
-                    category: category,
-                    description: s.title,
-                    posterUrl: s.poster,
-                    backdropUrl: s.poster,
-                    rating: 9.0,
-                    episodes: 1,
-                    platformSlug: 'cinemaid',
-                  ))
-              .toList();
+          final seedItems = _seedItems(category, seen: seen, isAdultTab: isAdultTab);
           final otherVods = vods.where((v) => seen.add(v.id)).toList();
           return [...seedItems, ...otherVods];
         }
@@ -231,21 +224,7 @@ class CinemaIdSource implements DramaSource {
         if (out.isNotEmpty) {
           // Sisipkan seed items yang terbukti valid 100% di awal jika belum ada,
           // agar selalu ada konten yang siap putar langsung di home feed
-          final seedItems = cinemaIdSeedsForCategory(category)
-              .where((s) => seen.add(s.id))
-              .map((s) => ContentItem(
-                    id: s.id,
-                    title: s.title,
-                    source: 'cinemaid',
-                    category: category,
-                    description: s.title,
-                    posterUrl: s.poster,
-                    backdropUrl: s.poster,
-                    rating: 9.0,
-                    episodes: 1,
-                    platformSlug: 'cinemaid',
-                  ))
-              .toList();
+          final seedItems = _seedItems(category, seen: seen);
           return [...seedItems, ...out];
         }
       }
@@ -256,7 +235,26 @@ class CinemaIdSource implements DramaSource {
     // Fallback ke catalog seed lokal jika backend offline atau API terenkripsi.
     // Filter berdasarkan kategori yang dipilih agar setiap tab menampilkan
     // film/serial yang berbeda dan sesuai kategorinya.
+    return _seedItems(category);
+  }
+
+  /// Bangun ContentItem dari seed lokal untuk satu kategori.
+  /// Top 10 diurut paling depan (sudah di-sort di cinemaIdSeedsForCategory).
+  /// Konten 18+ hanya muncul di tab 18+, tidak tercampur di tab lain.
+  List<ContentItem> _seedItems(
+    String category, {
+    Set<String>? seen,
+    bool isAdultTab = false,
+  }) {
+    final seenSet = seen ?? <String>{};
     return cinemaIdSeedsForCategory(category)
+        .where((s) {
+          final isAdult =
+              s.categories.any((c) => c.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') == '18');
+          if (isAdultTab) return isAdult;
+          if (isAdult) return false;
+          return seenSet.add(s.id);
+        })
         .map((s) => ContentItem(
               id: s.id,
               title: s.title,
