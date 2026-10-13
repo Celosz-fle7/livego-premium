@@ -30,8 +30,4 @@ class TvHomePerformanceConfig {
   /// Background refresh can be slightly longer because cached content is already
   /// visible and the user can keep navigating.
   static const Duration backgroundRefreshTimeout = Duration(seconds: 7);
-
-  /// Debounce platform/category changes so aggressive LEFT/RIGHT repeat does
-  /// not fire a request per intermediate chip.
-  static const Duration selectionCommitDelay = Duration(milliseconds: 300);
 }

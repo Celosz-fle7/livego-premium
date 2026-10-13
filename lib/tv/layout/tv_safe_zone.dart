@@ -12,9 +12,10 @@ class TvSafeZone {
 
   static const double bottomReach = 220;
   static const double homeGridBottomReach = 190;
-  // Header Home sticky = 128 (Platform 44 + gap 3 + Kategori 44 + gap 3 +
-  // Search 32 + padding bawah 2). Offset grid entry = header + 135.
-  static const double homeGridEntryOffset = 263;
+  // Header Home sticky = 93 (Platform 44 + gap 3 + Kategori 44 + padding
+  // bawah 2). Search jadi ikon di kanan border Kategori, bukan bar lagi.
+  // Offset grid entry = header + 135.
+  static const double homeGridEntryOffset = 228;
   static const double accountTop = 24;
   static const double accountSide = 48;
   static const double settingsTop = 24;

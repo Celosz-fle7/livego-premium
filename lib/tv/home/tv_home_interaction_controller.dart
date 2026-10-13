@@ -139,52 +139,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     return _loadedPlatformSlug == platform && _loadedCategoryLabel == category;
   }
 
-  void _cancelHomeSelectionCommit() {
-    _homeSelectionCommitTimer?.cancel();
-    _homeSelectionCommitTimer = null;
-  }
-
-  void _scheduleHomeSelectionCommit(TvZone zone) {
-    final platform = _platformSlug;
-    final category = _categoryLabel;
-    if (_isLoadedHomeSelection(platform, category)) return;
-
-    _cancelHomeSelectionCommit();
-    _homeSelectionCommitTimer =
-        Timer(TvHomePerformanceConfig.selectionCommitDelay, () {
-      if (!mounted) return;
-      // Guard: hanya commit kalau user MASIH di zone chip yang sama.
-      // Kalau sudah pindah ke grid/search/banner, jangan yank fokus / reload.
-      if (_zone != zone) return;
-      if (_platformSlug != platform || _categoryLabel != category) return;
-
-      setState(() {
-        _gridIndex = 0;
-        _zone = zone;
-      });
-
-      _rememberSelection();
-      _loadHome(clearPrevious: false);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (zone == TvZone.platform) {
-          if (_fullGridMode) {
-            _focusPlatformAtControlAnchor(_platformIndex);
-          } else {
-            _focusPlatform(_platformIndex, throttle: false);
-          }
-        } else if (zone == TvZone.category) {
-          if (_fullGridMode) {
-            _focusCategoryAtControlAnchor(_categoryIndex);
-          } else {
-            _focusCategory(_categoryIndex, throttle: false);
-          }
-        }
-      });
-    });
-  }
-
   void _rememberFocus(TvZone zone, int index) {
     _zone = zone;
     ref.read(tvFocusProvider.notifier)
@@ -593,19 +547,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       if (zone == TvZone.grid) _gridIndex = target;
       if (zone == TvZone.banner) _fullGridMode = false;
       if (zone == TvZone.grid) _fullGridMode = true;
-      // Hover = preview selection: selected mengikuti kursor chip agar
-      // _scheduleHomeSelectionCommit menangkap platform/kategori yang di-hover
-      // (bukan pilihan lama). Commit ter-debounce 300ms; OK membatalkan timer.
-      if (zone == TvZone.platform) _selectedPlatformIndex = target;
-      if (zone == TvZone.category) _selectedCategoryIndex = target;
+      // OK-only: hover/lewat chip HANYA menggerakkan kursor
+      // (_platformIndex / _categoryIndex). selected TIDAK ikut — konten baru
+      // ter-load saat user tekan OK (_selectPlatform/_selectCategory).
+      // Chip yang dilewati remote tidak boleh memicu request.
     });
 
     _rememberFocus(zone, target);
     if (scroll) _scrollManualZone(zone, target);
-    // Hover-trigger: load konten saat fokus diam 300ms di chip, tanpa tekan OK.
-    if (zone == TvZone.platform || zone == TvZone.category) {
-      _scheduleHomeSelectionCommit(zone);
-    }
 
     final headerFocused =
         targetControlFocus == _HomeControlFocus.platformHeader ||
@@ -973,7 +922,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   Future<void> _openPlatformManager() async {
-    _cancelHomeSelectionCommit();
     final openedFromHeader = _controlFocus == _HomeControlFocus.platformHeader;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -995,7 +943,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   Future<void> _openCategoryManager() async {
-    _cancelHomeSelectionCommit();
     final openedFromHeader = _controlFocus == _HomeControlFocus.categoryHeader;
     final platform = _platformSlug;
     await Navigator.of(context).push(
@@ -1079,7 +1026,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _returnToSearchAnchor() {
-    _cancelHomeSelectionCommit();
     if (!_fullGridMode || _zone != TvZone.search) {
       setState(() {
         _fullGridMode = true;
@@ -1094,7 +1040,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _returnToCategoryAnchor() {
-    _cancelHomeSelectionCommit();
     if (!_fullGridMode || _zone != TvZone.category) {
       setState(() {
         _fullGridMode = true;
@@ -1111,7 +1056,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _returnToPlatformAnchor() {
-    _cancelHomeSelectionCommit();
     if (!_fullGridMode || _zone != TvZone.platform) {
       setState(() {
         _fullGridMode = true;
@@ -1128,7 +1072,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _returnToBanner() {
-    _cancelHomeSelectionCommit();
     if (_zone != TvZone.banner || _fullGridMode) {
       setState(() {
         _zone = TvZone.banner;
@@ -1251,7 +1194,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _selectPlatform(int index) {
-    _cancelHomeSelectionCommit();
     final keepControlGridZone = _fullGridMode;
     final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return;
@@ -1260,9 +1202,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _controlFocus = _HomeControlFocus.platformChip;
     _rememberFocus(TvZone.platform, target);
     _homeDebugLog('home_platform_chip_select');
-    // Hover mungkin sudah menggeser _selectedPlatformIndex ke target + membatalkan
-    // timer commit via _cancelHomeSelectionCommit di atas. Jangan early-return
-    // kalau konten untuk pilihan ini belum benar-benar ter-load.
+    // OK-only: hover tidak pernah menggeser _selectedPlatformIndex.
+    // Early-return hanya kalau konten pilihan ini sudah ter-load.
     if (target == _selectedPlatformIndex &&
         _isLoadedHomeSelection(platforms[target], _categoryLabel)) {
       return;
@@ -1294,7 +1235,6 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   void _selectCategory(int index) {
-    _cancelHomeSelectionCommit();
     final keepControlGridZone = _fullGridMode;
     final categories = _categories;
     if (categories.isEmpty) return;
@@ -1303,8 +1243,8 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _controlFocus = _HomeControlFocus.categoryChip;
     _rememberFocus(TvZone.category, target);
     _homeDebugLog('home_category_chip_select');
-    // Sama seperti platform: hover bisa sudah menggeser selection + membatalkan
-    // timer. Early-return hanya kalau konten pilihan ini sudah ter-load.
+    // Sama seperti platform: hover tidak pernah menggeser selection.
+    // Early-return hanya kalau konten pilihan ini sudah ter-load.
     if (target == _selectedCategoryIndex &&
         _isLoadedHomeSelection(_platformSlug, categories[target])) {
       return;

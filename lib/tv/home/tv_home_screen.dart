@@ -20,7 +20,6 @@ import '../navigation/tv_navigation_service.dart';
 import '../providers/tv_focus_provider.dart';
 import 'providers/tv_home_provider.dart';
 import 'providers/tv_home_content_state.dart';
-import 'tv_home_performance_config.dart';
 import 'focus/tv_home_focus_state.dart';
 import '../providers/tv_remote_owner.dart';
 import '../source_manager/tv_source_manager_screen.dart';
@@ -117,7 +116,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
   int _settingsVersion = LiveGoLocalStore.version.value;
   String _loadedPlatformSlug = '';
   String _loadedCategoryLabel = '';
-  Timer? _homeSelectionCommitTimer;
   List<ContentItem> _gridItems = const <ContentItem>[];
 
   int get _gridColumns => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
@@ -192,7 +190,6 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
 
   @override
   void dispose() {
-    _homeSelectionCommitTimer?.cancel();
     _navService.removeListener(_navListener);
     LiveGoLocalStore.version.removeListener(this._refreshIfSettingsChanged);
     _homeNavTick.dispose();
@@ -308,7 +305,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   SliverPersistentHeader(
                     pinned: true,
                     delegate: _HomeStickySourceHeaderDelegate(
-                      height: 128,
+                      height: 93,
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(
                             padding.left, 0, padding.right, 2),
@@ -333,13 +330,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                                 onFocus: (i) {
                                   setState(() {
                                     _platformIndex = i;
-                                    _selectedPlatformIndex = i;
                                     _controlFocus =
                                         _HomeControlFocus.platformChip;
                                   });
                                   this._rememberFocus(TvZone.platform, i);
-                                  this._scheduleHomeSelectionCommit(
-                                      TvZone.platform);
                                 },
                                 onKey: (i, event) =>
                                     this._platformKey(i, event),
@@ -372,13 +366,10 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                                       onFocus: (i) {
                                         setState(() {
                                           _categoryIndex = i;
-                                          _selectedCategoryIndex = i;
                                           _controlFocus =
                                               _HomeControlFocus.categoryChip;
                                         });
                                         this._rememberFocus(TvZone.category, i);
-                                        this._scheduleHomeSelectionCommit(
-                                            TvZone.category);
                                       },
                                       onKey: (i, event) =>
                                           this._categoryKey(i, event),

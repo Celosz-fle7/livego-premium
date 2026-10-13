@@ -33,9 +33,12 @@ class TvHomeContentController extends StateNotifier<TvHomeContentState> {
   String? get displayedKey => _displayedKey;
   String get loadingMode => _loadingMode;
 
-  /// Ukuran request satu halaman TV: 1 baris (jumlah kolom grid).
-  /// Server boleh mengembalikan lebih/sedikit — diterima apa adanya.
-  int get _pageSize => LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt();
+  /// Ukuran request satu halaman TV: 2 baris (2 × jumlah kolom grid).
+  /// = 14 konten saat kolom 7 — layar pertama penuh 2 baris, baris ke-3
+  /// tidak lagi terlihat separuh. Server boleh mengembalikan
+  /// lebih/sedikit — diterima apa adanya.
+  int get _pageSize =>
+      LiveGoSettings.tvHomeGrid.clamp(7, 10).toInt() * 2;
 
   Future<void> load({
     required String platform,

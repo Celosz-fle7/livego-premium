@@ -41,7 +41,9 @@ yang tampil di layar, remote-first.**
   `tv_home_provider.dart` (controller) + `tv_home_repository.dart`.
 - Render: `TvPosterGrid` (Sliver builder + `ValueKey` stabil per item).
   Hanya sel terlihat yang dibangun. **Tidak ada cap jumlah item.**
-- Data: pagination bertahap — halaman 1 = 1 baris (jumlah kolom grid).
+- Data: pagination bertahap — halaman 1 = 2 baris (2 × jumlah kolom
+  grid = 14 konten saat kolom 7). Layar pertama penuh 2 baris, baris
+  ke-3 tidak lagi terlihat separuh.
   Scroll masuk zona lookahead (~2 baris sebelum ujung) -> `loadMore()`.
   Append dedupe by id (`mergePagedItems`). Fokus tidak terganggu karena
   item lama tidak berubah posisi dan key stabil.
@@ -167,8 +169,13 @@ Tiru pola provider yang sudah ada. Urutan kerja:
   Melolo identitas perangkat TETAP (kredensial kerja jangan dihapus),
   penolakan dilempar `MeloloAuthException`.
 - **Pagination + infinite scroll**: `homePage`, `mergePagedItems`,
-  viewport + lookahead (mobile 3 baris, TV 1 baris), trigger di zona
+  viewport + lookahead (mobile 3 baris, TV 2 baris), trigger di zona
   lookahead, footer retry.
+- **Pilih provider/kategori TV = OK-only.** Hover/lewat chip (fokus
+  pindah) HANYA menggerakkan kursor — `selected` tidak ikut, tidak ada
+  request. Konten baru ter-load saat user tekan OK
+  (`_selectPlatform` / `_selectCategory`). Chip yang dilewati remote
+  tidak boleh memicu trigger.
 - **Hibernasi tab + restore kategori terakhir per provider.**
 - **Preferensi per provider**: kualitas + subtitle tersimpan per
   provider, tidak saling mengubah.
