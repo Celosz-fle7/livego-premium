@@ -1091,7 +1091,7 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
               const SizedBox(height: 10),
               Expanded(
                 child: GridView.builder(
-                  itemCount: widget.item.episodes.clamp(1, 240).toInt(),
+                  itemCount: widget.item.episodes.clamp(1, 999).toInt(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.35),
                   itemBuilder: (_, i) {
                     final ep = i + 1;
@@ -1412,7 +1412,7 @@ class _BottomInfoPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text('${item.source} â€¢ Episode $episode / ${item.episodes} â€¢ ${item.category}', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w800)),
+          Text('${item.source} • Episode $episode / ${item.episodes} • ${item.category}', style: const TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           Text(item.description.isEmpty ? 'Deskripsi belum tersedia.' : item.description, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppTheme.textSoft, height: 1.42)),
           const SizedBox(height: 16),
@@ -1420,7 +1420,7 @@ class _BottomInfoPanel extends StatelessWidget {
             height: 46,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: item.episodes.clamp(1, 120).toInt(),
+              itemCount: item.episodes.clamp(1, 999).toInt(),
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final ep = i + 1;
