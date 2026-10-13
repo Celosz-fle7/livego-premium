@@ -16,7 +16,7 @@ import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
 import '../../services/analytics/livego_analytics.dart';
-import '../../services/freereels/freereels_config.dart';
+import '../../services/search_filter.dart';
 import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_search_keyboard_panel.dart';
 import 'tv_search_config.dart';
@@ -65,15 +65,16 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   int _genreIndex = 0;
   bool _genreFocused = false;
 
-  /// Label row genre: "Semua" + semua genre FreeReels. Index 0 = Semua.
+  /// Label row filter: "Semua" + genre FreeReels + kata kunci/genre MovieBox.
+  /// Index 0 = Semua.
   List<String> get _genreLabels =>
-      ['Semua', ...FreereelsConfig.genreTags.keys];
+      ['Semua', ...SearchFilter.allLabels];
 
   /// Index chip genre yang aktif (untuk TvChipRow multi-select).
   Set<int> get _selectedGenreIndices {
     if (_selectedGenres.isEmpty) return {0};
     final out = <int>{};
-    final labels = FreereelsConfig.genreTags.keys.toList();
+    final labels = SearchFilter.allLabels.toList();
     for (var i = 0; i < labels.length; i++) {
       if (_selectedGenres.contains(labels[i])) out.add(i + 1);
     }
@@ -85,7 +86,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       setState(() => _selectedGenres.clear());
       return;
     }
-    final label = FreereelsConfig.genreTags.keys.toList()[index - 1];
+    final label = SearchFilter.allLabels.toList()[index - 1];
     setState(() {
       if (!_selectedGenres.remove(label)) _selectedGenres.add(label);
     });
@@ -506,7 +507,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     // Genre memfilter hasil (bukan mencari): "Semua" = tanpa filter.
     final visibleResults = search.loading
         ? const <ContentItem>[]
-        : FreereelsConfig.filterByGenres(results, _selectedGenres);
+        : SearchFilter.filter(results, _selectedGenres);
     if (_resultNodes.length != visibleResults.length) {
       _syncNodes(visibleResults.length);
     }

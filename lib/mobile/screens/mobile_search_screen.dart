@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../data/livego_catalog.dart';
 import '../../models/content_item.dart';
-import '../../services/freereels/freereels_config.dart';
+import '../../services/search_filter.dart';
 import '../../shared/widgets/poster_card.dart';
 import '../mobile_player_entry.dart';
 
@@ -25,9 +25,9 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
   /// "sulih suara" source FreeReels, lalu filter genre).
   final Set<String> _selectedGenres = {};
 
-  /// Hasil yang tampil = results difilter genre yang dipilih.
+  /// Hasil yang tampil = results difilter yang dipilih.
   List<ContentItem> get _displayed =>
-      FreereelsConfig.filterByGenres(results, _selectedGenres);
+      SearchFilter.filter(results, _selectedGenres);
 
   void _toggleGenre(String label) {
     setState(() {
@@ -127,11 +127,12 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        // Filter genre FreeReels — memfilter hasil, BUKAN mencari.
-        // "Semua" = tanpa filter. Tap genre = pilih manual (multi-select).
+        // Filter hasil — genre FreeReels + kata kunci & genre MovieBox.
+        // Memfilter hasil, BUKAN mencari. "Semua" = tanpa filter.
+        // Tap = pilih manual (multi-select).
         const Align(
           alignment: Alignment.centerLeft,
-          child: Text('Genre', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
+          child: Text('Filter', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -143,12 +144,12 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
               selected: _selectedGenres.isEmpty,
               onSelected: (_) => setState(() => _selectedGenres.clear()),
             ),
-            ...FreereelsConfig.genreTags.entries.map((e) {
-              final selected = _selectedGenres.contains(e.key);
+            ...SearchFilter.allLabels.map((label) {
+              final selected = _selectedGenres.contains(label);
               return FilterChip(
-                label: Text(e.key, style: const TextStyle(fontSize: 12)),
+                label: Text(label, style: const TextStyle(fontSize: 12)),
                 selected: selected,
-                onSelected: (_) => _toggleGenre(e.key),
+                onSelected: (_) => _toggleGenre(label),
               );
             }),
           ],

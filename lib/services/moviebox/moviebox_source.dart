@@ -82,6 +82,7 @@ class MovieBoxSource implements DramaSource {
             rating: 8.5,
             episodes: ep,
             platformSlug: slug,
+            tags: [genre],
           );
         }).toList();
 
@@ -275,6 +276,7 @@ class MovieBoxSource implements DramaSource {
     final title = (json['title'] as String? ?? 'Untitled').trim();
     final description = (json['description'] as String? ?? '').trim();
     final genre = (json['genre'] as String? ?? '').trim();
+    final country = (json['countryName'] as String? ?? '').trim();
 
     final cover = json['cover'] as Map<String, dynamic>?;
     final posterUrl = (cover?['url'] as String? ?? '').trim();
@@ -300,6 +302,11 @@ class MovieBoxSource implements DramaSource {
       rating: rating,
       episodes: 1,
       platformSlug: slug,
+      // Tag genre + negara dipakai matcher filter (kata kunci/genre).
+      tags: [
+        ...genre.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty),
+        if (country.isNotEmpty) country,
+      ],
     );
   }
 
