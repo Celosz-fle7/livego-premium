@@ -89,6 +89,7 @@ class TvNativeSurfacePlayerActivity : Activity() {
     private var mode = Mode.DOCK
     private var lastBackMs = 0L
     private var lastMoveMs = 0L
+    private var audioPreferenceApplied = false
     private var sentClosed = false
     private var episodeResolveInFlight = false
     private var episodeResolveTimeoutTask: Runnable? = null
@@ -218,8 +219,27 @@ class TvNativeSurfacePlayerActivity : Activity() {
             subtitleCursor = if (selectedSubtitle.equals("OFF", ignoreCase = true)) {
                 0
             } else {
-                subtitles.indexOfFirst { it.label.equals(selectedSubtitle, ignoreCase = true) }.takeIf { it >= 0 } ?: subtitleCursor
+                // Cocokkan kanonik: "Indonesia" == "ID-ID" == "Bahasa Indonesia".
+                // Fallback track pertama (bukan OFF) kalau tidak ketemu.
+                val want = canonicalLang(selectedSubtitle)
+                val found = subtitles.indexOfFirst { canonicalLang(it.label) == want }
+                if (found >= 0) found else if (subtitles.size > 1) 1 else subtitleCursor
             }
+        }
+    }
+
+    /**
+     * Samakan kode bahasa: "ID-ID", "id", "in", "Bahasa Indonesia",
+     * "Indonesian" -> "indonesia". Sama seperti PlayerPreferences
+     * di sisi Flutter (HP + TV).
+     */
+    private fun canonicalLang(raw: String): String {
+        val s = raw.trim().lowercase().replace('_', '-')
+        return when (s) {
+            "id", "id-id", "in", "in-id", "indonesia", "indonesian",
+            "bahasa", "bahasa-indonesia", "bahasa indonesia" -> "indonesia"
+            "en", "en-us", "en-gb", "english" -> "english"
+            else -> s
         }
     }
 
@@ -509,7 +529,15 @@ class TvNativeSurfacePlayerActivity : Activity() {
             }
             val config = MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub.url))
                 .setMimeType(mime)
-                .setLanguage(sub.label.take(8))
+                // Label sekarang displayName ("Bahasa Indonesia") -> kirim
+                // kode BCP-47 yang valid ("id"/"en"), bukan potongan displayName.
+                .setLanguage(
+                    when (canonicalLang(sub.label)) {
+                        "indonesia" -> "id"
+                        "english" -> "en"
+                        else -> sub.label.take(8)
+                    }
+                )
                 .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
                 .build()
             builder.setSubtitleConfigurations(listOf(config))
@@ -538,7 +566,29 @@ class TvNativeSurfacePlayerActivity : Activity() {
                 if (seen.add(label)) audioRows.add(AudioRow(label, language.ifBlank { null }))
             }
         }
-        audioCursor = audioRows.indexOfFirst { it.label.equals(previous, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+        audioCursor = if (!audioPreferenceApplied && audioRows.size > 1) {
+            // Pertama kali track audio kebaca: terapkan preferensi audio
+            // (default Indonesia kalau tersedia, sama seperti HP).
+            // 'Source'/'Auto'/kosong -> default Indonesia.
+            audioPreferenceApplied = true
+            val want = canonicalLang(selectedAudioLabel).let {
+                if (it == "source" || it == "auto" || it.isBlank()) "indonesia" else it
+            }
+            val match = audioRows.indexOfFirst { row ->
+                row.language != null && canonicalLang(row.language) == want
+            }
+            if (match > 0) {
+                selectedAudioLabel = audioRows[match].label
+                val builder = p.trackSelectionParameters.buildUpon()
+                builder.setPreferredAudioLanguage(audioRows[match].language)
+                p.trackSelectionParameters = builder.build()
+                match
+            } else {
+                audioRows.indexOfFirst { it.label.equals(previous, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+            }
+        } else {
+            audioRows.indexOfFirst { it.label.equals(previous, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+        }
     }
 
     private fun cancelEpisodeResolveTimeout() {

@@ -35,6 +35,28 @@ class PlayerPreferences {
   static double speed = 1.0;
   static bool fitCover = false;
 
+  /// Samakan kode bahasa subtitle/audio: "ID-ID", "id", "in", "Bahasa
+  /// Indonesia", "Indonesian" -> "indonesia". Dipakai mencocokkan default
+  /// Indonesia dengan label apa pun yang dikirim provider (HP + TV).
+  static String canonicalLanguage(String raw) {
+    final s = raw.trim().toLowerCase().replaceAll('_', '-');
+    if (s == 'id' ||
+        s == 'id-id' ||
+        s == 'in' ||
+        s == 'in-id' ||
+        s == 'indonesia' ||
+        s == 'indonesian' ||
+        s == 'bahasa' ||
+        s == 'bahasa-indonesia' ||
+        s == 'bahasa indonesia') {
+      return 'indonesia';
+    }
+    if (s == 'en' || s == 'en-us' || s == 'en-gb' || s == 'english') {
+      return 'english';
+    }
+    return s;
+  }
+
   static bool _loaded = false;
 
   static Future<void> load() async {

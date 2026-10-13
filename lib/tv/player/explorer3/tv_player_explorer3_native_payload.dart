@@ -26,13 +26,18 @@ class TvPlayerExplorer3NativePayload {
       'playbackKey': _playbackKey(item: item, episode: episode, chapterId: chapterId),
       'totalEpisodes': totalEpisodes,
       'selectedQuality': PlayerPreferences.quality.trim().isNotEmpty ? PlayerPreferences.quality : LiveGoSettings.quality,
-      'selectedSubtitle': PlayerPreferences.subtitleEnabled ? PlayerPreferences.subtitleLanguage : 'OFF',
+      // Subtitle per provider (sama seperti HP); native mencocokkan
+      // kanonik (ID-ID -> Indonesia).
+      'selectedSubtitle': PlayerPreferences.subtitleEnabledFor(item.platformSlug)
+          ? PlayerPreferences.subtitleLanguageFor(item.platformSlug)
+          : 'OFF',
       'selectedAudio': PlayerPreferences.audioTrack,
       'selectedSpeed': PlayerPreferences.speed,
       'headers': stream.headers,
       'qualityLabels': stream.qualities.map((e) => e.label).toList(),
       'qualityUrls': stream.qualities.map((e) => e.url).toList(),
-      'subtitleLabels': stream.subtitles.map((e) => e.language.trim().isEmpty ? 'Subtitle' : e.language).toList(),
+      // Label tampil (Bahasa Indonesia), bukan kode mentah (ID-ID).
+      'subtitleLabels': stream.subtitles.map((e) => e.displayName.trim().isNotEmpty ? e.displayName : (e.language.trim().isEmpty ? 'Subtitle' : e.language)).toList(),
       'subtitleUrls': stream.subtitles.map((e) => e.url).toList(),
       'subtitleFormats': stream.subtitles.map((e) => e.format).toList(),
       'autoNextEnabled': LiveGoSettings.autoNextEnabled,

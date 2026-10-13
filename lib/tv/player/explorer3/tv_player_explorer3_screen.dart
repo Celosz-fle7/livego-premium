@@ -221,7 +221,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   List<String> get _subtitleChoices {
     final rows = <String>['OFF'];
     for (final track in _streamInfo.subtitles) {
-      final lang = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+      final lang = track.displayName.trim().isNotEmpty
+          ? track.displayName.trim()
+          : (track.language.trim().isEmpty ? 'Subtitle' : track.language.trim());
       final format = track.format.trim().isEmpty ? '' : ' ${track.format.toUpperCase()}';
       rows.add('$lang$format');
     }
@@ -893,7 +895,17 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         } else if (!LiveGoSettings.subtitlesEnabled) {
           _subtitleCursor = 0;
         } else {
-          _subtitleCursor = _subtitleCursor.clamp(1, stream.subtitles.length).toInt();
+          // Default subtitle = preferensi user (kanonik: ID-ID -> Indonesia),
+          // sama seperti HP. Fallback track pertama kalau tidak ketemu.
+          final preferred = PlayerPreferences.canonicalLanguage(
+              PlayerPreferences.subtitleLanguageFor(widget.item.platformSlug));
+          var found = -1;
+          if (preferred.isNotEmpty && preferred != 'auto') {
+            found = stream.subtitles.indexWhere((e) =>
+                PlayerPreferences.canonicalLanguage(e.language) == preferred ||
+                PlayerPreferences.canonicalLanguage(e.displayName) == preferred);
+          }
+          _subtitleCursor = found >= 0 ? found + 1 : 1;
         }
       });
 
@@ -1171,10 +1183,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     final track = _streamInfo.subtitles[trackIndex];
     final label = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
+    final display = track.displayName.trim().isNotEmpty ? track.displayName.trim() : label;
     setState(() {
       LiveGoSettings.subtitlesEnabled = true;
       _subtitleCursor = safe;
-      _status = 'Subtitle $label';
+      _status = 'Subtitle $display';
       _mode = _Explorer3Mode.controls;
     });
     unawaited(PlayerPreferences.setSubtitleFor(
