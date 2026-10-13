@@ -66,4 +66,10 @@ class MeloloSource implements DramaSource {
   ) {
     return _client.episodeExtras(seriesId, episodeId);
   }
+
+  /// Melolo memakai identitas perangkat (kredensial di config), bukan
+  /// sesi akun — tidak ada yang perlu keluar. Penolakan server
+  /// (risk control) dilempar sebagai MeloloAuthException di client.
+  @override
+  Future<void> signOut() async {}
 }

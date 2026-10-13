@@ -25,6 +25,11 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   int category = 0;
   late Future<_HomeState> _future;
 
+  /// Generasi load terakhir. Background refresh hanya boleh mengganti UI
+  /// kalau generasinya masih sama — pindah kategori/platform bikin load
+  /// baru dan membatalkan refresh basi.
+  int _loadGen = 0;
+
   String get _platform {
     final platforms = LiveGoCatalog.platforms.take(6).toList();
     if (platforms.isEmpty) return 'shortmax';
@@ -39,6 +44,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   }
 
   Future<_HomeState> _load() async {
+    final gen = ++_loadGen;
     final platform = _platform;
 
     try {
@@ -66,14 +72,24 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
       final List<ContentItem> items;
       final dramaSource = DramaSourceRegistry.forSlug(platform);
       if (dramaSource != null) {
-        // Sumber drama eksternal (multi-APK): disk cache dulu biar instan,
-        // baru network kalau cache kosong. Tulis cache tiap sukses fetch.
+        // Stale-while-revalidate (samakan TV): cache tampil langsung biar
+        // instan, tapi server TETAP ditanya di background tiap pindah
+        // kategori. Cache bukan sumber kebenaran — hanya placeholder +
+        // fallback kalau network gagal.
         final cached = await LiveGoContentCache.readItems(
           platform: platform,
           endpoint: 'home',
           params: {'category': selectedCategory},
         ).timeout(const Duration(seconds: 2), onTimeout: () => null);
         if (cached != null && cached.isNotEmpty && !cached.any((i) => i.id.startsWith('cinemaid_'))) {
+          unawaited(_refreshHomeInBackground(
+            platform: platform,
+            categoryLabel: selectedCategory,
+            categoryIndex: category,
+            categories: baseCategories,
+            cached: cached,
+            gen: gen,
+          ));
           items = cached;
         } else {
           final fresh = await dramaSource.homeByCategory(selectedCategory)
@@ -118,6 +134,52 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
         categories: LiveGoCatalog.categoriesFor(platform),
       );
     }
+  }
+
+  /// Fetch server di background setelah cache ditampilkan. Kalau data fresh
+  /// datang dan user masih di platform/kategori yang sama, ganti UI.
+  /// Network gagal -> cache tetap tampil, tidak ada error palsu.
+  Future<void> _refreshHomeInBackground({
+    required String platform,
+    required String categoryLabel,
+    required int categoryIndex,
+    required List<String> categories,
+    required List<ContentItem> cached,
+    required int gen,
+  }) async {
+    final dramaSource = DramaSourceRegistry.forSlug(platform);
+    if (dramaSource == null) return;
+    try {
+      final fresh = await dramaSource
+          .homeByCategory(categoryLabel)
+          .timeout(const Duration(seconds: 15), onTimeout: () => <ContentItem>[]);
+      if (!mounted || fresh.isEmpty) return;
+      if (gen != _loadGen) return; // Sudah ada load baru (pindah kategori/platform).
+      if (_platform != platform || category != categoryIndex) return;
+      unawaited(LiveGoContentCache.writeItems(
+        platform: platform,
+        endpoint: 'home',
+        params: {'category': categoryLabel},
+        items: fresh,
+      ));
+      if (_sameIds(cached, fresh)) return; // Isi sama, tidak perlu rebuild.
+      if (!mounted) return;
+      setState(() {
+        _future = Future.value(_HomeState(
+          banners: fresh.take(5).toList(),
+          items: fresh,
+          categories: categories,
+        ));
+      });
+    } catch (_) {}
+  }
+
+  bool _sameIds(List<ContentItem> a, List<ContentItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
   }
 
   void _reload() => setState(() => _future = _load());

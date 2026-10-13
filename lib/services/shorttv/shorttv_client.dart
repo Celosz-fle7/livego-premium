@@ -25,6 +25,18 @@ class ShortTvClient {
   DateTime? _tokenExpiry;
   final Map<String, ({bool isLocked, int price})> _episodeLockCache = {};
 
+  /// Ada token sesi aktif (hasil handshake initLogin).
+  bool get hasSession => _token.isNotEmpty;
+
+  /// Keluar: buang token + kunci sesi runtime. Request berikutnya
+  /// handshake ulang (identitas tamu baru). Fallback token hardcoded di
+  /// config tidak dihapus — itu cadangan terakhir kalau handshake gagal.
+  void signOut() {
+    _token = '';
+    _rc4Key = ShortTvConfig.defaultRc4Key;
+    _tokenExpiry = null;
+  }
+
   /// Generate UUID v4 sederhana
   String _randomUuid() {
     final rnd = Random();

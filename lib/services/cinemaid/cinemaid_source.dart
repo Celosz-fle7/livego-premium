@@ -45,6 +45,12 @@ class CinemaIdSource implements DramaSource {
   }
 
   @override
+  Future<void> signOut() async {
+    await _client.signOut();
+    _streamCache.clear();
+  }
+
+  @override
   String get slug => 'cinemaid';
 
   @override

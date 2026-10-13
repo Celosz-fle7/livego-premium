@@ -8,33 +8,166 @@ import 'cinemaid_config.dart';
 import 'cinemaid_crypto.dart';
 import 'cinemaid_session.dart';
 
+/// Error auth CinemaID: token/sesi ditolak server (HTTP 401/403 atau
+/// kode auth). Ditangani khusus — client mencoba pulih (identitas tamu
+/// baru) sekali sebelum gagal ke pemanggil.
+class CinemaIdAuthException implements Exception {
+  final String message;
+  const CinemaIdAuthException(this.message);
+  @override
+  String toString() => 'CinemaIdAuthException: $message';
+}
+
+/// Kode respons server yang menandakan sesi/token tidak valid.
+bool isCinemaIdAuthCode(Object? code) {
+  const authCodes = {
+    4001, 401, 403, 1001, 1002, 1003, 10001, 40001, 40003,
+    '4001', '401', '403', '1001', '1002', '1003', '10001', '40001', '40003',
+  };
+  return authCodes.contains(code);
+}
+
+/// Pesan error yang menandakan sesi/token tidak valid.
+bool cinemaIdMessageLooksLikeAuth(String message) {
+  final m = message.toLowerCase();
+  return m.contains('401') ||
+      m.contains('403') ||
+      m.contains('4001') ||
+      m.contains('user_not_login') ||
+      m.contains('not login') ||
+      m.contains('token') ||
+      m.contains('unauthorized') ||
+      m.contains('session') ||
+      m.contains('auth');
+}
+
 class CinemaIdClient {
   String? _baseUrl;
-  String? _token = CinemaIdConfig.defaultToken;
+
+  /// Token mulai null (bukan default hardcoded) supaya ensureSession()
+  /// benar-benar jalan: sesi tersimpan -> auto-register -> default.
+  /// Default hardcoded hanya cadangan terakhir kalau dua jalur di atas gagal.
+  String? _token;
   bool _initTried = false;
-  String _deviceId = CinemaIdConfig.defaultDeviceId;
+  String _deviceId = '';
   bool _autoLoginTried = false;
+
+  /// Pengaman re-entrancy: ensureSession() -> _autoRegister() memanggil
+  /// _rawPost yang tidak boleh memicu ensureSession lagi.
+  bool _sessionResolving = false;
 
   String? get token => _token;
   String get deviceId => _deviceId;
   void setToken(String token) => _token = token;
   void setDeviceId(String id) => _deviceId = id;
 
+  /// Sesi dinamis-first:
+  /// 1. Token tersimpan (hasil login/register/auto-register sebelumnya).
+  /// 2. Auto-register identitas tamu baru (device_id unik per install).
+  /// 3. Token + device_id hardcoded sebagai cadangan terakhir.
   Future<void> ensureSession() async {
     if (_token != null && _token!.isNotEmpty && _deviceId.isNotEmpty) return;
+    if (_sessionResolving) return;
+    _sessionResolving = true;
     try {
-      final session = await CinemaIdSession.read();
-      final sessToken = session['token'];
-      final sessDevId = session['deviceId'];
-      if (sessToken != null && sessToken.isNotEmpty) _token = sessToken;
-      if (sessDevId != null && sessDevId.isNotEmpty) _deviceId = sessDevId;
+      try {
+        final session = await CinemaIdSession.read();
+        final sessToken = session['token'];
+        final sessDevId = session['deviceId'];
+        if (sessToken != null && sessToken.isNotEmpty) _token = sessToken;
+        if (sessDevId != null && sessDevId.isNotEmpty) _deviceId = sessDevId;
+      } catch (_) {}
+      if (_token != null && _token!.isNotEmpty && _deviceId.isNotEmpty) return;
+      try {
+        if (await _autoRegister()) return;
+      } catch (_) {}
+      if (_deviceId.isEmpty) {
+        _deviceId = CinemaIdConfig.defaultDeviceId;
+      }
+      if (_token == null || _token!.isEmpty) {
+        _token = CinemaIdConfig.defaultToken;
+      }
+    } finally {
+      _sessionResolving = false;
+    }
+  }
+
+  /// Daftar identitas tamu baru ke server. Pakai _rawPost langsung (bukan
+  /// _postJson) supaya tidak re-enter ensureSession. Gagal -> false,
+  /// pemanggil jatuh ke token hardcoded.
+  Future<bool> _autoRegister() async {
+    final deviceId = _randomDeviceId();
+    final username = '${CinemaIdConfig.autoRegisterUsername}_$deviceId';
+    _deviceId = deviceId;
+    _token = null;
+    final uri = Uri.parse(
+      '${_normalizeUrl(CinemaIdConfig.baseUrl)}/api/public/register',
+    );
+    final res = await _rawPost(uri, {
+      'username': username,
+      'password': CinemaIdConfig.autoRegisterPassword,
+      'device_id': deviceId,
+    });
+    final token = _extractToken(res);
+    if (token.isEmpty) return false;
+    _token = token;
+    try {
+      await CinemaIdSession.save(
+        token: token,
+        userId: _extractUserId(res),
+        deviceId: deviceId,
+        isSvip: '0',
+      );
     } catch (_) {}
-    if (_deviceId.isEmpty) {
-      _deviceId = CinemaIdConfig.defaultDeviceId;
+    return true;
+  }
+
+  String _extractToken(Map<String, dynamic> res) {
+    final data = res['data'];
+    if (data is Map && '${data['token'] ?? ''}'.isNotEmpty) {
+      return '${data['token']}';
     }
-    if (_token == null || _token!.isEmpty) {
-      _token = CinemaIdConfig.defaultToken;
+    final result = res['result'];
+    if (result is Map && '${result['token'] ?? ''}'.isNotEmpty) {
+      return '${result['token']}';
     }
+    if ('${res['token'] ?? ''}'.isNotEmpty) return '${res['token']}';
+    return '';
+  }
+
+  String _extractUserId(Map<String, dynamic> res) {
+    final data = res['data'];
+    if (data is Map) return '${data['user_id'] ?? data['userId'] ?? data['id'] ?? ''}';
+    return '';
+  }
+
+  String _randomDeviceId() {
+    final rnd = Random.secure();
+    const hex = '0123456789abcdef';
+    return List.generate(16, (_) => hex[rnd.nextInt(16)]).join();
+  }
+
+  /// Pulih dari error auth: buang sesi lama, bangun sesi baru
+  /// (tersimpan -> auto-register -> default), lalu pemanggil retry sekali.
+  Future<void> _recoverAuth() async {
+    try {
+      await CinemaIdSession.clear();
+    } catch (_) {}
+    _token = null;
+    _deviceId = '';
+    await ensureSession();
+  }
+
+  /// Keluar: buang sesi tersimpan + sesi runtime. Request berikutnya
+  /// membangun identitas baru (auto-register) — bukan kembali ke token
+  /// lama. Tidak menghapus fallback hardcoded di config (cadangan terakhir).
+  Future<void> signOut() async {
+    try {
+      await CinemaIdSession.clear();
+    } catch (_) {}
+    _token = null;
+    _deviceId = '';
+    _autoLoginTried = false;
   }
 
   void _applyHeaders(HttpHeaders headers) {
@@ -89,6 +222,11 @@ class CinemaIdClient {
       final response = await request.close().timeout(CinemaIdConfig.timeout);
       final rawBody = await response.transform(utf8.decoder).join();
       debugPrint('CINEMAID CLIENT: status=${response.statusCode} path=${uri.path} bodyLen=${rawBody.length}');
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw CinemaIdAuthException(
+          'CinemaID ${response.statusCode} ${uri.path}: sesi ditolak server',
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('CinemaID ${response.statusCode} ${uri.path}: $rawBody');
       }
@@ -104,7 +242,23 @@ class CinemaIdClient {
     }
   }
 
+  /// GET + pemulihan auth: kalau server menolak sesi, bangun sesi baru
+  /// (auto-register) dan coba sekali lagi. Gagal kedua -> error ke pemanggil.
   Future<Map<String, dynamic>> _getJson(
+    String path,
+    Map<String, String> query, {
+    bool authRetried = false,
+  }) async {
+    try {
+      return await _getJsonOnce(path, query);
+    } on CinemaIdAuthException {
+      if (authRetried) rethrow;
+      await _recoverAuth();
+      return _getJson(path, query, authRetried: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _getJsonOnce(
     String path,
     Map<String, String> query,
   ) async {
@@ -119,12 +273,31 @@ class CinemaIdClient {
     const okCodes = {0, 1, 200, 10000, '0', '1', '200', '10000'};
     final codeOk = code == null || okCodes.contains(code);
     if (!codeOk && res['data'] == null && res['result'] == null) {
-      throw Exception('CinemaID code=$code msg=${res['msg'] ?? res['message']} path=$path');
+      final msg = '${res['msg'] ?? res['message'] ?? ''}';
+      if (isCinemaIdAuthCode(code) || cinemaIdMessageLooksLikeAuth(msg)) {
+        throw CinemaIdAuthException('CinemaID code=$code msg=$msg path=$path');
+      }
+      throw Exception('CinemaID code=$code msg=$msg path=$path');
     }
     return res;
   }
 
+  /// POST + pemulihan auth (sama seperti [_getJson]).
   Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body, {
+    bool authRetried = false,
+  }) async {
+    try {
+      return await _postJsonOnce(path, body);
+    } on CinemaIdAuthException {
+      if (authRetried) rethrow;
+      await _recoverAuth();
+      return _postJson(path, body, authRetried: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _postJsonOnce(
     String path,
     Map<String, dynamic> body,
   ) async {
@@ -346,25 +519,41 @@ class CinemaIdClient {
   }
 
   /// POST /api/public/login {username, password} -> token.
+  /// Token disimpan ke sesi supaya tidak hilang saat restart.
   Future<String> login(String username, String password) async {
     final res = await _postJson('/public/login', {
       'username': username,
       'password': password,
-    });
-    final data = res['data'] as Map? ?? {};
-    final token = '${data['token'] ?? ''}';
+    }, authRetried: true);
+    final token = _extractToken(res);
     if (token.isEmpty) throw Exception('CinemaID login: token kosong');
     _token = token;
+    try {
+      await CinemaIdSession.save(
+        token: token,
+        userId: _extractUserId(res),
+        deviceId: _deviceId,
+        isSvip: '0',
+      );
+    } catch (_) {}
     return token;
   }
 
   /// POST /api/public/register {...} -> token.
+  /// Token disimpan ke sesi supaya tidak hilang saat restart.
   Future<String> register(Map<String, dynamic> fields) async {
-    final res = await _postJson('/public/register', fields);
-    final data = res['data'] as Map? ?? {};
-    final token = '${data['token'] ?? ''}';
+    final res = await _postJson('/public/register', fields, authRetried: true);
+    final token = _extractToken(res);
     if (token.isEmpty) throw Exception('CinemaID register: token kosong');
     _token = token;
+    try {
+      await CinemaIdSession.save(
+        token: token,
+        userId: _extractUserId(res),
+        deviceId: _deviceId,
+        isSvip: '0',
+      );
+    } catch (_) {}
     return token;
   }
 }

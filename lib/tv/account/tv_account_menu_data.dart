@@ -12,6 +12,8 @@ enum TvAccountAction {
   feedback,
   about,
   update,
+  signOutCinemaId,
+  signOutShortTv,
 }
 
 class TvAccountMenuItem {
@@ -111,6 +113,20 @@ class TvAccountMenuData {
         subtitle: 'Informasi LiveGo Premium, mode TV, dan status data.',
         badge: 'INFO',
         action: TvAccountAction.about,
+      ),
+      TvAccountMenuItem(
+        icon: Icons.logout_rounded,
+        title: 'Keluar CinemaID',
+        subtitle: 'Hapus sesi CinemaID. Request berikutnya memakai identitas tamu baru.',
+        badge: 'SESI',
+        action: TvAccountAction.signOutCinemaId,
+      ),
+      TvAccountMenuItem(
+        icon: Icons.logout_rounded,
+        title: 'Keluar ShortTV',
+        subtitle: 'Buang token ShortTV. Request berikutnya handshake ulang.',
+        badge: 'SESI',
+        action: TvAccountAction.signOutShortTv,
       ),
     ];
   }

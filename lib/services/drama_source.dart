@@ -37,6 +37,12 @@ abstract class DramaSource {
   /// Cari konten. Default: tidak didukung (return kosong).
   Future<List<ContentItem>> search(String query) async => const [];
 
+  /// Keluar dari sesi provider (kalau provider punya sesi).
+  /// Default: tidak ada sesi — FreeReels anonim, Melolo identitas perangkat.
+  /// CinemaID & ShortTV override: buang token/sesi tersimpan, request
+  /// berikutnya memakai identitas baru (auto-register / handshake ulang).
+  Future<void> signOut() async {}
+
   /// Info ekstra satu episode (subtitle, kualitas, status unlock).
   /// Default: tidak ada (return null).
   Future<DramaEpisodeExtras?> episodeExtras(

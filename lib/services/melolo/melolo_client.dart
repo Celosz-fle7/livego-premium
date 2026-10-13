@@ -7,6 +7,30 @@ import '../drama_source.dart';
 import 'melolo_config.dart';
 import 'melolo_stream_proxy.dart';
 
+/// Error auth Melolo: server menolak identitas perangkat (risk control /
+/// sesi tidak login). Dilempar sebagai tipe khusus supaya UI bisa
+/// menampilkan pesan yang jelas, bukan gagal diam / daftar kosong.
+/// Melolo tidak punya handshake refresh — identitasnya adalah kredensial
+/// perangkat di config, jadi tidak ada yang bisa di-retry otomatis di sini.
+class MeloloAuthException implements Exception {
+  final String message;
+  const MeloloAuthException(this.message);
+  @override
+  String toString() => 'MeloloAuthException: $message';
+}
+
+/// Respons server Melolo yang menandakan identitas perangkat ditolak.
+bool meloloResponseLooksLikeAuth({Object? code, String? message}) {
+  if (code == 4001 || code == '4001' || code == 101000 || code == '101000') {
+    return true;
+  }
+  final m = (message ?? '').toUpperCase();
+  return m.contains('RISK_CONTROL') ||
+      m.contains('USER_NOT_LOGIN') ||
+      m.contains('NOT_LOGIN') ||
+      m.contains('NOT LOGIN');
+}
+
 /// HTTP Client untuk Melolo API (https://api.tmtreader.com).
 /// Meniru permintaan jaringan resmi Melolo untuk discovery, episode, dan pemutaran stream.
 class MeloloClient {
@@ -52,6 +76,18 @@ class MeloloClient {
     headers.set('X-Xs-From-Web', 'false');
   }
 
+  /// Respons 2xx pun bisa membawa penolakan auth (code 4001 / risk control).
+  /// Lempar tipe khusus supaya pemanggil (player) menampilkan pesan jelas.
+  void _throwIfAuthError(Map<String, dynamic> decoded) {
+    final msg = '${decoded['msg'] ?? decoded['message'] ?? ''}';
+    if (meloloResponseLooksLikeAuth(code: decoded['code'], message: msg)) {
+      throw MeloloAuthException(
+        'Melolo menolak sesi perangkat ini ($msg). Coba lagi nanti — kalau '
+        'terus gagal, server butuh identitas perangkat baru.',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _getJson(
     String path,
     Map<String, String> query,
@@ -80,9 +116,22 @@ class MeloloClient {
         if (response.statusCode >= 200 && response.statusCode < 300) {
           if (body.trim().isEmpty) return <String, dynamic>{};
           final decoded = jsonDecode(body);
-          if (decoded is Map<String, dynamic>) return decoded;
-          if (decoded is Map) return Map<String, dynamic>.from(decoded);
+          if (decoded is Map<String, dynamic>) {
+            _throwIfAuthError(decoded);
+            return decoded;
+          }
+          if (decoded is Map) {
+            final map = Map<String, dynamic>.from(decoded);
+            _throwIfAuthError(map);
+            return map;
+          }
           return <String, dynamic>{'data': decoded};
+        }
+        if (meloloResponseLooksLikeAuth(message: body)) {
+          throw MeloloAuthException(
+            'Melolo menolak sesi perangkat ini. Coba lagi nanti — kalau '
+            'terus gagal, server butuh identitas perangkat baru.',
+          );
         }
         lastError = Exception('Melolo GET ${response.statusCode} $path ($host): $body');
       } catch (e) {
@@ -131,9 +180,22 @@ class MeloloClient {
         if (response.statusCode >= 200 && response.statusCode < 300) {
           if (respBody.trim().isEmpty) return <String, dynamic>{};
           final decoded = jsonDecode(respBody);
-          if (decoded is Map<String, dynamic>) return decoded;
-          if (decoded is Map) return Map<String, dynamic>.from(decoded);
+          if (decoded is Map<String, dynamic>) {
+            _throwIfAuthError(decoded);
+            return decoded;
+          }
+          if (decoded is Map) {
+            final map = Map<String, dynamic>.from(decoded);
+            _throwIfAuthError(map);
+            return map;
+          }
           return <String, dynamic>{'data': decoded};
+        }
+        if (meloloResponseLooksLikeAuth(message: respBody)) {
+          throw MeloloAuthException(
+            'Melolo menolak sesi perangkat ini. Coba lagi nanti — kalau '
+            'terus gagal, server butuh identitas perangkat baru.',
+          );
         }
         lastError = Exception('Melolo POST ${response.statusCode} $path ($host): $respBody');
       } catch (e) {

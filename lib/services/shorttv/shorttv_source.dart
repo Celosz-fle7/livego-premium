@@ -67,4 +67,10 @@ class ShortTvSource implements DramaSource {
   ) {
     return _client.episodeExtras(seriesId, episodeId);
   }
+
+  @override
+  Future<void> signOut() async {
+    ShortTvClient.instance.signOut();
+    _streamCache.clear();
+  }
 }

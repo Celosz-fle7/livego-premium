@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/livego_settings.dart';
 import '../../core/livego_local_store.dart';
 import '../../data/livego_catalog.dart';
+import '../../services/drama_source.dart';
 import '../../shared/widgets/glow_container.dart';
 import '../../shared/settings/livego_setting_models.dart';
 
@@ -126,6 +127,69 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
   void _applySetting(VoidCallback change) {
     setState(change);
     LiveGoLocalStore.saveSettings();
+  }
+
+  /// Keluar dari sesi provider: sesi lama dibuang, request berikutnya
+  /// memakai identitas baru (auto-register / handshake ulang). Tidak ada
+  /// yang hilang — sesi baru dibuat otomatis.
+  Future<void> _signOutProvider(String slug, String label) async {
+    try {
+      await DramaSourceRegistry.forSlug(slug)?.signOut();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sesi $label dihapus. Request berikutnya memakai identitas baru.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal keluar dari $label: $e')),
+      );
+    }
+  }
+
+  Widget _sessionSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _section('Sesi Provider'),
+        GlowContainer(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _tile(
+                Icons.tv_rounded,
+                'CinemaID',
+                'Hapus sesi tersimpan. Request berikutnya memakai identitas tamu baru.',
+                trailing: TextButton(
+                  onPressed: () => _signOutProvider('cinemaid', 'CinemaID'),
+                  child: const Text('KELUAR', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+                onTap: () => _signOutProvider('cinemaid', 'CinemaID'),
+              ),
+              const Divider(color: Color(0xFF24344A), height: 1),
+              _tile(
+                Icons.play_circle_rounded,
+                'ShortTV',
+                'Buang token sesi. Request berikutnya handshake ulang.',
+                trailing: TextButton(
+                  onPressed: () => _signOutProvider('shorttv', 'ShortTV'),
+                  child: const Text('KELUAR', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+                onTap: () => _signOutProvider('shorttv', 'ShortTV'),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(top: 10, bottom: 8),
+                child: Text(
+                  'FreeReels anonim dan Melolo identitas perangkat — tidak ada sesi akun untuk keluar.',
+                  style: TextStyle(color: AppTheme.textSoft, fontSize: 12, height: 1.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   void _activateSetting(LiveGoSettingId id) {
@@ -261,6 +325,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
           ),
         ),
         ..._settingSectionWidgets(),
+        _sessionSection(),
       ],
     );
   }

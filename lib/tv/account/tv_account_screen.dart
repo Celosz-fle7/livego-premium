@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
+import '../../services/drama_source.dart';
 import '../navigation/tv_nav_index.dart';
 import '../core/managers/tv_cache_manager.dart';
 import '../core/managers/tv_remote_manager.dart';
@@ -313,6 +314,17 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
     _scheduleEntry(header: false);
   }
 
+  Future<void> _signOutProvider(String slug, String label) async {
+    try {
+      await DramaSourceRegistry.forSlug(slug)?.signOut();
+      if (!mounted) return;
+      _message('Sesi $label dihapus. Request berikutnya memakai identitas baru.');
+    } catch (e) {
+      if (!mounted) return;
+      _message('Gagal keluar dari $label: $e');
+    }
+  }
+
   void _activateAction(TvAccountAction action) {
     switch (action) {
       case TvAccountAction.sourceManager:
@@ -347,6 +359,12 @@ class _TvAccountScreenState extends State<TvAccountScreen> {
         break;
       case TvAccountAction.search:
         widget.onOpenNavIndex?.call(TvNavIndex.search);
+        break;
+      case TvAccountAction.signOutCinemaId:
+        unawaited(_signOutProvider('cinemaid', 'CinemaID'));
+        break;
+      case TvAccountAction.signOutShortTv:
+        unawaited(_signOutProvider('shorttv', 'ShortTV'));
         break;
     }
   }

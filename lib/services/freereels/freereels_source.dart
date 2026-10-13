@@ -154,4 +154,8 @@ class FreereelsSource implements DramaSource {
       episodePrice: int.tryParse('${raw['episode_price'] ?? 0}') ?? 0,
     );
   }
+
+  /// FreeReels anonim — tidak ada sesi, tidak ada yang perlu keluar.
+  @override
+  Future<void> signOut() async {}
 }

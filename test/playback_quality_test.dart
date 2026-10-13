@@ -52,6 +52,9 @@ class _FakeQualitySource implements DramaSource {
   Future<List<ContentItem>> search(String query) async => const [];
 
   @override
+  Future<void> signOut() async {}
+
+  @override
   Future<DramaEpisodeExtras?> episodeExtras(String seriesId, String episodeId) async {
     return const DramaEpisodeExtras(
       qualities: [
