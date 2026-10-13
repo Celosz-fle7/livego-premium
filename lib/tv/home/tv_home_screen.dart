@@ -311,9 +311,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                             onFocus: (i) {
                               setState(() {
                                 _platformIndex = i;
+                                _selectedPlatformIndex = i;
                                 _controlFocus = _HomeControlFocus.platformChip;
                               });
                               this._rememberFocus(TvZone.platform, i);
+                              this._scheduleHomeSelectionCommit(TvZone.platform);
                             },
                             onKey: (i, event) => this._platformKey(i, event),
                           ),
@@ -337,9 +339,11 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                             onFocus: (i) {
                               setState(() {
                                 _categoryIndex = i;
+                                _selectedCategoryIndex = i;
                                 _controlFocus = _HomeControlFocus.categoryChip;
                               });
                               this._rememberFocus(TvZone.category, i);
+                              this._scheduleHomeSelectionCommit(TvZone.category);
                             },
                             onKey: (i, event) => this._categoryKey(i, event),
                           ),
@@ -383,7 +387,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // data loading or focus movement.
                     const SizedBox(height: 6),
                     if (home.loading && gridItems.isEmpty)
-                      const TvProfessionalGridSkeleton(columns: 7, rows: 2)
+                      TvProfessionalGridSkeleton(
+                        columns: 7,
+                        rows: 2,
+                        // Fokus visual saat loading: ring whiteGlow di sel pertama
+                        // agar remote "kelihatan" walau grid masih kosong.
+                        focusedIndex: _zone == TvZone.grid || _zone == TvZone.placeholder ? 0 : null,
+                      )
                     else if (gridItems.isEmpty)
                       ListenableBuilder(
                         listenable: _emptyNode,

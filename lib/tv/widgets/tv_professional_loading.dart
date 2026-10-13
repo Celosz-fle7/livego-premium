@@ -5,7 +5,8 @@ import '../../core/app_theme.dart';
 class TvSkeletonBlock extends StatelessWidget {
   final double height;
   final double radius;
-  const TvSkeletonBlock({super.key, required this.height, this.radius = 22});
+  final bool focused;
+  const TvSkeletonBlock({super.key, required this.height, this.radius = 22, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +24,10 @@ class TvSkeletonBlock extends StatelessWidget {
               AppTheme.surface.withOpacity(0.58),
             ],
           ),
-          border: Border.all(color: AppTheme.border.withOpacity(0.7)),
+          border: Border.all(
+            color: focused ? AppTheme.whiteGlow : AppTheme.border.withOpacity(0.7),
+            width: focused ? 2.0 : 1.0,
+          ),
         ),
       ),
     );
@@ -33,7 +37,8 @@ class TvSkeletonBlock extends StatelessWidget {
 class TvProfessionalGridSkeleton extends StatelessWidget {
   final int columns;
   final int rows;
-  const TvProfessionalGridSkeleton({super.key, this.columns = 6, this.rows = 2});
+  final int? focusedIndex;
+  const TvProfessionalGridSkeleton({super.key, this.columns = 6, this.rows = 2, this.focusedIndex});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +52,9 @@ class TvProfessionalGridSkeleton extends StatelessWidget {
                   Expanded(
                     child: Padding(
                       padding: EdgeInsets.only(right: c == columns - 1 ? 0 : 12),
-                      child: const TvSkeletonPoster(),
+                      child: TvSkeletonPoster(
+                        focused: focusedIndex == r * columns + c,
+                      ),
                     ),
                   ),
               ],
@@ -61,13 +68,14 @@ class TvProfessionalGridSkeleton extends StatelessWidget {
 }
 
 class TvSkeletonPoster extends StatelessWidget {
-  const TvSkeletonPoster({super.key});
+  final bool focused;
+  const TvSkeletonPoster({super.key, this.focused = false});
 
   @override
   Widget build(BuildContext context) {
-    return const AspectRatio(
+    return AspectRatio(
       aspectRatio: 2 / 3,
-      child: TvSkeletonBlock(height: double.infinity, radius: 18),
+      child: TvSkeletonBlock(height: double.infinity, radius: 18, focused: focused),
     );
   }
 }

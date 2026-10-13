@@ -104,16 +104,27 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   Future<void> _refreshCategoriesFor(String platform) async {
+    // Label kategori terpilih adalah source of truth, bukan index-nya:
+    // refresh bisa mengurutkan ulang/menyisipkan kategori tanpa menghapus pilihan.
+    final selectedLabel = _categoryLabel;
     final before = LiveGoCatalog.categoriesFor(platform).join('|');
     final refreshed = await LiveGoCatalog.fetchCategoriesFor(platform)
         .timeout(const Duration(seconds: 7), onTimeout: () => LiveGoCatalog.categoriesFor(platform));
     if (!mounted || platform != _platformSlug) return;
     if (refreshed.join('|') == before) return;
+    final newIndex = refreshed.indexOf(selectedLabel);
+    final resolvedIndex = newIndex < 0 ? 0 : newIndex;
+    final newLabel = refreshed.isEmpty ? '' : refreshed[resolvedIndex];
     setState(() {
-      if (_selectedCategoryIndex >= refreshed.length) _selectedCategoryIndex = 0;
-      if (_categoryIndex >= refreshed.length) _categoryIndex = _selectedCategoryIndex;
+      _selectedCategoryIndex = resolvedIndex;
+      _categoryIndex = resolvedIndex;
     });
     _rememberSelection();
+    // Reload hanya kalau label efektif benar-benar berubah (kategori lama hilang).
+    // Kalau label dipertahankan (reorder/insert), konten sudah cocok — tanpa reload.
+    if (newLabel != selectedLabel) {
+      _loadHome(clearPrevious: false);
+    }
   }
 
   bool _isLoadedHomeSelection(String platform, String category) {
@@ -133,6 +144,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _cancelHomeSelectionCommit();
     _homeSelectionCommitTimer = Timer(TvHomePerformanceConfig.selectionCommitDelay, () {
       if (!mounted) return;
+      // Guard: hanya commit kalau user MASIH di zone chip yang sama.
+      // Kalau sudah pindah ke grid/search/banner, jangan yank fokus / reload.
+      if (_zone != zone) return;
       if (_platformSlug != platform || _categoryLabel != category) return;
 
       setState(() {
@@ -569,10 +583,19 @@ extension TvHomeInteractionController on _TvHomeScreenState {
       if (zone == TvZone.grid) _gridIndex = target;
       if (zone == TvZone.banner) _fullGridMode = false;
       if (zone == TvZone.grid) _fullGridMode = true;
+      // Hover = preview selection: selected mengikuti kursor chip agar
+      // _scheduleHomeSelectionCommit menangkap platform/kategori yang di-hover
+      // (bukan pilihan lama). Commit ter-debounce 300ms; OK membatalkan timer.
+      if (zone == TvZone.platform) _selectedPlatformIndex = target;
+      if (zone == TvZone.category) _selectedCategoryIndex = target;
     });
 
     _rememberFocus(zone, target);
     if (scroll) _scrollManualZone(zone, target);
+    // Hover-trigger: load konten saat fokus diam 300ms di chip, tanpa tekan OK.
+    if (zone == TvZone.platform || zone == TvZone.category) {
+      _scheduleHomeSelectionCommit(zone);
+    }
 
     final headerFocused = targetControlFocus == _HomeControlFocus.platformHeader ||
         targetControlFocus == _HomeControlFocus.categoryHeader;
@@ -739,7 +762,9 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     switch (_zone) {
       case TvZone.grid:
         if (_gridColumns <= 0) return;
-        if (_gridIndex % _gridColumns == 0) {
+        // Wrap antar baris: kolom 0 tapi bukan index 0 -> item terakhir baris sebelumnya.
+        // Hanya index 0 mutlak yang ke Akun.
+        if (_gridIndex == 0) {
           _moveToNav();
         } else {
           _setManualZone(TvZone.grid, _gridIndex - 1, scroll: false);
@@ -774,9 +799,10 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     switch (_zone) {
       case TvZone.grid:
         if (_gridColumns <= 0) return;
-        final col = _gridIndex % _gridColumns;
+        // Wrap antar baris: grid row-major, index+1 dari ujung kanan baris
+        // = item pertama baris berikutnya. Diam hanya di item terakhir.
         final next = _gridIndex + 1;
-        if (col < _gridColumns - 1 && next < _gridNodes.length && next ~/ _gridColumns == _gridIndex ~/ _gridColumns) {
+        if (next < _gridNodes.length) {
           _setManualZone(TvZone.grid, next, scroll: false);
         }
         return;
@@ -1199,7 +1225,13 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _controlFocus = _HomeControlFocus.platformChip;
     _rememberFocus(TvZone.platform, target);
     _homeDebugLog('home_platform_chip_select');
-    if (target == _selectedPlatformIndex) return;
+    // Hover mungkin sudah menggeser _selectedPlatformIndex ke target + membatalkan
+    // timer commit via _cancelHomeSelectionCommit di atas. Jangan early-return
+    // kalau konten untuk pilihan ini belum benar-benar ter-load.
+    if (target == _selectedPlatformIndex &&
+        _isLoadedHomeSelection(platforms[target], _categoryLabel)) {
+      return;
+    }
 
     final selectedPlatform = platforms[target];
     final categories = LiveGoCatalog.categoriesFor(selectedPlatform);
@@ -1233,7 +1265,12 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     _controlFocus = _HomeControlFocus.categoryChip;
     _rememberFocus(TvZone.category, target);
     _homeDebugLog('home_category_chip_select');
-    if (target == _selectedCategoryIndex) return;
+    // Sama seperti platform: hover bisa sudah menggeser selection + membatalkan
+    // timer. Early-return hanya kalau konten pilihan ini sudah ter-load.
+    if (target == _selectedCategoryIndex &&
+        _isLoadedHomeSelection(_platformSlug, categories[target])) {
+      return;
+    }
 
     setState(() {
       _selectedCategoryIndex = target;
