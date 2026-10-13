@@ -1,5 +1,5 @@
 name: livego_premium
-version: 2.0.24+224
+version: 2.0.25+225
 publish_to: none
 
 environment:
@@ -24,3 +24,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/livego_logo.png

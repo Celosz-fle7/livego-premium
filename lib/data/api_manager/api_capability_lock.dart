@@ -55,8 +55,8 @@ class ApiCapabilityLock {
 
   static String _backendBadge(LiveGoApiBackend backend) {
     switch (backend) {
-      case LiveGoApiBackend.nobuzero:
-        return 'LIVEGO API';
+      case LiveGoApiBackend.direct:
+        return 'DIRECT';
     }
   }
 
@@ -68,6 +68,8 @@ class ApiCapabilityLock {
         return 'HLS';
       case LiveGoVideoType.encrypted:
         return 'DRM';
+      case LiveGoVideoType.cenc:
+        return 'CENC';
     }
   }
 
@@ -79,6 +81,8 @@ class ApiCapabilityLock {
         return 'HLS';
       case LiveGoVideoType.encrypted:
         return 'Encrypted';
+      case LiveGoVideoType.cenc:
+        return 'CENC';
     }
   }
 

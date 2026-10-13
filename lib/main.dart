@@ -9,6 +9,7 @@ import 'core/app_theme.dart';
 import 'core/livego_settings.dart';
 import 'core/livego_local_store.dart';
 import 'mobile/mobile_app.dart';
+import 'shared/widgets/livego_splash_screen.dart';
 import 'tv/tv_app.dart';
 
 void main() {
@@ -80,7 +81,7 @@ class LiveGoPremiumApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const AdaptiveRoot(),
+      home: const LiveGoSplashGate(child: AdaptiveRoot()),
     );
   }
 }
