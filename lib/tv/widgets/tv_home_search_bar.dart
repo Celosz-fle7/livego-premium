@@ -6,8 +6,8 @@ import '../../core/app_theme.dart';
 /// Search bar Home TV.
 ///
 /// Styling mengikuti border chip provider/kategori (TvChipRow):
-/// - pill (radius 999), tinggi 36
-/// - border: fokus -> whiteGlow 2.0, default -> putih 0.075 1.0
+/// - pill (radius 999), tinggi 32
+/// - border: fokus -> whiteGlow 1.6, default -> putih 0.075 0.8
 /// - background: fokus -> gradasi cyan, default -> surface2 0.82
 class TvHomeSearchBar extends StatelessWidget {
   final FocusNode focusNode;
@@ -46,8 +46,8 @@ class TvHomeSearchBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               focusColor: Colors.transparent,
               child: Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 alignment: Alignment.centerLeft,
                 decoration: BoxDecoration(
                   gradient: focused
@@ -57,7 +57,7 @@ class TvHomeSearchBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: focused ? AppTheme.whiteGlow : Colors.white.withOpacity(0.075),
-                    width: focused ? 2.0 : 1.0,
+                    width: focused ? 1.6 : 0.8,
                   ),
                 ),
                 child: Row(
@@ -65,9 +65,9 @@ class TvHomeSearchBar extends StatelessWidget {
                     Icon(
                       Icons.search_rounded,
                       color: focused ? Colors.white : AppTheme.textSoft,
-                      size: 18,
+                      size: 16,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 7),
                     const Expanded(
                       child: Text(
                         'Cari film, serial...',
@@ -75,7 +75,7 @@ class TvHomeSearchBar extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppTheme.textSoft,
-                          fontSize: 11.2,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w900,
                           decoration: TextDecoration.none,
                         ),
@@ -86,7 +86,7 @@ class TvHomeSearchBar extends StatelessWidget {
                       maxLines: 1,
                       style: TextStyle(
                         color: Colors.white54,
-                        fontSize: 10,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w800,
                         decoration: TextDecoration.none,
                       ),

@@ -12,9 +12,9 @@ class TvSafeZone {
 
   static const double bottomReach = 220;
   static const double homeGridBottomReach = 190;
-  // Header Home sticky = 150 (Platform 50 + gap 4 + Kategori 50 + gap 4 +
-  // Search 36 + padding bawah 6). Offset grid entry = header + 135.
-  static const double homeGridEntryOffset = 285;
+  // Header Home sticky = 128 (Platform 44 + gap 3 + Kategori 44 + gap 3 +
+  // Search 32 + padding bawah 2). Offset grid entry = header + 135.
+  static const double homeGridEntryOffset = 263;
   static const double accountTop = 24;
   static const double accountSide = 48;
   static const double settingsTop = 24;
@@ -33,9 +33,9 @@ class TvSafeZone {
   static const EdgeInsets search = EdgeInsets.fromLTRB(40, 24, 48, bottomReach);
   static const EdgeInsets library = EdgeInsets.fromLTRB(40, 24, 48, bottomReach);
   static const EdgeInsets downloads = EdgeInsets.fromLTRB(48, 24, 48, bottomReach);
-  // Top Home dikurangi 28 -> 20 untuk memberi ruang search bar di bawah
+  // Top Home dikurangi 28 -> 20 -> 16 untuk memberi ruang search bar di bawah
   // chip Kategori tanpa membuat layout bertumpuk.
-  static const EdgeInsets home = EdgeInsets.fromLTRB(32, 20, 44, bottomReach);
+  static const EdgeInsets home = EdgeInsets.fromLTRB(32, 16, 44, bottomReach);
 
   static const double listTop = 96;
   static const double listBottom = 160;

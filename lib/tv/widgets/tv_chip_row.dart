@@ -149,8 +149,8 @@ class _TvChip extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               focusColor: Colors.transparent,
               child: Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: active
@@ -164,7 +164,7 @@ class _TvChip extends StatelessWidget {
                     color: focused
                         ? AppTheme.whiteGlow
                         : (active ? Colors.white.withOpacity(0.20) : Colors.white.withOpacity(0.075)),
-                    width: focused ? 2.0 : 1.0,
+                    width: focused ? 1.6 : 0.8,
                   ),
                 ),
                 child: Row(
@@ -173,11 +173,11 @@ class _TvChip extends StatelessWidget {
                   children: [
                     if (active) ...[
                       Container(
-                        width: 6,
-                        height: 6,
+                        width: 5,
+                        height: 5,
                         decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                     ],
                     Flexible(
                       child: Text(
@@ -186,7 +186,7 @@ class _TvChip extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: selected ? Colors.white : AppTheme.textSoft,
-                          fontSize: 11.2,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w900,
                           decoration: TextDecoration.none,
                         ),

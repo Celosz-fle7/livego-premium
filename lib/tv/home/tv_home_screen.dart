@@ -288,16 +288,16 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _HomeStickySourceHeaderDelegate(
-                  height: 150,
+                  height: 128,
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 6),
+                    padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, 2),
                     child: Column(
                       children: [
                         TvSectionBox(
                           icon: Icons.apps_rounded,
                           label: 'Platform',
                           hint: LiveGoCatalog.label(_platformSlug),
-                          height: 50,
+                          height: 44,
                           showHeader: false,
                           child: TvChipRow(
                             labels: platforms,
@@ -320,12 +320,12 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                             onKey: (i, event) => this._platformKey(i, event),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         TvSectionBox(
                           icon: Icons.tune_rounded,
                           label: 'Kategori',
                           hint: categories.isEmpty ? 'Default' : categories[_selectedCategoryIndex],
-                          height: 50,
+                          height: 44,
                           showHeader: false,
                           child: TvChipRow(
                             labels: categories,
@@ -348,7 +348,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                             onKey: (i, event) => this._categoryKey(i, event),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         TvHomeSearchBar(
                           focusNode: _searchNode,
                           focusedOverride: _zone == TvZone.search ? true : null,
@@ -367,7 +367,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                 ),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(padding.left, 14, padding.right, 0),
+                padding: EdgeInsets.fromLTRB(padding.left, 4, padding.right, 0),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate.fixed([
                     if (!_fullGridMode)
@@ -385,7 +385,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                     // Grid title/count removed so poster grid can sit closer
                     // to Kategori. This saves vertical TV space without touching
                     // data loading or focus movement.
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
                     if (home.loading && gridItems.isEmpty)
                       TvProfessionalGridSkeleton(
                         columns: 7,
@@ -426,7 +426,7 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                   padding: EdgeInsets.fromLTRB(padding.left, 0, padding.right, TvSafeZone.homeGridBottomReach),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 14,
-                  mainAxisExtent: 205,
+                  mainAxisExtent: 190,
                   onFocus: (i) {
                     _gridIndex = i;
                     this._rememberFocus(TvZone.grid, i);

@@ -373,14 +373,14 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _anchorGridRow({required int targetIndex, required int previousIndex}) {
     // Safe-zone deterministic grid row scroll.
     //
-    // TvPosterGrid uses mainAxisExtent: 205 and mainAxisSpacing: 14,
-    // so the vertical row stride is stable: 219px. Unlike the v1 test, this uses
+    // TvPosterGrid uses mainAxisExtent: 190 and mainAxisSpacing: 14,
+    // so the vertical row stride is stable: 204px. Unlike the v1 test, this uses
     // actual row delta from index math and clamps aggressive repeat movement
     // through TvSafeZone.gridTop/gridBottom. No context, no RenderObject, and no
     // post-frame ensureVisible.
     if (!_scroll.hasClients || _gridColumns <= 0) return;
 
-    const rowStride = 219.0;
+    const rowStride = 204.0;
     final previousRow = previousIndex ~/ _gridColumns;
     final targetRow = targetIndex ~/ _gridColumns;
     final deltaRows = targetRow - previousRow;
@@ -650,7 +650,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   void _scrollHomeToGridIndex(int index) {
     if (!_scroll.hasClients || _gridColumns <= 0 || _gridNodes.isEmpty) return;
 
-    const rowStride = 219.0;
+    const rowStride = 204.0;
     final position = _scroll.position;
     final safeIndex = _safe(index, _gridNodes.length);
     final row = safeIndex ~/ _gridColumns;
@@ -669,7 +669,7 @@ extension TvHomeInteractionController on _TvHomeScreenState {
   }
 
   double _homeGridScrollForTopRow(int topRow, ScrollPosition position) {
-    final target = TvSafeZone.homeGridEntryOffset + (topRow * 219.0);
+    final target = TvSafeZone.homeGridEntryOffset + (topRow * 204.0);
     return target.clamp(position.minScrollExtent, position.maxScrollExtent).toDouble();
   }
 
