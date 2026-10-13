@@ -34,11 +34,11 @@ class FreereelsConfig {
 
   /// Tab key bawaan APK (dari script Python).
   /// New (505), Female (504), Male (506) DIHAPUS — tidak dipakai.
-  /// Dubbing (514) diganti label Indonesia: "Sulih Suara".
+  /// Dubbing (514) = konten sulih suara, all genre.
   static const Map<String, String> tabKeys = {
     'Popular': '503',
     'Coming Soon': '622',
-    'Sulih Suara': '514',
+    'Dubbing': '514',
     'Anime': '547',
   };
 

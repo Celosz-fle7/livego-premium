@@ -243,7 +243,7 @@ class FreereelsClient {
   }
 
   /// Cari drama dengan paginasi penuh (ikuti page_info.next sampai habis).
-  /// Dipakai untuk kategori Sulih Suara yang isinya ratusan judul.
+  /// Dipakai untuk kategori Dubbing yang isinya ratusan judul.
   Future<List<ContentItem>> searchAll(String keyword, {int maxPages = 20}) async {
     final seen = <String>{};
     final all = <ContentItem>[];
@@ -252,7 +252,7 @@ class FreereelsClient {
       final res = await searchPage(
         keyword,
         pageToken: pageToken,
-        category: 'Sulih Suara',
+        category: 'Dubbing',
       );
       var added = 0;
       for (final item in res.items) {
