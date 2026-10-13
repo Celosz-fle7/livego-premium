@@ -29,6 +29,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import io.flutter.plugin.common.MethodChannel
@@ -399,16 +400,33 @@ class TvNativeSurfacePlayerActivity : Activity() {
     }
 
     private fun createPlayer(url: String, keepPositionMs: Long, playWhenReady: Boolean) {
-        val old = player
-        old?.pause()
-        // Hanya detach surface saat MENGGANTI player lama (ganti episode/kualitas).
-        // Pada pembuatan pertama (old == null) PlayerView masih fresh & hitam —
-        // detach di sini balapan dengan attach surface pertama dan bisa bikin
-        // video tidak pernah dapat surface (audio jalan, gambar diem/hitam).
-        if (old != null) resetNativeVideoSurface()
-        old?.release()
-        player = null
+        val existing = player
+        if (existing != null) {
+            // Ganti episode/kualitas/retry: PAKAI ULANG player + decoder yang sama.
+            // Release + recreate balapan dengan pembebasan codec hardware TV
+            // (decoder terbatas) -> ERROR_CODE_DECODING_FAILED di episode berikut,
+            // padahal episode pertama jalan. ExoPlayer dirancang untuk ganti
+            // MediaItem pada instance yang sama. Surface tidak pernah diutak-atik
+            // di jalur ini, jadi tidak ada detach/re-attach.
+            // MediaSource baru dibangun dengan headers terbaru; subtitle ikut
+            // dari buildMediaItem(url). Listener & track selection dipertahankan.
+            existing.setMediaSource(buildMediaSource(url))
+            existing.prepare()
+            if (keepPositionMs > 0) existing.seekTo(keepPositionMs)
+            existing.playWhenReady = playWhenReady
+            existing.setPlaybackSpeed(speeds[speedIndex])
+            existing.volume = if (muted) 0f else 1f
+            currentUrl = url
+            handler.postDelayed({
+                updateDock()
+                updateProgress()
+                refreshAudioRows()
+            }, 350)
+            handler.postDelayed({ refreshAudioRows() }, 1200)
+            return
+        }
 
+        // Pembuatan pertama: tidak ada player lama, tidak ada detach/release.
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setUserAgent(headers["User-Agent"] ?: "LiveGO Premium TV")
@@ -463,6 +481,17 @@ class TvNativeSurfacePlayerActivity : Activity() {
             refreshAudioRows()
         }, 350)
         handler.postDelayed({ refreshAudioRows() }, 1200)
+    }
+
+    // MediaSource baru dari URL + headers TERBARU (dipakai jalur reuse player).
+    // Subtitle ikut dari buildMediaItem(url) via MediaSourceFactory.
+    private fun buildMediaSource(url: String): MediaSource {
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setUserAgent(headers["User-Agent"] ?: "LiveGO Premium TV")
+        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
+        return DefaultMediaSourceFactory(dataSourceFactory)
+            .createMediaSource(buildMediaItem(url))
     }
 
     private fun buildMediaItem(url: String): MediaItem {
@@ -730,18 +759,6 @@ class TvNativeSurfacePlayerActivity : Activity() {
 
     private fun episodePanelTotal(): Int {
         return if (totalEpisodes > 1) totalEpisodes.coerceIn(1, 999) else max(episode, 1)
-    }
-
-    private fun resetNativeVideoSurface() {
-        playerView.player = null
-        playerView.setBackgroundColor(Color.BLACK)
-        try {
-            playerView.setShutterBackgroundColor(Color.BLACK)
-            playerView.setKeepContentOnPlayerReset(false)
-        } catch (_: Throwable) {
-            // Older/lighter Media3 builds may not expose every PlayerView helper.
-            // Black root + player=null still prevents stale last frame on most TVs.
-        }
     }
 
     private fun updateTags() {
