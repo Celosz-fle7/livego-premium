@@ -11,43 +11,21 @@ class TvPlayerEntry {
     BuildContext context, {
     required ContentItem item,
     int? episode,
-    PlayerEngineType? engine,
   }) {
-    final selected = TvPlayerEngineConfig.selectedEngine(override: engine, isCenc: item.platformSlug == 'melolo');
+    const selected = PlayerEngineType.nativeExo;
     TvPlayerDebugLog.event(
       'player_engine_selected',
       item: item,
       episode: episode,
       engine: selected.wireName,
-      reason: selected == PlayerEngineType.nativeExo
-          ? (engine == null ? 'default_native' : 'manual_native_override')
-          : (engine == null ? 'default_fallback' : 'explicit_override'),
+      reason: 'native_only',
     );
-    return Navigator.of(context).push(_routeFor(item: item, episode: episode, engine: selected));
-  }
-
-  static Future<void> replaceWithNativeExo(
-    BuildContext context, {
-    required ContentItem item,
-    int? episode,
-    String reason = 'flutter_failed',
-  }) {
-    TvPlayerDebugLog.event(
-      'player_engine_fallback',
-      item: item,
-      episode: episode,
-      engine: PlayerEngineType.nativeExo.wireName,
-      reason: reason,
-    );
-    return Navigator.of(context).pushReplacement(
-      _routeFor(item: item, episode: episode, engine: PlayerEngineType.nativeExo),
-    );
+    return Navigator.of(context).push(_routeFor(item: item, episode: episode));
   }
 
   static PageRouteBuilder<void> _routeFor({
     required ContentItem item,
     required int? episode,
-    required PlayerEngineType engine,
   }) {
     return PageRouteBuilder<void>(
       opaque: true,
@@ -56,32 +34,9 @@ class TvPlayerEntry {
       reverseTransitionDuration: Duration.zero,
       pageBuilder: (_, __, ___) => ColoredBox(
         color: Colors.black,
-        child: _screenFor(item: item, episode: episode, engine: engine),
+        child: TvPlayerExplorer3Screen(item: item, episode: episode),
       ),
       transitionsBuilder: (_, __, ___, child) => ColoredBox(color: Colors.black, child: child),
     );
-  }
-
-  static Widget _screenFor({
-    required ContentItem item,
-    required int? episode,
-    required PlayerEngineType engine,
-  }) {
-    switch (engine) {
-      case PlayerEngineType.flutterFallback:
-        return TvPlayerExplorer3Screen(
-          item: item,
-          episode: episode,
-          preferNativeSurface: false,
-          onFallbackToNative: (context, reason) => replaceWithNativeExo(
-            context,
-            item: item,
-            episode: episode,
-            reason: reason,
-          ),
-        );
-      case PlayerEngineType.nativeExo:
-        return TvPlayerExplorer3Screen(item: item, episode: episode, preferNativeSurface: true);
-    }
   }
 }

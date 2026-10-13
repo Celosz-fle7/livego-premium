@@ -1,15 +1,13 @@
 import 'package:flutter/foundation.dart';
 
-import '../../core/livego_settings.dart';
 import '../../models/content_item.dart';
 
 /// TV player engine selection contract.
 ///
-/// TV starts on the hardware-accelerated Native ExoPlayer by default
-/// for fast, lightweight, and smooth playback on Android TV chipsets.
+/// TV player is 100% Native ExoPlayer (MethodChannel 'livego/native_surface_player').
+/// There is no Flutter fallback engine.
 enum PlayerEngineType {
   nativeExo,
-  flutterFallback,
 }
 
 extension PlayerEngineTypeLabel on PlayerEngineType {
@@ -17,8 +15,6 @@ extension PlayerEngineTypeLabel on PlayerEngineType {
     switch (this) {
       case PlayerEngineType.nativeExo:
         return 'nativeExo';
-      case PlayerEngineType.flutterFallback:
-        return 'flutterFallback';
     }
   }
 }
@@ -26,36 +22,10 @@ extension PlayerEngineTypeLabel on PlayerEngineType {
 class TvPlayerEngineConfig {
   const TvPlayerEngineConfig._();
 
-  static const String _defineEngine = String.fromEnvironment(
-    'LIVEGO_TV_PLAYER_ENGINE',
-    defaultValue: '',
-  );
-
   static PlayerEngineType get defaultEngine => PlayerEngineType.nativeExo;
 
   static PlayerEngineType selectedEngine({PlayerEngineType? override, bool isCenc = false}) {
-    if (isCenc) return PlayerEngineType.nativeExo;
-    return override ??
-        _fromName(LiveGoSettings.tvPlayerEngineOverride) ??
-        _fromName(_defineEngine) ??
-        defaultEngine;
-  }
-
-  static PlayerEngineType? _fromName(String value) {
-    final normalized = value.trim().toLowerCase();
-    switch (normalized) {
-      case 'nativeexo':
-      case 'native':
-      case 'exo':
-      case 'exoplayer':
-        return PlayerEngineType.nativeExo;
-      case 'flutterfallback':
-      case 'flutter':
-      case 'fallback':
-        return PlayerEngineType.flutterFallback;
-      default:
-        return null;
-    }
+    return PlayerEngineType.nativeExo;
   }
 }
 

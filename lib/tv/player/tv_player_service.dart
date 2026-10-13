@@ -26,7 +26,7 @@ class TvPlayerStreamResolveResult {
 
 /// Player data/service boundary.
 ///
-/// VideoPlayerController ownership still stays in TvPlayerScreen for stability.
+/// TV playback is 100% Native ExoPlayer (MethodChannel 'livego/native_surface_player').
 /// Stream resolving/fallback is owned here so the screen does not decide API order.
 class TvPlayerService implements PlaybackContract {
   const TvPlayerService();

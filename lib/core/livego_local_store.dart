@@ -286,7 +286,6 @@ class LiveGoLocalStore {
       'backgroundPoster': LiveGoSettings.backgroundPoster,
       'cachePlayback': LiveGoSettings.cachePlayback,
       'manualRotateButton': LiveGoSettings.manualRotateButton,
-      'tvPlayerEngineOverride': LiveGoSettings.tvPlayerEngineOverride,
       'tvSourceSetupCompleted': LiveGoSettings.tvSourceSetupCompleted,
       'mobileHomeGrid': LiveGoSettings.mobileHomeGrid,
       'tvHomeGrid': LiveGoSettings.tvHomeGrid,
@@ -331,7 +330,6 @@ class LiveGoLocalStore {
       LiveGoSettings.backgroundPoster = _bool(json['backgroundPoster'], LiveGoSettings.backgroundPoster);
       LiveGoSettings.cachePlayback = _bool(json['cachePlayback'], LiveGoSettings.cachePlayback);
       LiveGoSettings.manualRotateButton = _bool(json['manualRotateButton'], LiveGoSettings.manualRotateButton);
-      LiveGoSettings.tvPlayerEngineOverride = _string(json['tvPlayerEngineOverride'], LiveGoSettings.tvPlayerEngineOverride);
       LiveGoSettings.tvSourceSetupCompleted = _bool(json['tvSourceSetupCompleted'], LiveGoSettings.tvSourceSetupCompleted);
       // Grid settings are now fixed: HP=3, TV=7.
       // Ignore stale saved values so old settings cannot break layout.

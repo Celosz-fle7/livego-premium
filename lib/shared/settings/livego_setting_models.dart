@@ -11,7 +11,6 @@ enum LiveGoSettingId {
   manualRotate,
   drmMode,
   codecPreference,
-  tvPlayerEngine,
   cacheMaintenance,
   downloadNotice,
 }
@@ -109,7 +108,6 @@ class LiveGoSettingsMenuData {
   static List<LiveGoSettingSection> build({
     required bool tvLocked,
     bool cacheBusy = false,
-    bool includeTvPlayerEngine = true,
   }) {
     final selectedLayout = tvLocked
         ? LiveGoSettings.layoutTv
@@ -181,16 +179,6 @@ class LiveGoSettingsMenuData {
             subtitle: 'Pilih decoder H264/H265 untuk Melolo.',
             value: LiveGoSettings.codecPreference,
           ),
-          if (includeTvPlayerEngine)
-            LiveGoSettingItem.tile(
-              id: LiveGoSettingId.tvPlayerEngine,
-              icon: Icons.settings_input_component_rounded,
-              title: 'TV Player Engine',
-              subtitle: 'Pilih engine player TV (Native ExoPlayer / Flutter Fallback).',
-              value: LiveGoSettings.tvPlayerEngineOverride.isEmpty
-                  ? 'Default (Native Exo)'
-                  : LiveGoSettings.tvPlayerEngineOverride,
-            ),
         ],
       ),
       LiveGoSettingSection(

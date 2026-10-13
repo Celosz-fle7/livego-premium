@@ -160,9 +160,6 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
       case LiveGoSettingId.cacheMaintenance:
         _applySetting(LiveGoSettings.reset);
         break;
-      case LiveGoSettingId.tvPlayerEngine:
-        // TV-only setting; mobile routes must not read or mutate it.
-        break;
     }
   }
 
@@ -198,7 +195,7 @@ class _MobileSettingsScreenState extends State<MobileSettingsScreen> {
   }
 
   List<Widget> _settingSectionWidgets() {
-    final sections = LiveGoSettingsMenuData.build(tvLocked: false, includeTvPlayerEngine: false);
+    final sections = LiveGoSettingsMenuData.build(tvLocked: false);
     final widgets = <Widget>[];
     for (final section in sections) {
       widgets.add(_section(section.title));

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../../core/app_theme.dart';
 import '../../../core/livego_local_store.dart';
@@ -10,7 +9,6 @@ import '../../../core/livego_settings.dart';
 import '../../../models/content_item.dart';
 import '../../../models/stream_info.dart';
 import '../../../services/player/player_preferences.dart';
-import '../../../services/player/playback_contract.dart';
 import '../tv_player_engine.dart';
 import '../tv_player_service.dart';
 import '../../../services/melolo/melolo_stream_proxy.dart';
@@ -19,33 +17,25 @@ import '../../../services/shorttv/shorttv_stream_proxy.dart';
 import '../../../data/livego_catalog.dart';
 import '../../core/managers/tv_back_manager.dart';
 import '../../core/managers/tv_remote_manager.dart';
-import '../../core/managers/tv_cache_manager.dart';
-import '../../cache/tv_ram_cache.dart';
 import 'tv_player_explorer3_native_payload.dart';
 import 'tv_player_explorer3_timing.dart';
-import 'widgets/tv_player_explorer3_controls.dart';
-import 'widgets/tv_player_recommendations_sheet.dart';
 
 /// TV Player Explorer 3.
 ///
-/// Lightweight streaming-player structure:
+/// Native ExoPlayer only (MethodChannel 'livego/native_surface_player'):
 /// - one root Focus
 /// - one remote handler
-/// - one VideoPlayerController owner
-/// - modular lightweight overlay widgets
-/// - no debug recorder / no MediaStore / no native player route
+/// - Flutter route stays alive behind the native Activity for episode
+///   resolve / progress / preference callbacks
+/// - no debug recorder / no MediaStore
 class TvPlayerExplorer3Screen extends StatefulWidget {
   final ContentItem item;
   final int? episode;
-  final bool preferNativeSurface;
-  final Future<void> Function(BuildContext context, String reason)? onFallbackToNative;
 
   const TvPlayerExplorer3Screen({
     super.key,
     required this.item,
     this.episode,
-    this.preferNativeSurface = true,
-    this.onFallbackToNative,
   });
 
   @override
@@ -67,9 +57,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   final TvPlayerService _service = const TvPlayerService();
   static const MethodChannel _nativeSurfacePlayer = MethodChannel('livego/native_surface_player');
 
-  VideoPlayerController? _controller;
-  int? _controllerEpisode;
-  String _controllerChapterId = '';
   StreamInfo _streamInfo = StreamInfo.empty;
 
   int _loadToken = 0;
@@ -86,8 +73,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   String _status = 'Membuka player...';
   String _error = '';
-  String _subtitleStatus = 'Auto';
-  String _lastStreamUrl = '-';
   String _lastStreamHost = '-';
   String _lastStreamTail = '-';
   String _lastCodecHint = '-';
@@ -103,14 +88,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   int _recommendationCursor = 0;
   List<ContentItem> _recommendations = const <ContentItem>[];
   bool _loadingRecommendations = false;
-  int _lastCursorMoveMs = 0;
-  int _lastPlayerUiTickMs = 0;
-  int _lastProgressSaveMs = 0;
 
   double _speed = 1.0;
   _Explorer3Mode _mode = _Explorer3Mode.controls;
 
-  Timer? _surfaceTimer;
   Timer? _hideControlsTimer;
   Timer? _statusTimer;
   Timer? _prefetchTimer;
@@ -329,7 +310,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
             })
             .join(',');
 
-    _lastStreamUrl = url;
     _lastStreamHost = uri?.host.isNotEmpty == true ? uri!.host : '-';
     _lastStreamTail = url.length <= 42 ? url : url.substring(url.length - 42);
     _lastCodecHint = hint;
@@ -782,7 +762,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       case 'subtitle':
         final off = text.toLowerCase() == 'off' || text.toLowerCase() == 'matikan';
         LiveGoSettings.subtitlesEnabled = !off;
-        _subtitleStatus = off ? 'OFF' : text;
         await PlayerPreferences.setSubtitle(enabled: !off, language: off ? 'OFF' : text);
         break;
       case 'audio':
@@ -811,12 +790,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   void _exitFlutterPlayerRoute({required String source}) {
     if (!mounted) return;
 
-    unawaited(_saveProgressNow(force: true));
     _cancelEpisodeListWarmup();
     _cancelLightPrefetch();
     _cancelAutoHide();
     _statusTimer?.cancel();
-    _surfaceTimer?.cancel();
 
     setState(() {
       _closing = true;
@@ -862,9 +839,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
     _cancelLightPrefetch();
 
-    _surfaceTimer?.cancel();
-    _surfaceTimer = null;
-
     setState(() {
       _loading = true;
       _surfaceReady = false;
@@ -896,15 +870,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         _status = 'Menyiapkan video...';
         _qualityCursor = _qualityIndexFor(_activeQuality);
         if (stream.subtitles.isEmpty) {
-          _subtitleStatus = LiveGoSettings.subtitlesEnabled ? 'Tidak tersedia' : 'OFF';
           _subtitleCursor = LiveGoSettings.subtitlesEnabled ? 1 : 0;
         } else if (!LiveGoSettings.subtitlesEnabled) {
-          _subtitleStatus = 'OFF';
           _subtitleCursor = 0;
         } else {
           _subtitleCursor = _subtitleCursor.clamp(1, stream.subtitles.length).toInt();
-          final track = stream.subtitles[_subtitleCursor - 1];
-          _subtitleStatus = track.language.trim().isEmpty ? 'Subtitle' : track.language.trim();
         }
       });
 
@@ -921,43 +891,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         await ShortTvStreamProxy.instance.ensureRunning();
       }
 
-      if (widget.preferNativeSurface) {
-        final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
-        if (nativeOpened) {
-          _scheduleLightPrefetch();
-          return;
-        }
-      } else {
-        TvPlayerDebugLog.event(
-          'player_engine_selected',
-          item: widget.item,
-          episode: _episode,
-          engine: PlayerEngineType.flutterFallback.wireName,
-          reason: 'native_surface_disabled',
-        );
+      final nativeOpened = await _openNativeSurfacePlayer(token, stream, url);
+      if (!nativeOpened) {
+        throw StateError('Native ExoPlayer gagal dibuka');
       }
-
-      await _startController(token, stream, url);
+      _scheduleLightPrefetch();
+      return;
     } catch (error) {
       if (!_active(token)) return;
-      if (!widget.preferNativeSurface && widget.onFallbackToNative != null) {
-        final reason = _lastStreamUrl.toLowerCase().contains('.m3u8')
-            ? 'hls_requires_native'
-            : 'flutter_failed';
-        TvPlayerDebugLog.event(
-          'player_engine_fallback',
-          item: widget.item,
-          episode: _episode,
-          engine: PlayerEngineType.nativeExo.wireName,
-          reason: reason,
-          host: _lastStreamHost,
-          tail: _lastStreamTail,
-          error: error,
-        );
-        await widget.onFallbackToNative!(context, reason);
-        return;
-      }
-      await _disposeController();
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -995,231 +936,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return true;
     } catch (error) {
       if (!mounted || !_active(token)) return true;
-      TvPlayerDebugLog.event('player_engine_fallback', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'native_open_failed', error: error);
+      TvPlayerDebugLog.event('player_engine_failed', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, reason: 'native_open_failed', error: error);
       setState(() {
-        _status = 'Flutter fallback: $error';
+        _status = 'Native gagal: $error';
       });
       return false;
-    }
-  }
-
-  Future<void> _startController(int token, StreamInfo stream, String url) async {
-    TvPlayerDebugLog.event('player_legacy_controller_init_start', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, host: _lastStreamHost, tail: _lastStreamTail);
-    final controller = PlaybackContractRules.createController(
-      url,
-      headers: stream.headers,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
-    );
-
-    try {
-      await controller.initialize().timeout(
-        TvPlayerExplorer3Timing.fallbackControllerInitTimeout,
-        onTimeout: () => throw TimeoutException('Initialize video timeout'),
-      );
-      if (!_active(token)) {
-        await controller.dispose();
-        return;
-      }
-
-      await controller.setPlaybackSpeed(_speed);
-      if (!_active(token)) {
-        await controller.dispose();
-        return;
-      }
-
-      await controller.setVolume(_muted ? 0 : 1);
-      if (!_active(token)) {
-        await controller.dispose();
-        return;
-      }
-
-      await controller.play();
-      TvPlayerDebugLog.event('player_legacy_controller_init_done', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
-      if (!_active(token)) {
-        await controller.dispose();
-        return;
-      }
-
-      await _saveProgressNow(force: true);
-      if (!_active(token)) {
-        await controller.dispose();
-        return;
-      }
-
-      final old = _controller;
-      old?.removeListener(_onControllerTick);
-      _controller = controller;
-      _controllerEpisode = _episode;
-      _controllerChapterId = _chapterId;
-      controller.addListener(_onControllerTick);
-      await old?.dispose();
-
-      if (!_active(token)) {
-        controller.removeListener(_onControllerTick);
-        if (_controller == controller) {
-          _controller = null;
-          _controllerEpisode = null;
-          _controllerChapterId = '';
-        }
-        await controller.dispose();
-        return;
-      }
-      setState(() {
-        _loading = false;
-        _status = 'PLAY';
-        _mode = _Explorer3Mode.controls;
-        _episodeCursor = _episode;
-      });
-
-      _surfaceTimer?.cancel();
-      _surfaceTimer = null;
-      _detectVideoPlayback(token);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_closing) _onControllerTick();
-      });
-      _scheduleEpisodeListWarmup();
-      _scheduleLightPrefetch();
-      _scheduleAutoHide();
-    } catch (_) {
-      controller.removeListener(_onControllerTick);
-      if (_controller == controller) {
-        _controller = null;
-        _controllerEpisode = null;
-        _controllerChapterId = '';
-      }
-      await controller.dispose();
-      rethrow;
-    }
-  }
-
-  void _detectVideoPlayback(int token) {
-    int checkCount = 0;
-    final maxChecks = TvPlayerExplorer3Timing.surfaceMaxChecks;
-    final checkInterval = TvPlayerExplorer3Timing.surfaceCheckInterval;
-
-    void checkProgress() {
-      if (!_active(token)) return;
-
-      final c = _controller;
-      if (c == null || !c.value.isInitialized) {
-        _surfaceTimer = Timer(checkInterval, checkProgress);
-        return;
-      }
-
-      if (c.value.hasError) {
-        _surfaceTimer?.cancel();
-        _surfaceTimer = null;
-        if (!mounted) return;
-        setState(() {
-          _error = c.value.errorDescription ?? 'Video error';
-          _loading = false;
-          _surfaceReady = false;
-          _status = 'ERROR';
-          _mode = _Explorer3Mode.controls;
-        });
-        return;
-      }
-
-      checkCount += 1;
-      final currentPos = c.value.position;
-      final hasMotion = currentPos.inMilliseconds > 50;
-      final hasSize = c.value.size.width > 0 && c.value.size.height > 0;
-      final hasPlaybackSignal = c.value.isPlaying || hasMotion || !c.value.isBuffering;
-      final timedOut = checkCount >= maxChecks;
-      final sizeStableEnough = hasSize && checkCount >= 8;
-
-      if ((hasSize && hasPlaybackSignal) || sizeStableEnough || timedOut) {
-        _surfaceTimer?.cancel();
-        _surfaceTimer = null;
-        if (!_active(token)) return;
-        TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName, reason: 'surface_timeout_or_size_ready');
-        setState(() => _surfaceReady = true);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_closing) _rootFocus.requestFocus();
-        });
-        return;
-      }
-
-      _surfaceTimer = Timer(checkInterval, checkProgress);
-    }
-
-    checkProgress();
-  }
-
-  void _onControllerTick() {
-    if (!mounted || _closing) return;
-
-    final c = _controller;
-    if (c == null || !c.value.isInitialized || c.value.hasError) return;
-
-    final value = c.value;
-    final hasSize = value.size.width > 0 && value.size.height > 0;
-    final hasPlaybackSignal = value.isPlaying ||
-        value.position.inMilliseconds > 0 ||
-        !value.isBuffering;
-
-    if (!_surfaceReady && hasSize && hasPlaybackSignal) {
-      TvPlayerDebugLog.event('player_legacy_ready', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
-      setState(() {
-        _surfaceReady = true;
-        _loading = false;
-        _status = value.isPlaying ? 'PLAY' : 'PAUSE';
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_closing) _rootFocus.requestFocus();
-      });
-      return;
-    }
-
-    unawaited(_saveProgressNow());
-
-    // Keep the visible progress text fresh without adding a recorder/timer.
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if ((_showsControls || _showsPanel) && now - _lastPlayerUiTickMs >= TvPlayerExplorer3Timing.playerUiTickMs) {
-      _lastPlayerUiTickMs = now;
-      setState(() {});
-    }
-  }
-
-  Future<void> _saveProgressNow({bool force = false}) async {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized || c.value.hasError) return;
-
-    final value = c.value;
-    final duration = value.duration;
-    final position = value.position;
-    if (duration <= Duration.zero || position <= Duration.zero) return;
-    if (position > duration) return;
-
-    final itemId = widget.item.id.trim();
-    final platformSlug = widget.item.platformSlug.trim();
-    if (itemId.isEmpty || platformSlug.isEmpty) return;
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (!force && now - _lastProgressSaveMs < TvPlayerExplorer3Timing.progressSaveThrottleMs) return;
-    _lastProgressSaveMs = now;
-
-    final episode = (_controllerEpisode ?? _episode).clamp(1, TvPlayerExplorer3Timing.maxEpisode).toInt();
-    final chapterId = _controllerChapterId.trim().isNotEmpty ? _controllerChapterId.trim() : '$episode';
-    await LiveGoLocalStore.saveProgress(
-      _playableItemFor(episode: episode, chapterId: chapterId),
-      episode,
-      position,
-      duration,
-    );
-  }
-
-  Future<void> _disposeController() async {
-    _surfaceTimer?.cancel();
-    _surfaceTimer = null;
-    await _saveProgressNow(force: true);
-    final c = _controller;
-    _controller = null;
-    _controllerEpisode = null;
-    _controllerChapterId = '';
-    if (c != null) {
-      c.removeListener(_onControllerTick);
-      await c.dispose();
     }
   }
 
@@ -1244,7 +965,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     setState(() {
       _mode = _Explorer3Mode.controls;
       if (defaultPlay) _controlCursor = 2;
-      _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE';
     });
     _rootFocus.requestFocus();
     _scheduleAutoHide();
@@ -1276,7 +996,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!mounted) return;
     setState(() {
       _mode = _Explorer3Mode.watching;
-      _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE';
     });
     _rootFocus.requestFocus();
   }
@@ -1290,68 +1009,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     });
     _statusTimer = Timer(duration, () {
       if (!mounted || _loading || _error.isNotEmpty) return;
-      setState(() => _status = _controller?.value.isPlaying == true ? 'PLAY' : 'PAUSE');
-    });
-    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
-  }
-
-  bool _allowCursorMove([int ms = TvPlayerExplorer3Timing.cursorMoveGuardMs]) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastCursorMoveMs < ms) return false;
-    _lastCursorMoveMs = now;
-    return true;
-  }
-
-  bool _isBack(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.goBack ||
-        key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.browserBack;
-  }
-
-  bool _isSelect(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.select ||
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter ||
-        key == LogicalKeyboardKey.space ||
-        key == LogicalKeyboardKey.mediaPlayPause;
-  }
-
-  bool _isMenu(LogicalKeyboardKey key) {
-    return key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.f10;
-  }
-
-  Future<void> _togglePlay() async {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    if (c.value.isPlaying) {
-      await c.pause();
-    } else {
-      await c.play();
-    }
-    if (!mounted) return;
-    setState(() {
-      _status = c.value.isPlaying ? 'PLAY' : 'PAUSE';
-      if (_mode == _Explorer3Mode.watching) _mode = _Explorer3Mode.controls;
-    });
-    if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
-  }
-
-  Future<void> _seekBy(Duration delta) async {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-
-    final duration = c.value.duration;
-    final current = c.value.position;
-    final raw = current + delta;
-    final target = raw < Duration.zero
-        ? Duration.zero
-        : (duration > Duration.zero && raw > duration ? duration : raw);
-
-    await c.seekTo(target);
-    if (!mounted) return;
-    setState(() {
-      _status = delta.isNegative ? '-10s' : '+10s';
-      if (_mode == _Explorer3Mode.watching) _mode = _Explorer3Mode.controls;
+      setState(() => _status = 'Native Surface Player');
     });
     if (_mode == _Explorer3Mode.controls) _scheduleAutoHide();
   }
@@ -1374,7 +1032,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       return;
     }
 
-    await _saveProgressNow(force: true);
+    // Progress disimpan native via nativeProgress callback.
     if (!mounted || _loading) return;
 
     setState(() {
@@ -1440,8 +1098,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     final safe = _qualityCursor.clamp(0, choices.length - 1).toInt();
     final label = choices[safe];
 
-    TvPlayerDebugLog.event('player_quality_switch_start', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
-    await _saveProgressNow(force: true);
+    TvPlayerDebugLog.event('player_quality_switch_start', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, reason: label);
     if (!mounted) return;
 
     setState(() {
@@ -1454,9 +1111,9 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     unawaited(LiveGoLocalStore.saveSettings());
     try {
       await _load();
-      TvPlayerDebugLog.event('player_quality_switch_success', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label);
+      TvPlayerDebugLog.event('player_quality_switch_success', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, reason: label);
     } catch (error) {
-      TvPlayerDebugLog.event('player_quality_switch_failed', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName, reason: label, error: error);
+      TvPlayerDebugLog.event('player_quality_switch_failed', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName, reason: label, error: error);
       rethrow;
     }
   }
@@ -1468,7 +1125,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (safe == 0) {
       setState(() {
         LiveGoSettings.subtitlesEnabled = false;
-        _subtitleStatus = 'OFF';
         _subtitleCursor = 0;
         _status = 'Subtitle OFF';
         _mode = _Explorer3Mode.controls;
@@ -1490,7 +1146,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     setState(() {
       LiveGoSettings.subtitlesEnabled = true;
       _subtitleCursor = safe;
-      _subtitleStatus = label;
       _status = 'Subtitle $label';
       _mode = _Explorer3Mode.controls;
     });
@@ -1504,10 +1159,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (index < 0) index = 1;
     final next = speeds[(index + 1) % speeds.length];
 
-    final c = _controller;
-    if (c != null && c.value.isInitialized) {
-      await c.setPlaybackSpeed(next);
-    }
     if (!mounted) return;
     setState(() {
       _speed = next;
@@ -1522,7 +1173,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   void _toggleMute() {
     final next = !_muted;
-    _controller?.setVolume(next ? 0 : 1);
     setState(() {
       _muted = next;
       _status = next ? 'Mute' : 'Volume normal';
@@ -1599,7 +1249,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     if (!TvRemoteManager.instance.canActivate()) return;
     if (_recommendations.isEmpty) return;
     final target = _recommendations[_recommendationCursor.clamp(0, _recommendations.length - 1).toInt()];
-    await _saveProgressNow(force: true);
     if (!mounted) return;
     // Replace current route with new target player
     Navigator.of(context).pushReplacement(
@@ -1611,7 +1260,6 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         pageBuilder: (_, __, ___) => TvPlayerExplorer3Screen(
           item: target,
           episode: 1,
-          preferNativeSurface: widget.preferNativeSurface,
         ),
       ),
     );
@@ -1627,7 +1275,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         unawaited(_changeEpisode(-1));
         return;
       case 2:
-        unawaited(_togglePlay());
+        // Play/pause ditangani native Activity; Flutter route hanya di belakang.
+        _showControls();
         return;
       case 3:
         unawaited(_changeEpisode(1));
@@ -1798,12 +1447,10 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
         return KeyEventResult.handled;
 
       case _Explorer3Mode.watching:
+        // Native Activity yang terbuka menangani play/pause/seek.
+        // Flutter route di belakang hanya menangani BACK (di atas) & panel.
         if (selectPressed) {
-          unawaited(_togglePlay());
-        } else if (key == LogicalKeyboardKey.arrowLeft) {
-          unawaited(_seekBy(const Duration(seconds: -10)));
-        } else if (key == LogicalKeyboardKey.arrowRight) {
-          unawaited(_seekBy(const Duration(seconds: 10)));
+          _showControls();
         } else if (key == LogicalKeyboardKey.arrowUp) {
           _showControls(defaultPlay: true);
         } else if (key == LogicalKeyboardKey.arrowDown) {
@@ -1815,59 +1462,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     }
   }
 
-  Widget _videoSurface() {
-    final c = _controller;
-    if (!_surfaceReady || c == null || !c.value.isInitialized || c.value.hasError) {
-      TvPlayerDebugLog.event('player_legacy_blank_guard', item: widget.item, episode: _episode, engine: PlayerEngineType.flutterFallback.wireName);
-      return const ColoredBox(color: Colors.black);
-    }
-
-    final value = c.value;
-    final size = value.size;
-    if (size.width <= 0 || size.height <= 0) {
-      return const ColoredBox(color: Colors.black);
-    }
-
-    // Android TV safety:
-    // Do not wrap VideoPlayer in FittedBox/SizedBox with raw native texture size.
-    // Some TV boxes play audio but render a white native texture with that layout.
-    // The earlier stable Explorer 3 surface used Center + AspectRatio; keep it.
-    final aspect = value.aspectRatio;
-
-    Widget player = AspectRatio(
-      aspectRatio: aspect > 0 ? aspect : 16 / 9,
-      child: VideoPlayer(c),
-    );
-
-    if (_fitCover) {
-      player = SizedBox.expand(
-        child: FittedBox(
-          fit: BoxFit.cover,
-          clipBehavior: Clip.hardEdge,
-          child: SizedBox(
-            width: size.width,
-            height: size.height,
-            child: VideoPlayer(c),
-          ),
-        ),
-      );
-    }
-
-    return ColoredBox(
-      color: Colors.black,
-      child: Center(child: player),
-    );
-  }
-
   Widget _playerDiagnosticOverlay() {
     if (!_showPlayerDiag) return const SizedBox.shrink();
-
-    final c = _controller;
-    final value = c?.value;
-    final size = value?.size;
-    final pos = value?.position.inMilliseconds ?? 0;
-    final dur = value?.duration.inMilliseconds ?? 0;
-    final aspect = value?.aspectRatio.toStringAsFixed(3) ?? '-';
 
     final lines = <String>[
       'LIVEGO PLAYER SAFE DIAG V3',
@@ -1876,9 +1472,7 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
       'host=$_lastStreamHost',
       'tail=$_lastStreamTail',
       'qualities=$_lastQualityLabels',
-      'ctrl=${c != null} init=${value?.isInitialized ?? false} play=${value?.isPlaying ?? false} buf=${value?.isBuffering ?? false} err=${value?.hasError ?? false}',
-      'size=${size == null ? '-' : '${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'} aspect=$aspect',
-      'pos=${pos}ms dur=${dur}ms',
+      'engine=nativeExo',
     ];
 
     return IgnorePointer(
@@ -1953,24 +1547,14 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     );
   }
 
-  bool get _showsControls => _mode == _Explorer3Mode.controls;
-  bool get _showsPanel => _mode == _Explorer3Mode.episode ||
-      _mode == _Explorer3Mode.quality ||
-      _mode == _Explorer3Mode.subtitle ||
-      _mode == _Explorer3Mode.options;
-
   @override
   void dispose() {
     _episodeWarmupTimer?.cancel();
     _prefetchTimer?.cancel();
-    _surfaceTimer?.cancel();
     _hideControlsTimer?.cancel();
     _statusTimer?.cancel();
     _rootFocus.dispose();
-    unawaited(_saveProgressNow(force: true));
-    _controller?.removeListener(_onControllerTick);
-    _controller?.dispose();
-    TvPlayerDebugLog.event('player_dispose', item: widget.item, episode: _episode, engine: widget.preferNativeSurface ? PlayerEngineType.nativeExo.wireName : PlayerEngineType.flutterFallback.wireName);
+    TvPlayerDebugLog.event('player_dispose', item: widget.item, episode: _episode, engine: PlayerEngineType.nativeExo.wireName);
     _nativeSurfacePlayer.setMethodCallHandler(null);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -1978,9 +1562,8 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = _controller;
-    final ready = c != null && c.value.isInitialized && _error.isEmpty;
-
+    // Native ExoPlayer only: Flutter route is a black screen behind the
+    // native Activity. Only loading / error states render Flutter UI.
     return PopScope(
       canPop: _allowRoutePop,
       onPopInvoked: (didPop) {
@@ -1999,128 +1582,11 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
               fit: StackFit.expand,
               children: [
                 const ColoredBox(color: Colors.black),
-                _videoSurface(),
-                if (!_surfaceReady)
-                  const ColoredBox(color: Colors.black),
-                if ((_loading && !widget.preferNativeSurface) || _error.isNotEmpty)
+                if (_loading || _error.isNotEmpty)
                   _statusCenter(
                     title: _error.isEmpty ? _status : 'Gagal membuka video',
-                    subtitle: _error.isEmpty ? 'Explorer 3 • EP $_episode' : _error,
+                    subtitle: _error.isEmpty ? 'Explorer 3 \u2022 EP $_episode' : _error,
                     loading: _loading && _error.isEmpty,
-                  ),
-                if (ready && (_showsControls || _showsPanel))
-                  TvPlayerExplorer3InfoOverlay(
-                    title: widget.item.title,
-                    episode: _episode,
-                    totalEpisodes: _episodeTotal(),
-                    speed: _speed,
-                    quality: _activeQuality,
-                    subtitle: _subtitleStatus,
-                    autoNext: LiveGoSettings.autoNextEnabled,
-                    muted: _muted,
-                  ),
-                if (ready && _showsControls)
-                  Positioned(
-                    left: 44,
-                    right: 44,
-                    bottom: 0,
-                    child: SafeArea(
-                      bottom: true,
-                      minimum: const EdgeInsets.only(bottom: 28),
-                      child: TvPlayerExplorer3Controls(
-                        controller: c,
-                        title: widget.item.title,
-                        episode: _episode,
-                        totalEpisodes: _episodeTotal(),
-                        status: _status,
-                        selectedIndex: _controlCursor,
-                        isPlaying: c.value.isPlaying,
-                        speed: _speed,
-                      ),
-                    ),
-                  ),
-                if (ready && _mode == _Explorer3Mode.recommendations)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: SafeArea(
-                      bottom: true,
-                      child: TvPlayerRecommendationsSheet(
-                        items: _recommendations,
-                        cursor: _recommendationCursor,
-                        currentTitle: widget.item.title,
-                      ),
-                    ),
-                  ),
-                if (ready && _mode == _Explorer3Mode.episode)
-                  Positioned(
-                    right: 48,
-                    top: 0,
-                    bottom: 0,
-                    width: 390,
-                    child: SafeArea(
-                      top: true,
-                      right: true,
-                      bottom: true,
-                      minimum: const EdgeInsets.only(top: 28, bottom: 28),
-                      child: TvPlayerExplorer3EpisodePanel(
-                        selected: _episode,
-                        cursor: _episodeCursor,
-                        total: _episodeTotal(),
-                      ),
-                    ),
-                  ),
-                if (ready && _mode == _Explorer3Mode.quality)
-                  Positioned(
-                    right: 48,
-                    bottom: 0,
-                    child: SafeArea(
-                      right: true,
-                      bottom: true,
-                      minimum: const EdgeInsets.only(bottom: 188),
-                      child: TvPlayerExplorer3ChoicePanel(
-                        title: 'Kualitas Video',
-                        subtitle: 'UP/DOWN pilih • OK terapkan • BACK kembali',
-                        choices: _qualityChoices,
-                        cursor: _qualityCursor,
-                      ),
-                    ),
-                  ),
-                if (ready && _mode == _Explorer3Mode.subtitle)
-                  Positioned(
-                    right: 48,
-                    bottom: 0,
-                    child: SafeArea(
-                      right: true,
-                      bottom: true,
-                      minimum: const EdgeInsets.only(bottom: 188),
-                      child: TvPlayerExplorer3ChoicePanel(
-                        title: 'Subtitle',
-                        subtitle: 'UP/DOWN pilih • OK aktifkan • BACK kembali',
-                        choices: _subtitleChoices,
-                        cursor: _subtitleCursor,
-                      ),
-                    ),
-                  ),
-                if (ready && _mode == _Explorer3Mode.options)
-                  Positioned(
-                    right: 48,
-                    bottom: 0,
-                    child: SafeArea(
-                      right: true,
-                      bottom: true,
-                      minimum: const EdgeInsets.only(bottom: 188),
-                      child: TvPlayerExplorer3OptionsPanel(
-                        cursor: _optionCursor,
-                        speed: _formatSpeed(_speed),
-                        autoNext: LiveGoSettings.autoNextEnabled,
-                        fitCover: _fitCover,
-                        muted: _muted,
-                        quality: _activeQuality,
-                        subtitle: _subtitleStatus,
-                      ),
-                    ),
                   ),
                 _playerDiagnosticOverlay(),
               ],
