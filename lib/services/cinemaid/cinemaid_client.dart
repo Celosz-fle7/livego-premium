@@ -188,6 +188,43 @@ class CinemaIdClient {
     return list.map((m) => Map<String, dynamic>.from(m)).toList();
   }
 
+  /// Cari topic_id server berdasarkan nama platform (case-insensitive).
+  /// Dipakai untuk platform tanpa topic_id hardcoded (Vidio, Vivamax, Viu, iFlix).
+  /// Return '' jika tidak ketemu.
+  Future<String> discoverTopicId(String platformName) async {
+    try {
+      final modules = await topicModules();
+      final norm = platformName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      for (final m in modules) {
+        final name = '${m['topic_name'] ?? m['module_name'] ?? m['name'] ?? m['title'] ?? ''}';
+        final nameNorm = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if (nameNorm.isEmpty) continue;
+        if (nameNorm == norm || nameNorm.contains(norm) || norm.contains(nameNorm)) {
+          final id = '${m['topic_id'] ?? m['module_id'] ?? m['id'] ?? ''}';
+          if (id.isNotEmpty) {
+            return id;
+          }
+        }
+      }
+      // Coba juga gali videoList di dalam modul untuk nama topic tersembunyi
+      for (final m in modules) {
+        final videoList = m['videoList'] ?? m['video_list'] ?? m['list'];
+        if (videoList is List) {
+          for (final v in videoList.whereType<Map>()) {
+            final name = '${v['topic_name'] ?? v['name'] ?? v['title'] ?? ''}';
+            final nameNorm = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+            if (nameNorm.isEmpty) continue;
+            if (nameNorm == norm || nameNorm.contains(norm) || norm.contains(nameNorm)) {
+              final id = '${v['topic_id'] ?? v['id'] ?? ''}';
+              if (id.isNotEmpty) return id;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+
   /// GET /api/topic/change?module_id=.. -> refresh satu modul.
   Future<List<ContentItem>> refreshModule(String moduleId) async {
     final res = await _getJson('/topic/change', {'module_id': moduleId});
@@ -202,8 +239,7 @@ class CinemaIdClient {
   }
 
   /// GET /api/topic/vod_list?topic_id=.. -> isi satu topik.
-  Future<List<ContentItem>> topicVods(String topicId, {String category = ''}) async {
-    final res = await _getJson('/topic/vod_list', {'topic_id': topicId});
+  Future<List<ContentItem>> topicVods(String topicId, {String category = ''}) async {    final res = await _getJson('/topic/vod_list', {'topic_id': topicId});
     final data = res['result'] ?? res['data'];
     final items = data is Map
         ? _asMaps(data['vod_list'] ?? data['list'] ?? data['items'] ?? data['videoList'])

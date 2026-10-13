@@ -72,15 +72,17 @@ class CinemaIdSource implements DramaSource {
     'rakuten viki': '3004',
   };
 
-  /// Kategori tanpa topic_id server -> pakai seed lokal langsung
-  /// (hindari channel module yang mencampur konten antar platform).
-  static const Set<String> _seedOnlyCategories = {
+  /// Kategori tanpa topic_id hardcoded -> coba discovery otomatis dari /topic/list,
+  /// fallback ke seed lokal jika tidak ketemu.
+  static const Set<String> _discoverableCategories = {
     'vidio',
     'vivamax',
     'viu',
     'iflix',
-    '18+',
   };
+
+  /// Cache hasil discovery topic_id per kategori (hindari fetch berulang).
+  final Map<String, String> _discoveredTopicIds = {};
 
   /// Keluarga platform per kategori: tag seed yang dinormalisasi milik platform ini.
   /// Dipakai untuk verifikasi bahwa item server benar-benar dari platform tersebut.
@@ -162,14 +164,28 @@ class CinemaIdSource implements DramaSource {
       final catKey = category.toLowerCase().trim();
       final isAdultTab = catKey == '18+';
 
-      // 0. Kategori seed-only (tanpa topic_id): langsung dari seed lokal
-      // agar tidak tercampur konten antar platform via channel module.
-      if (_seedOnlyCategories.contains(catKey)) {
-        return _seedItems(category, isAdultTab: isAdultTab);
+      // 0. Kategori tanpa topic hardcoded: discovery otomatis dari /topic/list.
+      // 18+ selalu seed-only (konten dewasa tidak diambil dari server).
+      String? topicId = _categoryToTopicId[catKey];
+      if (topicId == null && _discoverableCategories.contains(catKey)) {
+        topicId = _discoveredTopicIds[catKey];
+        if (topicId == null) {
+          final found = await _client.discoverTopicId(category).timeout(
+                const Duration(seconds: 15),
+                onTimeout: () => '',
+              );
+          topicId = found.isEmpty ? null : found;
+          if (topicId != null) {
+            _discoveredTopicIds[catKey] = topicId;
+            debugPrint('CINEMAID SOURCE: discovered topic $topicId for $category');
+          }
+        }
+      }
+      if (topicId == null && catKey == '18+') {
+        return _seedItems(category, isAdultTab: true);
       }
 
-      // 1. Jalur Utama: Jika kategori memiliki topic_id server langsung
-      final topicId = _categoryToTopicId[catKey];
+      // 1. Jalur Utama: topic_id server (hardcoded atau hasil discovery)
       if (topicId != null && topicId.isNotEmpty) {
         final vods = await _client.topicVods(topicId, category: category).timeout(
               const Duration(seconds: 15),
