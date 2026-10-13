@@ -39,6 +39,8 @@ class TvSourceManagerConfig {
     'freereels': 0,
     'cinemaid': 1,
     'melolo': 2,
+    'shorttv': 3,
+    'moviebox': 4,
   };
 
   static int sourcePriority(String slug) {
