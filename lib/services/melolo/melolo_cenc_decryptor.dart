@@ -3,6 +3,37 @@ import 'dart:typed_data';
 
 import '../../core/livego_settings.dart';
 
+/// Satu sample CENC: offset absolut di file, ukuran, IV 8 byte.
+class MeloloMp4Sample {
+  final int offset;
+  final int size;
+  final Uint8List iv;
+
+  const MeloloMp4Sample(this.offset, this.size, this.iv);
+}
+
+/// Hasil parse moov untuk progressive streaming.
+class MeloloMoovInfo {
+  /// Offset absolut box moov di file (termasuk 4-byte size).
+  final int moovStart;
+
+  /// Offset absolut akhir box moov (eksklusif).
+  final int moovEnd;
+
+  /// Isi moov yang sudah disanitasi (encv/enca/DRM), ukuran == moovEnd - moovStart.
+  final Uint8List sanitizedMoov;
+
+  /// Semua sample video+audio, terurut offset naik.
+  final List<MeloloMp4Sample> samples;
+
+  const MeloloMoovInfo({
+    required this.moovStart,
+    required this.moovEnd,
+    required this.sanitizedMoov,
+    required this.samples,
+  });
+}
+
 /// Dekriptor CENC (Common Encryption, cenc AES-128-CTR) untuk MP4 ByteDance/Melolo.
 ///
 /// Bekerja 100% pure Dart tanpa pustaka C eksternal atau daemon Termux:
@@ -218,6 +249,245 @@ class MeloloCencDecryptor {
 
     out[outOffset + 12] = s30 ^ rk10[3][0]; out[outOffset + 13] = s31 ^ rk10[3][1];
     out[outOffset + 14] = s32 ^ rk10[3][2]; out[outOffset + 15] = s33 ^ rk10[3][3];
+  }
+
+  // --- 3b. Parsing moov + dekripsi per-range (progressive streaming) ---
+  //
+  // API ini dipakai MeloloProgressiveProxy agar playback tidak perlu menunggu
+  // download full file. decryptMp4Bytes (jalur lama) TIDAK diubah sama sekali.
+
+  /// Kunci AES yang sudah di-expand untuk CTR. Dipakai ulang per chunk.
+  static List<List<Uint8List>> roundKeysFor(Uint8List aesKey) => _expandKey(aesKey);
+
+  /// Dekripsi in-place byte dalam [bytes] yang overlap dengan [samples].
+  /// [bytesFileOffset] = offset absolut file dari bytes[0].
+  /// Hanya byte yang termasuk sample yang di-XOR; header box / gap dilewati.
+  /// Samples HARUS terurut offset naik (jaminan dari parseMoov).
+  static void decryptRangeInPlace(
+    Uint8List bytes,
+    int bytesFileOffset,
+    List<MeloloMp4Sample> samples,
+    List<List<Uint8List>> roundKeys,
+  ) {
+    if (bytes.isEmpty || samples.isEmpty) return;
+    final rangeStart = bytesFileOffset;
+    final rangeEnd = bytesFileOffset + bytes.length;
+    final counterBlock = Uint8List(16);
+    final keyStream = Uint8List(16);
+
+    for (final sample in samples) {
+      if (sample.offset >= rangeEnd) break;
+      final sampleEnd = sample.offset + sample.size;
+      if (sampleEnd <= rangeStart) continue;
+
+      final overlapStart = sample.offset > rangeStart ? sample.offset : rangeStart;
+      final overlapEnd = sampleEnd < rangeEnd ? sampleEnd : rangeEnd;
+      final overlapLen = overlapEnd - overlapStart;
+      var posInSample = overlapStart - sample.offset;
+      var done = 0;
+
+      while (done < overlapLen) {
+        final blockIdx = posInSample ~/ 16;
+        final blockOff = posInSample % 16;
+        final take = (16 - blockOff < overlapLen - done) ? 16 - blockOff : overlapLen - done;
+
+        for (var i = 0; i < 8; i++) {
+          counterBlock[i] = sample.iv[i];
+        }
+        counterBlock[8] = (blockIdx >> 56) & 0xff;
+        counterBlock[9] = (blockIdx >> 48) & 0xff;
+        counterBlock[10] = (blockIdx >> 40) & 0xff;
+        counterBlock[11] = (blockIdx >> 32) & 0xff;
+        counterBlock[12] = (blockIdx >> 24) & 0xff;
+        counterBlock[13] = (blockIdx >> 16) & 0xff;
+        counterBlock[14] = (blockIdx >> 8) & 0xff;
+        counterBlock[15] = blockIdx & 0xff;
+
+        _encryptBlock(counterBlock, 0, roundKeys, keyStream, 0);
+
+        final outPos = (overlapStart - rangeStart) + done;
+        for (var j = 0; j < take; j++) {
+          bytes[outPos + j] ^= keyStream[blockOff + j];
+        }
+        done += take;
+        posInSample += take;
+      }
+    }
+  }
+
+  /// Sanitasi moov: encv -> avc1/hvc1, enca -> mp4a, box DRM CENC -> free.
+  /// Semua penggantian berukuran sama sehingga offset absolut sample tidak berubah.
+  /// Duplikat logika di decryptMp4Bytes (jalur lama dibiarkan apa adanya).
+  static Uint8List sanitizeMoov(Uint8List moovBytes) {
+    final out = Uint8List.fromList(moovBytes);
+    final searchStart = 0;
+    final searchEnd = out.length;
+
+    String targetFourCC;
+    final pref = LiveGoSettings.codecPreference;
+    if (pref == 'H264') {
+      targetFourCC = 'avc1';
+    } else if (pref == 'H265') {
+      targetFourCC = 'hvc1';
+    } else {
+      final hasHvcC = _findBox(out, 'hvcC', searchStart, searchEnd) >= 0;
+      final hasAvcC = _findBox(out, 'avcC', searchStart, searchEnd) >= 0;
+      targetFourCC = (hasAvcC && !hasHvcC) ? 'avc1' : 'hvc1';
+    }
+
+    var pos = searchStart;
+    while (pos < searchEnd - 4) {
+      final idx = _findBox(out, 'encv', pos, searchEnd);
+      if (idx < 0) break;
+      out[idx] = targetFourCC.codeUnitAt(0);
+      out[idx + 1] = targetFourCC.codeUnitAt(1);
+      out[idx + 2] = targetFourCC.codeUnitAt(2);
+      out[idx + 3] = targetFourCC.codeUnitAt(3);
+      pos = idx + 4;
+    }
+
+    pos = searchStart;
+    while (pos < searchEnd - 4) {
+      final idx = _findBox(out, 'enca', pos, searchEnd);
+      if (idx < 0) break;
+      out[idx] = 0x6d;
+      out[idx + 1] = 0x70;
+      out[idx + 2] = 0x34;
+      out[idx + 3] = 0x61;
+      pos = idx + 4;
+    }
+
+    for (final boxType in ['sinf', 'senc', 'saio', 'saiz', 'schm', 'schi', 'tenc', 'pssh']) {
+      pos = searchStart;
+      while (pos < searchEnd - 4) {
+        final idx = _findBox(out, boxType, pos, searchEnd);
+        if (idx < 0) break;
+        out[idx] = 0x66;
+        out[idx + 1] = 0x72;
+        out[idx + 2] = 0x65;
+        out[idx + 3] = 0x65;
+        pos = idx + 4;
+      }
+    }
+    return out;
+  }
+
+  /// Parse satu box moov (diawali 4-byte size + 'moov').
+  /// [moovStart] = offset absolut box moov di file.
+  /// Return null kalau struktur tidak didukung -> pemanggil fallback download full.
+  static MeloloMoovInfo? parseMoov(Uint8List moovBytes, int moovStart) {
+    if (moovBytes.length < 16) return null;
+    if (String.fromCharCodes(moovBytes.sublist(4, 8)) != 'moov') return null;
+    final moovSize = _readUint32(moovBytes, 0);
+    if (moovSize < 8 || moovSize > moovBytes.length) return null;
+
+    final samples = <MeloloMp4Sample>[];
+    var trakPos = _findBox(moovBytes, 'trak', 0, moovBytes.length);
+    while (trakPos >= 0) {
+      final nextTrak = _findBox(moovBytes, 'trak', trakPos + 4, moovBytes.length);
+      final trakEnd = nextTrak >= 0 ? nextTrak : moovBytes.length;
+      final trackSamples = _parseTrackSamples(moovBytes, trakPos, trakEnd);
+      if (trackSamples == null) return null;
+      samples.addAll(trackSamples);
+      trakPos = nextTrak;
+    }
+    if (samples.isEmpty) return null;
+    samples.sort((a, b) => a.offset.compareTo(b.offset));
+
+    return MeloloMoovInfo(
+      moovStart: moovStart,
+      moovEnd: moovStart + moovSize,
+      sanitizedMoov: sanitizeMoov(moovBytes.sublist(0, moovSize)),
+      samples: samples,
+    );
+  }
+
+  /// Parse tabel sample satu trak. Null = tidak didukung (co64, senc subsample, dsb).
+  static List<MeloloMp4Sample>? _parseTrackSamples(
+    Uint8List moov,
+    int trakPos,
+    int trakEnd,
+  ) {
+    // co64 (offset 64-bit) tidak didukung -> fallback.
+    if (_findBox(moov, 'co64', trakPos, trakEnd) >= 0) return null;
+
+    final stszPos = _findBox(moov, 'stsz', trakPos, trakEnd);
+    if (stszPos < 0) return null;
+    final fixedSize = _readUint32(moov, stszPos + 8);
+    final scnt = _readUint32(moov, stszPos + 12);
+    if (scnt <= 0 || scnt > 1000000) return null;
+    final sizes = List<int>.filled(scnt, 0);
+    if (fixedSize != 0) {
+      for (var i = 0; i < scnt; i++) {
+        sizes[i] = fixedSize;
+      }
+    } else {
+      for (var i = 0; i < scnt; i++) {
+        sizes[i] = _readUint32(moov, stszPos + 16 + i * 4);
+      }
+    }
+
+    final stcoPos = _findBox(moov, 'stco', trakPos, trakEnd);
+    if (stcoPos < 0) return null;
+    final ccnt = _readUint32(moov, stcoPos + 8);
+    if (ccnt <= 0 || ccnt > 1000000) return null;
+    final chunks = List<int>.filled(ccnt, 0);
+    for (var i = 0; i < ccnt; i++) {
+      chunks[i] = _readUint32(moov, stcoPos + 12 + i * 4);
+    }
+
+    final stscPos = _findBox(moov, 'stsc', trakPos, trakEnd);
+    if (stscPos < 0) return null;
+    final ecnt = _readUint32(moov, stscPos + 8);
+    if (ecnt <= 0 || ecnt > 100000) return null;
+    final stscEntries = <List<int>>[];
+    for (var i = 0; i < ecnt; i++) {
+      final base = stscPos + 12 + i * 12;
+      stscEntries.add([
+        _readUint32(moov, base),
+        _readUint32(moov, base + 4),
+        _readUint32(moov, base + 8),
+      ]);
+    }
+
+    final sencPos = _findBox(moov, 'senc', trakPos, trakEnd);
+    if (sencPos < 0) return null;
+    final sencFlags = _readUint32(moov, sencPos + 4) & 0x00FFFFFF;
+    // Subsample encryption info tidak didukung -> fallback.
+    if ((sencFlags & 0x2) != 0) return null;
+    final ivCnt = _readUint32(moov, sencPos + 8);
+    if (ivCnt != scnt) return null;
+
+    var sIdx = 0;
+    final sampleOffsets = List<int>.filled(scnt, 0);
+    for (var cIdx = 0; cIdx < ccnt; cIdx++) {
+      final chunkNo = cIdx + 1;
+      var spc = stscEntries.first[1];
+      for (final e in stscEntries) {
+        if (chunkNo >= e[0]) spc = e[1];
+      }
+      var currOff = chunks[cIdx];
+      for (var s = 0; s < spc; s++) {
+        if (sIdx < scnt) {
+          sampleOffsets[sIdx] = currOff;
+          currOff += sizes[sIdx];
+          sIdx++;
+        }
+      }
+    }
+    if (sIdx != scnt) return null;
+
+    final out = <MeloloMp4Sample>[];
+    for (var i = 0; i < scnt; i++) {
+      final ivOffset = sencPos + 12 + i * 8;
+      if (ivOffset + 8 > moov.length) return null;
+      out.add(MeloloMp4Sample(
+        sampleOffsets[i],
+        sizes[i],
+        Uint8List.fromList(moov.sublist(ivOffset, ivOffset + 8)),
+      ));
+    }
+    return out;
   }
 
   // --- 3. MP4 Parsing & CENC Decryption ---

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'melolo_cenc_decryptor.dart';
 import 'melolo_config.dart';
+import 'melolo_progressive_proxy.dart';
 
 /// Embedded Local Streaming Server & Decryption Cache untuk Melolo di LiveGo.
 ///
@@ -173,6 +174,23 @@ class MeloloStreamProxy {
     if (aesKey == null) {
       debugPrint('LIVEGO MELOLO: gagal mengekstrak kunci AES dari spade_a, fallback ke URL asli');
       return rawVideoUrl;
+    }
+
+    // PROGRESSIVE: decrypt on-the-fly per range, playback mulai setelah moov
+    // (~1-2MB) tanpa menunggu download full episode. Gagal -> fallback jalur
+    // download full di bawah (perilaku lama, tetap jalan).
+    try {
+      final progressiveUrl = await MeloloProgressiveProxy.instance.prepareProgressiveUrl(
+        seriesId: seriesId,
+        episodeId: episodeId,
+        rawVideoUrl: rawVideoUrl,
+        spadeA: spadeA,
+        quality: quality,
+      );
+      debugPrint('LIVEGO MELOLO: progressive streaming aktif $seriesId/$episodeId');
+      return progressiveUrl;
+    } catch (e) {
+      debugPrint('LIVEGO MELOLO: progressive tidak tersedia ($e), fallback download full');
     }
 
     // STREAMING MODE: daftarkan token & kembalikan URL proxy LANGSUNG,
