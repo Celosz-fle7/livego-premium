@@ -82,6 +82,9 @@ class PlaybackSource {
   final int totalEpisodes;
   final String nextEpisodeId;
   final String prevEpisodeId;
+
+  /// ID episode yang sedang diputar (dipakai re-resolve kualitas).
+  final String episodeId;
   final bool encrypted;
 
   const PlaybackSource({
@@ -100,6 +103,7 @@ class PlaybackSource {
     required this.totalEpisodes,
     required this.nextEpisodeId,
     required this.prevEpisodeId,
+    this.episodeId = '',
     this.encrypted = false,
   });
 
@@ -163,6 +167,7 @@ class PlaybackSource {
       totalEpisodes: stream.totalEpisodes,
       nextEpisodeId: stream.nextEpisodeId,
       prevEpisodeId: stream.prevEpisodeId,
+      episodeId: stream.episodeId,
     );
   }
 
@@ -174,6 +179,7 @@ class PlaybackSource {
       totalEpisodes: totalEpisodes <= 0 ? 1 : totalEpisodes,
       nextEpisodeId: nextEpisodeId,
       prevEpisodeId: prevEpisodeId,
+      episodeId: episodeId,
       headers: headers,
       subtitles: subtitles.map((e) => e.toSubtitleTrack()).toList(),
       qualities: qualities.map((e) => e.toStreamQuality()).toList(),

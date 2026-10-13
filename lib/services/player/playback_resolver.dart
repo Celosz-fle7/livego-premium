@@ -73,6 +73,10 @@ class PlaybackResolver {
       final url = await source.streamUrl(
         seriesId: item.id,
         episodeId: episodeId,
+        // Hormati preferensi kualitas user (TV 360p / HP 480p / pilihan manual).
+        // FreeReels & CinemaID mengabaikan param ini; Melolo & ShortTV
+        // memilih definisi video sesuai kualitas.
+        quality: PlayerPreferences.quality,
       );
       if (url.trim().isEmpty) {
         return PlaybackSource.empty(
@@ -84,7 +88,12 @@ class PlaybackResolver {
       }
       final nextIdx = episodes.indexWhere((e) => e.id == episodeId);
 
-      // Extras: subtitle, kualitas
+      // Extras: subtitle, kualitas.
+      // NOTE: URL tiap entri kualitas = URL dasar (sudah sesuai preferensi
+      // kualitas user). JANGAN fabrikasi `?q=` — proxy Melolo/ShortTV
+      // mengabaikan query param, jadi `?q=` adalah no-op yang membuat
+      // ganti kualitas kelihatan jalan padahal tidak. Ganti kualitas yang
+      // beneran lewat streamUrlForQuality() (re-resolve per kualitas).
       List<SubtitleTrack> subtitles = const [];
       List<StreamQuality> qualities = const [];
       if (extras != null) {
@@ -98,9 +107,7 @@ class PlaybackResolver {
         qualities = extras.qualities
             .map((q) => StreamQuality(
                   label: q.label,
-                  url: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
-                      ? (url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}')
-                      : url,
+                  url: url,
                   isDefault: (source.slug == 'melolo' || source.slug == 'shorttv' || source.slug == 'shortmax')
                       ? (q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase())
                       : q.label == '720p',
@@ -118,7 +125,7 @@ class PlaybackResolver {
           DramaQuality(label: '240p', resolution: '240x426 (Ringan)'),
         ].map((q) => StreamQuality(
               label: q.label,
-              url: url.contains('?') ? '$url&q=${q.label}' : '$url?q=${q.label}',
+              url: url,
               isDefault: q.label.toLowerCase() == PlayerPreferences.quality.toLowerCase(),
             )).toList();
       }
@@ -127,6 +134,7 @@ class PlaybackResolver {
         url: url,
         episodeIndex: ep,
         totalEpisodes: episodes.length,
+        episodeId: episodeId,
         nextEpisodeId: nextIdx >= 0 && nextIdx + 1 < episodes.length
             ? episodes[nextIdx + 1].id
             : '0',
@@ -160,6 +168,28 @@ class PlaybackResolver {
             ? LiveGoVideoType.mp4
             : LiveGoVideoType.hls,
       );
+    }
+  }
+
+  /// Resolve ulang URL stream untuk [quality] tertentu (ganti kualitas di player).
+  /// Dipakai Melolo/ShortTV/ShortMax yang memilih definisi video per kualitas.
+  /// Return null kalau gagal -> pemanggil pakai URL lama (urlForQuality).
+  static Future<String?> streamUrlForQuality(
+    ContentItem item, {
+    required String episodeId,
+    required String quality,
+  }) async {
+    final source = DramaSourceRegistry.forSlug(item.platformSlug);
+    if (source == null) return null;
+    try {
+      final url = await source.streamUrl(
+        seriesId: item.id,
+        episodeId: episodeId,
+        quality: quality,
+      );
+      return url.trim().isEmpty ? null : url;
+    } catch (_) {
+      return null;
     }
   }
 

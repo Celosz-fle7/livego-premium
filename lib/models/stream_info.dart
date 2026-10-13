@@ -4,6 +4,10 @@ class StreamInfo {
   final int totalEpisodes;
   final String nextEpisodeId;
   final String prevEpisodeId;
+
+  /// ID episode yang sedang diputar (dipakai re-resolve kualitas).
+  /// Kosong kalau tidak diketahui (jalur legacy).
+  final String episodeId;
   final Map<String, String> headers;
   final List<SubtitleTrack> subtitles;
   final List<StreamQuality> qualities;
@@ -14,6 +18,7 @@ class StreamInfo {
     required this.totalEpisodes,
     required this.nextEpisodeId,
     required this.prevEpisodeId,
+    this.episodeId = '',
     required this.headers,
     required this.subtitles,
     this.qualities = const <StreamQuality>[],

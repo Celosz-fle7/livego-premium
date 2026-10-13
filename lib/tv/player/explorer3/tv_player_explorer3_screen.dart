@@ -249,6 +249,12 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   }
 
   String _safeAutoUrl(StreamInfo stream) {
+    // Melolo/ShortTV: stream.url sudah ter-resolve dengan preferensi
+    // kualitas user (TV 360p / HP 480p) -> langsung pakai, tanpa `?q=`.
+    final slug = widget.item.platformSlug;
+    if (slug == 'melolo' || slug == 'shorttv' || slug == 'shortmax') {
+      if (stream.url.trim().isNotEmpty) return stream.url;
+    }
     final qualities = stream.qualities;
     if (qualities.isEmpty) return stream.autoStartUrl.trim().isNotEmpty ? stream.autoStartUrl : stream.url;
 
@@ -273,6 +279,13 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
   String _safeUrlForQuality(StreamInfo stream, String quality) {
     final q = quality.trim();
     if (q.isEmpty || q.toLowerCase() == 'auto') return _safeAutoUrl(stream);
+    // Melolo/ShortTV: stream.url sudah ter-resolve dengan kualitas aktif
+    // (_load() re-resolve setelah kualitas disimpan). JANGAN pakai
+    // urlForQuality (URL `?q=` diabaikan proxy -> kualitas tidak berubah).
+    final slug = widget.item.platformSlug;
+    if (slug == 'melolo' || slug == 'shorttv' || slug == 'shortmax') {
+      return stream.url;
+    }
     final selected = stream.urlForQuality(q).trim();
     return selected.isNotEmpty ? selected : _safeAutoUrl(stream);
   }

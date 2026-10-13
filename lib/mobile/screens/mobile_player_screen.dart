@@ -773,9 +773,21 @@ class _PlayerSurfaceState extends State<_PlayerSurface> {
       await PlayerPreferences.setQuality(picked);
       await LiveGoLocalStore.saveSettings();
 
-      final url = picked.toLowerCase() == 'auto'
+      var url = picked.toLowerCase() == 'auto'
           ? _resolvedInitialUrl()
           : widget.stream.urlForQuality(picked);
+      // Melolo/ShortTV: URL kualitas harus re-resolve (proxy mengabaikan
+      // `?q=`). Provider lain pakai URL dari daftar kualitas.
+      final slug = widget.item.platformSlug;
+      if ((slug == 'melolo' || slug == 'shorttv' || slug == 'shortmax') &&
+          widget.stream.episodeId.isNotEmpty) {
+        final fresh = await PlaybackResolver.streamUrlForQuality(
+          widget.item,
+          episodeId: widget.stream.episodeId,
+          quality: picked,
+        );
+        if (fresh != null && fresh.isNotEmpty) url = fresh;
+      }
       if (url.isNotEmpty && url != _activeUrl) {
         final c = _controller;
         final pos = c?.value.position ?? Duration.zero;
