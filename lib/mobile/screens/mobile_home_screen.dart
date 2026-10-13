@@ -482,7 +482,10 @@ class _OneLineSelector extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    // Chip melebar sampai pas batas samping kiri-kanan
+                    // (spaceBetween, sama seperti navbar player); kalau
+                    // chip melebihi lebar, row bisa di-scroll.
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: List.generate(shown.length, (i) {
                 final active = i == selected;
                 return Padding(

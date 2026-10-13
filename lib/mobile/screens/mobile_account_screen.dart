@@ -11,21 +11,6 @@ import '../update/mobile_update_screen.dart';
 class MobileAccountScreen extends StatelessWidget {
   const MobileAccountScreen({super.key});
 
-  Widget _stat(String value, String label) {
-    return Expanded(
-      child: GlowContainer(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 3),
-            Text(label, style: const TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: .4)),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _section(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 18, 2, 10),
@@ -91,44 +76,6 @@ class MobileAccountScreen extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
           children: [
-            GlowContainer(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: const LinearGradient(colors: [AppTheme.cyan, AppTheme.purple]),
-                      boxShadow: [BoxShadow(color: AppTheme.purple.withOpacity(0.3), blurRadius: 24)],
-                    ),
-                    child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 40),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('RUANG PRIBADI', style: TextStyle(color: AppTheme.cyan, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: .8)),
-                        SizedBox(height: 6),
-                        Text('Penggemar LiveGo', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-                        SizedBox(height: 4),
-                        Text('Masuk cepat ke riwayat, favorit, pengaturan, dan update.', style: TextStyle(color: AppTheme.textSoft, height: 1.35)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(children: [
-              _stat('${LiveGoLocalStore.history.length}', 'HISTORI'),
-              const SizedBox(width: 8),
-              _stat('${LiveGoLocalStore.favorites.length}', 'FAVORIT'),
-              const SizedBox(width: 8),
-              _stat('${LiveGoLocalStore.downloads.length}', 'DOWNLOAD'),
-            ]),
             _section('Koleksi Cepat'),
             _menuGroup(context, [
               _menu(context, Icons.history_rounded, 'Riwayat', 'Lanjutkan tontonan terakhir yang sudah dibuka.', () {
