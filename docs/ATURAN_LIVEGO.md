@@ -44,6 +44,11 @@ yang tampil di layar, remote-first.**
 - Data: pagination bertahap — halaman 1 = 2 baris (2 × jumlah kolom
   grid = 14 konten saat kolom 7). Layar pertama penuh 2 baris, baris
   ke-3 tidak lagi terlihat separuh.
+- Header Home (border provider + kategori) TIDAK pinned — ikut
+  kedorong ke atas saat scroll, viewport jadi konten penuh (3 baris).
+  Balik ke chip (UP dari grid) jump ke anchor 228, header tetap
+  kelihatan di sana. Scroll TIDAK nambah data; data nambah hanya
+  lewat `loadMore()`.
   Scroll masuk zona lookahead (~2 baris sebelum ujung) -> `loadMore()`.
   Append dedupe by id (`mergePagedItems`). Fokus tidak terganggu karena
   item lama tidak berubah posisi dan key stabil.

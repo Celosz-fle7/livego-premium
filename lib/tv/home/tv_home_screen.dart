@@ -302,8 +302,13 @@ class _TvHomeScreenState extends ConsumerState<TvHomeScreen> {
                       ]),
                     ),
                   ),
+                  // Header TIDAK pinned: ikut kedorong ke atas saat scroll,
+                  // supaya viewport jadi konten penuh (3 baris). Balik ke
+                  // chip (UP dari grid) jump ke anchor 228 — header tetap
+                  // kelihatan di sana (banner 202 + header 93), jadi fokus
+                  // chip tidak pernah tak terlihat.
                   SliverPersistentHeader(
-                    pinned: true,
+                    pinned: false,
                     delegate: _HomeStickySourceHeaderDelegate(
                       height: 93,
                       child: Padding(
