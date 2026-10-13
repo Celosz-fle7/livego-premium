@@ -20,6 +20,21 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
   bool loading = false;
   List<ContentItem> results = [];
 
+  /// Filter genre: kosong = "Semua" (tanpa filter). Genre BUKAN untuk
+  /// mencari — genre memfilter hasil yang sudah ada (contoh: ketik
+  /// "sulih suara" source FreeReels, lalu filter genre).
+  final Set<String> _selectedGenres = {};
+
+  /// Hasil yang tampil = results difilter genre yang dipilih.
+  List<ContentItem> get _displayed =>
+      FreereelsConfig.filterByGenres(results, _selectedGenres);
+
+  void _toggleGenre(String label) {
+    setState(() {
+      if (!_selectedGenres.remove(label)) _selectedGenres.add(label);
+    });
+  }
+
   Future<void> _search(String value) async {
     query = value.trim();
     if (query.isEmpty) {
@@ -112,7 +127,8 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        // Genre tags FreeReels — tap untuk quick search.
+        // Filter genre FreeReels — memfilter hasil, BUKAN mencari.
+        // "Semua" = tanpa filter. Tap genre = pilih manual (multi-select).
         const Align(
           alignment: Alignment.centerLeft,
           child: Text('Genre', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 13)),
@@ -121,15 +137,21 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: FreereelsConfig.genreTags.entries.map((e) {
-            return ActionChip(
-              label: Text(e.key, style: const TextStyle(fontSize: 12)),
-              onPressed: () {
-                _controller.text = e.key;
-                _search(e.value);
-              },
-            );
-          }).toList(),
+          children: [
+            FilterChip(
+              label: const Text('Semua', style: TextStyle(fontSize: 12)),
+              selected: _selectedGenres.isEmpty,
+              onSelected: (_) => setState(() => _selectedGenres.clear()),
+            ),
+            ...FreereelsConfig.genreTags.entries.map((e) {
+              final selected = _selectedGenres.contains(e.key);
+              return FilterChip(
+                label: Text(e.key, style: const TextStyle(fontSize: 12)),
+                selected: selected,
+                onSelected: (_) => _toggleGenre(e.key),
+              );
+            }),
+          ],
         ),
         const SizedBox(height: 20),
         if (loading)
@@ -137,7 +159,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
             padding: EdgeInsets.only(top: 70),
             child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
           )
-        else if (results.isEmpty)
+        else if (_displayed.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 70),
             child: Center(
@@ -154,7 +176,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: results.length,
+            itemCount: _displayed.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisExtent: 265,
@@ -162,7 +184,7 @@ class _MobileSearchScreenState extends State<MobileSearchScreen> {
               mainAxisSpacing: 18,
             ),
             itemBuilder: (_, i) {
-              final item = results[i];
+              final item = _displayed[i];
               return PosterCard(
                 item: item,
                 onTap: () => MobilePlayerEntry.open(context, item: item),

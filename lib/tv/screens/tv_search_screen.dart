@@ -16,6 +16,8 @@ import '../widgets/tv_empty_panel.dart';
 import '../widgets/tv_poster_grid.dart';
 import '../widgets/tv_screen_header.dart';
 import '../../services/analytics/livego_analytics.dart';
+import '../../services/freereels/freereels_config.dart';
+import '../widgets/tv_chip_row.dart';
 import '../widgets/tv_search_keyboard_panel.dart';
 import 'tv_search_config.dart';
 
@@ -55,6 +57,40 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _editingInput = false;
   int _lastSearchSubmitMs = 0;
 
+  /// Filter genre: kosong = "Semua" (tanpa filter). Genre BUKAN untuk
+  /// mencari — genre memfilter hasil yang sudah ada (contoh: ketik
+  /// "sulih suara" source FreeReels, lalu filter genre).
+  final Set<String> _selectedGenres = {};
+  final List<FocusNode> _genreNodes = <FocusNode>[];
+  int _genreIndex = 0;
+  bool _genreFocused = false;
+
+  /// Label row genre: "Semua" + semua genre FreeReels. Index 0 = Semua.
+  List<String> get _genreLabels =>
+      ['Semua', ...FreereelsConfig.genreTags.keys];
+
+  /// Index chip genre yang aktif (untuk TvChipRow multi-select).
+  Set<int> get _selectedGenreIndices {
+    if (_selectedGenres.isEmpty) return {0};
+    final out = <int>{};
+    final labels = FreereelsConfig.genreTags.keys.toList();
+    for (var i = 0; i < labels.length; i++) {
+      if (_selectedGenres.contains(labels[i])) out.add(i + 1);
+    }
+    return out;
+  }
+
+  void _toggleGenreIndex(int index) {
+    if (index <= 0) {
+      setState(() => _selectedGenres.clear());
+      return;
+    }
+    final label = FreereelsConfig.genreTags.keys.toList()[index - 1];
+    setState(() {
+      if (!_selectedGenres.remove(label)) _selectedGenres.add(label);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +113,9 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     for (final node in _resultNodes) {
       node.dispose();
     }
+    for (final node in _genreNodes) {
+      node.dispose();
+    }
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -91,6 +130,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
   }
 
+  void _syncGenreNodes(int count) {
+    while (_genreNodes.length < count) {
+      _genreNodes.add(FocusNode(skipTraversal: true, debugLabel: 'tv-search-genre-${_genreNodes.length}'));
+    }
+    while (_genreNodes.length > count) {
+      _genreNodes.removeLast().dispose();
+    }
+  }
+
   int _safe(int value) {
     if (_resultNodes.isEmpty) return 0;
     return value.clamp(0, _resultNodes.length - 1).toInt();
@@ -99,6 +147,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   bool _focusInput({bool throttle = true}) {
     if (!mounted) return false;
     _editingInput = false;
+    _genreFocused = false;
     final ok = tvFocus(
       _searchNode,
       alignment: TvSearchConfig.inputFocusAlignment,
@@ -108,8 +157,37 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     return ok;
   }
 
+  bool _focusGenre(int index, {bool throttle = true}) {
+    if (_genreNodes.isEmpty) return false;
+    final target = index.clamp(0, _genreNodes.length - 1).toInt();
+    final ok = tvFocusComfort(
+      _genreNodes[target],
+      topMargin: TvSearchConfig.gridTopMargin,
+      bottomMargin: TvSearchConfig.listBottomMargin,
+      throttle: throttle,
+    );
+    if (ok) {
+      _genreFocused = true;
+      _genreIndex = target;
+      _zone = TvZone.list;
+    }
+    return ok;
+  }
+
+  void _focusDownToResults() {
+    final search = ref.read(tvSearchProvider);
+    if (search.loading) {
+      _focusInput(throttle: false);
+    } else if (_resultNodes.isNotEmpty) {
+      _focusGrid(_gridIndex);
+    } else {
+      _focusEmpty();
+    }
+  }
+
   bool _focusGrid(int index, {bool throttle = true}) {
     if (_resultNodes.isEmpty) return false;
+    _genreFocused = false;
     final target = _safe(index);
     final ok = tvFocusGrid(
       _resultNodes[target],
@@ -125,6 +203,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   }
 
   bool _focusEmpty({bool throttle = true}) {
+    _genreFocused = false;
     final ok = tvFocusComfort(
       _emptyNode,
       topMargin: TvSearchConfig.gridTopMargin,
@@ -172,11 +251,50 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       _exitTextEdit(refocusBox: true);
       return;
     }
+    if (_genreFocused) {
+      _focusInput(throttle: false);
+      return;
+    }
     if (_zone == TvZone.grid || _zone == TvZone.placeholder) {
       _focusInput(throttle: false);
       return;
     }
     widget.onBackToNav?.call();
+  }
+
+  KeyEventResult _genreKey(int index, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+    if (tvIgnoreRepeatActivation(event)) return KeyEventResult.handled;
+    final key = event.logicalKey;
+    if (tvIsBackKey(key)) {
+      _handleBack();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (index == 0) {
+        widget.onMoveToNav?.call();
+      } else {
+        _focusGenre(index - 1);
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (index < _genreNodes.length - 1) _focusGenre(index + 1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _focusInput(throttle: false);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _focusDownToResults();
+      return KeyEventResult.handled;
+    }
+    if (tvIsSelectKey(key)) {
+      _toggleGenreIndex(index);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _submitSearch(String value) async {
@@ -271,13 +389,10 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
 
       if (key == LogicalKeyboardKey.arrowDown) {
         _exitTextEdit(refocusBox: false);
-        final search = ref.read(tvSearchProvider);
-        if (search.loading) {
+        if (ref.read(tvSearchProvider).loading) {
           _focusInput(throttle: false);
-        } else if (_resultNodes.isNotEmpty) {
-          _focusGrid(_gridIndex);
         } else {
-          _focusEmpty();
+          _focusGenre(_genreIndex);
         }
         return KeyEventResult.handled;
       }
@@ -303,10 +418,8 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       final search = ref.read(tvSearchProvider);
       if (search.loading) {
         _focusInput(throttle: false);
-      } else if (_resultNodes.isNotEmpty) {
-        _focusGrid(_gridIndex);
       } else {
-        _focusEmpty();
+        _focusGenre(_genreIndex);
       }
       return KeyEventResult.handled;
     }
@@ -330,7 +443,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      _focusInput(throttle: false);
+      _focusGenre(_genreIndex);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowRight || tvIsSelectKey(key)) {
@@ -368,7 +481,7 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (row == 0) {
-        _focusInput(throttle: false);
+        _focusGenre(_genreIndex);
       } else {
         _focusGrid(current - columns);
       }
@@ -390,9 +503,15 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
   Widget build(BuildContext context) {
     final search = ref.watch(tvSearchProvider);
     final results = search.results;
-    final visibleResults = search.loading ? const <ContentItem>[] : results;
+    // Genre memfilter hasil (bukan mencari): "Semua" = tanpa filter.
+    final visibleResults = search.loading
+        ? const <ContentItem>[]
+        : FreereelsConfig.filterByGenres(results, _selectedGenres);
     if (_resultNodes.length != visibleResults.length) {
       _syncNodes(visibleResults.length);
+    }
+    if (_genreNodes.length != _genreLabels.length) {
+      _syncGenreNodes(_genreLabels.length);
     }
     if (visibleResults.isEmpty) {
       _gridIndex = 0;
@@ -495,6 +614,32 @@ class _TvSearchScreenState extends ConsumerState<TvSearchScreen> {
                         const SizedBox(height: TvSearchConfig.keyboardGap),
                         const TvSearchKeyboardPanel(),
                         const SizedBox(height: TvSearchConfig.afterKeyboardGap),
+                        // Filter genre: memfilter hasil, BUKAN mencari.
+                        // "Semua" = tanpa filter. OK di chip = pilih manual.
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'GENRE',
+                              style: TextStyle(color: AppTheme.textSoft, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1, decoration: TextDecoration.none),
+                            ),
+                            const SizedBox(height: 6),
+                            TvChipRow(
+                              labels: _genreLabels,
+                              selected: -1,
+                              selectedSet: _selectedGenreIndices,
+                              focusedIndex: _genreFocused ? _genreIndex : null,
+                              nodes: _genreNodes,
+                              onTap: _toggleGenreIndex,
+                              onFocus: (i) {
+                                _genreIndex = i;
+                                _genreFocused = true;
+                              },
+                              onKey: (i, event) => _genreKey(i, event),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         if (search.loading)
                           Padding(
                             padding: const EdgeInsets.only(top: TvSearchConfig.loadingTopPadding),

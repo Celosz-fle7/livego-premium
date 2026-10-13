@@ -6,6 +6,10 @@ import '../../core/app_theme.dart';
 class TvChipRow extends StatefulWidget {
   final List<String> labels;
   final int selected;
+
+  /// Multi-select: kalau diisi, chip aktif = index yang ada di set ini
+  /// (mengalahkan [selected]). Dipakai filter genre Search (Semua/manual).
+  final Set<int>? selectedSet;
   final int? focusedIndex;
   final List<FocusNode> nodes;
   final ValueChanged<int> onTap;
@@ -16,6 +20,7 @@ class TvChipRow extends StatefulWidget {
     super.key,
     required this.labels,
     required this.selected,
+    this.selectedSet,
     this.focusedIndex,
     required this.nodes,
     required this.onTap,
@@ -71,7 +76,9 @@ class _TvChipRowState extends State<TvChipRow> {
     final count = widget.labels.length;
     Widget chipAt(int i) => _TvChip(
           text: widget.labels[i],
-          active: i == widget.selected,
+          active: widget.selectedSet != null
+              ? widget.selectedSet!.contains(i)
+              : i == widget.selected,
           focusNode: widget.nodes[i],
           focusedOverride: widget.focusedIndex == i,
           onTap: () => widget.onTap(i),

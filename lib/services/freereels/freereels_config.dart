@@ -1,3 +1,5 @@
+import '../../models/content_item.dart';
+
 /// Konfigurasi client FreeReels — meniru persis perilaku APK mod.
 ///
 /// SALT: satu-satunya nilai statis. Isi lewat:
@@ -60,4 +62,33 @@ class FreereelsConfig {
     'Wanita Kuat': 'strong female',
     'Romansa Manis': 'sweet romance',
   };
+
+  /// Filter genre untuk hasil pencarian.
+  ///
+  /// Genre BUKAN untuk mencari — genre memfilter hasil yang sudah ada.
+  /// Contoh: ketik "sulih suara" source FreeReels, lalu filter genre.
+  /// `selectedLabels` kosong = "Semua" (tanpa filter).
+  /// Item lolos kalau tag/judul/deskripsinya mengandung label ATAU
+  /// keyword salah satu genre yang dipilih.
+  static bool matchesGenres(ContentItem item, Set<String> selectedLabels) {
+    if (selectedLabels.isEmpty) return true;
+    final hay =
+        '${item.tags.join(' ')} ${item.title} ${item.description}'.toLowerCase();
+    for (final label in selectedLabels) {
+      if (hay.contains(label.toLowerCase())) return true;
+      final keyword = genreTags[label];
+      if (keyword != null && hay.contains(keyword.toLowerCase())) return true;
+    }
+    return false;
+  }
+
+  /// Filter list hasil pencarian berdasarkan genre yang dipilih.
+  /// `selectedLabels` kosong = "Semua" (kembalikan list apa adanya).
+  static List<ContentItem> filterByGenres(
+    List<ContentItem> items,
+    Set<String> selectedLabels,
+  ) {
+    if (selectedLabels.isEmpty) return items;
+    return items.where((item) => matchesGenres(item, selectedLabels)).toList();
+  }
 }
