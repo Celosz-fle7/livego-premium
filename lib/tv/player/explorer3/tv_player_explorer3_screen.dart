@@ -1561,6 +1561,40 @@ class _TvPlayerExplorer3ScreenState extends State<TvPlayerExplorer3Screen> {
     });
   }
 
+  void _moveEpisodeCursor(int delta) {
+    if (!TvRemoteManager.instance.canNavigate()) return;
+    final total = _episodeTotal();
+    setState(() {
+      _episodeCursor = (_episodeCursor + delta).clamp(1, total).toInt();
+      _status = 'EP $_episodeCursor';
+    });
+  }
+
+  void _moveQualityCursor(int delta) {
+    if (!TvRemoteManager.instance.canNavigate()) return;
+    final count = _qualityChoices.length;
+    if (count <= 0) return;
+    setState(() {
+      _qualityCursor = (_qualityCursor + delta).clamp(0, count - 1).toInt();
+      _status = _qualityChoices[_qualityCursor];
+    });
+  }
+
+  void _moveSubtitleCursor(int delta) {
+    if (!TvRemoteManager.instance.canNavigate()) return;
+    final count = _subtitleChoices.length;
+    if (count <= 0) return;
+    setState(() {
+      _subtitleCursor = (_subtitleCursor + delta).clamp(0, count - 1).toInt();
+      _status = _subtitleChoices[_subtitleCursor];
+    });
+  }
+
+  void _moveOptionCursor(int delta) {
+    if (!TvRemoteManager.instance.canNavigate()) return;
+    setState(() => _optionCursor = (_optionCursor + delta).clamp(0, 5).toInt());
+  }
+
   Future<void> _selectRecommendation() async {
     if (!TvRemoteManager.instance.canActivate()) return;
     if (_recommendations.isEmpty) return;

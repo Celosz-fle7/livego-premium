@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/app_theme.dart';
 import '../../../../models/content_item.dart';
+import '../../../../services/image/image_quality_config.dart';
 import '../../../../shared/widgets/livego_cached_image.dart';
 
 /// YouTube TV-Style Horizontal Recommendations Rail for TV Player.
