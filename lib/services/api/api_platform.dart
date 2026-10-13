@@ -147,6 +147,13 @@ class LiveGoApiPlatforms {
       supportsSubtitle: true,
       streamFromAllEpisodes: true,
       categories: [
+        'Sedang Trending',
+        'Terbaru',
+        'Balas Dendam',
+        'Cerita Barat',
+        'Drama Dubbing',
+        'Lokal Short TV',
+        'Animasi',
         '🔥Hot Short TV',
         'Trending Drama🔥',
         'Trending Indonesian Drama💗',

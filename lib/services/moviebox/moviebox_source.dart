@@ -5,6 +5,7 @@ import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'moviebox_client.dart';
+import 'moviebox_shorttv_seed.dart';
 
 /// Implementasi DramaSource untuk provider MovieBox / OneRoom.
 class MovieBoxSource implements DramaSource {
@@ -29,6 +30,15 @@ class MovieBoxSource implements DramaSource {
 
   @override
   List<String> get categories => const [
+        // Tab ShortTV Internal
+        'Sedang Trending',
+        'Terbaru',
+        'Balas Dendam',
+        'Cerita Barat',
+        'Drama Dubbing',
+        'Lokal Short TV',
+        'Animasi',
+        // Kategori Film & Drama Utama
         '🔥Hot Short TV',
         'Trending Drama🔥',
         'Trending Indonesian Drama💗',
@@ -52,6 +62,35 @@ class MovieBoxSource implements DramaSource {
       return _categoryItemsCache[normCat]!;
     }
 
+    // 1. Cek apakah kategori ada di Seed ShortTV Internal (Disewa Jadi Pengasuh, Putri yang Kembali, dll)
+    for (final entry in MovieBoxShortTvSeed.categories.entries) {
+      if (_normalizeCategory(entry.key) == normCat) {
+        final items = entry.value.map((m) {
+          final id = '${m['id']}';
+          final title = '${m['title']}';
+          final cover = '${m['cover']}';
+          final ep = (m['totalEpisode'] as num?)?.toInt() ?? 1;
+          final genre = '${m['genre'] ?? entry.key}';
+          return ContentItem(
+            id: id,
+            title: title,
+            source: 'MovieBox',
+            category: genre,
+            description: '',
+            posterUrl: cover,
+            backdropUrl: cover,
+            rating: 8.5,
+            episodes: ep,
+            platformSlug: slug,
+          );
+        }).toList();
+
+        _categoryItemsCache[normCat] = items;
+        return items;
+      }
+    }
+
+    // 2. Ambil dari H5 Gateway live feed (tab-operating)
     final data = await _client.fetchTabOperating(tabCode: 'HOME');
     final operatingList = data['operatingList'] as List<dynamic>? ?? [];
 
@@ -75,6 +114,7 @@ class MovieBoxSource implements DramaSource {
     }
 
     return _categoryItemsCache[normCat] ??
+        _categoryItemsCache[_normalizeCategory('Sedang Trending')] ??
         _categoryItemsCache[_normalizeCategory('🔥Hot Short TV')] ??
         const [];
   }
@@ -87,7 +127,6 @@ class MovieBoxSource implements DramaSource {
   }) async {
     final all = await homeByCategory(category);
     if (page > 1) {
-      // MovieBox mengembalikan seluruh list section di tab-operating
       return (items: const <ContentItem>[], hasMore: false);
     }
     return (items: all, hasMore: false);
@@ -95,32 +134,42 @@ class MovieBoxSource implements DramaSource {
 
   @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
-    // 1. Coba ambil dari detail cache atau fetch detail MovieBox
-    var detail = _detailCache[seriesId];
-    if (detail == null) {
-      detail = await _client.fetchDetail(seriesId);
-      if (detail.isNotEmpty) {
-        _detailCache[seriesId] = detail;
+    // 1. Cek apakah ada di MovieBoxShortTvSeed untuk mendapatkan total episode asli
+    int totalEp = 1;
+    for (final list in MovieBoxShortTvSeed.categories.values) {
+      for (final item in list) {
+        if ('${item['id']}' == seriesId) {
+          totalEp = (item['totalEpisode'] as num?)?.toInt() ?? 1;
+          break;
+        }
       }
+      if (totalEp > 1) break;
     }
 
-    final epList = <LiveGoEpisode>[];
-    int totalEp = 1;
+    // 2. Jika bukan ShortTV seed, coba ambil dari detail cache MovieBox
+    if (totalEp <= 1) {
+      var detail = _detailCache[seriesId];
+      if (detail == null) {
+        detail = await _client.fetchDetail(seriesId);
+        if (detail.isNotEmpty) {
+          _detailCache[seriesId] = detail;
+        }
+      }
 
-    final resource = detail['resource'] as Map<String, dynamic>?;
-    if (resource != null) {
-      final seasons = resource['seasons'] as List<dynamic>?;
-      if (seasons != null && seasons.isNotEmpty) {
-        final s0 = seasons[0] as Map<String, dynamic>?;
-        totalEp = (s0?['maxEp'] as num?)?.toInt() ?? 1;
+      final resource = detail?['resource'] as Map<String, dynamic>?;
+      if (resource != null) {
+        final seasons = resource['seasons'] as List<dynamic>?;
+        if (seasons != null && seasons.isNotEmpty) {
+          final s0 = seasons[0] as Map<String, dynamic>?;
+          totalEp = (s0?['maxEp'] as num?)?.toInt() ?? 1;
+        }
       }
     }
 
     if (totalEp <= 0) totalEp = 1;
 
-    // Stream URL yang ada di trailer/stream cache untuk episode 1
     final cachedStream = _streamCache['$seriesId:1'];
-
+    final epList = <LiveGoEpisode>[];
     for (var i = 1; i <= totalEp; i++) {
       epList.add(LiveGoEpisode(
         id: '$i',
@@ -146,7 +195,7 @@ class MovieBoxSource implements DramaSource {
       return _streamCache[cacheKey]!;
     }
 
-    // Cek detail trailer jika episode 1
+    // Ambil direct video dari trailer jika episode 1
     var detail = _detailCache[seriesId];
     if (detail == null) {
       detail = await _client.fetchDetail(seriesId);
@@ -173,8 +222,9 @@ class MovieBoxSource implements DramaSource {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
 
-    // Cari dari seluruh item yang sudah di-load di kategori
+    // Pastikan data seed dan gateway sudah terisi
     if (_categoryItemsCache.isEmpty) {
+      await homeByCategory('Sedang Trending');
       await homeByCategory('🔥Hot Short TV');
     }
 
@@ -185,7 +235,8 @@ class MovieBoxSource implements DramaSource {
       for (final item in items) {
         if (!seenIds.contains(item.id)) {
           if (item.title.toLowerCase().contains(q) ||
-              item.description.toLowerCase().contains(q)) {
+              item.description.toLowerCase().contains(q) ||
+              item.category.toLowerCase().contains(q)) {
             seenIds.add(item.id);
             matched.add(item);
           }
@@ -228,7 +279,6 @@ class MovieBoxSource implements DramaSource {
     final cover = json['cover'] as Map<String, dynamic>?;
     final posterUrl = (cover?['url'] as String? ?? '').trim();
 
-    // Cache trailer stream URL jika ada
     final trailer = json['trailer'] as Map<String, dynamic>?;
     final vAddr = trailer?['videoAddress'] as Map<String, dynamic>?;
     final videoUrl = (vAddr?['url'] as String? ?? '').trim();
