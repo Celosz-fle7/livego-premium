@@ -114,7 +114,7 @@ class ShortDramaTvStreamProxy {
 
             final contentLength = res.headers.value(HttpHeaders.contentLengthHeader);
             if (contentLength != null) {
-              request.response.headers.contentLength = int.tryParse(contentLength);
+              request.response.headers.contentLength = int.tryParse(contentLength) ?? -1;
             }
 
             await res.pipe(request.response);
