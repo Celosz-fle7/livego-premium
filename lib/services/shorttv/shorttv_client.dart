@@ -431,11 +431,16 @@ class ShortTvClient {
       throw Exception('ShortTV: currentEpisodesReponse kosong ($seriesId/$episodeId)');
     }
 
-    final isLock = cur['lock'] == 1 || cur['alreadyLock'] == 2;
+    // BYPASS LOCK: Ambil videoUrl walau locked. Server mungkin tetap kirim.
     final rawVideoUrl = '${cur['videoUrl'] ?? ''}';
-    if (isLock || rawVideoUrl.isEmpty) {
-      final price = cur['price'] ?? 50;
-      throw Exception('Episode ini terkunci ($price koin di ShortTV)');
+    if (rawVideoUrl.isEmpty) {
+      // Kalau server nggak kirim videoUrl sama sekali, baru fallback ke lock info
+      final isLock = cur['lock'] == 1 || cur['alreadyLock'] == 2;
+      if (isLock) {
+        final price = cur['price'] ?? 50;
+        throw Exception('Episode ini terkunci ($price koin di ShortTV)');
+      }
+      throw Exception('ShortTV: videoUrl kosong ($seriesId/$episodeId)');
     }
 
     Map<String, dynamic> videoMap = {};
@@ -482,10 +487,7 @@ class ShortTvClient {
     String seriesId,
     String episodeId,
   ) async {
-    final lockInfo = _episodeLockCache['$seriesId:$episodeId'];
-    final isUnlocked = lockInfo != null ? !lockInfo.isLocked : true;
-    final price = lockInfo?.price ?? 0;
-
+    // BYPASS LOCK: Semua episode dianggap unlocked
     return DramaEpisodeExtras(
       qualities: const [
         DramaQuality(label: '1080p', resolution: '1080x1920 (FHD)'),
@@ -493,8 +495,8 @@ class ShortTvClient {
         DramaQuality(label: '480p', resolution: '480x854 (Standar)'),
         DramaQuality(label: '360p', resolution: '360x640 (Cepat)'),
       ],
-      unlocked: isUnlocked,
-      episodePrice: price,
+      unlocked: true,
+      episodePrice: 0,
     );
   }
 }
