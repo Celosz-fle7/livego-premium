@@ -135,6 +135,29 @@ class LiveGoApiPlatforms {
       ],
     ),
     LiveGoApiPlatform(
+      slug: 'shortdramatv',
+      endpointSlug: 'shortdramatv',
+      name: 'ShortDramaTV',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'keyword',
+      videoType: LiveGoVideoType.mp4,
+      supportedLangs: ['id'],
+      enabledByDefault: true,
+      supportsSubtitle: false,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Populer',
+        'Trending',
+        'Rilisan Baru',
+        'Dubbing',
+        'Reinkarnasi',
+        'Mafia',
+        'Balas Dendam',
+        'Romansa Manis',
+      ],
+    ),
+    LiveGoApiPlatform(
       slug: 'moviebox',
       endpointSlug: 'moviebox',
       name: 'MovieBox',
@@ -177,6 +200,7 @@ class LiveGoApiPlatforms {
     'cinemaid',
     'melolo',
     'shorttv',
+    'shortdramatv',
     'moviebox',
   ];
 
