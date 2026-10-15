@@ -2,7 +2,6 @@ import 'cinemaid/cinemaid_source.dart';
 import 'freereels/freereels_source.dart';
 import 'melolo/melolo_source.dart';
 import 'moviebox/moviebox_source.dart';
-import 'shortdramatv/shortdramatv_source.dart';
 import 'shorttv/shorttv_source.dart';
 
 import '../models/content_item.dart';
@@ -136,7 +135,6 @@ class DramaSourceRegistry {
     'melolo': MeloloSource(),
     'shorttv': ShortTvSource(),
     'shortmax': ShortTvSource(),
-    'shortdramatv': ShortDramaTvSource(),
     'moviebox': MovieBoxSource(),
   };
 
