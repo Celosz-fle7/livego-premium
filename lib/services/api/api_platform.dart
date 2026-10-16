@@ -177,7 +177,7 @@ class LiveGoApiPlatforms {
       backend: LiveGoApiBackend.direct,
       defaultLang: 'id',
       searchParam: 'keyword',
-      videoType: LiveGoVideoType.hls,
+      videoType: LiveGoVideoType.mp4,
       supportedLangs: ['id'],
       enabledByDefault: true,
       supportsSubtitle: true,

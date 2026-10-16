@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
@@ -52,23 +53,34 @@ class NetShortSource implements DramaSource {
   Future<List<ContentItem>> homeByCategory(String category) async {
     final cat = category.trim();
 
-    // Jika tab ranking khusus
-    if (cat.toLowerCase() == 'trending' || cat.toLowerCase() == 'rilis baru') {
-      final rankingList = await _client.getRankingCharts();
-      if (rankingList.isNotEmpty) {
-        return rankingList.map(_mapToContentItem).toList();
+    try {
+      // Jika tab ranking khusus
+      if (cat.toLowerCase() == 'trending' || cat.toLowerCase() == 'rilis baru') {
+        final rankingList = await _client.getRankingCharts();
+        if (rankingList.isNotEmpty) {
+          return rankingList.map(_mapToContentItem).toList();
+        }
       }
-    }
 
-    final channelId = _categoryChannelIds[cat] ?? 345;
-    final videos = await _client.getChannelVideos(channelId);
-    if (videos.isNotEmpty) {
-      return videos.map(_mapToContentItem).toList();
-    }
+      final channelId = _categoryChannelIds[cat] ?? 345;
+      final videos = await _client.getChannelVideos(channelId);
+      if (videos.isNotEmpty) {
+        return videos.map(_mapToContentItem).toList();
+      }
 
-    // Fallback ambil ranking charts jika channel video kosong
-    final fallbacks = await _client.getRankingCharts();
-    return fallbacks.map(_mapToContentItem).toList();
+      // Fallback ambil ranking charts jika channel video kosong
+      final fallbacks = await _client.getRankingCharts();
+      if (fallbacks.isNotEmpty) {
+        return fallbacks.map(_mapToContentItem).toList();
+      }
+    } catch (e, stack) {
+      debugPrint('NETSHORT HOME BY CATEGORY ERROR: $e\n$stack');
+      try {
+        final fallbacks = await _client.getRankingCharts();
+        return fallbacks.map(_mapToContentItem).toList();
+      } catch (_) {}
+    }
+    return const [];
   }
 
   @override
