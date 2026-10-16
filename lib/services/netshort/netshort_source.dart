@@ -54,33 +54,49 @@ class NetShortSource implements DramaSource {
     final cat = category.trim();
 
     try {
-      // Jika tab ranking khusus
+      // 1. Jika tab ranking khusus
       if (cat.toLowerCase() == 'trending' || cat.toLowerCase() == 'rilis baru') {
         final rankingList = await _client.getRankingCharts();
         if (rankingList.isNotEmpty) {
-          return rankingList.map(_mapToContentItem).toList();
+          final items = rankingList.map(_mapToContentItem).where((e) => e.id.isNotEmpty).toList();
+          if (items.isNotEmpty) return _dedupe(items);
         }
       }
 
+      // 2. Tab channel/kategori
       final channelId = _categoryChannelIds[cat] ?? 345;
       final videos = await _client.getChannelVideos(channelId);
       if (videos.isNotEmpty) {
-        return videos.map(_mapToContentItem).toList();
+        final items = videos.map(_mapToContentItem).where((e) => e.id.isNotEmpty).toList();
+        if (items.isNotEmpty) return _dedupe(items);
       }
 
-      // Fallback ambil ranking charts jika channel video kosong
+      // 3. Fallback ambil ranking charts jika channel video kosong
       final fallbacks = await _client.getRankingCharts();
       if (fallbacks.isNotEmpty) {
-        return fallbacks.map(_mapToContentItem).toList();
+        final items = fallbacks.map(_mapToContentItem).where((e) => e.id.isNotEmpty).toList();
+        if (items.isNotEmpty) return _dedupe(items);
       }
     } catch (e, stack) {
       debugPrint('NETSHORT HOME BY CATEGORY ERROR: $e\n$stack');
       try {
         final fallbacks = await _client.getRankingCharts();
-        return fallbacks.map(_mapToContentItem).toList();
+        if (fallbacks.isNotEmpty) {
+          final items = fallbacks.map(_mapToContentItem).where((e) => e.id.isNotEmpty).toList();
+          if (items.isNotEmpty) return _dedupe(items);
+        }
       } catch (_) {}
     }
     return const [];
+  }
+
+  List<ContentItem> _dedupe(List<ContentItem> items) {
+    final seen = <String>{};
+    final out = <ContentItem>[];
+    for (final item in items) {
+      if (seen.add(item.id)) out.add(item);
+    }
+    return out;
   }
 
   @override

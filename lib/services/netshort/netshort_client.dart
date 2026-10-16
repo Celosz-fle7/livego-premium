@@ -225,11 +225,14 @@ class NetShortClient {
 
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 15);
+    client.badCertificateCallback = (cert, host, port) => true;
 
     try {
       final uri = Uri.parse('${NetShortConfig.baseUrl}$endpoint');
       final request = await client.postUrl(uri);
 
+      request.headers.set('User-Agent', 'okhttp/4.9.0');
+      request.headers.set('Accept', 'application/json, text/plain, */*');
       request.headers.set('encrypt-key', encKeyHeader);
       request.headers.set('Content-Type', 'application/json');
       request.headers.set('timestamp', DateTime.now().millisecondsSinceEpoch.toString());
@@ -251,20 +254,31 @@ class NetShortClient {
 
       final resEncKey = response.headers.value('encrypt-key');
       final resBytes = await response.fold<List<int>>([], (acc, chunk) => acc..addAll(chunk));
-      final resText = utf8.decode(resBytes, allowMalformed: true);
+      final resText = utf8.decode(resBytes, allowMalformed: true).trim();
 
       if (resEncKey != null && resEncKey.isNotEmpty) {
-        final decAesKeyBytes = NetShortCrypto.rsaDecrypt(base64.decode(resEncKey));
-        // Server mengembalikan Base64 string dari AES key
-        final rawKeyStr = utf8.decode(decAesKeyBytes);
-        final rawKeyBytes = base64.decode(rawKeyStr);
-        final plainJson = NetShortCrypto.aes256EcbDecrypt(resText, rawKeyBytes);
-        return jsonDecode(plainJson) as Map<String, dynamic>;
+        try {
+          final decAesKeyBytes = NetShortCrypto.rsaDecrypt(base64.decode(resEncKey.trim()));
+          final rawKeyStr = utf8.decode(decAesKeyBytes).trim();
+          final rawKeyBytes = base64.decode(rawKeyStr);
+          final plainJson = NetShortCrypto.aes256EcbDecrypt(resText, rawKeyBytes);
+          return jsonDecode(plainJson) as Map<String, dynamic>;
+        } catch (e) {
+          debugPrint('NETSHORT DECRYPT ERROR on $endpoint: $e');
+        }
       }
 
-      return jsonDecode(resText) as Map<String, dynamic>;
+      if (resText.isNotEmpty) {
+        try {
+          return jsonDecode(resText) as Map<String, dynamic>;
+        } catch (e) {
+          debugPrint('NETSHORT JSON ERROR on $endpoint (status ${response.statusCode}): $resText');
+        }
+      }
+
+      return {'code': response.statusCode, 'msg': 'HTTP ${response.statusCode}', 'data': null};
     } finally {
-      client.close();
+      client.close(force: true);
     }
   }
 
