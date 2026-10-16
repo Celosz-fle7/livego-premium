@@ -170,6 +170,30 @@ class LiveGoApiPlatforms {
         'Family Time🏡',
       ],
     ),
+    LiveGoApiPlatform(
+      slug: 'netshort',
+      endpointSlug: 'netshort',
+      name: 'NetShort',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'keyword',
+      videoType: LiveGoVideoType.hls,
+      supportedLangs: ['id'],
+      enabledByDefault: true,
+      supportsSubtitle: true,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Populer',
+        'Trending',
+        'Rilis Baru',
+        'Kepuasan',
+        'Sang Juara Kembali',
+        'Bangkit Kembali',
+        'Menghukum Penjahat',
+        'Pertumbuhan Wanita',
+        'Romantis Perkotaan',
+      ],
+    ),
   ];
 
   static const List<String> tvStarterSlugs = <String>[
@@ -178,6 +202,7 @@ class LiveGoApiPlatforms {
     'melolo',
     'shorttv',
     'moviebox',
+    'netshort',
   ];
 
   static List<String> get supportedSlugs =>
