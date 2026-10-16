@@ -224,7 +224,6 @@ class NetShortClient {
     final ctBody = NetShortCrypto.aes256EcbEncrypt(jsonStr, aesKey);
 
     final client = HttpClient();
-    client.badCertificateCallback = (cert, host, port) => true;
     client.connectionTimeout = const Duration(seconds: 15);
 
     try {
