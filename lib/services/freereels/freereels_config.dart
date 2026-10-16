@@ -36,9 +36,9 @@ class FreereelsConfig {
   /// New (505), Female (504), Male (506) DIHAPUS — tidak dipakai.
   /// Dubbing (514) = konten sulih suara, all genre.
   static const Map<String, String> tabKeys = {
+    'Dubbing': '514',
     'Popular': '503',
     'Coming Soon': '622',
-    'Dubbing': '514',
     'Anime': '547',
   };
 
