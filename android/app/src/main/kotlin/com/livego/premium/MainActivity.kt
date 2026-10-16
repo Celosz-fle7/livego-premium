@@ -201,7 +201,69 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-
+        val cryptoChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "livego/netshort_crypto")
+        cryptoChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "rsaEncrypt" -> {
+                    try {
+                        val dataBytes = call.argument<ByteArray>("data") ?: byteArrayOf()
+                        val pubKeyB64 = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2poXMstZ8NCWE7915MXzDWC5/t+oB2waGfskPqSZwLqxd4ZBR0H1cb1tAZRZcV7P+LmOd6SYNxhnELaWuKTD+D3xkz8Tt1L5j/ynGqVt1MDbiQIEzXQKUkNDSH6T0A+Xzo/67/8QOQXlVJfW06resbaeNvibfx6Qc78j96bCIPlxPrtieilVTBHUFOXjirxK/ki/mO8P2smRbpt73fsQWdGmTGMfYGvfPApGyxbxLkL/qrBjU25XpM8a0MBqzFWUAchHmqSBJ6Mbfam1SSgf3b2U28s67nOW+JiOrhd6iVLcsLFxXA54HX+Zbej3AbOB6jKaEmp/bz1amneE1NYXwwIDAQAB"
+                        val keySpec = java.security.spec.X509EncodedKeySpec(android.util.Base64.decode(pubKeyB64, android.util.Base64.DEFAULT))
+                        val keyFactory = java.security.KeyFactory.getInstance("RSA")
+                        val publicKey = keyFactory.generatePublic(keySpec)
+                        val cipher = javax.crypto.Cipher.getInstance("RSA/ECB/PKCS1Padding")
+                        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, publicKey)
+                        val encrypted = cipher.doFinal(dataBytes)
+                        result.success(android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
+                    } catch (e: Exception) {
+                        result.error("RSA_ENCRYPT_ERROR", e.message, null)
+                    }
+                }
+                "rsaDecrypt" -> {
+                    try {
+                        val cipherBytes = call.argument<ByteArray>("cipherBytes") ?: byteArrayOf()
+                        val privKeyB64 = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCK0Tl1pd7bjTRU93bWoHW1hLCDj2+9bg1MgY8j5C7xXaw6bJfToXhWbH1fXNbnFFVqxyYNErcuOUwJZxyDgcxUXM4yWnRseb2GF97GOicAQ2keDzVYmwky4lrSRwvcXutJRLPUCRQNfc6upfk2G5TKh6/CcP4TV1eXTF7+vdEw2SHxAOITKbSfcaZXr/hVs6a1aRHsBF+7RG99ebwZIP6/AgIyqX9RbDVN6ixi1v2G3/bwAULHLSqGdSaqij/ca17fbFGITaeCeEaZ6d/P4ZuOK+PEPdbPQt6SbY4lZaYwRvdrpH73kigPITgDzIDONFybJ1m7wRKlq1wxWHwbimptAgMBAAECggEAPz3cYJXFtt5YphDrahJGLgEabYVOUc2ub1li/eX54OpdCWzpqneYnD7myyg/m5zu4SuDUVdibsOZuXrpSZw7m3+ATP5apgS8bDe5vTNHC16qqBAjrI9NHIp09/F4HNh9dq6/Am10XkUfgP+KTrU4DyDL2NijV+pltD8N1B5kDE1igokVcsavhnu2INoMRXYE78Wq6urNECuFWw9hldv81M9m2w56t1CQOUukpo4mfmLjZRe2s+kwtcBVefGHP8Cj0OeH2dGltjl2YSQMRBFUCVoixYpOrcjIHoqzWri8IfUZ2tW+nUvHl5IZ9RVxefnFaLGnxiXd2sk6Sn4aD/l9YQKBgQDVv3HaOZxHRqlNSPrNGqplGhE066HnDsq6MlPukiovxE43CRBmpTnk9zDCqrDh9t2HbJuao7nSq5WlBERWgwqXU/qDpH43W7Y/lJfHkDv6A2m0viJa0a9x8+CJpNnCDu1ATo4/IQKwoXYice6JKnUyXgkGKn+HipiN6tO0EtWHlQKBgQCmQfklKFtXtm/FZ6NIMs+d+EyvaE5xNLKGYQxmiCR10WGYd8ZV+K0Q6qXHS+a32TirWB9F3TqPOklTytMrfPZB3BCXj4weEldb8W716G8FYf7LLhaT+MdpF7KDcruObwoQAvKV3N4eX6tUEMmdrx9hpCmmIU5EeXUkhGdmwk7BeQKBgAIXMkThJV8pGMTRvuo8pYgBnkN3PoklAuSZU2rU8Sawc9dj9k4atZtAs7BjvQEoyffmHwt/KHUgCoGnrgdulq7uOlgJRtbBxeGPUYC5L2z9lY4YAfwDawThTsPp4dtdDAMCAbAqYX1axu4FUUD0MltAwjPWPJMVzvIsZs+vE3mVAoGAJPja3OaCmZjadj2709xoyypic0dw2j/ry3JdfZec9A5h87P/CTNJ2U81GoLIhe3qakAohDLUSPGfSOD74NnjMXYswmeLs0xE3Q9tq4XK2pmWPby8DJ/wSHCapByplN0gkbr2E1mQk5SW1xT8oPJGukH1eRpC+3s/D6XaEMH5HZECgYEAigoX5l39LDsCgeaUcI4S9grkaas/WsKv37eqo3oD9Qk6VFiMM5L5Zig6aXJxuAPLVjb38caJRPmPmOXLT2kEP1E1h6OJOhEhETwVIUtcBzsK25ju9LqL89bC+W0uS7BPvk6Tcws/tXHCkQCTgb9jVXceZ2ox+6axvlW/5WgHt5Q="
+                        val keySpec = java.security.spec.PKCS8EncodedKeySpec(android.util.Base64.decode(privKeyB64, android.util.Base64.DEFAULT))
+                        val keyFactory = java.security.KeyFactory.getInstance("RSA")
+                        val privateKey = keyFactory.generatePrivate(keySpec)
+                        val cipher = javax.crypto.Cipher.getInstance("RSA/ECB/PKCS1Padding")
+                        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, privateKey)
+                        val decrypted = cipher.doFinal(cipherBytes)
+                        result.success(decrypted)
+                    } catch (e: Exception) {
+                        result.error("RSA_DECRYPT_ERROR", e.message, null)
+                    }
+                }
+                "aesDecrypt" -> {
+                    try {
+                        val cipherTextB64 = call.argument<String>("cipherText") ?: ""
+                        val keyBytes = call.argument<ByteArray>("key") ?: byteArrayOf()
+                        val cipherBytes = android.util.Base64.decode(cipherTextB64, android.util.Base64.DEFAULT)
+                        val secretKey = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+                        val cipher = javax.crypto.Cipher.getInstance("AES/ECB/PKCS7Padding")
+                        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKey)
+                        val decrypted = cipher.doFinal(cipherBytes)
+                        result.success(String(decrypted, Charsets.UTF_8))
+                    } catch (e: Exception) {
+                        result.error("AES_DECRYPT_ERROR", e.message, null)
+                    }
+                }
+                "aesEncrypt" -> {
+                    try {
+                        val plainText = call.argument<String>("plainText") ?: ""
+                        val keyBytes = call.argument<ByteArray>("key") ?: byteArrayOf()
+                        val secretKey = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+                        val cipher = javax.crypto.Cipher.getInstance("AES/ECB/PKCS7Padding")
+                        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey)
+                        val encrypted = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+                        result.success(android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
+                    } catch (e: Exception) {
+                        result.error("AES_ENCRYPT_ERROR", e.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

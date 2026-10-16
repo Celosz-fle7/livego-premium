@@ -259,10 +259,10 @@ class NetShortClient {
 
       if (resEncKey != null && resEncKey.isNotEmpty) {
         try {
-          final decAesKeyBytes = NetShortCrypto.rsaDecrypt(base64.decode(resEncKey.trim()));
+          final decAesKeyBytes = await NetShortCrypto.nativeRsaDecrypt(base64.decode(resEncKey.trim()));
           final rawKeyStr = utf8.decode(decAesKeyBytes).trim();
           final rawKeyBytes = base64.decode(rawKeyStr);
-          final plainJson = NetShortCrypto.aes256EcbDecrypt(resText, rawKeyBytes);
+          final plainJson = await NetShortCrypto.nativeAesDecrypt(resText, rawKeyBytes);
           return jsonDecode(plainJson) as Map<String, dynamic>;
         } catch (e) {
           debugPrint('NETSHORT DECRYPT ERROR on $endpoint: $e');

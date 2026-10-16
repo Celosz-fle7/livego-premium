@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 
 /// Utilitas Kriptografi NetShort (AES-256-ECB & RSA-2048 PKCS1 v1.5).
 /// Berjalan murni di Dart tanpa dependensi eksternal C/native.
@@ -158,6 +159,31 @@ class NetShortCrypto {
     final padLen = pt.last;
     final unpaddedLen = (padLen > 0 && padLen <= 16) ? pt.length - padLen : pt.length;
     return utf8.decode(pt.sublist(0, unpaddedLen.clamp(0, pt.length)), allowMalformed: true);
+  }
+
+  static const MethodChannel _nativeChannel = MethodChannel('livego/netshort_crypto');
+
+  /// Native Android hardware-accelerated RSA Decryption
+  static Future<Uint8List> nativeRsaDecrypt(Uint8List cipherBytes) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<Uint8List>('rsaDecrypt', {
+        'cipherBytes': cipherBytes,
+      });
+      if (res != null && res.isNotEmpty) return res;
+    } catch (_) {}
+    return rsaDecrypt(cipherBytes);
+  }
+
+  /// Native Android hardware-accelerated AES-256-ECB Decryption
+  static Future<String> nativeAesDecrypt(String cipherText, Uint8List rawKeyBytes) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<String>('aesDecrypt', {
+        'cipherText': cipherText,
+        'key': rawKeyBytes,
+      });
+      if (res != null && res.isNotEmpty) return res;
+    } catch (_) {}
+    return aes256EcbDecrypt(cipherText, rawKeyBytes);
   }
 }
 
