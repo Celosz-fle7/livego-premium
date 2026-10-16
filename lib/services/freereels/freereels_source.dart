@@ -68,6 +68,10 @@ class FreereelsSource implements DramaSource {
     // Workaround: tab Dubbing di API cuma sedikit item.
     // Tambah hasil search "sulih suara" dengan paginasi penuh (ratusan judul).
     if (category == 'Dubbing') {
+      // Filter HANYA item dari tab 514 (isinya campur dubbed non-Indonesia).
+      // Hasil search "sulih suara" JANGAN difilter — API sudah tentuin itu
+      // item sulih suara, metadata visible belum tentu menyebutnya.
+      items.removeWhere(_isNonIndonesianDubbed);
       try {
         final searchItems = await _client.searchAll('sulih suara', maxPages: 20);
         final seen = items.map((e) => e.id).toSet();
@@ -75,8 +79,6 @@ class FreereelsSource implements DramaSource {
           if (seen.add(s.id)) items.add(s);
         }
       } catch (_) {}
-      // Buang item "dubbed" yang bukan sulih suara (Indonesia).
-      items.removeWhere(_isNonIndonesianDubbed);
     }
     return items;
   }
@@ -160,9 +162,10 @@ class FreereelsSource implements DramaSource {
             pageToken: tokens[page - 1],
             category: category,
           );
+          // Hasil search JANGAN difilter — API sudah tentuin itu sulih suara.
           for (final item in res.items) {
             if (!seen.add(item.id)) continue;
-            if (!_isNonIndonesianDubbed(item)) fresh.add(item);
+            fresh.add(item);
           }
           if (tokens.length == page) tokens.add(res.nextToken);
           if (res.nextToken.isEmpty) {
