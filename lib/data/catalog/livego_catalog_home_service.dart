@@ -260,7 +260,7 @@ class LiveGoCatalogHomeService {
     await LiveGoContentCache.cleanExpiredAndTrim();
     final entries = <MapEntry<String, List<ContentItem>>>[];
     final seenKeys = <String>{};
-    for (final platform in LiveGoCatalogPlatformService.platforms.take(6)) {
+    for (final platform in LiveGoCatalogPlatformService.platforms) {
       final rows = await home(platform: platform);
       final clean = <ContentItem>[];
       for (final item in rows) {

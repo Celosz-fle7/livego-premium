@@ -402,7 +402,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
         _home.remove(slug);
       } else {
         _active.add(slug);
-        if (_home.length < 6) _home.add(slug);
+        _home.add(slug);
       }
       if (_home.isEmpty) _home.add(_active.first);
     });
@@ -412,7 +412,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     setState(() {
       if (_home.contains(slug)) {
         if (_home.length > 1) _home.remove(slug);
-      } else if (_home.length < 6) {
+      } else {
         _home.add(slug);
         _active.add(slug);
       }
@@ -428,7 +428,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
     setState(() {
       if (current.contains(name)) {
         if (current.length > 1) current.remove(name);
-      } else if (current.length < 6) {
+      } else {
         current.add(name);
       }
       _categoryDrafts[slug] = current;
@@ -441,7 +441,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       ..addAll(_active);
     LiveGoSettings.homePlatforms
       ..clear()
-      ..addAll(_home.take(6));
+      ..addAll(_home);
     if (LiveGoSettings.homePlatforms.isEmpty) {
       LiveGoSettings.homePlatforms.add(_active.first);
     }

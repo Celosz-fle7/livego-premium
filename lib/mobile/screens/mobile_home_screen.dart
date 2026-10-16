@@ -46,7 +46,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 2;
 
   String get _platform {
-    final platforms = LiveGoCatalog.platforms.take(6).toList();
+    final platforms = LiveGoCatalog.platforms;
     if (platforms.isEmpty) return 'shortmax';
     if (source >= platforms.length) source = 0;
     return platforms[source];
@@ -225,7 +225,7 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
     final categories = LiveGoCatalog.categoriesFor(_platform);
     if (category >= categories.length) category = 0;
     final items = _items;
-    final platforms = LiveGoCatalog.platforms.take(6).toList();
+    final platforms = LiveGoCatalog.platforms;
     final labels = LiveGoCatalog.labelsFor(platforms);
     final grid = LiveGoSettings.mobileHomeGrid.clamp(2, 6);
     final posterHeight = grid <= 3 ? 210.0 : (grid == 4 ? 212.0 : 184.0);

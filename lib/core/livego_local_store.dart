@@ -353,16 +353,16 @@ class LiveGoLocalStore {
         home = List<String>.from(LiveGoSettings.defaultPlatforms);
       }
 
-      // Nobuzero migration guard:
-      // Old saved source settings can leave Home with only one Nobuzero platform
-      // (or a legacy alias normalized to freereels). Always merge the
-      // current Nobuzero starter pack back into active/home so Source Manager and
-      // Home expose all clean Nobuzero platforms after update.
-      final defaultNobuzeroPlatforms = LiveGoSettings.defaultPlatforms
+      // Nobuzero & standalone provider migration guard:
+      // Old saved source settings can leave Home with only old platforms
+      // or cut off newly introduced platforms (e.g. netshort).
+      // Always merge defaultPlatforms back into active/home so all clean
+      // platforms are exposed in UI after update.
+      final defaultSupportedPlatforms = LiveGoSettings.defaultPlatforms
           .where(supported.contains)
           .toList(growable: false);
-      if (defaultNobuzeroPlatforms.isNotEmpty) {
-        for (final slug in defaultNobuzeroPlatforms) {
+      if (defaultSupportedPlatforms.isNotEmpty) {
+        for (final slug in defaultSupportedPlatforms) {
           if (!active.contains(slug)) active.add(slug);
           if (!home.contains(slug)) home.add(slug);
         }
@@ -376,7 +376,7 @@ class LiveGoLocalStore {
       if (home.isNotEmpty) {
         LiveGoSettings.homePlatforms
           ..clear()
-          ..addAll(home.where(LiveGoSettings.activePlatforms.contains).take(6));
+          ..addAll(home.where(LiveGoSettings.activePlatforms.contains));
       }
       if (LiveGoSettings.homePlatforms.isEmpty) {
         LiveGoSettings.homePlatforms.add(LiveGoSettings.activePlatforms.isNotEmpty
