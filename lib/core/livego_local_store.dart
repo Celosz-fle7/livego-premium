@@ -439,12 +439,10 @@ class LiveGoLocalStore {
     final slug = '${value ?? ''}'.trim().toLowerCase();
     return const <String>{
       'shortmax',
-      'netshort',
       'pinedrama',
       'flickreels',
       'meloshort',
       'dramabox',
-      'melolo',
     }.contains(slug);
   }
 

@@ -105,10 +105,17 @@ class NetShortClient {
       for (final col in columnList) {
         final modelList = (col as Map<String, dynamic>)['modelList'] as List<dynamic>? ?? [];
         for (final model in modelList) {
-          final insertRespList = (model as Map<String, dynamic>)['insertRespList'] as List<dynamic>? ?? [];
+          final m = model as Map<String, dynamic>;
+          final insertRespList = m['insertRespList'] as List<dynamic>? ?? [];
           for (final ins in insertRespList) {
             final sp = (ins as Map<String, dynamic>)['shortPlayResp'] as Map<String, dynamic>?;
             if (sp != null) {
+              dramas.add(sp);
+            }
+          }
+          final shortPlayRespList = m['shortPlayRespList'] as List<dynamic>? ?? [];
+          for (final sp in shortPlayRespList) {
+            if (sp is Map<String, dynamic>) {
               dramas.add(sp);
             }
           }
@@ -217,6 +224,7 @@ class NetShortClient {
     final ctBody = NetShortCrypto.aes256EcbEncrypt(jsonStr, aesKey);
 
     final client = HttpClient();
+    client.badCertificateCallback = (cert, host, port) => true;
     client.connectionTimeout = const Duration(seconds: 15);
 
     try {
