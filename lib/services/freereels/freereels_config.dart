@@ -19,12 +19,12 @@ class FreereelsConfig {
   static const String baseUrl = 'https://apiv2.free-reels.com';
   static const String apiPrefix = '/frv2-api';
   static const String appName = 'com.freereels.app';
-  static const String appVersion = '2.2.00';
+  static const String appVersion = '2.3.70';
   static const String userAgent = 'okhttp/4.12.0';
 
-  // === Device spoof — meniru script Python (JANGAN DIRUBAH) ===
+  // === Device spoof — meniru APK terbaru (JANGAN DIRUBAH) ===
   static const String device = 'android';
-  static const String language = 'id';
+  static const String language = 'id-ID';
   static const String country = 'ID';
   static const String deviceModel = 'Pixel 6';
   static const String screenWidth = '1080';

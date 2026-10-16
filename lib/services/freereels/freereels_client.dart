@@ -154,6 +154,64 @@ class FreereelsClient {
     return items;
   }
 
+  /// POST /frv2-api/homepage/v2/tab/item/list
+  /// Mengambil item sekunder feed (misal module_key 612 untuk Dubbing).
+  Future<({List<ContentItem> items, String nextToken, bool hasMore})> tabItemList({
+    required String moduleKey,
+    String sceneSource = '/home/dubbed/dubbed',
+    int positionIndex = 2,
+    int offset = 10,
+    String nextParam = '',
+    String category = 'Dubbing',
+  }) async {
+    final body = <String, dynamic>{
+      'module_key': moduleKey,
+      'scene_source': sceneSource,
+      'position_index': positionIndex,
+      'offset': offset,
+    };
+    if (nextParam.isNotEmpty) {
+      for (final part in nextParam.split('&')) {
+        final kv = part.split('=');
+        if (kv.length == 2) body[kv[0]] = kv[1];
+      }
+    }
+
+    final res = await _postJson('/homepage/v2/tab/item/list', body);
+    final code = res['code'];
+    if (code != 200 && code != 0) {
+      throw Exception('FreeReels tab/item/list code=$code msg=${res['msg']}');
+    }
+
+    final data = res['data'] as Map? ?? {};
+    final rawItems = data['items'] as List? ?? [];
+    final items = <ContentItem>[];
+    for (final item in rawItems) {
+      final m = item as Map;
+      final key = '${m['key'] ?? m['id'] ?? ''}';
+      if (key.isEmpty) continue;
+      items.add(ContentItem(
+        id: key,
+        title: '${m['title'] ?? m['name'] ?? 'No title'}',
+        source: 'freereels',
+        category: category,
+        description: '${m['desc'] ?? ''}',
+        posterUrl: '${m['cover'] ?? ''}',
+        backdropUrl: '${m['cover'] ?? ''}',
+        rating: 0,
+        episodes: int.tryParse('${m['episode_count'] ?? 1}') ?? 1,
+        platformSlug: 'freereels',
+        lang: 'id',
+        tags: ContentItem.extractTags(m),
+      ));
+    }
+
+    final pageInfo = data['page_info'] as Map? ?? {};
+    final next = '${pageInfo['next'] ?? ''}';
+    final hasMore = pageInfo['has_more'] == true;
+    return (items: items, nextToken: next, hasMore: hasMore);
+  }
+
   /// Ambil semua series unik dari satu tab (pagination ala script Python).
   Future<List<ContentItem>> allSeriesFromTab({
     required String tabKey,

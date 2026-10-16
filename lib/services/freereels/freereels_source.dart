@@ -58,27 +58,40 @@ class FreereelsSource implements DramaSource {
   @override
   List<String> get categories => FreereelsConfig.tabKeys.keys.toList(growable: false);
 
+  static const List<String> _dubbingKeywords = [
+    'sulih suara',
+    'dubbing',
+    'suara',
+    'sulih',
+    'bahasa indonesia',
+  ];
+
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
-    // Ambil semua halaman (paginasi) agar konten maksimal per tab.
     final items = await _client.allSeriesFromTab(tabKey: tabKey, category: category);
 
-    // Workaround: tab Dubbing di API cuma sedikit item.
-    // Tambah hasil search "sulih suara" dengan paginasi penuh (ratusan judul).
     if (category == 'Dubbing') {
-      // Filter HANYA item dari tab 514 (isinya campur dubbed non-Indonesia).
-      // Hasil search "sulih suara" JANGAN difilter — API sudah tentuin itu
-      // item sulih suara, metadata visible belum tentu menyebutnya.
-      items.removeWhere(_isNonIndonesianDubbed);
+      final seen = items.map((e) => e.id).toSet();
+
+      // 1. Ambil feed sekunder module_key 612 (/home/dubbed/dubbed)
       try {
-        final searchItems = await _client.searchAll('sulih suara', maxPages: 20);
-        final seen = items.map((e) => e.id).toSet();
-        for (final s in searchItems) {
-          if (seen.add(s.id)) items.add(s);
+        final mod = await _client.tabItemList(moduleKey: '612', category: category);
+        for (final m in mod.items) {
+          if (seen.add(m.id)) items.add(m);
         }
       } catch (_) {}
+
+      // 2. Agregasi semua keyword pencarian sulih suara Indonesia
+      for (final kw in _dubbingKeywords) {
+        try {
+          final searchItems = await _client.searchAll(kw, maxPages: 5);
+          for (final s in searchItems) {
+            if (seen.add(s.id)) items.add(s);
+          }
+        } catch (_) {}
+      }
     }
     return items;
   }
@@ -89,9 +102,6 @@ class FreereelsSource implements DramaSource {
     int page = 1,
     int pageSize = 30,
   }) async {
-    // SATU tabFeed per halaman (bukan allSeriesFromTab + searchAll yang
-    // bikin load berat). position_index melangkah 10 — pola yang sudah
-    // terbukti di allSeriesFromTab; jumlah per halaman ikut server.
     final tabKey =
         FreereelsConfig.tabKeys[category] ?? FreereelsConfig.tabKeys['Popular']!;
     if (page <= 1) {
@@ -102,27 +112,62 @@ class FreereelsSource implements DramaSource {
     final seen = _pageSeen.putIfAbsent(category, () => <String>{});
     final fresh = <ContentItem>[];
     var hasMore = false;
+
     if (category == 'Dubbing') {
-      // Tab Dubbing: buang item "dubbed" yang bukan sulih suara. Ulangi
-      // fetch raw (maks 3x) kalau satu halaman raw habis terbuang — biar
-      // halaman tidak kosong padahal server masih punya konten.
-      var pos = (page - 1) * 10;
-      for (var attempt = 0; attempt < 3; attempt++) {
-        final batch = await _client.tabFeed(
-          tabKey: tabKey,
-          positionIndex: pos,
-          category: category,
-        );
-        var anyNew = false;
-        for (final item in batch) {
-          if (!seen.add(item.id)) continue;
-          anyNew = true;
-          if (!_isNonIndonesianDubbed(item)) fresh.add(item);
-        }
-        hasMore = batch.isNotEmpty && anyNew;
-        if (fresh.isNotEmpty || !hasMore) break;
-        pos += 10;
+      // 1. Ambil batch tabFeed utama
+      final batch = await _client.tabFeed(
+        tabKey: tabKey,
+        positionIndex: (page - 1) * 10,
+        category: category,
+      );
+      for (final item in batch) {
+        if (seen.add(item.id)) fresh.add(item);
       }
+      if (batch.isNotEmpty) hasMore = true;
+
+      // 2. Halaman 1 ambil feed sekunder module_key 612
+      if (page == 1) {
+        try {
+          final mod = await _client.tabItemList(moduleKey: '612', category: category);
+          for (final item in mod.items) {
+            if (seen.add(item.id)) fresh.add(item);
+          }
+        } catch (_) {}
+      }
+
+      // 3. Paging berputar pada multi-keyword sulih suara
+      final kwIndex = (page - 1) % _dubbingKeywords.length;
+      final kw = _dubbingKeywords[kwIndex];
+      final searchPageNum = ((page - 1) ~/ _dubbingKeywords.length) + 1;
+
+      try {
+        final tokenKey = '${category}_$kw';
+        final tokens = _searchTokens.putIfAbsent(tokenKey, () => <String>['']);
+        while (tokens.length < searchPageNum) {
+          final probe = await _client.searchPage(
+            kw,
+            pageToken: tokens.last,
+            category: category,
+          );
+          tokens.add(probe.nextToken);
+          if (probe.nextToken.isEmpty) break;
+        }
+
+        if (searchPageNum <= tokens.length) {
+          final res = await _client.searchPage(
+            kw,
+            pageToken: tokens[searchPageNum - 1],
+            category: category,
+          );
+          for (final item in res.items) {
+            if (seen.add(item.id)) fresh.add(item);
+          }
+          if (tokens.length == searchPageNum) tokens.add(res.nextToken);
+          if (res.nextToken.isNotEmpty) {
+            hasMore = true;
+          }
+        }
+      } catch (_) {}
     } else {
       final batch = await _client.tabFeed(
         tabKey: tabKey,
@@ -135,47 +180,6 @@ class FreereelsSource implements DramaSource {
       hasMore = batch.isNotEmpty && fresh.isNotEmpty;
     }
 
-    // Dubbing = konten sulih suara, all genre: tab 514 saja cuma sedikit
-    // item. Gabung satu halaman search "sulih suara" (ratusan judul) agar
-    // SEMUA konten sulih suara ketarik — di jalur paged juga, bukan cuma
-    // homeByCategory (legacy).
-    if (category == 'Dubbing' && !_searchExhausted.contains(category)) {
-      try {
-        final tokens =
-            _searchTokens.putIfAbsent(category, () => <String>['']);
-        // Pastikan token halaman ini ada (pagination sekuensial).
-        while (tokens.length < page) {
-          final probe = await _client.searchPage(
-            'sulih suara',
-            pageToken: tokens.last,
-            category: category,
-          );
-          tokens.add(probe.nextToken);
-          if (probe.nextToken.isEmpty) {
-            _searchExhausted.add(category);
-            break;
-          }
-        }
-        if (page <= tokens.length) {
-          final res = await _client.searchPage(
-            'sulih suara',
-            pageToken: tokens[page - 1],
-            category: category,
-          );
-          // Hasil search JANGAN difilter — API sudah tentuin itu sulih suara.
-          for (final item in res.items) {
-            if (!seen.add(item.id)) continue;
-            fresh.add(item);
-          }
-          if (tokens.length == page) tokens.add(res.nextToken);
-          if (res.nextToken.isEmpty) {
-            _searchExhausted.add(category);
-          } else {
-            hasMore = true;
-          }
-        }
-      } catch (_) {}
-    }
     return (items: fresh, hasMore: hasMore);
   }
 
