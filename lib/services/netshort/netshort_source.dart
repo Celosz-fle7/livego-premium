@@ -107,22 +107,33 @@ class NetShortSource implements DramaSource {
         _streamCache['$seriesId:$epId'] = playVoucher;
       }
 
-      // Parse subtitle list jika ada
+      // Parse subtitle list
       final rawSubs = raw['subtitleList'] as List<dynamic>? ?? [];
       final List<DramaSubtitle> subtitles = [];
       for (final s in rawSubs) {
         if (s is Map<String, dynamic>) {
-          final lang = s['language']?.toString() ?? '';
-          final name = s['languageName']?.toString() ?? lang;
-          final subUrl = s['subtitleUrl']?.toString() ?? '';
+          final lang = s['subtitleLanguage']?.toString() ?? s['language']?.toString() ?? 'id_ID';
+          final subUrl = s['url']?.toString() ?? s['subtitleUrl']?.toString() ?? '';
           if (subUrl.isNotEmpty) {
-            subtitles.add(DramaSubtitle(language: lang, displayName: name, url: subUrl));
+            subtitles.add(DramaSubtitle(
+              language: lang,
+              displayName: lang == 'id_ID' ? 'Indonesia' : lang,
+              url: subUrl,
+            ));
           }
         }
       }
 
+      // Parse resolution / clarity
+      final clarity = raw['playClarity']?.toString() ?? '540p';
+      final List<DramaQuality> qualities = [
+        DramaQuality(label: clarity.toUpperCase(), resolution: clarity),
+      ];
+
       _extrasCache['$seriesId:$epId'] = DramaEpisodeExtras(
         subtitles: subtitles,
+        qualities: qualities,
+        audioLanguages: const ['id'],
         unlocked: true,
       );
 
@@ -165,17 +176,27 @@ class NetShortSource implements DramaSource {
         final List<DramaSubtitle> subtitles = [];
         for (final s in rawSubs) {
           if (s is Map<String, dynamic>) {
-            final lang = s['language']?.toString() ?? '';
-            final name = s['languageName']?.toString() ?? lang;
-            final subUrl = s['subtitleUrl']?.toString() ?? '';
+            final lang = s['subtitleLanguage']?.toString() ?? s['language']?.toString() ?? 'id_ID';
+            final subUrl = s['url']?.toString() ?? s['subtitleUrl']?.toString() ?? '';
             if (subUrl.isNotEmpty) {
-              subtitles.add(DramaSubtitle(language: lang, displayName: name, url: subUrl));
+              subtitles.add(DramaSubtitle(
+                language: lang,
+                displayName: lang == 'id_ID' ? 'Indonesia' : lang,
+                url: subUrl,
+              ));
             }
           }
         }
 
+        final clarity = ep['playClarity']?.toString() ?? '540p';
+        final List<DramaQuality> qualities = [
+          DramaQuality(label: clarity.toUpperCase(), resolution: clarity),
+        ];
+
         _extrasCache['$seriesId:$episodeId'] = DramaEpisodeExtras(
           subtitles: subtitles,
+          qualities: qualities,
+          audioLanguages: const ['id'],
           unlocked: true,
         );
 
