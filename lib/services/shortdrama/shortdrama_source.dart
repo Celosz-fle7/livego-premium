@@ -8,6 +8,7 @@ import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'shortdrama_client.dart';
 import 'shortdrama_config.dart';
+import 'shortdrama_filters.dart';
 
 /// Adapter ShortDrama TV sebagai DramaSource di LiveGo.
 ///
@@ -192,8 +193,16 @@ class ShortDramaSource implements DramaSource {
       addRaw(raw);
     }
 
-    if (out.isNotEmpty) _categoryCache[category] = out;
-    return out;
+    // Kategori "Sulih Suara": server tidak menyediakan channel dubbing yang
+    // bisa diakses anonim, jadi filter di client (nama bertanda
+    // Doblado/Dublado atau tag menyebut sulih suara/indonesia).
+    var finalItems = out;
+    if (category == 'Sulih Suara') {
+      finalItems = ShortDramaFilters.dubbedOnly(out);
+    }
+
+    if (finalItems.isNotEmpty) _categoryCache[category] = finalItems;
+    return finalItems;
   }
 
   /// Jalankan request, kembalikan list kosong kalau gagal.

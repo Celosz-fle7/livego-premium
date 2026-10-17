@@ -1,10 +1,12 @@
 import '../models/content_item.dart';
 import 'freereels/freereels_config.dart';
 import 'moviebox/moviebox_filters.dart';
+import 'shortdrama/shortdrama_filters.dart';
 
 /// Filter hasil pencarian — MASING-MASING PROVIDER PUNYA FILTER SENDIRI,
 /// tidak dicampur. FreeReels pakai genre FreeReels, MovieBox pakai kata
-/// kunci + genre MovieBox, provider lain tanpa filter (row disembunyikan).
+/// kunci + genre MovieBox, ShortDrama pakai genre + Sulih Suara,
+/// provider lain tanpa filter (row disembunyikan).
 /// Filter memfilter hasil yang sudah ada, BUKAN mencari.
 class SearchFilter {
   /// Label filter milik satu provider. Kosong = provider tidak punya filter.
@@ -15,6 +17,8 @@ class SearchFilter {
         return FreereelsConfig.genreTags.keys.toList();
       case 'moviebox':
         return MovieBoxFilters.allLabels.toList();
+      case 'shortdrama':
+        return ShortDramaFilters.allLabels;
       default:
         return const [];
     }
@@ -31,6 +35,8 @@ class SearchFilter {
         return FreereelsConfig.matchesGenres(item, selectedLabels);
       case 'moviebox':
         return MovieBoxFilters.matches(item, selectedLabels);
+      case 'shortdrama':
+        return ShortDramaFilters.matches(item, selectedLabels);
       default:
         return true;
     }

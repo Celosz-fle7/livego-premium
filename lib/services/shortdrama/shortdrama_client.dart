@@ -334,12 +334,16 @@ class ShortDramaClient {
     final title = '${m['vod_name'] ?? m['name'] ?? m['title'] ?? 'Tanpa judul'}';
     final cover = '${m['vod_pic'] ?? m['pic'] ?? m['cover'] ?? ''}';
     final total = int.tryParse('${m['vod_total'] ?? m['vod_serial'] ?? 0}') ?? 0;
-    final theme = '${m['theme'] ?? ''}';
-    final tags = theme
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+
+    // Tag = theme + background (dipakai filter genre & sulih suara).
+    final tags = <String>[];
+    for (final key in ['theme', 'background']) {
+      final raw = '${m[key] ?? ''}';
+      for (final t in raw.split(',')) {
+        final s = t.trim();
+        if (s.isNotEmpty && !tags.contains(s)) tags.add(s);
+      }
+    }
 
     return ContentItem(
       id: id,
