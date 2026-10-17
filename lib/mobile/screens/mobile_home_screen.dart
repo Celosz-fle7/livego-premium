@@ -40,10 +40,12 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
   /// membatalkan hasil fetch basi dari load sebelumnya.
   int _loadGen = 0;
 
-  /// Ukuran request satu halaman: 2 baris (2 baris terlihat penuh di
-  /// layar pertama). Grid 3 kolom -> 6 item. Server boleh mengembalikan
+  /// Ukuran request satu halaman: 4 baris (layar pertama langsung
+  /// penuh, scroll langsung bisa — page 1 yang cuma 2 baris bikin
+  /// loadMore ke kunci karena konten tidak bisa di-scroll).
+  /// Grid 3 kolom -> 12 item. Server boleh mengembalikan
   /// lebih/sedikit — diterima apa adanya.
-  int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 2;
+  int get _pageSize => LiveGoSettings.mobileHomeGrid.clamp(2, 6) * 4;
 
   String get _platform {
     final platforms = LiveGoCatalog.platforms;
@@ -166,6 +168,13 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
         _hasMore = res.hasMore;
         _loading = false;
       });
+      // Auto-fill: kalau page 1 belum bisa di-scroll (konten muat di
+      // layar) dan masih ada halaman berikut, load otomatis sampai
+      // layar penuh. Tanpa ini loadMore ke kunci di 6 item karena
+      // trigger-nya cuma scroll.
+      if (mounted && _hasMore && res.items.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _autoFill());
+      }
       if (res.items.isNotEmpty &&
           !res.items.any((i) => i.id.startsWith('cinemaid_'))) {
         unawaited(LiveGoContentCache.writeItems(
@@ -213,6 +222,23 @@ class _MobileHomeScreenState extends State<MobileHomeScreen> {
         _loadingMore = false;
         _loadMoreError = true;
       });
+    }
+  }
+
+  /// Isi layar otomatis sampai bisa di-scroll: panggil _loadMore
+  /// berulang selama konten belum overflow viewport dan server masih
+  /// punya halaman berikut. Guard: berhenti kalau item tidak nambah
+  /// (server return duplikat/kosong) dan maks 3x supaya tidak loop.
+  Future<void> _autoFill() async {
+    for (var i = 0; i < 3; i++) {
+      if (!mounted || _loading || _loadingMore || !_hasMore || _items.isEmpty) {
+        return;
+      }
+      if (!_scroll.hasClients) return;
+      if (_scroll.position.maxScrollExtent > 0) return;
+      final before = _items.length;
+      await _loadMore();
+      if (_items.length <= before) return;
     }
   }
 
