@@ -91,9 +91,22 @@ extension TvHomeInteractionController on _TvHomeScreenState {
     final current = LiveGoLocalStore.version.value;
     if (current == _settingsVersion) return;
     _settingsVersion = current;
+    // Guard anti double-load: _rememberSelection() ikut bump version,
+    // jadi tiap pindah provider/kategori via OK selalu memicu listener
+    // ini — padahal _loadHome dari _selectPlatform/_selectCategory
+    // sudah jalan. Reload hanya kalau seleksi efektif berubah
+    // (mis. dari layar Settings) atau kontennya belum ter-load.
+    // Tanpa guard ini 1x OK = 2x _loadHome (nyantol).
+    final beforePlatform = _platformSlug;
+    final beforeCategory = _categoryLabel;
     _restoreSavedSelection();
     _gridIndex = 0;
     if (mounted) setState(() {});
+    if (beforePlatform == _platformSlug &&
+        beforeCategory == _categoryLabel &&
+        _isLoadedHomeSelection(_platformSlug, _categoryLabel)) {
+      return;
+    }
     _loadHome(clearPrevious: true);
   }
 
