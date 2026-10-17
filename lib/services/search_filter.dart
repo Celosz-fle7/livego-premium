@@ -16,6 +16,7 @@ class SearchFilter {
       case 'freereels':
         return FreereelsConfig.genreTags.keys.toList();
       case 'moviebox':
+      case 'livegodrama':
         return MovieBoxFilters.allLabels.toList();
       case 'shortdrama':
         return ShortDramaFilters.allLabels;
@@ -34,6 +35,7 @@ class SearchFilter {
       case 'freereels':
         return FreereelsConfig.matchesGenres(item, selectedLabels);
       case 'moviebox':
+      case 'livegodrama':
         return MovieBoxFilters.matches(item, selectedLabels);
       case 'shortdrama':
         return ShortDramaFilters.matches(item, selectedLabels);

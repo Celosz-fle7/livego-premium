@@ -41,8 +41,9 @@ class TvSourceManagerConfig {
     'melolo': 2,
     'shorttv': 3,
     'moviebox': 4,
-    'netshort': 5,
-    'shortdrama': 6,
+    'livegodrama': 5,
+    'netshort': 6,
+    'shortdrama': 7,
   };
 
   static int sourcePriority(String slug) {

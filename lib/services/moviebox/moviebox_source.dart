@@ -6,20 +6,20 @@ import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'moviebox_client.dart';
 import 'moviebox_filters.dart';
-import 'moviebox_shorttv_seed.dart';
 
-/// Implementasi DramaSource untuk provider MovieBox / OneRoom.
+/// Adapter Provider MovieBox Short TV (Micro-drama vertikal episode 1-100).
+/// Mengambil data dari section Short TV (Tab 13) dan streaming langsung dari GoodShort/Vskit CDN.
 class MovieBoxSource implements DramaSource {
-  final MovieBoxClient _client = MovieBoxClient();
+  final MovieBoxClient _client = MovieBoxClient.instance;
 
-  /// Cache daftar kategori -> List ContentItem.
-  final Map<String, List<ContentItem>> _categoryItemsCache = {};
+  /// Cache category -> list ContentItem
+  final Map<String, List<ContentItem>> _categoryCache = {};
 
-  /// Cache subjectId -> detail map dari server MovieBox.
-  final Map<String, Map<String, dynamic>> _detailCache = {};
-
-  /// Cache episode direct stream url: "$seriesId:$episodeId" -> streamUrl.
+  /// Cache episode direct stream url: "$seriesId:$episodeId" -> streamUrl
   final Map<String, String> _streamCache = {};
+
+  /// Cache daftar episode per seriesId
+  final Map<String, List<LiveGoEpisode>> _episodesCache = {};
 
   MovieBoxClient get client => _client;
 
@@ -27,164 +27,110 @@ class MovieBoxSource implements DramaSource {
   String get slug => 'moviebox';
 
   @override
-  String get label => 'MovieBox';
+  String get label => 'Short TV';
 
   @override
   List<String> get categories => const [
-        // Tab ShortTV Internal
         'Sedang Trending',
         'Terbaru',
-        'Balas Dendam',
-        'Cerita Barat',
-        'Drama Dubbing',
-        'Lokal Short TV',
+        'Tokoh Legendaris',
         'Animasi',
-        // Kategori Film & Drama Utama
-        '🔥Hot Short TV',
-        'Trending Drama🔥',
-        'Trending Indonesian Drama💗',
-        'Trending Indonesian Movies',
-        'Trending Movies',
-        'K-Drama: New Release',
-        'Indonesian Horror Stories 💀',
-        'Free Now 🎉',
-        'Into Animeverse🌟',
-        'Thai-Drama',
-        'Trending Indo Dubbed',
-        'Action & Crime 👊',
-        '100% LOVE 💗',
-        'Family Time🏡',
+        'CEO',
+        '😈Balas Dendam',
+        '💖Cerita Barat',
+        '🎧Drama Dubbing',
+        '🇮🇩Lokal Short TV',
       ];
 
   @override
   Future<List<ContentItem>> homeByCategory(String category) async {
-    final normCat = _normalizeCategory(category);
-    if (_categoryItemsCache.containsKey(normCat)) {
-      return _categoryItemsCache[normCat]!;
+    final normCat = category.trim().toLowerCase();
+    if (_categoryCache.containsKey(normCat) && _categoryCache[normCat]!.isNotEmpty) {
+      return _categoryCache[normCat]!;
     }
 
-    // 1. Cek apakah kategori ada di Seed ShortTV Internal (Disewa Jadi Pengasuh, Putri yang Kembali, dll)
-    for (final entry in MovieBoxShortTvSeed.categories.entries) {
-      if (_normalizeCategory(entry.key) == normCat) {
-        final items = entry.value.map((m) {
-          final id = '${m['id']}';
-          final title = '${m['title']}';
-          final cover = '${m['cover']}';
-          final ep = (m['totalEpisode'] as num?)?.toInt() ?? 1;
-          final genre = '${m['genre'] ?? entry.key}';
-          return ContentItem(
-            id: id,
-            title: title,
-            source: 'MovieBox',
-            category: genre,
-            description: '',
-            posterUrl: cover,
-            backdropUrl: cover,
-            rating: 8.5,
-            episodes: ep,
-            platformSlug: slug,
-            tags: [genre],
-          );
-        }).toList();
+    try {
+      // Ambil feed tab 13 (Short TV section resmi)
+      final data = await _client.fetchTabOperating(13);
+      final rawItems = data['items'] as List<dynamic>? ?? [];
 
-        final clean = MovieBoxFilters.stripAdult(items);
-        _categoryItemsCache[normCat] = clean;
-        return clean;
+      // Isi semua cache kategori dari response yang didapat sekaligus
+      for (final raw in rawItems) {
+        if (raw is! Map<String, dynamic>) continue;
+        final title = (raw['title'] as String?)?.trim() ?? '';
+        final subjects = raw['subjects'] as List<dynamic>? ?? [];
+        if (subjects.isEmpty) continue;
+
+        final items = subjects
+            .whereType<Map<String, dynamic>>()
+            .map((s) => _mapShortToContentItem(s, title))
+            .where((item) => item.id.isNotEmpty)
+            .toList();
+
+        final cleanItems = MovieBoxFilters.stripAdult(items);
+        _categoryCache[title.toLowerCase()] = cleanItems;
       }
-    }
 
-    // 2. Ambil dari H5 Gateway live feed (tab-operating)
-    final data = await _client.fetchTabOperating(tabCode: 'HOME');
-    final operatingList = data['operatingList'] as List<dynamic>? ?? [];
-
-    for (final op in operatingList) {
-      if (op is! Map<String, dynamic>) continue;
-      final title = (op['title'] as String? ?? '').trim();
-      final subjects = op['subjects'] as List<dynamic>? ?? [];
-      if (subjects.isEmpty) continue;
-
-      final items = <ContentItem>[];
-      for (final s in subjects) {
-        if (s is! Map<String, dynamic>) continue;
-        final item = _parseContentItem(s, defaultCategory: title);
-        if (item != null) {
-          items.add(item);
+      // Cari kategori yang cocok
+      for (final entry in _categoryCache.entries) {
+        if (entry.key == normCat ||
+            entry.key.contains(normCat) ||
+            normCat.contains(entry.key)) {
+          return entry.value;
         }
       }
 
-      final opNorm = _normalizeCategory(title);
-      _categoryItemsCache[opNorm] = MovieBoxFilters.stripAdult(items);
+      // Fallback: kembalikan item dari section pertama jika tidak ketemu persis
+      if (_categoryCache.isNotEmpty) {
+        return _categoryCache.values.first;
+      }
+    } catch (e, stack) {
+      debugPrint('[MovieBoxSource] homeByCategory error: $e\n$stack');
     }
 
-    return _categoryItemsCache[normCat] ??
-        _categoryItemsCache[_normalizeCategory('Sedang Trending')] ??
-        _categoryItemsCache[_normalizeCategory('🔥Hot Short TV')] ??
-        const [];
-  }
-
-  @override
-  Future<({List<ContentItem> items, bool hasMore})> homePage(
-    String category, {
-    int page = 1,
-    int pageSize = 30,
-  }) async {
-    final all = await homeByCategory(category);
-    if (page > 1) {
-      return (items: const <ContentItem>[], hasMore: false);
-    }
-    return (items: all, hasMore: false);
+    return const [];
   }
 
   @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
-    // 1. Cek apakah ada di MovieBoxShortTvSeed untuk mendapatkan total episode asli
-    int totalEp = 1;
-    for (final list in MovieBoxShortTvSeed.categories.values) {
-      for (final item in list) {
-        if ('${item['id']}' == seriesId) {
-          totalEp = (item['totalEpisode'] as num?)?.toInt() ?? 1;
-          break;
+    final cached = _episodesCache[seriesId];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    try {
+      // Ambil hingga 100 episode pertama
+      final rawEpisodes = await _client.fetchShortEpisodes(seriesId, startPosition: 1, endPosition: 100);
+      if (rawEpisodes.isNotEmpty) {
+        final list = <LiveGoEpisode>[];
+        for (var i = 0; i < rawEpisodes.length; i++) {
+          final epData = rawEpisodes[i];
+          final miniId = '${epData['miniId'] ?? epData['id'] ?? ''}';
+          final epNum = (epData['ep'] as num?)?.toInt() ?? (i + 1);
+          final title = 'Episode $epNum';
+
+          if (miniId.isNotEmpty) {
+            list.add(LiveGoEpisode(id: miniId, index: epNum, title: title));
+
+            // Simpan stream url ke cache
+            final videoMap = epData['video'] as Map<String, dynamic>?;
+            final addrMap = videoMap?['videoAddress'] as Map<String, dynamic>?;
+            final url = (addrMap?['url'] as String?)?.trim() ?? '';
+            if (url.isNotEmpty) {
+              _streamCache['$seriesId:$miniId'] = url;
+            }
+          }
+        }
+
+        if (list.isNotEmpty) {
+          _episodesCache[seriesId] = list;
+          return list;
         }
       }
-      if (totalEp > 1) break;
+    } catch (e) {
+      debugPrint('[MovieBoxSource] episodes error: $e');
     }
 
-    // 2. Jika bukan ShortTV seed, coba ambil dari detail cache MovieBox
-    if (totalEp <= 1) {
-      var detail = _detailCache[seriesId];
-      if (detail == null) {
-        detail = await _client.fetchDetail(seriesId);
-        if (detail.isNotEmpty) {
-          _detailCache[seriesId] = detail;
-        }
-      }
-
-      final resource = detail?['resource'] as Map<String, dynamic>?;
-      if (resource != null) {
-        final seasons = resource['seasons'] as List<dynamic>?;
-        if (seasons != null && seasons.isNotEmpty) {
-          final s0 = seasons[0] as Map<String, dynamic>?;
-          totalEp = (s0?['maxEp'] as num?)?.toInt() ?? 1;
-        }
-      }
-    }
-
-    if (totalEp <= 0) totalEp = 1;
-
-    final cachedStream = _streamCache['$seriesId:1'];
-    final epList = <LiveGoEpisode>[];
-    for (var i = 1; i <= totalEp; i++) {
-      epList.add(LiveGoEpisode(
-        id: '$i',
-        index: i,
-        title: 'Episode $i',
-      ));
-      if (i == 1 && cachedStream != null && cachedStream.isNotEmpty) {
-        _streamCache['$seriesId:$i'] = cachedStream;
-      }
-    }
-
-    return epList;
+    // Fallback minimal jika gagal network
+    return [LiveGoEpisode(id: seriesId, index: 1, title: 'Episode 1')];
   }
 
   @override
@@ -194,27 +140,16 @@ class MovieBoxSource implements DramaSource {
     String? quality,
   }) async {
     final cacheKey = '$seriesId:$episodeId';
-    if (_streamCache.containsKey(cacheKey) && _streamCache[cacheKey]!.isNotEmpty) {
-      return _streamCache[cacheKey]!;
-    }
+    final cached = _streamCache[cacheKey];
+    if (cached != null && cached.isNotEmpty) return cached;
 
-    // Ambil direct video dari trailer jika episode 1
-    var detail = _detailCache[seriesId];
-    if (detail == null) {
-      detail = await _client.fetchDetail(seriesId);
-      if (detail.isNotEmpty) {
-        _detailCache[seriesId] = detail;
-      }
-    }
-
-    final subject = detail['subject'] as Map<String, dynamic>?;
-    final trailer = subject?['trailer'] as Map<String, dynamic>?;
-    final vAddr = trailer?['videoAddress'] as Map<String, dynamic>?;
-    final url = (vAddr?['url'] as String? ?? '').trim();
-
-    if (url.isNotEmpty) {
-      _streamCache[cacheKey] = url;
-      return url;
+    try {
+      // Refresh daftar episode untuk mendapatkan stream URL
+      await episodes(seriesId);
+      final refetched = _streamCache[cacheKey];
+      if (refetched != null && refetched.isNotEmpty) return refetched;
+    } catch (e) {
+      debugPrint('[MovieBoxSource] streamUrl error: $e');
     }
 
     return '';
@@ -222,97 +157,54 @@ class MovieBoxSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> search(String query) async {
-    final q = query.trim().toLowerCase();
+    final q = query.trim();
     if (q.isEmpty) return const [];
 
-    // Pastikan data seed dan gateway sudah terisi
-    if (_categoryItemsCache.isEmpty) {
-      await homeByCategory('Sedang Trending');
-      await homeByCategory('🔥Hot Short TV');
-    }
-
-    final matched = <ContentItem>[];
-    final seenIds = <String>{};
-
-    for (final items in _categoryItemsCache.values) {
-      for (final item in items) {
-        if (!seenIds.contains(item.id)) {
-          if (item.title.toLowerCase().contains(q) ||
-              item.description.toLowerCase().contains(q) ||
-              item.category.toLowerCase().contains(q)) {
-            seenIds.add(item.id);
-            matched.add(item);
-          }
+    try {
+      final results = await _client.search(q, page: 1, perPage: 20);
+      final items = <ContentItem>[];
+      for (final r in results) {
+        // Ambil Short TV (subjectType == 7) atau item dengan cover valid
+        final sType = (r['subjectType'] as num?)?.toInt() ?? 0;
+        if (sType == 7 || sType == 0) {
+          items.add(_mapShortToContentItem(r, 'Pencarian'));
         }
       }
+      return MovieBoxFilters.stripAdult(items);
+    } catch (e) {
+      debugPrint('[MovieBoxSource] search error: $e');
+      return const [];
+    }
+  }
+
+  ContentItem _mapShortToContentItem(Map<String, dynamic> json, String category) {
+    final id = '${json['subjectId'] ?? json['id'] ?? ''}';
+    final title = '${json['title'] ?? json['name'] ?? 'Untitled'}';
+    final desc = '${json['description'] ?? json['desc'] ?? ''}';
+
+    String coverUrl = '';
+    final cover = json['cover'];
+    if (cover is Map<String, dynamic>) {
+      coverUrl = (cover['url'] as String?) ?? '';
+    } else if (cover is String) {
+      coverUrl = cover;
     }
 
-    return MovieBoxFilters.stripAdult(matched);
-  }
-
-  @override
-  Future<void> signOut() async {
-    _streamCache.clear();
-    _categoryItemsCache.clear();
-    _detailCache.clear();
-  }
-
-  @override
-  Future<DramaEpisodeExtras?> episodeExtras(
-    String seriesId,
-    String episodeId,
-  ) async {
-    return const DramaEpisodeExtras(
-      unlocked: true,
-      episodePrice: 0,
-    );
-  }
-
-  ContentItem? _parseContentItem(
-    Map<String, dynamic> json, {
-    required String defaultCategory,
-  }) {
-    final subjectId = '${json['subjectId'] ?? ''}';
-    if (subjectId.isEmpty || subjectId == '0') return null;
-
-    final title = (json['title'] as String? ?? 'Untitled').trim();
-    final description = (json['description'] as String? ?? '').trim();
-    final genre = (json['genre'] as String? ?? '').trim();
-    final country = (json['countryName'] as String? ?? '').trim();
-
-    final cover = json['cover'] as Map<String, dynamic>?;
-    final posterUrl = (cover?['url'] as String? ?? '').trim();
-
-    final trailer = json['trailer'] as Map<String, dynamic>?;
-    final vAddr = trailer?['videoAddress'] as Map<String, dynamic>?;
-    final videoUrl = (vAddr?['url'] as String? ?? '').trim();
-    if (videoUrl.isNotEmpty) {
-      _streamCache['$subjectId:1'] = videoUrl;
-    }
-
-    final ratingRaw = json['imdbRatingValue'];
-    final rating = double.tryParse('$ratingRaw') ?? 8.0;
+    final epRaw = json['totalEpisode'] ?? json['episodes'] ?? json['total'];
+    final episodesCount = (epRaw as num?)?.toInt() ?? 60;
 
     return ContentItem(
-      id: subjectId,
+      id: id,
       title: title,
       source: 'MovieBox',
-      category: genre.isNotEmpty ? genre.split(',').first.trim() : defaultCategory,
-      description: description,
-      posterUrl: posterUrl,
-      backdropUrl: posterUrl,
-      rating: rating,
-      episodes: 1,
+      category: category,
+      description: desc,
+      posterUrl: coverUrl,
+      backdropUrl: coverUrl,
+      rating: 8.8,
+      episodes: episodesCount,
       platformSlug: slug,
-      // Tag genre + negara dipakai matcher filter (kata kunci/genre).
-      tags: [
-        ...genre.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty),
-        if (country.isNotEmpty) country,
-      ],
+      tags: [category],
     );
-  }
-
-  String _normalizeCategory(String cat) {
-    return cat.trim().toLowerCase();
   }
 }

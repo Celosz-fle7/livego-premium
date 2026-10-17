@@ -585,7 +585,8 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'cinemaid': 'CinemaID • Movies & TV Series. Multi-kategori OTT & Ranking.',
       'melolo': 'Melolo • Drama HLS/MP4. Multi-resolusi (240p-720p).',
       'shorttv': 'ShortTV • Drama pendek vertikal multi-bahasa.',
-      'moviebox': 'MovieBox • Ribuan Short TV, Drama & Movies direct CDN.',
+      'moviebox': 'MovieBox Shorts • Micro-drama vertikal GoodShort/Vskit CDN.',
+      'livegodrama': 'Livego-drama • Film bioskop, serial TV, anime & subtitle SRT.',
       'netshort': 'NetShort • Drama pendek populer & viral direct CDN.',
       'shortdrama': 'ShortDrama • Drama pendek Indonesia & sulih suara direct CDN.',
     };

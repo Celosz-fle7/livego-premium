@@ -1,6 +1,7 @@
 import 'cinemaid/cinemaid_source.dart';
 import 'freereels/freereels_source.dart';
 import 'melolo/melolo_source.dart';
+import 'moviebox/livego_drama_source.dart';
 import 'moviebox/moviebox_source.dart';
 import 'netshort/netshort_source.dart';
 import 'shortdrama/shortdrama_source.dart';
@@ -138,6 +139,7 @@ class DramaSourceRegistry {
     'shorttv': ShortTvSource(),
     'shortmax': ShortTvSource(),
     'moviebox': MovieBoxSource(),
+    'livegodrama': LivegoDramaSource(),
     'netshort': NetShortSource(),
     'shortdrama': ShortDramaSource(),
   };
@@ -149,12 +151,14 @@ class DramaSourceRegistry {
   static bool handles(String slug) {
     final s = slug.trim().toLowerCase();
     if (s == 'shortmax') return _sources.containsKey('shorttv') || _sources.containsKey('shortmax');
+    if (s == 'livego-drama') return _sources.containsKey('livegodrama');
     return _sources.containsKey(s);
   }
 
   static DramaSource? forSlug(String slug) {
     final s = slug.trim().toLowerCase();
     if (s == 'shortmax') return _sources['shorttv'] ?? _sources['shortmax'];
+    if (s == 'livego-drama') return _sources['livegodrama'];
     return _sources[s];
   }
 
