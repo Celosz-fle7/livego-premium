@@ -37,10 +37,10 @@ class CinemaIdConfig {
 
   static const timeout = Duration(seconds: 15);
 
-  /// Kategori bawaan CinemaID sesuai aplikasi asli (10 tab platform OTT):
+  /// Kategori bawaan CinemaID sesuai aplikasi asli (9 tab platform OTT):
   /// Tiap tab = 1 daftar utuh (Top 10 provider di paling atas, disusul katalog
   /// lengkap provider tersebut). Tidak dipisah, tidak campur antar platform.
-  /// 18+ menghimpun semua konten dewasa di tab sendiri.
+  /// Tab 18+ dihapus: konten dewasa tidak disertakan.
   static const categories = <String>[
     'Netflix',
     'Amazon Prime',
@@ -51,7 +51,6 @@ class CinemaIdConfig {
     'Viu',
     'iFlix',
     'Crunchyroll',
-    '18+',
   ];
 
   /// Taruh token auth sebagai header DAN query param.

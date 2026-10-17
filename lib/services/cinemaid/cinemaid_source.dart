@@ -107,7 +107,6 @@ class CinemaIdSource implements DramaSource {
     'viu': {'viu', 'viutop10', 'newkoreandramaseries'},
     'iflix': {'iflix', 'iflixtop10'},
     'crunchyroll': {'crunchyroll', 'crunchyrolltop10', 'popularanime'},
-    '18+': {'18', '18top10'},
   };
 
   /// Map ID seed -> tag platform ternormalisasi (ground truth dari storage app asli).
@@ -125,20 +124,14 @@ class CinemaIdSource implements DramaSource {
   /// Filter item server: buang yang TERBUKTI milik platform lain
   /// (ID-nya ada di seed dengan tag platform berbeda).
   /// Item yang tidak ada di seed tetap lolos (tidak bisa diverifikasi).
-  /// Khusus tab 18+: hanya item yang terbukti 18+ yang lolos.
   List<ContentItem> _verifyPlatform(List<ContentItem> items, String catKey) {
     final family = _platformFamilies[catKey];
     if (family == null) return items;
-    final isAdultTab = catKey == '18+';
     final out = <ContentItem>[];
     var dropped = 0;
     for (final item in items) {
       final known = _seedPlatforms[item.id];
       if (known == null) {
-        if (isAdultTab) {
-          dropped++; // tab dewasa: hanya yang terbukti 18+
-          continue;
-        }
         out.add(item);
         continue;
       }
@@ -173,10 +166,8 @@ class CinemaIdSource implements DramaSource {
     await ensureSession();
     try {
       final catKey = category.toLowerCase().trim();
-      final isAdultTab = catKey == '18+';
 
       // 0. Kategori tanpa topic hardcoded: discovery otomatis dari /topic/list.
-      // 18+ selalu seed-only (konten dewasa tidak diambil dari server).
       String? topicId = _categoryToTopicId[catKey];
       if (topicId == null && _discoverableCategories.contains(catKey)) {
         topicId = _discoveredTopicIds[catKey];
@@ -192,9 +183,6 @@ class CinemaIdSource implements DramaSource {
           }
         }
       }
-      if (topicId == null && catKey == '18+') {
-        return _seedItems(category, isAdultTab: true);
-      }
 
       // 1. Jalur Utama: topic_id server (hardcoded atau hasil discovery)
       // Paginasi penuh ala FreeReels agar konten per tab maksimal dan variatif.
@@ -208,7 +196,7 @@ class CinemaIdSource implements DramaSource {
         if (vods.isNotEmpty) {
           debugPrint('CINEMAID SOURCE: loaded ${vods.length} items for topic $topicId ($category)');
           final seen = <String>{};
-          final seedItems = _seedItems(category, seen: seen, isAdultTab: isAdultTab);
+          final seedItems = _seedItems(category, seen: seen);
           final otherVods = _verifyPlatform(
             vods.where((v) => seen.add(v.id)).toList(),
             catKey,
@@ -340,12 +328,6 @@ class CinemaIdSource implements DramaSource {
     await ensureSession();
     final catKey = category.toLowerCase().trim();
 
-    // 18+ selalu seed-only (konten dewasa tidak diambil dari server).
-    if (catKey == '18+') {
-      if (page > 1) return (items: const <ContentItem>[], hasMore: false);
-      return (items: _seedItems(category, isAdultTab: true), hasMore: false);
-    }
-
     // Resolusi topicId (sama seperti homeByCategory): hardcoded / discovery.
     String? topicId = _categoryToTopicId[catKey];
     if (topicId == null && _discoverableCategories.contains(catKey)) {
@@ -387,18 +369,16 @@ class CinemaIdSource implements DramaSource {
 
   /// Bangun ContentItem dari seed lokal untuk satu kategori.
   /// Top 10 diurut paling depan (sudah di-sort di cinemaIdSeedsForCategory).
-  /// Konten 18+ hanya muncul di tab 18+, tidak tercampur di tab lain.
+  /// Item bertag 18+ dibuang: konten dewasa tidak disertakan.
   List<ContentItem> _seedItems(
     String category, {
     Set<String>? seen,
-    bool isAdultTab = false,
   }) {
     final seenSet = seen ?? <String>{};
     return cinemaIdSeedsForCategory(category)
         .where((s) {
           final isAdult =
               s.categories.any((c) => c.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') == '18');
-          if (isAdultTab) return isAdult;
           if (isAdult) return false;
           return seenSet.add(s.id);
         })

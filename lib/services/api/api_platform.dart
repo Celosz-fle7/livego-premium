@@ -108,7 +108,6 @@ class LiveGoApiPlatforms {
         'Viu',
         'iFlix',
         'Crunchyroll',
-        '18+',
       ],
     ),
     LiveGoApiPlatform(
