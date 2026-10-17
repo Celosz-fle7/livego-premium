@@ -17,7 +17,7 @@ class ShortDramaClient {
   static final ShortDramaClient instance = ShortDramaClient._();
 
   String _deviceId = ShortDramaConfig.defaultDeviceId;
-  String _host = ShortDramaConfig.baseUrl;
+  final String _host = ShortDramaConfig.baseUrl;
   String _token = '';
   String _userId = '';
 
@@ -113,7 +113,7 @@ class ShortDramaClient {
     String path,
     Map<String, dynamic> body, {
     bool skipAuth = false,
-    bool _retried = false,
+    bool retried = false,
   }) async {
     if (!skipAuth) await ensureLogin();
 
@@ -150,9 +150,9 @@ class ShortDramaClient {
           : (decoded is Map ? Map<String, dynamic>.from(decoded) : <String, dynamic>{'result': decoded});
 
       // Token expired -> refresh sekali lalu ulang.
-      if (!skipAuth && !_retried && _isTokenExpired(map)) {
+      if (!skipAuth && !retried && _isTokenExpired(map)) {
         await ensureLogin(force: true);
-        return post(path, body, skipAuth: skipAuth, _retried: true);
+        return post(path, body, skipAuth: skipAuth, retried: true);
       }
       return map;
     } finally {

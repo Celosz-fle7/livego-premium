@@ -47,9 +47,6 @@ class ShortDramaSource implements DramaSource {
 
   bool _channelsLoaded = false;
 
-  /// Cache hasil per kategori (server lambat & hasilnya statis).
-  final Map<String, List<ContentItem>> _categoryCache = {};
-
   /// Sesi device: muat token tersimpan, lalu pastikan token valid.
   bool _sessionReady = false;
 
@@ -288,7 +285,7 @@ class ShortDramaSource implements DramaSource {
 
   /// Ambil series_hash dari URL play (segmen setelah /series/).
   static String extractSeriesHash(String playUrl) {
-    final marker = '/series/';
+    const marker = '/series/';
     final idx = playUrl.indexOf(marker);
     if (idx < 0) return '';
     final rest = playUrl.substring(idx + marker.length);
@@ -298,7 +295,7 @@ class ShortDramaSource implements DramaSource {
 
   /// Ambil bahasa audio dari URL play: /series/{hash}/translated/{lang}/{ep}.mp4
   static String extractSeriesLang(String playUrl) {
-    final marker = '/translated/';
+    const marker = '/translated/';
     final idx = playUrl.indexOf(marker);
     if (idx < 0) return '';
     final rest = playUrl.substring(idx + marker.length);
