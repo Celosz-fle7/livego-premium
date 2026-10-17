@@ -42,15 +42,39 @@ class ShortDramaClient {
     _tokenAt = _token.isEmpty ? null : DateTime.now();
   }
 
+  /// Future login yang sedang berjalan (cegah login dobel bersamaan).
+  Future<void>? _loginInFlight;
+
   /// Pastikan punya token device yang valid.
   ///
   /// Meniru APK: token didapat otomatis dari POST /api/public/init
   /// (user_info.token, login_type=0 = device login). Token di-refresh
   /// kalau belum ada, sudah lewat TTL, atau server bilang expired.
+  ///
+  /// Kalau sudah ada token (walau belum lewat TTL), TIDAK memblokir:
+  /// request tetap jalan pakai token lama, refresh berjalan di belakang.
   Future<void> ensureLogin({bool force = false}) async {
-    if (!force && _token.isNotEmpty && _tokenAt != null) {
-      if (DateTime.now().difference(_tokenAt!) < _tokenTtl) return;
+    final hasToken = _token.isNotEmpty && _tokenAt != null;
+    final fresh = hasToken && DateTime.now().difference(_tokenAt!) < _tokenTtl;
+    if (!force && fresh) return;
+
+    // Sudah ada login berjalan -> tunggu yang itu, jangan mulai baru.
+    final inFlight = _loginInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
     }
+
+    final future = _doLogin();
+    _loginInFlight = future;
+    try {
+      await future;
+    } finally {
+      _loginInFlight = null;
+    }
+  }
+
+  Future<void> _doLogin() async {
     try {
       final res = await post(
         ShortDramaConfig.epInit,

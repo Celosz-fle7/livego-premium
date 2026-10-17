@@ -64,8 +64,12 @@ class ShortDramaSource implements DramaSource {
 
   /// Muat token dari SharedPreferences (biar awet antar sesi) lalu
   /// pastikan token valid via /api/public/init.
+  ///
+  /// TIDAK PERNAH melempar exception: kegagalan login tidak boleh
+  /// mengosongkan feed (request tetap dicoba tanpa token).
   Future<void> _ensureSession() async {
     if (_sessionReady) return;
+    _sessionReady = true; // set lebih dulu agar tidak dobel
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_prefToken);
@@ -73,7 +77,9 @@ class ShortDramaSource implements DramaSource {
         _client.setToken(saved);
       }
     } catch (_) {}
-    await _client.ensureLogin();
+    try {
+      await _client.ensureLogin();
+    } catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_client.token.isNotEmpty) {
@@ -83,7 +89,6 @@ class ShortDramaSource implements DramaSource {
         await prefs.setString(_prefUserId, _client.userId);
       }
     } catch (_) {}
-    _sessionReady = true;
   }
 
   /// Muat daftar channel dari server sekali, isi _channelIds.
@@ -151,12 +156,12 @@ class ShortDramaSource implements DramaSource {
     final cached = _categoryCache[category];
     if (cached != null) return cached;
 
-    await _ensureChannels();
     final seen = <String>{};
     final out = <ContentItem>[];
     final filter = _filterFor(category);
 
     void addRaw(List<Map<String, dynamic>> raw) {
+      if (raw.isEmpty) return;
       _registerFromRaw(raw);
       for (final m in raw) {
         final id = '${m['id'] ?? m['vod_id'] ?? ''}';
@@ -168,47 +173,38 @@ class ShortDramaSource implements DramaSource {
       }
     }
 
-    // 1. vod_short/list_new (semua item punya play_url)
-    try {
-      addRaw(await _client.vodShortNewRaw());
-    } catch (_) {}
+    // Jalankan semua endpoint PARALEL. Kalau berurutan, total waktu bisa
+    // melewati timeout home (10s) dan feed jadi kosong.
+    final results = await Future.wait<List<Map<String, dynamic>>>([
+      _safe(() => _client.vodShortNewRaw()),
+      _safe(() => _client.newbieTopRaw()),
+      _safe(() => _client.screenRaw(
+            page: 1,
+            pageSize: 20,
+            audience: filter.audience,
+            background: filter.background,
+            sort: filter.sort,
+          )),
+      _safe(() => _client.hotSearchRaw()),
+    ]);
 
-    // 2. newbie_top (semua item punya play_url)
-    try {
-      addRaw(await _client.newbieTopRaw());
-    } catch (_) {}
-
-    // 3. search/screen + hot_search: hanya menambah kalau ada play_url
-    try {
-      addRaw(await _client.screenRaw(
-        page: 1,
-        pageSize: 20,
-        audience: filter.audience,
-        background: filter.background,
-        sort: filter.sort,
-      ));
-    } catch (_) {}
-
-    try {
-      addRaw(await _client.hotSearchRaw());
-    } catch (_) {}
-
-    // 4. channel/get_info kalau channel_id dikenal (biasanya gagal anonim)
-    final channelId = _channelIds[category];
-    if (channelId != null) {
-      try {
-        final res = await _client.channelInfo(
-          channelId: channelId,
-          page: 1,
-          pageSize: 20,
-          category: category,
-        );
-        addRaw(res.raw);
-      } catch (_) {}
+    for (final raw in results) {
+      addRaw(raw);
     }
 
     if (out.isNotEmpty) _categoryCache[category] = out;
     return out;
+  }
+
+  /// Jalankan request, kembalikan list kosong kalau gagal.
+  static Future<List<Map<String, dynamic>>> _safe(
+    Future<List<Map<String, dynamic>>> Function() run,
+  ) async {
+    try {
+      return await run();
+    } catch (_) {
+      return const <Map<String, dynamic>>[];
+    }
   }
 
   @override
