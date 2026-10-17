@@ -5,6 +5,7 @@ import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
 import '../drama_source.dart';
 import 'moviebox_client.dart';
+import 'moviebox_filters.dart';
 import 'moviebox_shorttv_seed.dart';
 
 /// Implementasi DramaSource untuk provider MovieBox / OneRoom.
@@ -86,8 +87,9 @@ class MovieBoxSource implements DramaSource {
           );
         }).toList();
 
-        _categoryItemsCache[normCat] = items;
-        return items;
+        final clean = MovieBoxFilters.stripAdult(items);
+        _categoryItemsCache[normCat] = clean;
+        return clean;
       }
     }
 
@@ -111,7 +113,7 @@ class MovieBoxSource implements DramaSource {
       }
 
       final opNorm = _normalizeCategory(title);
-      _categoryItemsCache[opNorm] = items;
+      _categoryItemsCache[opNorm] = MovieBoxFilters.stripAdult(items);
     }
 
     return _categoryItemsCache[normCat] ??
@@ -245,7 +247,7 @@ class MovieBoxSource implements DramaSource {
       }
     }
 
-    return matched;
+    return MovieBoxFilters.stripAdult(matched);
   }
 
   @override

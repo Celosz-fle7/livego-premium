@@ -50,4 +50,86 @@ class MovieBoxFilters {
     }
     return false;
   }
+
+  /// Penanda konten dewasa: kode produksi JAV, kata kunci eksplisit, dan
+  /// tag 18+ dari server. Server MovieBox sesekali menyelipkan judul seperti
+  /// ini ke feed umum, jadi item harus disaring sebelum ditampilkan.
+  static final RegExp _adultCodePattern = RegExp(
+    r'\b(?:[A-Z]{2,6})-?\d{2,5}\b',
+  );
+
+  static const List<String> _adultKeywords = [
+    'hardcore',
+    'porn',
+    'xxx',
+    'hentai',
+    'jav',
+    'uncensored',
+    'adult',
+    '18+',
+    '18 plus',
+    'erotic',
+    'nude',
+    'sex tape',
+    'onlyfans',
+    'bokep',
+    'telanjang',
+    'dewasa',
+    'mesum',
+    'cabul',
+  ];
+
+  /// Kode produksi yang dikenal (JAV) — dicocokkan apa adanya.
+  static const List<String> _knownAdultCodes = [
+    'meyd', 'vrtm', 'mimk', 'ssis', 'stars', 'abp', 'ipx', 'pred', 'jul',
+    'miaa', 'dasd', 'adn', 'shkd', 'rctd', 'waaa', 'mide', 'mifd', 'sone',
+    'snis', 'ssni', 'ofje', 'fsdss', 'start', 'hnd', 'jul', 'pppd', 'nkkd',
+    'nsps', 'mukd', 'gvh', 'hbad', 'saba', 'achj', 'cawd', 'dvdms', 'mogi',
+  ];
+
+  /// True kalau item terindikasi konten dewasa dan harus disembunyikan.
+  static bool isAdult(ContentItem item) {
+    final hay =
+        '${item.tags.join(' ')} ${item.title} ${item.description} ${item.category}'.toLowerCase();
+
+    for (final k in _adultKeywords) {
+      if (hay.contains(k)) return true;
+    }
+
+    // Kode produksi JAV yang dikenal (mis. "meyd-528", "vrtm 345").
+    final lower = hay.replaceAll(RegExp(r'[\s_]+'), '-');
+    for (final code in _knownAdultCodes) {
+      if (RegExp('\\b$code-?\\d{2,5}\\b').hasMatch(lower)) return true;
+    }
+
+    // Pola umum kode produksi: 2-6 huruf kapital + 2-5 angka di judul asli.
+    final titleUpper = item.title.toUpperCase();
+    if (_adultCodePattern.hasMatch(titleUpper)) {
+      final m = _adultCodePattern.firstMatch(titleUpper);
+      final code = m?.group(0)?.toLowerCase().replaceAll('-', '') ?? '';
+      for (final known in _knownAdultCodes) {
+        if (code.startsWith(known)) return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Buang semua item yang terindikasi konten dewasa.
+  static List<ContentItem> stripAdult(List<ContentItem> items) {
+    final out = <ContentItem>[];
+    var dropped = 0;
+    for (final item in items) {
+      if (isAdult(item)) {
+        dropped++;
+        continue;
+      }
+      out.add(item);
+    }
+    if (dropped > 0) {
+      // ignore: avoid_print
+      print('MOVIEBOX FILTER: dropped $dropped adult item(s)');
+    }
+    return out;
+  }
 }
