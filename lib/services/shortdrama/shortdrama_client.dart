@@ -116,6 +116,38 @@ class ShortDramaClient {
 
   // === Endpoint ===
 
+  /// /api/search/screen -> feed besar (20 item) + filter audience/background/sort.
+  /// Server anonim mengabaikan filter & paginasi, jadi ini sumber utama
+  /// untuk memperbanyak konten per kategori.
+  Future<List<Map<String, dynamic>>> screenRaw({
+    int page = 1,
+    int pageSize = 20,
+    String? audience,
+    String? background,
+    String? sort,
+  }) async {
+    final body = <String, dynamic>{'pn': page, 'psize': pageSize};
+    if (audience != null && audience.isNotEmpty) body['audience'] = audience;
+    if (background != null && background.isNotEmpty) body['background'] = background;
+    if (sort != null && sort.isNotEmpty) body['sort'] = sort;
+    final res = await post(ShortDramaConfig.epSearchScreen, body);
+    if (!isOk(res)) return const [];
+    return resultList(res)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  /// /api/search/newbie_top -> 5 item.
+  Future<List<Map<String, dynamic>>> newbieTopRaw() async {
+    final res = await post(ShortDramaConfig.epSearchNewbieTop, {});
+    if (!isOk(res)) return const [];
+    return resultList(res)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   /// /api/channel/get_list -> daftar tab (id, channel_name, channel_type).
   Future<List<Map<String, dynamic>>> channelList() async {
     final res = await post(ShortDramaConfig.epChannelList, {});

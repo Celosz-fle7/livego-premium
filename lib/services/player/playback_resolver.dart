@@ -149,7 +149,9 @@ class PlaybackResolver {
       );
       final videoType = source.slug == 'melolo'
           ? (url.toLowerCase().contains('.m3u8') ? LiveGoVideoType.hls : LiveGoVideoType.cenc)
-          : LiveGoVideoType.hls;
+          : (source.slug == 'shortdrama' || source.slug == 'netshort')
+              ? LiveGoVideoType.mp4
+              : LiveGoVideoType.hls;
       return PlaybackSource.fromStreamInfo(
         stream: stream,
         platform: source.slug,

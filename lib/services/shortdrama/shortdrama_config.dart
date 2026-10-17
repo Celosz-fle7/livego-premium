@@ -59,6 +59,9 @@ class ShortDramaConfig {
   static const String epSearchResult = '/api/search/result';
   static const String epSearchSuggest = '/api/search/suggest';
   static const String epSearchHot = '/api/search/hot_search';
+  static const String epSearchScreen = '/api/search/screen';
+  static const String epSearchNewbieTop = '/api/search/newbie_top';
+  static const String epSearchRecommendNew = '/api/search/recommend_new';
   static const String epTopicList = '/api/topic/list';
   static const String epTopicVodList = '/api/topic/vod_list';
 

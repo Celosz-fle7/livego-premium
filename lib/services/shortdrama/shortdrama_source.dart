@@ -12,10 +12,14 @@ import 'shortdrama_config.dart';
 ///
 /// Alur (hasil reverse engineering APK com.shortdramatv.rlles):
 ///   1. /api/channel/get_list   -> tab bawaan
-///   2. /api/channel/get_info   -> feed per tab (paginasi pn/psize)
+///   2. /api/search/screen      -> feed besar (20 item) per kategori
 ///   3. /api/vod_short/list_new -> short drama + show_collection_play_url
-///   4. series_hash diambil dari play_url -> path episode
+///   4. series_hash + bahasa diambil dari play_url -> path episode
 ///   5. URL video di-sign sendiri: md5(key + path + wsTimeHex)
+///
+/// Catatan server: request anonim mengabaikan filter & paginasi
+/// (channel/get_info dan topic/vod_list butuh login), jadi konten
+/// digabung dari beberapa endpoint agar kategori tidak kosong.
 class ShortDramaSource implements DramaSource {
   final ShortDramaClient _client = ShortDramaClient.instance;
 
@@ -31,8 +35,14 @@ class ShortDramaSource implements DramaSource {
   /// seriesId -> total episode.
   final Map<String, int> _seriesTotal = {};
 
+  /// seriesId -> URL subtitle (srt) kalau ada.
+  final Map<String, String> _seriesSubtitle = {};
+
   /// "$seriesId:$episodeId" -> signed stream URL.
   final Map<String, String> _streamCache = {};
+
+  /// Cache hasil per kategori (server lambat & hasilnya statis).
+  final Map<String, List<ContentItem>> _categoryCache = {};
 
   bool _channelsLoaded = false;
 
@@ -60,11 +70,11 @@ class ShortDramaSource implements DramaSource {
       }
       _channelsLoaded = true;
     } catch (_) {
-      // biarkan; kategori fallback ke list_new
+      // biarkan; kategori fallback ke agregasi endpoint
     }
   }
 
-  /// Daftarkan series (hash + bahasa + total) dari item API mentah.
+  /// Daftarkan series (hash + bahasa + total + subtitle) dari item API mentah.
   void _registerFromRaw(List<Map<String, dynamic>> raw) {
     for (final m in raw) {
       final id = '${m['id'] ?? m['vod_id'] ?? ''}';
@@ -73,10 +83,100 @@ class ShortDramaSource implements DramaSource {
       final hash = extractSeriesHash(playUrl);
       final lang = extractSeriesLang(playUrl);
       final total = int.tryParse('${m['vod_total'] ?? m['vod_serial'] ?? 0}') ?? 0;
+      final srt = '${m['show_collection_srt_url'] ?? ''}';
       if (hash.isNotEmpty) _seriesHash[id] = hash;
       if (lang.isNotEmpty) _seriesLang[id] = lang;
       if (total > 0) _seriesTotal[id] = total;
+      if (srt.isNotEmpty) _seriesSubtitle[id] = srt;
     }
+  }
+
+  /// Pilih filter server sesuai nama kategori.
+  /// audience: Femenino/Masculino, background: Moderno/Fantasía/Histórico,
+  /// sort: hot/new. Server anonim kadang mengabaikan, tapi tetap dikirim
+  /// supaya kalau nanti login, hasilnya sudah benar.
+  ({String? audience, String? background, String? sort}) _filterFor(String category) {
+    switch (category) {
+      case 'Wanita':
+        return (audience: 'Femenino', background: null, sort: null);
+      case 'Pria':
+        return (audience: 'Masculino', background: null, sort: null);
+      case 'Peringkat':
+        return (audience: null, background: null, sort: 'hot');
+      case 'Rilis Baru':
+        return (audience: null, background: null, sort: 'new');
+      default:
+        return (audience: null, background: null, sort: null);
+    }
+  }
+
+  /// Ambil konten satu kategori dari beberapa endpoint, gabung tanpa duplikat.
+  ///
+  /// PENTING: hanya item dengan `show_collection_play_url` yang bisa diputar
+  /// (item dari screen/hot_search tidak punya hash dan endpoint detail butuh
+  /// login). Item tanpa play_url dibuang supaya tidak error saat diklik.
+  Future<List<ContentItem>> _fetchCategory(String category) async {
+    final cached = _categoryCache[category];
+    if (cached != null) return cached;
+
+    await _ensureChannels();
+    final seen = <String>{};
+    final out = <ContentItem>[];
+    final filter = _filterFor(category);
+
+    void addRaw(List<Map<String, dynamic>> raw) {
+      _registerFromRaw(raw);
+      for (final m in raw) {
+        final id = '${m['id'] ?? m['vod_id'] ?? ''}';
+        if (id.isEmpty) continue;
+        if (!_seriesHash.containsKey(id)) continue; // hanya yang playable
+        if (!seen.add(id)) continue;
+        final items = _client.mapAll([m], category);
+        if (items.isNotEmpty) out.add(items.first);
+      }
+    }
+
+    // 1. vod_short/list_new (semua item punya play_url)
+    try {
+      addRaw(await _client.vodShortNewRaw());
+    } catch (_) {}
+
+    // 2. newbie_top (semua item punya play_url)
+    try {
+      addRaw(await _client.newbieTopRaw());
+    } catch (_) {}
+
+    // 3. search/screen + hot_search: hanya menambah kalau ada play_url
+    try {
+      addRaw(await _client.screenRaw(
+        page: 1,
+        pageSize: 20,
+        audience: filter.audience,
+        background: filter.background,
+        sort: filter.sort,
+      ));
+    } catch (_) {}
+
+    try {
+      addRaw(await _client.hotSearchRaw());
+    } catch (_) {}
+
+    // 4. channel/get_info kalau channel_id dikenal (biasanya gagal anonim)
+    final channelId = _channelIds[category];
+    if (channelId != null) {
+      try {
+        final res = await _client.channelInfo(
+          channelId: channelId,
+          page: 1,
+          pageSize: 20,
+          category: category,
+        );
+        addRaw(res.raw);
+      } catch (_) {}
+    }
+
+    if (out.isNotEmpty) _categoryCache[category] = out;
+    return out;
   }
 
   @override
@@ -91,35 +191,14 @@ class ShortDramaSource implements DramaSource {
     int page = 1,
     int pageSize = 30,
   }) async {
-    await _ensureChannels();
+    final all = await _fetchCategory(category);
+    if (all.isEmpty) return (items: <ContentItem>[], hasMore: false);
 
-    final channelId = _channelIds[category];
-    if (channelId != null) {
-      try {
-        final res = await _client.channelInfo(
-          channelId: channelId,
-          page: page,
-          pageSize: pageSize,
-          category: category,
-        );
-        if (res.items.isNotEmpty) {
-          _registerFromRaw(res.raw);
-          return (items: res.items, hasMore: res.hasMore);
-        }
-      } catch (_) {}
-    }
-
-    // Fallback: halaman 1 pakai list_new (tanpa paginasi server).
-    if (page <= 1) {
-      try {
-        final raw = await _client.vodShortNewRaw();
-        if (raw.isNotEmpty) {
-          _registerFromRaw(raw);
-          return (items: _client.mapAll(raw, category), hasMore: false);
-        }
-      } catch (_) {}
-    }
-    return (items: <ContentItem>[], hasMore: false);
+    // Server anonim tidak mendukung paginasi -> potong lokal.
+    final start = (page - 1) * pageSize;
+    if (start >= all.length) return (items: <ContentItem>[], hasMore: false);
+    final end = (start + pageSize).clamp(0, all.length);
+    return (items: all.sublist(start, end), hasMore: end < all.length);
   }
 
   @override
@@ -202,16 +281,44 @@ class ShortDramaSource implements DramaSource {
 
   @override
   Future<DramaEpisodeExtras?> episodeExtras(String seriesId, String episodeId) async {
-    return const DramaEpisodeExtras(
-      subtitles: [],
-      qualities: [DramaQuality(label: 'AUTO', resolution: 'auto')],
-      audioLanguages: ['id'],
+    final lang = _seriesLang[seriesId] ?? ShortDramaConfig.videoLang;
+    final srt = _seriesSubtitle[seriesId];
+
+    final subtitles = <DramaSubtitle>[];
+    if (srt != null && srt.isNotEmpty) {
+      subtitles.add(DramaSubtitle(
+        language: lang,
+        displayName: _langName(lang),
+        url: srt,
+      ));
+    }
+
+    return DramaEpisodeExtras(
+      subtitles: subtitles,
+      // CDN hanya menyediakan satu berkas MP4 (tanpa varian 720p/1080p).
+      qualities: const [DramaQuality(label: 'AUTO', resolution: 'auto')],
+      // "Audio track" = bahasa audio yang tersedia di CDN.
+      audioLanguages: [_langName(lang)],
       unlocked: true,
     );
+  }
+
+  static String _langName(String code) {
+    switch (code) {
+      case 'id':
+        return 'Indonesia';
+      case 'es':
+        return 'Español';
+      case 'en':
+        return 'English';
+      default:
+        return code.toUpperCase();
+    }
   }
 
   @override
   Future<void> signOut() async {
     _streamCache.clear();
+    _categoryCache.clear();
   }
 }
