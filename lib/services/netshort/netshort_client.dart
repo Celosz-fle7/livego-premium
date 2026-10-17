@@ -4,6 +4,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'netshort_config.dart';
 import 'netshort_crypto.dart';
 
@@ -15,29 +17,58 @@ class NetShortClient {
 
   NetShortClient._();
 
+  static const String _prefDeviceCode = 'netshort_device_code';
+
   String _token = '';
   String _deviceCode = '';
   String _theaterId = '';
   String _jsonParam = '';
   List<Map<String, dynamic>> _channels = [];
+  bool _deviceCodeLoaded = false;
 
   bool get hasSession => _token.isNotEmpty;
 
   void signOut() {
     _token = '';
     _deviceCode = '';
+    _deviceCodeLoaded = false;
     _theaterId = '';
     _jsonParam = '';
     _channels = [];
   }
 
-  /// Generate deviceCode 16-hex jika belum ada
-  String _getDeviceCode() {
-    if (_deviceCode.isNotEmpty) return _deviceCode;
-    final rnd = Random();
-    final bytes = List<int>.generate(8, (_) => rnd.nextInt(256));
-    _deviceCode = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return _deviceCode;
+  /// Muat atau generate deviceCode 16-hex persisten
+  Future<String> _ensureDeviceCode() async {
+    if (_deviceCodeLoaded && _deviceCode.isNotEmpty) return _deviceCode;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var saved = prefs.getString(_prefDeviceCode);
+      if (saved == null || saved.isEmpty) {
+        final rnd = Random.secure();
+        final bytes = List<int>.generate(8, (_) => rnd.nextInt(256));
+        saved = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+        await prefs.setString(_prefDeviceCode, saved);
+      }
+      _deviceCode = saved;
+      _deviceCodeLoaded = true;
+      return _deviceCode;
+    } catch (_) {
+      if (_deviceCode.isEmpty) {
+        final rnd = Random();
+        final bytes = List<int>.generate(8, (_) => rnd.nextInt(256));
+        _deviceCode = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      }
+      return _deviceCode;
+    }
+  }
+
+  Future<void> _resetDeviceCode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefDeviceCode);
+    } catch (_) {}
+    _deviceCode = '';
+    _deviceCodeLoaded = false;
   }
 
   /// Pastikan token aktif via /auth/login (visitor)
@@ -46,24 +77,35 @@ class NetShortClient {
       return _token;
     }
 
-    final devCode = _getDeviceCode();
-    final payload = {
-      'deviceCode': devCode,
-      'deviceId': null,
-      'model': NetShortConfig.defaultModel,
-      'os': 'Android',
-      'osVer': NetShortConfig.defaultOsVer,
-      'appVer': NetShortConfig.appVersion,
-      'source': 'visitor',
-    };
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      final devCode = await _ensureDeviceCode();
+      final payload = {
+        'deviceCode': devCode,
+        'deviceId': null,
+        'model': NetShortConfig.defaultModel,
+        'os': 'Android',
+        'osVer': NetShortConfig.defaultOsVer,
+        'appVer': NetShortConfig.appVersion,
+        'source': 'visitor',
+      };
 
-    final resp = await _rawPost(NetShortConfig.authLogin, payload, requiresAuth: false);
-    if (resp['code'] == 200 && resp['data'] != null) {
-      final data = resp['data'] as Map<String, dynamic>;
-      _token = data['token']?.toString() ?? '';
-      return _token;
+      final resp = await _rawPost(NetShortConfig.authLogin, payload, requiresAuth: false);
+      if (resp['code'] == 200 && resp['data'] != null) {
+        final data = resp['data'] as Map<String, dynamic>;
+        _token = data['token']?.toString() ?? '';
+        if (_token.isNotEmpty) {
+          return _token;
+        }
+      }
+
+      // Jika gagal login karena deviceCode ditolak server, reset dan coba lagi sekali
+      if (attempt < 2) {
+        await _resetDeviceCode();
+      } else {
+        throw StateError('NetShort visitor login gagal: ${resp['msg']}');
+      }
     }
-    throw StateError('NetShort visitor login gagal: ${resp['msg']}');
+    throw StateError('NetShort visitor login gagal');
   }
 
   /// Ambil info Home Theater & channels
@@ -247,7 +289,7 @@ class NetShortClient {
     String? token,
     bool requiresAuth = true,
   }) async {
-    final devCode = _getDeviceCode();
+    final devCode = await _ensureDeviceCode();
     final aesKey = NetShortCrypto.generateAesKey();
     final encKeyHeader = NetShortCrypto.rsaEncrypt(Uint8List.fromList(utf8.encode(base64.encode(utf8.encode(aesKey)))));
     final jsonStr = jsonEncode(bodyJson);
