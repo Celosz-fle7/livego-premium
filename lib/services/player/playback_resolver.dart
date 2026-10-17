@@ -221,10 +221,13 @@ class PlaybackResolver {
       final effectiveTimeout = (dramaSource.slug == 'melolo' ||
               dramaSource.slug == 'shorttv' ||
               dramaSource.slug == 'shortmax' ||
+              dramaSource.slug == 'shortdrama' ||
               dramaSource.slug == 'netshort')
           ? const Duration(seconds: 15)
           : timeout;
-      final videoType = (dramaSource.slug == 'melolo' || dramaSource.slug == 'netshort')
+      final videoType = (dramaSource.slug == 'melolo' ||
+              dramaSource.slug == 'netshort' ||
+              dramaSource.slug == 'shortdrama')
           ? LiveGoVideoType.mp4
           : LiveGoVideoType.hls;
       return _resolveFromDramaSource(dramaSource, item, chapterId: chapterId)

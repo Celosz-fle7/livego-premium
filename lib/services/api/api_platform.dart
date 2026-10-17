@@ -194,6 +194,28 @@ class LiveGoApiPlatforms {
         'Romantis Perkotaan',
       ],
     ),
+    LiveGoApiPlatform(
+      slug: 'shortdrama',
+      endpointSlug: 'shortdrama',
+      name: 'ShortDrama',
+      backend: LiveGoApiBackend.direct,
+      defaultLang: 'id',
+      searchParam: 'kw',
+      videoType: LiveGoVideoType.mp4,
+      supportedLangs: ['id'],
+      enabledByDefault: true,
+      supportsSubtitle: false,
+      streamFromAllEpisodes: true,
+      categories: [
+        'Populer',
+        'Rilis Baru',
+        'Sulih Suara',
+        'Peringkat',
+        'Kategori',
+        'Wanita',
+        'Pria',
+      ],
+    ),
   ];
 
   static const List<String> tvStarterSlugs = <String>[
@@ -203,6 +225,7 @@ class LiveGoApiPlatforms {
     'shorttv',
     'moviebox',
     'netshort',
+    'shortdrama',
   ];
 
   static List<String> get supportedSlugs =>

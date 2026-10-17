@@ -42,6 +42,7 @@ class TvSourceManagerConfig {
     'shorttv': 3,
     'moviebox': 4,
     'netshort': 5,
+    'shortdrama': 6,
   };
 
   static int sourcePriority(String slug) {

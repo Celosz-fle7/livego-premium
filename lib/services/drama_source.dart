@@ -3,6 +3,7 @@ import 'freereels/freereels_source.dart';
 import 'melolo/melolo_source.dart';
 import 'moviebox/moviebox_source.dart';
 import 'netshort/netshort_source.dart';
+import 'shortdrama/shortdrama_source.dart';
 import 'shorttv/shorttv_source.dart';
 
 import '../models/content_item.dart';
@@ -138,6 +139,7 @@ class DramaSourceRegistry {
     'shortmax': ShortTvSource(),
     'moviebox': MovieBoxSource(),
     'netshort': NetShortSource(),
+    'shortdrama': ShortDramaSource(),
   };
 
   static void register(DramaSource source) {

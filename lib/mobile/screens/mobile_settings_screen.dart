@@ -587,6 +587,7 @@ class _SourceManagerScreenState extends State<SourceManagerScreen> {
       'shorttv': 'ShortTV • Drama pendek vertikal multi-bahasa.',
       'moviebox': 'MovieBox • Ribuan Short TV, Drama & Movies direct CDN.',
       'netshort': 'NetShort • Drama pendek populer & viral direct CDN.',
+      'shortdrama': 'ShortDrama • Drama pendek Indonesia & sulih suara direct CDN.',
     };
     return map[slug] ?? 'Source LiveGo siap dikoneksikan ke player.';
   }
