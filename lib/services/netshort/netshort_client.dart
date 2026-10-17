@@ -180,6 +180,7 @@ class NetShortClient {
     final resp = await _rawPost(NetShortConfig.tabLoadAllChart, payload, token: token);
     if (resp['code'] == 200 && resp['data'] != null) {
       final data = resp['data'] as Map<String, dynamic>;
+      final List<Map<String, dynamic>> items = [];
       for (final key in ['mostTrending', 'topSearch', 'newRelease']) {
         final val = data[key];
         if (val is List) {
