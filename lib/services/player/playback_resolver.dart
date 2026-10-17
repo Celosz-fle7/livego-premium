@@ -149,9 +149,13 @@ class PlaybackResolver {
       );
       final videoType = source.slug == 'melolo'
           ? (url.toLowerCase().contains('.m3u8') ? LiveGoVideoType.hls : LiveGoVideoType.cenc)
-          : (source.slug == 'shortdrama' || source.slug == 'netshort')
+          : (source.slug == 'shortdrama' ||
+                  source.slug == 'netshort' ||
+                  source.slug == 'moviebox' ||
+                  source.slug == 'livegodrama' ||
+                  url.toLowerCase().contains('.mp4'))
               ? LiveGoVideoType.mp4
-              : LiveGoVideoType.hls;
+              : (url.toLowerCase().contains('.m3u8') ? LiveGoVideoType.hls : LiveGoVideoType.mp4);
       return PlaybackSource.fromStreamInfo(
         stream: stream,
         platform: source.slug,
@@ -166,13 +170,17 @@ class PlaybackResolver {
     } catch (e, st) {
       // ignore: avoid_print
       print('LIVEGO PlaybackResolver error on ${source.slug}: $e\n$st');
+      final fallbackType = (source.slug == 'shortdrama' ||
+              source.slug == 'netshort' ||
+              source.slug == 'moviebox' ||
+              source.slug == 'livegodrama')
+          ? LiveGoVideoType.mp4
+          : LiveGoVideoType.hls;
       return PlaybackSource.empty(
         platform: source.slug,
         dramaId: item.id,
         episodeNumber: ep,
-        videoType: source.slug == 'melolo'
-            ? LiveGoVideoType.mp4
-            : LiveGoVideoType.hls,
+        videoType: fallbackType,
       );
     }
   }
@@ -224,12 +232,16 @@ class PlaybackResolver {
               dramaSource.slug == 'shorttv' ||
               dramaSource.slug == 'shortmax' ||
               dramaSource.slug == 'shortdrama' ||
-              dramaSource.slug == 'netshort')
+              dramaSource.slug == 'netshort' ||
+              dramaSource.slug == 'moviebox' ||
+              dramaSource.slug == 'livegodrama')
           ? const Duration(seconds: 15)
           : timeout;
       final videoType = (dramaSource.slug == 'melolo' ||
               dramaSource.slug == 'netshort' ||
-              dramaSource.slug == 'shortdrama')
+              dramaSource.slug == 'shortdrama' ||
+              dramaSource.slug == 'moviebox' ||
+              dramaSource.slug == 'livegodrama')
           ? LiveGoVideoType.mp4
           : LiveGoVideoType.hls;
       return _resolveFromDramaSource(dramaSource, item, chapterId: chapterId)

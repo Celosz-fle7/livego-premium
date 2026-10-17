@@ -7,7 +7,7 @@ import '../drama_source.dart';
 import 'moviebox_client.dart';
 import 'moviebox_filters.dart';
 
-/// Provider Livego-drama untuk LiveGO (Movie & TV Series).
+/// Provider Movie untuk LiveGO (Movie & TV Series).
 /// Menggantikan CinemaID dengan katalog film layar lebar bioskop, serial TV / drakor,
 /// anime, dan video musik dengan direct stream MP4 multi-resolusi serta subtitle SRT.
 class LivegoDramaSource implements DramaSource {
@@ -25,13 +25,16 @@ class LivegoDramaSource implements DramaSource {
   /// Cache metadata resource per seriesId
   final Map<String, Map<String, dynamic>> _resourceCache = {};
 
+  /// Cache daftar episode per seriesId
+  final Map<String, List<LiveGoEpisode>> _episodesCache = {};
+
   MovieBoxClient get client => _client;
 
   @override
   String get slug => 'livegodrama';
 
   @override
-  String get label => 'Livego-drama';
+  String get label => 'Movie';
 
   @override
   List<String> get categories => const [
@@ -130,10 +133,14 @@ class LivegoDramaSource implements DramaSource {
     _extrasCache.clear();
     _streamCache.clear();
     _resourceCache.clear();
+    _episodesCache.clear();
   }
 
   @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
+    final cached = _episodesCache[seriesId];
+    if (cached != null && cached.isNotEmpty) return cached;
+
     try {
       final resData = await _client.fetchSubjectResource(seriesId);
       _resourceCache[seriesId] = resData;
@@ -141,15 +148,31 @@ class LivegoDramaSource implements DramaSource {
       final rawList = resData['list'] as List<dynamic>? ?? [];
       final subjectType = (resData['subjectType'] as num?)?.toInt() ?? 1;
 
-      // Jika Movie (subjectType == 1), kembalikan 1 episode "Full Movie"
+      // Jika Movie (subjectType == 1) atau single video
       if (subjectType == 1 || rawList.isEmpty || (rawList.length == 1 && rawList.first['episode'] == 0)) {
-        return [
+        // Pre-fetch play-info untuk stream movie agar streamUrl instan
+        final streams = await _client.fetchPlayInfo(seriesId);
+        String movieUrl = '';
+        if (streams.isNotEmpty) {
+          movieUrl = (streams.first['url'] as String?)?.trim() ?? '';
+        }
+        if (movieUrl.isEmpty && rawList.isNotEmpty) {
+          movieUrl = (rawList.first['resourceLink'] as String?)?.trim() ?? '';
+        }
+        if (movieUrl.isNotEmpty) {
+          _streamCache['$seriesId:1'] = movieUrl;
+          _streamCache['$seriesId:full_movie'] = movieUrl;
+        }
+
+        final list = [
           LiveGoEpisode(
-            id: 'full_movie',
+            id: '1',
             index: 1,
             title: 'Full Movie',
           )
         ];
+        _episodesCache[seriesId] = list;
+        return list;
       }
 
       // Jika Series / TV Show (subjectType == 2)
@@ -169,10 +192,12 @@ class LivegoDramaSource implements DramaSource {
         final resLink = (item['resourceLink'] as String?)?.trim() ?? '';
         if (resLink.isNotEmpty) {
           _streamCache['$seriesId:$resId'] = resLink;
+          _streamCache['$seriesId:$epNum'] = resLink;
         }
       }
 
       if (episodes.isNotEmpty) {
+        _episodesCache[seriesId] = episodes;
         return episodes;
       }
     } catch (e) {
@@ -188,16 +213,14 @@ class LivegoDramaSource implements DramaSource {
     required String episodeId,
     String? quality,
   }) async {
-    // 1. Cek direct stream cache dari resource link
     final cacheKey = '$seriesId:$episodeId';
-    final cached = _streamCache[cacheKey];
+    final cached = _streamCache[cacheKey] ?? _streamCache['$seriesId:1'];
     if (cached != null && cached.isNotEmpty) return cached;
 
     try {
-      // 2. Ambil dari play-info (multi-resolusi streams)
+      // 1. Ambil dari play-info (multi-resolusi streams)
       final streams = await _client.fetchPlayInfo(seriesId);
       if (streams.isNotEmpty) {
-        // Cari resolusi yang cocok dengan preferensi quality user (misal 720, 1080, 480)
         Map<String, dynamic>? selectedStream;
         if (quality != null && quality.isNotEmpty) {
           final targetQ = quality.replaceAll(RegExp(r'[^0-9]'), '');
@@ -209,26 +232,35 @@ class LivegoDramaSource implements DramaSource {
             }
           }
         }
-
-        // Fallback: ambil stream dengan resolusi terbaik atau stream pertama
         selectedStream ??= streams.first;
         final url = (selectedStream['url'] as String?)?.trim() ?? '';
         if (url.isNotEmpty) {
           _streamCache[cacheKey] = url;
+          _streamCache['$seriesId:1'] = url;
           return url;
         }
       }
 
-      // 3. Fallback: ambil dari fetchSubjectResource
+      // 2. Fallback: ambil dari fetchSubjectResource
       final resData = _resourceCache[seriesId] ?? await _client.fetchSubjectResource(seriesId);
       final rawList = resData['list'] as List<dynamic>? ?? [];
       for (final r in rawList) {
         if (r is Map<String, dynamic>) {
-          final link = (r['resourceLink'] as String?)?.trim() ?? '';
-          if (link.isNotEmpty) {
-            _streamCache[cacheKey] = link;
-            return link;
+          final resId = '${r['resourceId'] ?? r['id'] ?? r['episode']}';
+          if (resId == episodeId || episodeId == '1' || episodeId == 'full_movie') {
+            final link = (r['resourceLink'] as String?)?.trim() ?? '';
+            if (link.isNotEmpty) {
+              _streamCache[cacheKey] = link;
+              return link;
+            }
           }
+        }
+      }
+      if (rawList.isNotEmpty && rawList.first is Map<String, dynamic>) {
+        final link = (rawList.first['resourceLink'] as String?)?.trim() ?? '';
+        if (link.isNotEmpty) {
+          _streamCache[cacheKey] = link;
+          return link;
         }
       }
     } catch (e) {
@@ -307,7 +339,6 @@ class LivegoDramaSource implements DramaSource {
       final items = <ContentItem>[];
       for (final r in results) {
         final sType = (r['subjectType'] as num?)?.toInt() ?? 1;
-        // Ambil Movies (1), TV Series (2), Musik (6), Anime (8)
         if (sType != 7) {
           items.add(_mapSubjectToContentItem(r, 'Pencarian'));
         }
@@ -338,7 +369,7 @@ class LivegoDramaSource implements DramaSource {
     return ContentItem(
       id: id,
       title: title,
-      source: 'Livego-drama',
+      source: 'Movie',
       category: category,
       description: desc,
       posterUrl: coverUrl,

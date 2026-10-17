@@ -210,14 +210,15 @@ class MovieBoxClient {
     return {};
   }
 
-  /// Ambil daftar episode dan URL stream Short TV
+  /// Ambil daftar episode dan URL stream Short TV (maksimal 20 episode per request agar tidak 400)
   Future<List<Map<String, dynamic>>> fetchShortEpisodes(
     String subjectId, {
     int startPosition = 1,
-    int endPosition = 100,
+    int endPosition = 20,
   }) async {
+    final safeEnd = (endPosition - startPosition >= 20) ? (startPosition + 19) : endPosition;
     final path =
-        '/wefeed-mobile-bff/shorts/mini-list?endPosition=$endPosition&pagerMode=1&startPosition=$startPosition&subjectId=$subjectId';
+        '/wefeed-mobile-bff/shorts/mini-list?endPosition=$safeEnd&pagerMode=1&startPosition=$startPosition&subjectId=$subjectId';
     final resp = await _rawRequest('GET', path);
     if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
       final items = resp['data']['items'];

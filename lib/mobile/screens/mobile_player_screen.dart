@@ -116,12 +116,14 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen> {
     // First playback must not wait for detail/allepisode. Tembak /episode
     // singkat dulu; kalau kosong baru fallback normal. Metadata tetap di-warm
     // lewat _warmEpisodeMetadata() dan tidak menahan video jalan.
-    final isMelolo = widget.item.platformSlug == 'melolo';
-    final initialTimeout = isMelolo
+    final isSlowSource = widget.item.platformSlug == 'melolo' ||
+        widget.item.platformSlug == 'moviebox' ||
+        widget.item.platformSlug == 'livegodrama';
+    final initialTimeout = isSlowSource
         ? const Duration(seconds: 15)
         : PlaybackTimeoutConfig.directEpisode;
-    final fallbackTimeout = isMelolo
-        ? const Duration(seconds: 15)
+    final fallbackTimeout = isSlowSource
+        ? const Duration(seconds: 18)
         : PlaybackTimeoutConfig.fallbackStream;
 
     var stream = await LiveGoCatalog.fastStreamInfo(

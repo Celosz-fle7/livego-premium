@@ -136,7 +136,7 @@ class LiveGoApiPlatforms {
     LiveGoApiPlatform(
       slug: 'moviebox',
       endpointSlug: 'moviebox',
-      name: 'MovieBox',
+      name: 'Livego',
       backend: LiveGoApiBackend.direct,
       defaultLang: 'id',
       searchParam: 'keyword',
@@ -160,7 +160,7 @@ class LiveGoApiPlatforms {
     LiveGoApiPlatform(
       slug: 'livegodrama',
       endpointSlug: 'livegodrama',
-      name: 'Livego-drama',
+      name: 'Movie',
       backend: LiveGoApiBackend.direct,
       defaultLang: 'id',
       searchParam: 'keyword',

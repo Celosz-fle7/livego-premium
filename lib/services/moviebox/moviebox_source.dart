@@ -7,7 +7,7 @@ import '../drama_source.dart';
 import 'moviebox_client.dart';
 import 'moviebox_filters.dart';
 
-/// Adapter Provider MovieBox Short TV (Micro-drama vertikal episode 1-100).
+/// Adapter Provider Livego (MovieBox Short TV / Micro-drama vertikal episode 1-100).
 /// Mengambil data dari section Short TV (Tab 13) dan streaming langsung dari GoodShort/Vskit CDN.
 class MovieBoxSource implements DramaSource {
   final MovieBoxClient _client = MovieBoxClient.instance;
@@ -27,7 +27,7 @@ class MovieBoxSource implements DramaSource {
   String get slug => 'moviebox';
 
   @override
-  String get label => 'Short TV';
+  String get label => 'Livego';
 
   @override
   List<String> get categories => const [
@@ -54,7 +54,6 @@ class MovieBoxSource implements DramaSource {
       final data = await _client.fetchTabOperating(13);
       final rawItems = data['items'] as List<dynamic>? ?? [];
 
-      // Isi semua cache kategori dari response yang didapat sekaligus
       for (final raw in rawItems) {
         if (raw is! Map<String, dynamic>) continue;
         final title = (raw['title'] as String?)?.trim() ?? '';
@@ -71,7 +70,6 @@ class MovieBoxSource implements DramaSource {
         _categoryCache[title.toLowerCase()] = cleanItems;
       }
 
-      // Cari kategori yang cocok
       for (final entry in _categoryCache.entries) {
         if (entry.key == normCat ||
             entry.key.contains(normCat) ||
@@ -80,7 +78,6 @@ class MovieBoxSource implements DramaSource {
         }
       }
 
-      // Fallback: kembalikan item dari section pertama jika tidak ketemu persis
       if (_categoryCache.isNotEmpty) {
         return _categoryCache.values.first;
       }
@@ -132,39 +129,50 @@ class MovieBoxSource implements DramaSource {
     if (cached != null && cached.isNotEmpty) return cached;
 
     try {
-      // Ambil hingga 100 episode pertama
-      final rawEpisodes = await _client.fetchShortEpisodes(seriesId, startPosition: 1, endPosition: 100);
-      if (rawEpisodes.isNotEmpty) {
-        final list = <LiveGoEpisode>[];
-        for (var i = 0; i < rawEpisodes.length; i++) {
-          final epData = rawEpisodes[i];
-          final miniId = '${epData['miniId'] ?? epData['id'] ?? ''}';
-          final epNum = (epData['ep'] as num?)?.toInt() ?? (i + 1);
-          final title = 'Episode $epNum';
+      // 1. Ambil detail info drama untuk jumlah total episode
+      final info = await _client.fetchShortInfo(seriesId);
+      final totalEpRaw = info['totalEpisode'] ?? info['total'];
+      final totalEp = (totalEpRaw as num?)?.toInt() ?? 60;
 
-          if (miniId.isNotEmpty) {
-            list.add(LiveGoEpisode(id: miniId, index: epNum, title: title));
+      // 2. Ambil 20 episode pertama secara instan (server membatasi range maks 20 per request)
+      final rawEpisodes = await _client.fetchShortEpisodes(seriesId, startPosition: 1, endPosition: 20);
+      final list = <LiveGoEpisode>[];
 
-            // Simpan stream url ke cache
-            final videoMap = epData['video'] as Map<String, dynamic>?;
-            final addrMap = videoMap?['videoAddress'] as Map<String, dynamic>?;
-            final url = (addrMap?['url'] as String?)?.trim() ?? '';
-            if (url.isNotEmpty) {
-              _streamCache['$seriesId:$miniId'] = url;
-            }
+      for (var i = 0; i < rawEpisodes.length; i++) {
+        final epData = rawEpisodes[i];
+        final miniId = '${epData['miniId'] ?? epData['id'] ?? ''}';
+        final epNum = (epData['ep'] as num?)?.toInt() ?? (i + 1);
+        final title = 'Episode $epNum';
+
+        if (miniId.isNotEmpty) {
+          list.add(LiveGoEpisode(id: miniId, index: epNum, title: title));
+
+          final videoMap = epData['video'] as Map<String, dynamic>?;
+          final addrMap = videoMap?['videoAddress'] as Map<String, dynamic>?;
+          final url = (addrMap?['url'] as String?)?.trim() ?? '';
+          if (url.isNotEmpty) {
+            _streamCache['$seriesId:$miniId'] = url;
+            _streamCache['$seriesId:$epNum'] = url;
+            _streamCache['$seriesId:ep_$epNum'] = url;
           }
         }
+      }
 
-        if (list.isNotEmpty) {
-          _episodesCache[seriesId] = list;
-          return list;
+      // 3. Tambahkan sisa episode jika total > 20 sebagai stub agar episode picker lengkap
+      if (list.isNotEmpty && totalEp > list.length) {
+        for (var i = list.length + 1; i <= totalEp; i++) {
+          list.add(LiveGoEpisode(id: '$i', index: i, title: 'Episode $i'));
         }
+      }
+
+      if (list.isNotEmpty) {
+        _episodesCache[seriesId] = list;
+        return list;
       }
     } catch (e) {
       debugPrint('[MovieBoxSource] episodes error: $e');
     }
 
-    // Fallback minimal jika gagal network
     return [LiveGoEpisode(id: seriesId, index: 1, title: 'Episode 1')];
   }
 
@@ -179,9 +187,32 @@ class MovieBoxSource implements DramaSource {
     if (cached != null && cached.isNotEmpty) return cached;
 
     try {
-      // Refresh daftar episode untuk mendapatkan stream URL
-      await episodes(seriesId);
-      final refetched = _streamCache[cacheKey];
+      // Coba parse nomor episode (misal "1", "25", atau "ep_25")
+      final epNum = int.tryParse(episodeId.replaceAll(RegExp(r'[^0-9]'), ''));
+      if (epNum != null && epNum > 0 && epNum <= 200) {
+        final start = ((epNum - 1) ~/ 20) * 20 + 1;
+        final end = start + 19;
+        final pageEpisodes = await _client.fetchShortEpisodes(seriesId, startPosition: start, endPosition: end);
+        for (var i = 0; i < pageEpisodes.length; i++) {
+          final epData = pageEpisodes[i];
+          final miniId = '${epData['miniId'] ?? epData['id'] ?? ''}';
+          final epNo = (epData['ep'] as num?)?.toInt() ?? (start + i);
+          final videoMap = epData['video'] as Map<String, dynamic>?;
+          final addrMap = videoMap?['videoAddress'] as Map<String, dynamic>?;
+          final url = (addrMap?['url'] as String?)?.trim() ?? '';
+          if (url.isNotEmpty) {
+            _streamCache['$seriesId:$miniId'] = url;
+            _streamCache['$seriesId:$epNo'] = url;
+            _streamCache['$seriesId:ep_$epNo'] = url;
+          }
+        }
+      } else {
+        await episodes(seriesId);
+      }
+
+      final refetched = _streamCache[cacheKey] ??
+          (epNum != null ? _streamCache['$seriesId:$epNum'] : null) ??
+          _streamCache['$seriesId:1'];
       if (refetched != null && refetched.isNotEmpty) return refetched;
     } catch (e) {
       debugPrint('[MovieBoxSource] streamUrl error: $e');
@@ -199,7 +230,6 @@ class MovieBoxSource implements DramaSource {
       final results = await _client.search(q, page: 1, perPage: 20);
       final items = <ContentItem>[];
       for (final r in results) {
-        // Ambil Short TV (subjectType == 7) atau item dengan cover valid
         final sType = (r['subjectType'] as num?)?.toInt() ?? 0;
         if (sType == 7 || sType == 0) {
           items.add(_mapShortToContentItem(r, 'Pencarian'));
@@ -231,7 +261,7 @@ class MovieBoxSource implements DramaSource {
     return ContentItem(
       id: id,
       title: title,
-      source: 'MovieBox',
+      source: 'Livego',
       category: category,
       description: desc,
       posterUrl: coverUrl,
