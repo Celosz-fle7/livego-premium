@@ -39,8 +39,11 @@ class ShortDramaClient {
 
   /// Muat device ID persisten, atau buat baru kalau belum ada.
   /// Dipanggil sebelum login pertama.
+  ///
+  /// SELALU dijalankan (bukan cuma saat masih default): kalau device_id
+  /// sudah pernah dimuat dari prefs, cukup return cepat.
   Future<void> _ensureDeviceId() async {
-    if (_deviceId != ShortDramaConfig.defaultDeviceId) return;
+    if (_deviceIdLoaded) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       var saved = prefs.getString(_prefDeviceId);
@@ -52,10 +55,14 @@ class ShortDramaClient {
         await prefs.setString(_prefDeviceId, saved);
       }
       _deviceId = saved;
+      _deviceIdLoaded = true;
     } catch (_) {
       // Fallback: pakai default kalau SharedPreferences gagal.
     }
   }
+
+  /// Device ID sudah dimuat dari prefs?
+  bool _deviceIdLoaded = false;
 
   String get host => _host;
   String get deviceId => _deviceId;
@@ -67,9 +74,16 @@ class ShortDramaClient {
     if (clean.isNotEmpty) _deviceId = clean;
   }
 
+  /// Set token dari penyimpanan (restore sesi lama).
+  ///
+  /// PENTING: token hasil restore TIDAK dianggap fresh — `_tokenAt` sengaja
+  /// dikosongkan supaya `ensureLogin()` tetap jalan dan memastikan
+  /// device_id unik + token valid dari server. Kalau token lama dianggap
+  /// fresh, login tidak pernah jalan, device_id tetap default (hardcoded),
+  /// dan semua HP bentrok jadi satu device -> konten kosong.
   void setToken(String token) {
     _token = token.trim();
-    _tokenAt = _token.isEmpty ? null : DateTime.now();
+    _tokenAt = null;
   }
 
   /// Future login yang sedang berjalan (cegah login dobel bersamaan).
@@ -81,9 +95,11 @@ class ShortDramaClient {
   /// (user_info.token, login_type=0 = device login). Token di-refresh
   /// kalau belum ada, sudah lewat TTL, atau server bilang expired.
   ///
-  /// Kalau sudah ada token (walau belum lewat TTL), TIDAK memblokir:
-  /// request tetap jalan pakai token lama, refresh berjalan di belakang.
+  /// Device ID SELALU dipastikan lebih dulu — kalau tidak, device_id tetap
+  /// default (hardcoded) dan semua HP bentrok jadi satu device.
   Future<void> ensureLogin({bool force = false}) async {
+    await _ensureDeviceId();
+
     final hasToken = _token.isNotEmpty && _tokenAt != null;
     final fresh = hasToken && DateTime.now().difference(_tokenAt!) < _tokenTtl;
     if (!force && fresh) return;
