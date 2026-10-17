@@ -43,8 +43,11 @@ class LivegoDramaSource implements DramaSource {
         'Film',
         'TV/Serial',
         'Anime',
-        'Musik',
+        'Indonesia',
         'Anak-anak',
+        'Pendidikan',
+        'Musik',
+        'Permainan',
       ];
 
   static const Map<String, int> _tabMapping = {
@@ -54,8 +57,11 @@ class LivegoDramaSource implements DramaSource {
     'tv/serial': 5,
     'serial': 5,
     'anime': 8,
-    'musik': 4,
+    'indonesia': 29,
     'anak-anak': 23,
+    'pendidikan': 3,
+    'musik': 4,
+    'permainan': 11,
   };
 
   @override
@@ -63,6 +69,35 @@ class LivegoDramaSource implements DramaSource {
     final normCat = category.trim().toLowerCase();
     if (_categoryCache.containsKey(normCat) && _categoryCache[normCat]!.isNotEmpty) {
       return _categoryCache[normCat]!;
+    }
+
+    // 1. Jika Film, TV/Serial, atau Anime, gunakan master list API langsung untuk katalog penuh
+    int? directSubjectType;
+    if (normCat == 'film') directSubjectType = 1;
+    if (normCat == 'tv/serial' || normCat == 'serial') directSubjectType = 2;
+    if (normCat == 'anime') directSubjectType = 8;
+
+    if (directSubjectType != null) {
+      try {
+        final listRes = await _client.fetchSubjectList(
+          subjectType: directSubjectType,
+          sort: 'Terpanas',
+          page: 1,
+          perPage: 30,
+        );
+        final items = listRes.items
+            .map((s) => _mapSubjectToContentItem(s, category))
+            .where((item) => item.id.isNotEmpty)
+            .toList();
+
+        final cleanItems = _dedupe(MovieBoxFilters.stripAdult(items));
+        if (cleanItems.isNotEmpty) {
+          _categoryCache[normCat] = cleanItems;
+          return cleanItems;
+        }
+      } catch (e) {
+        debugPrint('[LivegoDramaSource] fetchSubjectList for $normCat error: $e');
+      }
     }
 
     final tabId = _tabMapping[normCat] ?? 0;
@@ -116,6 +151,32 @@ class LivegoDramaSource implements DramaSource {
     int page = 1,
     int pageSize = 30,
   }) async {
+    final normCat = category.trim().toLowerCase();
+    int? directSubjectType;
+    if (normCat == 'film') directSubjectType = 1;
+    if (normCat == 'tv/serial' || normCat == 'serial') directSubjectType = 2;
+    if (normCat == 'anime') directSubjectType = 8;
+
+    if (directSubjectType != null) {
+      try {
+        final listRes = await _client.fetchSubjectList(
+          subjectType: directSubjectType,
+          sort: 'Terpanas',
+          page: page,
+          perPage: pageSize,
+        );
+        final items = _dedupe(MovieBoxFilters.stripAdult(
+          listRes.items
+              .map((s) => _mapSubjectToContentItem(s, category))
+              .where((item) => item.id.isNotEmpty)
+              .toList(),
+        ));
+        return (items: items, hasMore: listRes.hasMore);
+      } catch (e) {
+        debugPrint('[LivegoDramaSource] homePage for $normCat error: $e');
+      }
+    }
+
     final items = await homeByCategory(category);
     final startIndex = (page - 1) * pageSize;
     if (startIndex >= items.length) {

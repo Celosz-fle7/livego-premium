@@ -31,6 +31,7 @@ class MovieBoxSource implements DramaSource {
 
   @override
   List<String> get categories => const [
+        'Paling Trending',
         'Sedang Trending',
         'Terbaru',
         'Tokoh Legendaris',
@@ -47,6 +48,42 @@ class MovieBoxSource implements DramaSource {
     final normCat = category.trim().toLowerCase();
     if (_categoryCache.containsKey(normCat) && _categoryCache[normCat]!.isNotEmpty) {
       return _categoryCache[normCat]!;
+    }
+
+    // Penanganan khusus Paling Trending (menggunakan list terpanas master & search rank)
+    if (normCat.contains('paling') || normCat == 'paling trending') {
+      try {
+        final listRes = await _client.fetchSubjectList(
+          subjectType: 7,
+          sort: 'Terpanas',
+          page: 1,
+          perPage: 30,
+        );
+        final items = listRes.items
+            .map((s) => _mapShortToContentItem(s, 'Paling Trending'))
+            .where((item) => item.id.isNotEmpty)
+            .toList();
+
+        final hotRanks = await _client.fetchSearchRank();
+        for (final cat in hotRanks) {
+          if ((cat['name'] as String?)?.toLowerCase().contains('short') == true) {
+            final rawItems = cat['items'] as List<dynamic>? ?? [];
+            for (final it in rawItems) {
+              if (it is Map<String, dynamic>) {
+                items.add(_mapShortToContentItem(it, 'Paling Trending'));
+              }
+            }
+          }
+        }
+
+        final deduped = _dedupe(MovieBoxFilters.stripAdult(items));
+        if (deduped.isNotEmpty) {
+          _categoryCache['paling trending'] = deduped;
+          return deduped;
+        }
+      } catch (e) {
+        debugPrint('[MovieBoxSource] paling trending error: $e');
+      }
     }
 
     try {
@@ -66,7 +103,7 @@ class MovieBoxSource implements DramaSource {
             .where((item) => item.id.isNotEmpty)
             .toList();
 
-        final cleanItems = MovieBoxFilters.stripAdult(items);
+        final cleanItems = _dedupe(MovieBoxFilters.stripAdult(items));
         _categoryCache[title.toLowerCase()] = cleanItems;
       }
 
@@ -94,6 +131,27 @@ class MovieBoxSource implements DramaSource {
     int page = 1,
     int pageSize = 30,
   }) async {
+    final normCat = category.trim().toLowerCase();
+    if (normCat.contains('paling') || normCat == 'paling trending') {
+      try {
+        final listRes = await _client.fetchSubjectList(
+          subjectType: 7,
+          sort: 'Terpanas',
+          page: page,
+          perPage: pageSize,
+        );
+        final items = _dedupe(MovieBoxFilters.stripAdult(
+          listRes.items
+              .map((s) => _mapShortToContentItem(s, 'Paling Trending'))
+              .where((item) => item.id.isNotEmpty)
+              .toList(),
+        ));
+        return (items: items, hasMore: listRes.hasMore);
+      } catch (e) {
+        debugPrint('[MovieBoxSource] homePage paling trending error: $e');
+      }
+    }
+
     final items = await homeByCategory(category);
     final startIndex = (page - 1) * pageSize;
     if (startIndex >= items.length) {
@@ -240,6 +298,17 @@ class MovieBoxSource implements DramaSource {
       debugPrint('[MovieBoxSource] search error: $e');
       return const [];
     }
+  }
+
+  List<ContentItem> _dedupe(List<ContentItem> items) {
+    final seen = <String>{};
+    final result = <ContentItem>[];
+    for (final it in items) {
+      if (it.id.isNotEmpty && seen.add(it.id)) {
+        result.add(it);
+      }
+    }
+    return result;
   }
 
   ContentItem _mapShortToContentItem(Map<String, dynamic> json, String category) {

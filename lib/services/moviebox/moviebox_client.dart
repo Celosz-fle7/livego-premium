@@ -294,4 +294,83 @@ class MovieBoxClient {
     }
     return [];
   }
+
+  /// Query katalog master dengan filter & pagination (subjectType: 1 Film, 2 Serial, 7 Short TV, 8 Anime)
+  Future<({List<Map<String, dynamic>> items, bool hasMore, int totalCount})> fetchSubjectList({
+    int subjectType = 7,
+    int page = 1,
+    int perPage = 20,
+    String? sort,
+    String? genre,
+    String? country,
+    String? year,
+    String? keyword,
+  }) async {
+    final payload = <String, dynamic>{
+      'page': page,
+      'perPage': perPage,
+      'subjectType': subjectType,
+    };
+    if (sort != null && sort.isNotEmpty) payload['sort'] = sort;
+    if (genre != null && genre.isNotEmpty) payload['genre'] = genre;
+    if (country != null && country.isNotEmpty) payload['country'] = country;
+    if (year != null && year.isNotEmpty) payload['year'] = year;
+    if (keyword != null && keyword.isNotEmpty) payload['keyword'] = keyword;
+
+    final resp = await _rawRequest('POST', '/wefeed-mobile-bff/subject-api/list', bodyJson: payload);
+    if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
+      final data = resp['data'] as Map<String, dynamic>;
+      final rawItems = data['items'] as List<dynamic>? ?? [];
+      final items = rawItems.whereType<Map<String, dynamic>>().toList();
+      final pager = data['pager'] as Map<String, dynamic>?;
+      final hasMore = pager?['hasMore'] as bool? ?? false;
+      final total = (pager?['totalCount'] as num?)?.toInt() ?? items.length;
+      return (items: items, hasMore: hasMore, totalCount: total);
+    }
+    return (items: <Map<String, dynamic>>[], hasMore: false, totalCount: 0);
+  }
+
+  /// Ambil metadata filter yang didukung server (genre, negara, tahun, dubbing)
+  Future<Map<String, dynamic>> fetchFilterItems() async {
+    final resp = await _rawRequest('GET', '/wefeed-mobile-bff/subject-api/filter-items');
+    if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
+      return resp['data'] as Map<String, dynamic>;
+    }
+    return {};
+  }
+
+  /// Ambil daftar negara yang memiliki saluran Live TV
+  Future<List<Map<String, dynamic>>> fetchLiveTvCountries() async {
+    final resp = await _rawRequest('GET', '/wefeed-mobile-bff/live/tv-country-list');
+    if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
+      final items = resp['data']['items'];
+      if (items is List) {
+        return items.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
+  }
+
+  /// Ambil saluran TV berdasarkan kode negara (mis. 'ID', 'US')
+  Future<List<Map<String, dynamic>>> fetchLiveTvChannels(String countryCode) async {
+    final path = '/wefeed-mobile-bff/live/tv-channel-list-by-country?countryCode=$countryCode';
+    final resp = await _rawRequest('GET', path);
+    if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
+      final items = resp['data']['items'];
+      if (items is List) {
+        return items.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
+  }
+
+  /// Ambil detail stasiun TV & stream URL HLS (.m3u8)
+  Future<Map<String, dynamic>> fetchLiveTvChannel(String channelId) async {
+    final path = '/wefeed-mobile-bff/live/tv-channel?channelId=$channelId';
+    final resp = await _rawRequest('GET', path);
+    if (resp['code'] == 0 && resp['data'] is Map<String, dynamic>) {
+      return resp['data'] as Map<String, dynamic>;
+    }
+    return {};
+  }
 }
