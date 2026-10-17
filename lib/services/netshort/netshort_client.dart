@@ -303,10 +303,12 @@ class NetShortClient {
       final uri = Uri.parse('${NetShortConfig.baseUrl}$endpoint');
       final request = await client.postUrl(uri);
 
+      final bodyBytes = utf8.encode(ctBody);
+      request.contentLength = bodyBytes.length;
       request.headers.set('User-Agent', 'okhttp/4.9.0');
       request.headers.set('Accept', 'application/json, text/plain, */*');
       request.headers.set('encrypt-key', encKeyHeader);
-      request.headers.set('Content-Type', 'application/json');
+      request.headers.contentType = ContentType('application', 'json', charset: 'UTF-8');
       request.headers.set('timestamp', DateTime.now().millisecondsSinceEpoch.toString());
       request.headers.set('content-language', NetShortConfig.defaultLanguage);
       request.headers.set('package-name', NetShortConfig.packageName);
@@ -321,7 +323,7 @@ class NetShortClient {
         request.headers.set('Authorization', 'Bearer $token');
       }
 
-      request.write(ctBody);
+      request.add(bodyBytes);
       final response = await request.close();
 
       final resEncKey = response.headers.value('encrypt-key');
@@ -334,7 +336,9 @@ class NetShortClient {
           final rawKeyStr = utf8.decode(decAesKeyBytes).trim();
           final rawKeyBytes = base64.decode(rawKeyStr);
           final plainJson = await NetShortCrypto.nativeAesDecrypt(resText, rawKeyBytes);
-          return jsonDecode(plainJson) as Map<String, dynamic>;
+          final parsed = jsonDecode(plainJson) as Map<String, dynamic>;
+          debugPrint('NETSHORT SUCCESS on $endpoint: code=${parsed['code']}');
+          return parsed;
         } catch (e) {
           debugPrint('NETSHORT DECRYPT ERROR on $endpoint: $e');
         }
@@ -342,12 +346,15 @@ class NetShortClient {
 
       if (resText.isNotEmpty) {
         try {
-          return jsonDecode(resText) as Map<String, dynamic>;
+          final parsed = jsonDecode(resText) as Map<String, dynamic>;
+          debugPrint('NETSHORT PLAIN JSON on $endpoint: code=${parsed['code']} msg=${parsed['msg']}');
+          return parsed;
         } catch (e) {
           debugPrint('NETSHORT JSON ERROR on $endpoint (status ${response.statusCode}): $resText');
         }
       }
 
+      debugPrint('NETSHORT FALLBACK HTTP ${response.statusCode} on $endpoint');
       return {'code': response.statusCode, 'msg': 'HTTP ${response.statusCode}', 'data': null};
     } finally {
       client.close(force: true);
