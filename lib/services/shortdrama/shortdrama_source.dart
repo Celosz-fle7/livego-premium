@@ -180,9 +180,6 @@ class ShortDramaSource implements DramaSource {
     final cached = _categoryCache[category];
     if (cached != null) return cached;
 
-    // Muat channel dari server dulu (kategori ori + session).
-    await _ensureChannels();
-
     final seen = <String>{};
     final out = <ContentItem>[];
     final filter = _filterFor(category);
@@ -202,6 +199,9 @@ class ShortDramaSource implements DramaSource {
 
     // Jalankan semua endpoint PARALEL. Kalau berurutan, total waktu bisa
     // melewati timeout home (10s) dan feed jadi kosong.
+    // _ensureChannels() juga ikut paralel (tidak memblokir feed) — kalau
+    // channel list lambat, kategori tetap terisi dari endpoint feed.
+    final channelFuture = _ensureChannels();
     final results = await Future.wait<List<Map<String, dynamic>>>([
       _safe(() => _client.vodShortNewRaw()),
       _safe(() => _client.newbieTopRaw()),
@@ -214,6 +214,11 @@ class ShortDramaSource implements DramaSource {
           )),
       _safe(() => _client.hotSearchRaw()),
     ]);
+    // Channel list tidak dipakai untuk feed (server tolak channel_id anonim),
+    // tapi ditunggu supaya kategori server terisi untuk UI.
+    try {
+      await channelFuture;
+    } catch (_) {}
 
     for (final raw in results) {
       addRaw(raw);
