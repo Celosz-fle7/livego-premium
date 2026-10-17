@@ -108,6 +108,31 @@ class LivegoDramaSource implements DramaSource {
   }
 
   @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final items = await homeByCategory(category);
+    final startIndex = (page - 1) * pageSize;
+    if (startIndex >= items.length) {
+      return (items: <ContentItem>[], hasMore: false);
+    }
+    final endIndex = (startIndex + pageSize).clamp(0, items.length);
+    final paged = items.sublist(startIndex, endIndex);
+    final hasMore = endIndex < items.length;
+    return (items: paged, hasMore: hasMore);
+  }
+
+  @override
+  Future<void> signOut() async {
+    _categoryCache.clear();
+    _extrasCache.clear();
+    _streamCache.clear();
+    _resourceCache.clear();
+  }
+
+  @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
     try {
       final resData = await _client.fetchSubjectResource(seriesId);

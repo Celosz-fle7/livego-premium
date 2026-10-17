@@ -92,6 +92,41 @@ class MovieBoxSource implements DramaSource {
   }
 
   @override
+  Future<({List<ContentItem> items, bool hasMore})> homePage(
+    String category, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final items = await homeByCategory(category);
+    final startIndex = (page - 1) * pageSize;
+    if (startIndex >= items.length) {
+      return (items: <ContentItem>[], hasMore: false);
+    }
+    final endIndex = (startIndex + pageSize).clamp(0, items.length);
+    final paged = items.sublist(startIndex, endIndex);
+    final hasMore = endIndex < items.length;
+    return (items: paged, hasMore: hasMore);
+  }
+
+  @override
+  Future<void> signOut() async {
+    _categoryCache.clear();
+    _streamCache.clear();
+    _episodesCache.clear();
+  }
+
+  @override
+  Future<DramaEpisodeExtras?> episodeExtras(
+    String seriesId,
+    String episodeId,
+  ) async {
+    return const DramaEpisodeExtras(
+      unlocked: true,
+      episodePrice: 0,
+    );
+  }
+
+  @override
   Future<List<LiveGoEpisode>> episodes(String seriesId) async {
     final cached = _episodesCache[seriesId];
     if (cached != null && cached.isNotEmpty) return cached;
