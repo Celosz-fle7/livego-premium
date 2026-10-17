@@ -180,14 +180,19 @@ class NetShortClient {
     final resp = await _rawPost(NetShortConfig.tabLoadAllChart, payload, token: token);
     if (resp['code'] == 200 && resp['data'] != null) {
       final data = resp['data'] as Map<String, dynamic>;
-      final List<Map<String, dynamic>> items = [];
       for (final key in ['mostTrending', 'topSearch', 'newRelease']) {
         final val = data[key];
-        if (val is Map<String, dynamic>) {
-          final list = (val['shortPlayList'] ?? val['list']) as List<dynamic>? ?? [];
-          items.addAll(list.cast<Map<String, dynamic>>());
-        } else if (val is List<dynamic>) {
-          items.addAll(val.cast<Map<String, dynamic>>());
+        if (val is List) {
+          for (final item in val) {
+            if (item is Map) items.add(Map<String, dynamic>.from(item));
+          }
+        } else if (val is Map) {
+          final list = val['shortPlayList'] ?? val['list'];
+          if (list is List) {
+            for (final item in list) {
+              if (item is Map) items.add(Map<String, dynamic>.from(item));
+            }
+          }
         }
       }
       return items;
@@ -321,6 +326,7 @@ class NetShortClient {
 
       if (token != null && token.isNotEmpty) {
         request.headers.set('Authorization', 'Bearer $token');
+        request.headers.set('token', token);
       }
 
       request.add(bodyBytes);
