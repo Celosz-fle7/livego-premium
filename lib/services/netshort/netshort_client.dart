@@ -218,6 +218,35 @@ class NetShortClient {
     String? token,
     bool requiresAuth = true,
   }) async {
+    // Retry pada kegagalan jaringan/DNS: koneksi seluler sering gagal resolve
+    // sekali lalu berhasil pada percobaan berikutnya.
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await _rawPostOnce(
+          endpoint,
+          bodyJson,
+          token: token,
+          requiresAuth: requiresAuth,
+        );
+      } catch (e) {
+        lastError = e;
+        debugPrint('NETSHORT NETWORK ERROR on $endpoint (attempt $attempt/3): $e');
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
+    }
+    debugPrint('NETSHORT GAVE UP on $endpoint: $lastError');
+    return {'code': -1, 'msg': 'network error: $lastError', 'data': null};
+  }
+
+  Future<Map<String, dynamic>> _rawPostOnce(
+    String endpoint,
+    Map<String, dynamic> bodyJson, {
+    String? token,
+    bool requiresAuth = true,
+  }) async {
     final devCode = _getDeviceCode();
     final aesKey = NetShortCrypto.generateAesKey();
     final encKeyHeader = NetShortCrypto.rsaEncrypt(Uint8List.fromList(utf8.encode(base64.encode(utf8.encode(aesKey)))));
