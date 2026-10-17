@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/content_item.dart';
 import '../../models/livego_episode.dart';
@@ -46,6 +47,15 @@ class ShortDramaSource implements DramaSource {
 
   bool _channelsLoaded = false;
 
+  /// Cache hasil per kategori (server lambat & hasilnya statis).
+  final Map<String, List<ContentItem>> _categoryCache = {};
+
+  /// Sesi device: muat token tersimpan, lalu pastikan token valid.
+  bool _sessionReady = false;
+
+  static const String _prefToken = 'shortdrama_token';
+  static const String _prefUserId = 'shortdrama_user_id';
+
   @override
   String get slug => 'shortdrama';
 
@@ -55,9 +65,34 @@ class ShortDramaSource implements DramaSource {
   @override
   List<String> get categories => ShortDramaConfig.categories;
 
+  /// Muat token dari SharedPreferences (biar awet antar sesi) lalu
+  /// pastikan token valid via /api/public/init.
+  Future<void> _ensureSession() async {
+    if (_sessionReady) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_prefToken);
+      if (saved != null && saved.isNotEmpty) {
+        _client.setToken(saved);
+      }
+    } catch (_) {}
+    await _client.ensureLogin();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_client.token.isNotEmpty) {
+        await prefs.setString(_prefToken, _client.token);
+      }
+      if (_client.userId.isNotEmpty) {
+        await prefs.setString(_prefUserId, _client.userId);
+      }
+    } catch (_) {}
+    _sessionReady = true;
+  }
+
   /// Muat daftar channel dari server sekali, isi _channelIds.
   Future<void> _ensureChannels() async {
     if (_channelsLoaded) return;
+    await _ensureSession();
     try {
       final list = await _client.channelList();
       for (final c in list) {
@@ -274,6 +309,7 @@ class ShortDramaSource implements DramaSource {
 
   @override
   Future<List<ContentItem>> search(String query) async {
+    await _ensureSession();
     final raw = await _client.searchRaw(query);
     _registerFromRaw(raw);
     return _client.mapAll(raw, 'Pencarian');
@@ -320,5 +356,12 @@ class ShortDramaSource implements DramaSource {
   Future<void> signOut() async {
     _streamCache.clear();
     _categoryCache.clear();
+    _sessionReady = false;
+    _client.setToken('');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefToken);
+      await prefs.remove(_prefUserId);
+    } catch (_) {}
   }
 }

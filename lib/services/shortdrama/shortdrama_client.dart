@@ -19,16 +19,58 @@ class ShortDramaClient {
   String _deviceId = ShortDramaConfig.defaultDeviceId;
   String _host = ShortDramaConfig.baseUrl;
   String _token = '';
+  String _userId = '';
+
+  /// Waktu token didapat (untuk refresh berkala).
+  DateTime? _tokenAt;
+
+  /// Token dianggap perlu refresh setelah durasi ini.
+  static const Duration _tokenTtl = Duration(hours: 12);
 
   String get host => _host;
   String get deviceId => _deviceId;
+  String get token => _token;
+  String get userId => _userId;
 
   void setDeviceId(String id) {
     final clean = id.trim();
     if (clean.isNotEmpty) _deviceId = clean;
   }
 
-  void setToken(String token) => _token = token.trim();
+  void setToken(String token) {
+    _token = token.trim();
+    _tokenAt = _token.isEmpty ? null : DateTime.now();
+  }
+
+  /// Pastikan punya token device yang valid.
+  ///
+  /// Meniru APK: token didapat otomatis dari POST /api/public/init
+  /// (user_info.token, login_type=0 = device login). Token di-refresh
+  /// kalau belum ada, sudah lewat TTL, atau server bilang expired.
+  Future<void> ensureLogin({bool force = false}) async {
+    if (!force && _token.isNotEmpty && _tokenAt != null) {
+      if (DateTime.now().difference(_tokenAt!) < _tokenTtl) return;
+    }
+    try {
+      final res = await post(
+        ShortDramaConfig.epInit,
+        {'gaid': _deviceId, 'idfa': '', 'invitedby': '', 'referer': ''},
+        skipAuth: true,
+      );
+      final info = (res['result'] as Map?)?['user_info'];
+      if (info is Map) {
+        final t = '${info['token'] ?? ''}'.trim();
+        if (t.isNotEmpty) {
+          _token = t;
+          _tokenAt = DateTime.now();
+        }
+        final uid = '${info['user_id'] ?? ''}'.trim();
+        if (uid.isNotEmpty) _userId = uid;
+      }
+    } catch (_) {
+      // biarkan; request berikutnya tetap dicoba tanpa token
+    }
+  }
 
   /// sign = MD5(salt + deviceId + curTimeMs).toUpperCase()
   static String buildSign(String deviceId, int curTimeMs) {
@@ -62,10 +104,19 @@ class ShortDramaClient {
   }
 
   /// POST ke path, dekripsi response, kembalikan Map JSON.
+  ///
+  /// [skipAuth] = true untuk endpoint init (jangan panggil ensureLogin,
+  /// hindari rekursi).
+  /// Kalau server bilang token expired (code 21007 / pesan login),
+  /// token di-refresh sekali lalu request diulang.
   Future<Map<String, dynamic>> post(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    bool skipAuth = false,
+    bool _retried = false,
+  }) async {
+    if (!skipAuth) await ensureLogin();
+
     final uri = Uri.parse('$_host$path');
     final client = HttpClient();
     client.connectionTimeout = ShortDramaConfig.timeout;
@@ -94,12 +145,26 @@ class ShortDramaClient {
         throw Exception('ShortDrama decrypt gagal $path: ${text.substring(0, text.length.clamp(0, 120))}');
       }
       final decoded = jsonDecode(plain);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      return <String, dynamic>{'result': decoded};
+      final map = decoded is Map<String, dynamic>
+          ? decoded
+          : (decoded is Map ? Map<String, dynamic>.from(decoded) : <String, dynamic>{'result': decoded});
+
+      // Token expired -> refresh sekali lalu ulang.
+      if (!skipAuth && !_retried && _isTokenExpired(map)) {
+        await ensureLogin(force: true);
+        return post(path, body, skipAuth: skipAuth, _retried: true);
+      }
+      return map;
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// Deteksi token expired dari response server.
+  static bool _isTokenExpired(Map<String, dynamic> res) {
+    if (res['code'] == 21007) return true;
+    final msg = '${res['message'] ?? ''}'.toLowerCase();
+    return msg.contains('inicie sesión') || msg.contains('login');
   }
 
   /// Cek sukses: code 10000 = OK.
