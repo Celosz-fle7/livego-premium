@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/content_item.dart';
 import 'shortdrama_config.dart';
@@ -25,7 +27,35 @@ class ShortDramaClient {
   DateTime? _tokenAt;
 
   /// Token dianggap perlu refresh setelah durasi ini.
-  static const Duration _tokenTtl = Duration(hours: 12);
+  /// Server bisa expire token tiap jam, jadi TTL 1 jam + refresh
+  /// otomatis saat server bilang expired (code 21007).
+  static const Duration _tokenTtl = Duration(hours: 1);
+
+  /// Device ID unik per device, persisten di SharedPreferences.
+  /// Dibuat sekali saat pertama install, awet antar restart.
+  /// Kalau masih pakai default hardcoded, semua HP dianggap 1 device
+  /// oleh server -> konflik sesi, 1 HP dapat konten, 1 HP kosong.
+  static const String _prefDeviceId = 'shortdrama_device_id';
+
+  /// Muat device ID persisten, atau buat baru kalau belum ada.
+  /// Dipanggil sebelum login pertama.
+  Future<void> _ensureDeviceId() async {
+    if (_deviceId != ShortDramaConfig.defaultDeviceId) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var saved = prefs.getString(_prefDeviceId);
+      if (saved == null || saved.isEmpty) {
+        // Generate 16 byte random -> 32 hex char, seperti FreeReels.
+        final rnd = math.Random.secure();
+        final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+        saved = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+        await prefs.setString(_prefDeviceId, saved);
+      }
+      _deviceId = saved;
+    } catch (_) {
+      // Fallback: pakai default kalau SharedPreferences gagal.
+    }
+  }
 
   String get host => _host;
   String get deviceId => _deviceId;
@@ -76,6 +106,8 @@ class ShortDramaClient {
 
   Future<void> _doLogin() async {
     try {
+      // Pastikan device ID unik per device sebelum login.
+      await _ensureDeviceId();
       final res = await post(
         ShortDramaConfig.epInit,
         {'gaid': _deviceId, 'idfa': '', 'invitedby': '', 'referer': ''},

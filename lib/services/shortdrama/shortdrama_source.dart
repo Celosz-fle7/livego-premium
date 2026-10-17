@@ -60,8 +60,25 @@ class ShortDramaSource implements DramaSource {
   @override
   String get label => 'ShortDrama';
 
+  /// Kategori dari server (channel list) kalau sudah dimuat,
+  /// fallback ke hardcoded kalau server belum merespon.
+  /// Urutan: server order (urutan tampil asli dari server).
   @override
-  List<String> get categories => ShortDramaConfig.categories;
+  List<String> get categories {
+    if (_serverCategories.isNotEmpty) return _serverCategories;
+    return ShortDramaConfig.categories;
+  }
+
+  /// Kategori dari server (channel list), dimuat via _ensureChannels().
+  final List<String> _serverCategories = [];
+
+  /// Ambil kategori dari server (channel list).
+  /// Dipakai UI untuk refresh tab setelah channel dimuat.
+  Future<List<String>> fetchServerCategories() async {
+    await _ensureChannels();
+    if (_serverCategories.isNotEmpty) return _serverCategories;
+    return ShortDramaConfig.categories;
+  }
 
   /// Muat token dari SharedPreferences (biar awet antar sesi) lalu
   /// pastikan token valid via /api/public/init.
@@ -92,18 +109,24 @@ class ShortDramaSource implements DramaSource {
     } catch (_) {}
   }
 
-  /// Muat daftar channel dari server sekali, isi _channelIds.
+  /// Muat daftar channel dari server sekali, isi _channelIds + _serverCategories.
+  /// Kategori diambil ORI dari server (urutan tampil server), bukan hardcoded.
   Future<void> _ensureChannels() async {
     if (_channelsLoaded) return;
     await _ensureSession();
     try {
       final list = await _client.channelList();
+      final seen = <String>{};
       for (final c in list) {
         final id = c['id'];
         final name = '${c['channel_name'] ?? ''}'.toLowerCase().trim();
         if (id is int) {
           final label = ShortDramaConfig.channelNameMap[name] ?? name;
           _channelIds[label] = id;
+          // Kategori dari server, urutan sesuai server, tanpa duplikat.
+          if (label.isNotEmpty && seen.add(label)) {
+            _serverCategories.add(label);
+          }
         }
       }
       _channelsLoaded = true;
@@ -156,6 +179,9 @@ class ShortDramaSource implements DramaSource {
   Future<List<ContentItem>> _fetchCategory(String category) async {
     final cached = _categoryCache[category];
     if (cached != null) return cached;
+
+    // Muat channel dari server dulu (kategori ori + session).
+    await _ensureChannels();
 
     final seen = <String>{};
     final out = <ContentItem>[];

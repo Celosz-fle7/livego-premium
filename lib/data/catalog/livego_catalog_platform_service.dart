@@ -2,6 +2,7 @@ import '../../core/livego_settings.dart';
 import '../../services/api/api_platform.dart';
 import '../../services/drama_source.dart';
 import '../../services/livego_api_gateway.dart';
+import '../../services/shortdrama/shortdrama_source.dart';
 import '../api_manager/api_timeout_policy.dart';
 import '../api_manager/api_provider_registry.dart';
 import '../api_manager/livego_api_manager.dart';
@@ -60,6 +61,18 @@ class LiveGoCatalogPlatformService {
       LiveGoApiPlatforms.bySlug(platform).isDobda;
 
   static Future<List<String>> fetchCategoriesFor(String platform) async {
+    // ShortDrama: kategori ORI dari server (channel list), bukan hardcoded.
+    // Fetch async, fallback ke static kalau server gagal.
+    if (platform == 'shortdrama') {
+      try {
+        final source = DramaSourceRegistry.forSlug('shortdrama');
+        if (source is ShortDramaSource) {
+          final cats = await source.fetchServerCategories();
+          if (cats.isNotEmpty) return cats;
+        }
+      } catch (_) {}
+      return categoriesFor(platform);
+    }
     // Sumber drama eksternal (multi-APK): kategori statis, tanpa network.
     if (DramaSourceRegistry.handles(platform)) return categoriesFor(platform);
     final config = LiveGoApiPlatforms.bySlug(platform);
